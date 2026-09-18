@@ -1,0 +1,6 @@
+{
+  "name": "RADIANT QUEEN • PASIYA MAX v2.0",
+  "description": "Next-gen luxury bullet robot super computer OS with quantum AI brain, 20 tools, neural control, and social command nexus by Pasiya AI.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
