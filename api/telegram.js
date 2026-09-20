@@ -1,5 +1,5 @@
-const { Telegraf } = require('telegraf');
-const { GoogleGenAI } = require('@google/genai');
+import { Telegraf } from 'telegraf';
+import { GoogleGenAI } from '@google/genai';
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ADMIN_ID = String(process.env.ADMIN_ID || '').trim();
@@ -34,24 +34,22 @@ function getAI() {
 }
 
 function isAdmin(ctx) {
-  const id = String(ctx.from && ctx.from.id ? ctx.from.id : '');
-  return ADMIN_ID && id === ADMIN_ID;
+  const id = String(ctx.from?.id ?? '');
+  return Boolean(ADMIN_ID && id === ADMIN_ID);
 }
 
 function identityLine(ctx) {
   if (isAdmin(ctx)) {
-    const name = ctx.from.username || ctx.from.first_name || 'Pasiya Max';
-    return `FOUNDER MODE: This Telegram user is ${name} (id ${ctx.from.id}), owner of RADIANT QUEEN and Pasiya Max. Address him as නිර්මාතෘ. Greet that role once, then answer.`;
+    const name = ctx.from?.username || ctx.from?.first_name || 'Pasiya Max';
+    return `FOUNDER MODE: This Telegram user is ${name} (id ${ctx.from.id}), owner of RADIANT QUEEN and Pasiya Max. Address him as නිර්මාතෘ.`;
   }
-  const name = (ctx.from && (ctx.from.first_name || ctx.from.username)) || 'athlete';
+  const name = ctx.from?.first_name || ctx.from?.username || 'user';
   return `The user is ${name}. Be helpful. Do not call them the founder.`;
 }
 
 async function generateReply(prompt, ctx, imageBase64, mimeType) {
   const ai = getAI();
-  if (!ai) {
-    return 'Gemini key missing. Set GEMINI_API_KEY on Vercel.';
-  }
+  if (!ai) return 'Gemini key missing. Set GEMINI_API_KEY on Vercel.';
 
   const systemInstruction = `You are Pasiya AI, assistant of Pasiya Max, for RADIANT QUEEN.
 Answer in the user's language (Sinhala or English). Be practical. No fake supercomputer stats.
@@ -81,7 +79,7 @@ ${LINKS}`;
       if (text) return text.slice(0, 3500);
     } catch (err) {
       lastErr = err;
-      const msg = String(err && err.message ? err.message : err).toLowerCase();
+      const msg = String(err?.message || err).toLowerCase();
       if (msg.includes('404') || msg.includes('not found') || msg.includes('no longer available')) {
         continue;
       }
@@ -92,7 +90,7 @@ ${LINKS}`;
     }
   }
 
-  return `AI error: ${String(lastErr && lastErr.message ? lastErr.message : lastErr).slice(0, 180)}`;
+  return `AI error: ${String(lastErr?.message || lastErr).slice(0, 180)}`;
 }
 
 function buildBot() {
@@ -104,7 +102,7 @@ function buildBot() {
   bot.start(async (ctx) => {
     const who = isAdmin(ctx)
       ? 'ආයුබෝවන් නිර්මාතෘ Pasiya Max.'
-      : `Hello ${ctx.from.first_name || ''}`.trim();
+      : `Hello ${ctx.from?.first_name || ''}`.trim();
     await ctx.reply(
       `${who}\n\nRADIANT QUEEN • PASIYA MAX bot is live.\n\n/help — commands\n/ask — Gemini chat\n/social — links\n/id — your Telegram id\n\nPhoto එකක් යවන්න — vision analysis.`
     );
@@ -112,32 +110,19 @@ function buildBot() {
 
   bot.command('help', async (ctx) => {
     await ctx.reply(
-      `Commands\n` +
-        `/start — welcome\n` +
-        `/ask <question> — Gemini\n` +
-        `/social — official links\n` +
-        `/strideclub — running platform\n` +
-        `/id — your Telegram user id (put this in ADMIN_ID)\n` +
-        `/status — real config check\n\n` +
-        `Or just type a message.`
+      `Commands\n/start — welcome\n/ask <question> — Gemini\n/social — official links\n/strideclub — running platform\n/id — your Telegram user id\n/status — config check\n\nOr just type a message.`
     );
   });
 
   bot.command('id', async (ctx) => {
     await ctx.reply(
-      `Your Telegram id: ${ctx.from.id}\n` +
-        `Username: @${ctx.from.username || 'none'}\n` +
-        `Admin match: ${isAdmin(ctx) ? 'YES — founder' : 'NO — set ADMIN_ID to this number on Vercel'}`
+      `Your Telegram id: ${ctx.from.id}\nUsername: @${ctx.from.username || 'none'}\nAdmin match: ${isAdmin(ctx) ? 'YES — founder' : 'NO — set ADMIN_ID on Vercel'}`
     );
   });
 
   bot.command('status', async (ctx) => {
     await ctx.reply(
-      `Token: ${BOT_TOKEN ? 'yes' : 'NO'}\n` +
-        `Gemini key: ${GEMINI_KEY ? 'yes' : 'NO'}\n` +
-        `ADMIN_ID set: ${ADMIN_ID ? 'yes' : 'NO'}\n` +
-        `You are founder: ${isAdmin(ctx) ? 'yes' : 'no'}\n` +
-        `Model: ${resolvedModel || 'not used yet'}`
+      `Token: ${BOT_TOKEN ? 'yes' : 'NO'}\nGemini key: ${GEMINI_KEY ? 'yes' : 'NO'}\nADMIN_ID set: ${ADMIN_ID ? 'yes' : 'NO'}\nYou are founder: ${isAdmin(ctx) ? 'yes' : 'no'}\nModel: ${resolvedModel || 'not used yet'}`
     );
   });
 
@@ -147,7 +132,7 @@ function buildBot() {
 
   bot.command('strideclub', async (ctx) => {
     await ctx.reply(
-      'StrideClub (running club, separate project):\nhttps://strideclub-platform-6b71a.containers.snapdeploy.app'
+      'StrideClub:\nhttps://strideclub-platform-6b71a.containers.snapdeploy.app'
     );
   });
 
@@ -166,7 +151,9 @@ function buildBot() {
       await ctx.sendChatAction('typing');
       const photos = ctx.message.photo || [];
       const best = photos[photos.length - 1];
-      const caption = ctx.message.caption || 'Analyze this image. If it is running-related, coach me.';
+      const caption =
+        ctx.message.caption ||
+        'Analyze this image. If it is running-related, coach me.';
       const file = await ctx.telegram.getFile(best.file_id);
       const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
       const img = await fetch(fileUrl);
@@ -174,7 +161,7 @@ function buildBot() {
       const b64 = buf.toString('base64');
       const mime = (file.file_path || '').endsWith('.png') ? 'image/png' : 'image/jpeg';
       await ctx.reply(await generateReply(caption, ctx, b64, mime));
-    } catch (err) {
+    } catch {
       await ctx.reply('Photo analysis failed. Try a smaller image.');
     }
   });
@@ -193,10 +180,10 @@ function buildBot() {
   return bot;
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
-      if (req.query && req.query.setup === '1') {
+      if (req.query?.setup === '1') {
         if (!BOT_TOKEN) {
           return res.status(500).json({ ok: false, error: 'BOT_TOKEN missing' });
         }
@@ -233,4 +220,4 @@ module.exports = async function handler(req, res) {
     console.error('telegram webhook', err);
     return res.status(200).json({ ok: true });
   }
-}; 
+} 
