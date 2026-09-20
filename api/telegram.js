@@ -117,20 +117,24 @@ function buildBot() {
   bot = new Telegraf(BOT_TOKEN);
 
   bot.start(async (ctx) => {
-    const who = isAdmin(ctx)
-      ? 'ආයුබෝවන් නිර්මාතෘ Pasiya Max 👑'
-      : `Hello ${ctx.from?.first_name || 'there'}`.trim();
+    try {
+      const who = isAdmin(ctx)
+        ? 'Ayubowan Nirmathru Pasiya Max'
+        : `Hello ${ctx.from?.first_name || 'there'}`;
 
-    await ctx.reply(
-      `${who}\n\n` +
-        `✨ *RADIANT QUEEN • PASIYA MAX*\n` +
-        `Your AI command hub — chat, vision, links & tools.\n\n` +
-        `Pick a button below, or type a message anytime.`,
-      {
-        parse_mode: 'Markdown',
-        ...mainMenuKeyboard(),
-      }
-    );
+      await ctx.reply(
+        `${who}\n\n` +
+          `RADIANT QUEEN • PASIYA MAX\n` +
+          `AI command hub — chat, vision, links & tools.\n\n` +
+          `Pick a button below, or type a message anytime.`,
+        mainMenuKeyboard()
+      );
+    } catch (err) {
+      console.error('start handler', err);
+      try {
+        await ctx.reply('Welcome to RADIANT QUEEN. Type a message or use /help.', mainMenuKeyboard());
+      } catch (_) {}
+    }
   });
 
   bot.command('help', async (ctx) => {
@@ -322,4 +326,5 @@ export default async function handler(req, res) {
     console.error('telegram webhook', err);
     return res.status(200).json({ ok: true });
   }
-} 
+}
+ 
