@@ -1,4 +1,4 @@
-import { Telegraf } from 'telegraf';
+import { Telegraf, Markup } from 'telegraf';
 import { GoogleGenAI } from '@google/genai';
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
@@ -45,6 +45,23 @@ function identityLine(ctx) {
   }
   const name = ctx.from?.first_name || ctx.from?.username || 'user';
   return `The user is ${name}. Be helpful. Do not call them the founder.`;
+}
+
+function mainMenuKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('🤖 Ask AI', 'menu_ask'),
+      Markup.button.callback('🔗 Social', 'menu_social'),
+    ],
+    [
+      Markup.button.callback('📊 Status', 'menu_status'),
+      Markup.button.callback('🏃 StrideClub', 'menu_stride'),
+    ],
+    [
+      Markup.button.callback('ℹ️ Help', 'menu_help'),
+      Markup.button.callback('🆔 My ID', 'menu_id'),
+    ],
+  ]);
 }
 
 async function generateReply(prompt, ctx, imageBase64, mimeType) {
@@ -101,49 +118,134 @@ function buildBot() {
 
   bot.start(async (ctx) => {
     const who = isAdmin(ctx)
-      ? 'ආයුබෝවන් නිර්මාතෘ Pasiya Max.'
-      : `Hello ${ctx.from?.first_name || ''}`.trim();
+      ? 'ආයුබෝවන් නිර්මාතෘ Pasiya Max 👑'
+      : `Hello ${ctx.from?.first_name || 'there'}`.trim();
+
     await ctx.reply(
-      `${who}\n\nRADIANT QUEEN • PASIYA MAX bot is live.\n\n/help — commands\n/ask — Gemini chat\n/social — links\n/id — your Telegram id\n\nPhoto එකක් යවන්න — vision analysis.`
+      `${who}\n\n` +
+        `✨ *RADIANT QUEEN • PASIYA MAX*\n` +
+        `Your AI command hub — chat, vision, links & tools.\n\n` +
+        `Pick a button below, or type a message anytime.`,
+      {
+        parse_mode: 'Markdown',
+        ...mainMenuKeyboard(),
+      }
     );
   });
 
   bot.command('help', async (ctx) => {
     await ctx.reply(
-      `Commands\n/start — welcome\n/ask <question> — Gemini\n/social — official links\n/strideclub — running platform\n/id — your Telegram user id\n/status — config check\n\nOr just type a message.`
+      `*Commands*\n` +
+        `/start — main menu\n` +
+        `/ask <question> — Gemini\n` +
+        `/social — official links\n` +
+        `/strideclub — running club\n` +
+        `/id — your Telegram id\n` +
+        `/status — config check\n\n` +
+        `Or use the buttons under /start.\n` +
+        `Send a photo for vision analysis.`,
+      { parse_mode: 'Markdown', ...mainMenuKeyboard() }
     );
   });
 
   bot.command('id', async (ctx) => {
     await ctx.reply(
-      `Your Telegram id: ${ctx.from.id}\nUsername: @${ctx.from.username || 'none'}\nAdmin match: ${isAdmin(ctx) ? 'YES — founder' : 'NO — set ADMIN_ID on Vercel'}`
+      `Your Telegram id: \`${ctx.from.id}\`\n` +
+        `Username: @${ctx.from.username || 'none'}\n` +
+        `Admin match: ${isAdmin(ctx) ? 'YES — founder' : 'NO'}`,
+      { parse_mode: 'Markdown', ...mainMenuKeyboard() }
     );
   });
 
   bot.command('status', async (ctx) => {
     await ctx.reply(
-      `Token: ${BOT_TOKEN ? 'yes' : 'NO'}\nGemini key: ${GEMINI_KEY ? 'yes' : 'NO'}\nADMIN_ID set: ${ADMIN_ID ? 'yes' : 'NO'}\nYou are founder: ${isAdmin(ctx) ? 'yes' : 'no'}\nModel: ${resolvedModel || 'not used yet'}`
+      `*Bot status*\n` +
+        `Token: ${BOT_TOKEN ? 'yes' : 'NO'}\n` +
+        `Gemini: ${GEMINI_KEY ? 'yes' : 'NO'}\n` +
+        `ADMIN_ID: ${ADMIN_ID ? 'yes' : 'NO'}\n` +
+        `You are founder: ${isAdmin(ctx) ? 'yes' : 'no'}\n` +
+        `Model: ${resolvedModel || 'not used yet'}`,
+      { parse_mode: 'Markdown', ...mainMenuKeyboard() }
     );
   });
 
   bot.command('social', async (ctx) => {
-    await ctx.reply(LINKS);
+    await ctx.reply(LINKS, mainMenuKeyboard());
   });
 
   bot.command('strideclub', async (ctx) => {
     await ctx.reply(
-      'StrideClub:\nhttps://strideclub-platform-6b71a.containers.snapdeploy.app'
+      'StrideClub:\nhttps://strideclub-platform-6b71a.containers.snapdeploy.app',
+      mainMenuKeyboard()
     );
   });
 
   bot.command('ask', async (ctx) => {
     const q = (ctx.message.text || '').replace(/^\/ask(@\w+)?\s*/i, '').trim();
     if (!q) {
-      await ctx.reply('Usage: /ask Zone 2 කියන්නේ මොකක්ද?');
+      await ctx.reply(
+        'Usage: `/ask Zone 2 කියන්නේ මොකක්ද?`\nOr just type your question.',
+        { parse_mode: 'Markdown', ...mainMenuKeyboard() }
+      );
       return;
     }
     await ctx.sendChatAction('typing');
-    await ctx.reply(await generateReply(q, ctx));
+    await ctx.reply(await generateReply(q, ctx), mainMenuKeyboard());
+  });
+
+  // Inline button callbacks
+  bot.action('menu_ask', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply(
+      '🤖 *Ask AI mode*\n\nType your question now (Sinhala or English).\nExample: `5K pacing tip දෙන්න`',
+      { parse_mode: 'Markdown' }
+    );
+  });
+
+  bot.action('menu_social', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply(LINKS, mainMenuKeyboard());
+  });
+
+  bot.action('menu_status', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply(
+      `*Bot status*\n` +
+        `Token: ${BOT_TOKEN ? 'yes' : 'NO'}\n` +
+        `Gemini: ${GEMINI_KEY ? 'yes' : 'NO'}\n` +
+        `ADMIN_ID: ${ADMIN_ID ? 'yes' : 'NO'}\n` +
+        `You are founder: ${isAdmin(ctx) ? 'yes' : 'no'}\n` +
+        `Model: ${resolvedModel || 'not used yet'}`,
+      { parse_mode: 'Markdown', ...mainMenuKeyboard() }
+    );
+  });
+
+  bot.action('menu_stride', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply(
+      'StrideClub:\nhttps://strideclub-platform-6b71a.containers.snapdeploy.app',
+      mainMenuKeyboard()
+    );
+  });
+
+  bot.action('menu_help', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply(
+      `*Help*\n` +
+        `• Type any message → AI reply\n` +
+        `• Send photo → vision analysis\n` +
+        `• /ask question → Gemini\n` +
+        `• Buttons below for quick actions`,
+      { parse_mode: 'Markdown', ...mainMenuKeyboard() }
+    );
+  });
+
+  bot.action('menu_id', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply(
+      `Your Telegram id: \`${ctx.from.id}\`\nAdmin: ${isAdmin(ctx) ? 'YES' : 'NO'}`,
+      { parse_mode: 'Markdown', ...mainMenuKeyboard() }
+    );
   });
 
   bot.on('photo', async (ctx) => {
@@ -160,9 +262,9 @@ function buildBot() {
       const buf = Buffer.from(await img.arrayBuffer());
       const b64 = buf.toString('base64');
       const mime = (file.file_path || '').endsWith('.png') ? 'image/png' : 'image/jpeg';
-      await ctx.reply(await generateReply(caption, ctx, b64, mime));
+      await ctx.reply(await generateReply(caption, ctx, b64, mime), mainMenuKeyboard());
     } catch {
-      await ctx.reply('Photo analysis failed. Try a smaller image.');
+      await ctx.reply('Photo analysis failed. Try a smaller image.', mainMenuKeyboard());
     }
   });
 
@@ -170,7 +272,7 @@ function buildBot() {
     const text = (ctx.message.text || '').trim();
     if (!text || text.startsWith('/')) return;
     await ctx.sendChatAction('typing');
-    await ctx.reply(await generateReply(text, ctx));
+    await ctx.reply(await generateReply(text, ctx), mainMenuKeyboard());
   });
 
   bot.catch((err) => {
@@ -194,7 +296,7 @@ export default async function handler(req, res) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             url,
-            allowed_updates: ['message'],
+            allowed_updates: ['message', 'callback_query'],
             drop_pending_updates: true,
           }),
         });
