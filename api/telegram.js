@@ -23,6 +23,9 @@ TikTok: https://tiktok.com/@pasindudananjaya619
 Telegram: https://t.me/goldenbotmdchannel
 GitHub: https://github.com/pasindudananjaya92-bot/radiant-queen-pasiya-max-v2`;
 
+// pending tool mode per user (serverless: best-effort in-memory)
+const pendingTool = new Map();
+
 let aiClient = null;
 let resolvedModel = null;
 let bot = null;
@@ -41,7 +44,7 @@ function isAdmin(ctx) {
 function identityLine(ctx) {
   if (isAdmin(ctx)) {
     const name = ctx.from?.username || ctx.from?.first_name || 'Pasiya Max';
-    return `FOUNDER MODE: This Telegram user is ${name} (id ${ctx.from.id}), owner of RADIANT QUEEN and Pasiya Max. Address him as නිර්මාතෘ.`;
+    return `FOUNDER MODE: This Telegram user is ${name} (id ${ctx.from.id}), owner of RADIANT QUEEN and Pasiya Max. Address him as the founder.`;
   }
   const name = ctx.from?.first_name || ctx.from?.username || 'user';
   return `The user is ${name}. Be helpful. Do not call them the founder.`;
@@ -50,18 +53,44 @@ function identityLine(ctx) {
 function mainMenuKeyboard() {
   return Markup.inlineKeyboard([
     [
-      Markup.button.callback('🤖 Ask AI', 'menu_ask'),
-      Markup.button.callback('🔗 Social', 'menu_social'),
+      Markup.button.callback('Ask AI', 'menu_ask'),
+      Markup.button.callback('Tools', 'menu_tools'),
     ],
     [
-      Markup.button.callback('📊 Status', 'menu_status'),
-      Markup.button.callback('🏃 StrideClub', 'menu_stride'),
+      Markup.button.callback('Social', 'menu_social'),
+      Markup.button.callback('Status', 'menu_status'),
     ],
     [
-      Markup.button.callback('ℹ️ Help', 'menu_help'),
-      Markup.button.callback('🆔 My ID', 'menu_id'),
+      Markup.button.callback('StrideClub', 'menu_stride'),
+      Markup.button.callback('Help', 'menu_help'),
     ],
+    [Markup.button.callback('My ID', 'menu_id')],
   ]);
+}
+
+function toolsKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('Translate', 'tool_translate'),
+      Markup.button.callback('Summarize', 'tool_summarize'),
+    ],
+    [
+      Markup.button.callback('Running tip', 'tool_run_tip'),
+      Markup.button.callback('Rewrite pro', 'tool_rewrite'),
+    ],
+    [Markup.button.callback('Back to menu', 'menu_home')],
+  ]);
+}
+
+function statusText(ctx) {
+  return (
+    `Bot status\n` +
+    `Token: ${BOT_TOKEN ? 'yes' : 'NO'}\n` +
+    `Gemini: ${GEMINI_KEY ? 'yes' : 'NO'}\n` +
+    `ADMIN_ID: ${ADMIN_ID ? 'yes' : 'NO'}\n` +
+    `You are founder: ${isAdmin(ctx) ? 'yes' : 'no'}\n` +
+    `Model: ${resolvedModel || 'not used yet'}`
+  );
 }
 
 async function generateReply(prompt, ctx, imageBase64, mimeType) {
@@ -110,6 +139,19 @@ ${LINKS}`;
   return `AI error: ${String(lastErr?.message || lastErr).slice(0, 180)}`;
 }
 
+function toolPrompt(mode, userText) {
+  if (mode === 'translate') {
+    return `Translate the following text. If it is Sinhala, translate to clear English. If English, translate to natural Sinhala. Output only the translation.\n\n${userText}`;
+  }
+  if (mode === 'summarize') {
+    return `Summarize the following text in short bullet points. Use the same language as the input.\n\n${userText}`;
+  }
+  if (mode === 'rewrite') {
+    return `Rewrite the following text to sound more professional and clear. Keep the same language. Output only the rewritten text.\n\n${userText}`;
+  }
+  return userText;
+}
+
 function buildBot() {
   if (bot) return bot;
   if (!BOT_TOKEN) return null;
@@ -125,52 +167,49 @@ function buildBot() {
       await ctx.reply(
         `${who}\n\n` +
           `RADIANT QUEEN • PASIYA MAX\n` +
-          `AI command hub — chat, vision, links & tools.\n\n` +
-          `Pick a button below, or type a message anytime.`,
+          `AI hub — chat, vision, tools & links.\n\n` +
+          `Pick a button, or type a message.`,
         mainMenuKeyboard()
       );
     } catch (err) {
       console.error('start handler', err);
       try {
-        await ctx.reply('Welcome to RADIANT QUEEN. Type a message or use /help.', mainMenuKeyboard());
+        await ctx.reply('Welcome to RADIANT QUEEN. Use /help or the buttons.', mainMenuKeyboard());
       } catch (_) {}
     }
   });
 
   bot.command('help', async (ctx) => {
     await ctx.reply(
-      `*Commands*\n` +
+      `Commands\n` +
         `/start — main menu\n` +
         `/ask <question> — Gemini\n` +
-        `/social — official links\n` +
+        `/social — links\n` +
         `/strideclub — running club\n` +
         `/id — your Telegram id\n` +
         `/status — config check\n\n` +
-        `Or use the buttons under /start.\n` +
+        `Tools: Translate, Summarize, Running tip, Rewrite\n` +
         `Send a photo for vision analysis.`,
-      { parse_mode: 'Markdown', ...mainMenuKeyboard() }
+      mainMenuKeyboard()
     );
   });
 
   bot.command('id', async (ctx) => {
     await ctx.reply(
-      `Your Telegram id: \`${ctx.from.id}\`\n` +
+      `Your Telegram id: ${ctx.from.id}\n` +
         `Username: @${ctx.from.username || 'none'}\n` +
         `Admin match: ${isAdmin(ctx) ? 'YES — founder' : 'NO'}`,
-      { parse_mode: 'Markdown', ...mainMenuKeyboard() }
+      mainMenuKeyboard()
     );
   });
 
   bot.command('status', async (ctx) => {
-    await ctx.reply(
-      `*Bot status*\n` +
-        `Token: ${BOT_TOKEN ? 'yes' : 'NO'}\n` +
-        `Gemini: ${GEMINI_KEY ? 'yes' : 'NO'}\n` +
-        `ADMIN_ID: ${ADMIN_ID ? 'yes' : 'NO'}\n` +
-        `You are founder: ${isAdmin(ctx) ? 'yes' : 'no'}\n` +
-        `Model: ${resolvedModel || 'not used yet'}`,
-      { parse_mode: 'Markdown', ...mainMenuKeyboard() }
-    );
+    try {
+      await ctx.reply(statusText(ctx), mainMenuKeyboard());
+    } catch (err) {
+      console.error('status command', err);
+      await ctx.reply('Status unavailable right now.');
+    }
   });
 
   bot.command('social', async (ctx) => {
@@ -188,8 +227,8 @@ function buildBot() {
     const q = (ctx.message.text || '').replace(/^\/ask(@\w+)?\s*/i, '').trim();
     if (!q) {
       await ctx.reply(
-        'Usage: `/ask Zone 2 කියන්නේ මොකක්ද?`\nOr just type your question.',
-        { parse_mode: 'Markdown', ...mainMenuKeyboard() }
+        'Usage: /ask your question here\nOr just type your question.',
+        mainMenuKeyboard()
       );
       return;
     }
@@ -197,13 +236,21 @@ function buildBot() {
     await ctx.reply(await generateReply(q, ctx), mainMenuKeyboard());
   });
 
-  // Inline button callbacks
+  // —— main menu callbacks ——
+  bot.action('menu_home', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply('Main menu', mainMenuKeyboard());
+  });
+
   bot.action('menu_ask', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply(
-      '🤖 *Ask AI mode*\n\nType your question now (Sinhala or English).\nExample: `5K pacing tip දෙන්න`',
-      { parse_mode: 'Markdown' }
-    );
+    pendingTool.delete(String(ctx.from.id));
+    await ctx.reply('Ask AI mode — type your question now (Sinhala or English).');
+  });
+
+  bot.action('menu_tools', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply('Tools panel — pick one:', toolsKeyboard());
   });
 
   bot.action('menu_social', async (ctx) => {
@@ -212,16 +259,16 @@ function buildBot() {
   });
 
   bot.action('menu_status', async (ctx) => {
-    await ctx.answerCbQuery();
-    await ctx.reply(
-      `*Bot status*\n` +
-        `Token: ${BOT_TOKEN ? 'yes' : 'NO'}\n` +
-        `Gemini: ${GEMINI_KEY ? 'yes' : 'NO'}\n` +
-        `ADMIN_ID: ${ADMIN_ID ? 'yes' : 'NO'}\n` +
-        `You are founder: ${isAdmin(ctx) ? 'yes' : 'no'}\n` +
-        `Model: ${resolvedModel || 'not used yet'}`,
-      { parse_mode: 'Markdown', ...mainMenuKeyboard() }
-    );
+    try {
+      await ctx.answerCbQuery();
+      await ctx.reply(statusText(ctx), mainMenuKeyboard());
+    } catch (err) {
+      console.error('menu_status', err);
+      try {
+        await ctx.answerCbQuery('Error');
+        await ctx.reply('Status check failed. Try /status');
+      } catch (_) {}
+    }
   });
 
   bot.action('menu_stride', async (ctx) => {
@@ -235,25 +282,56 @@ function buildBot() {
   bot.action('menu_help', async (ctx) => {
     await ctx.answerCbQuery();
     await ctx.reply(
-      `*Help*\n` +
-        `• Type any message → AI reply\n` +
-        `• Send photo → vision analysis\n` +
-        `• /ask question → Gemini\n` +
-        `• Buttons below for quick actions`,
-      { parse_mode: 'Markdown', ...mainMenuKeyboard() }
+      `Help\n` +
+        `- Type any message → AI reply\n` +
+        `- Send photo → vision\n` +
+        `- Tools → translate / summarize / tips\n` +
+        `- /ask question → Gemini`,
+      mainMenuKeyboard()
     );
   });
 
   bot.action('menu_id', async (ctx) => {
     await ctx.answerCbQuery();
     await ctx.reply(
-      `Your Telegram id: \`${ctx.from.id}\`\nAdmin: ${isAdmin(ctx) ? 'YES' : 'NO'}`,
-      { parse_mode: 'Markdown', ...mainMenuKeyboard() }
+      `Your Telegram id: ${ctx.from.id}\nAdmin: ${isAdmin(ctx) ? 'YES' : 'NO'}`,
+      mainMenuKeyboard()
     );
+  });
+
+  // —— tools callbacks ——
+  bot.action('tool_translate', async (ctx) => {
+    await ctx.answerCbQuery();
+    pendingTool.set(String(ctx.from.id), 'translate');
+    await ctx.reply('Translate mode — send the text to translate.');
+  });
+
+  bot.action('tool_summarize', async (ctx) => {
+    await ctx.answerCbQuery();
+    pendingTool.set(String(ctx.from.id), 'summarize');
+    await ctx.reply('Summarize mode — send the long text to summarize.');
+  });
+
+  bot.action('tool_rewrite', async (ctx) => {
+    await ctx.answerCbQuery();
+    pendingTool.set(String(ctx.from.id), 'rewrite');
+    await ctx.reply('Rewrite mode — send the text to make professional.');
+  });
+
+  bot.action('tool_run_tip', async (ctx) => {
+    await ctx.answerCbQuery();
+    pendingTool.delete(String(ctx.from.id));
+    await ctx.sendChatAction('typing');
+    const tip = await generateReply(
+      'Give one practical running tip for today (max 6 lines). Sinhala or English matching a Sri Lankan amateur runner context.',
+      ctx
+    );
+    await ctx.reply(tip, toolsKeyboard());
   });
 
   bot.on('photo', async (ctx) => {
     try {
+      pendingTool.delete(String(ctx.from.id));
       await ctx.sendChatAction('typing');
       const photos = ctx.message.photo || [];
       const best = photos[photos.length - 1];
@@ -275,7 +353,19 @@ function buildBot() {
   bot.on('text', async (ctx) => {
     const text = (ctx.message.text || '').trim();
     if (!text || text.startsWith('/')) return;
+
+    const uid = String(ctx.from.id);
+    const mode = pendingTool.get(uid);
+
     await ctx.sendChatAction('typing');
+
+    if (mode) {
+      pendingTool.delete(uid);
+      const out = await generateReply(toolPrompt(mode, text), ctx);
+      await ctx.reply(out, toolsKeyboard());
+      return;
+    }
+
     await ctx.reply(await generateReply(text, ctx), mainMenuKeyboard());
   });
 
@@ -326,5 +416,4 @@ export default async function handler(req, res) {
     console.error('telegram webhook', err);
     return res.status(200).json({ ok: true });
   }
-}
- 
+} 
