@@ -18,6 +18,10 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<MenuItemId>("dashboard");
   const [theme, setTheme] = useState<ThemeMode>("gold");
 
+  // AI Chat states
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiAnswer, setAiAnswer] = useState<string | null>(null);
+
   // Modals state
   const [isNexusOpen, setIsNexusOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
@@ -110,16 +114,39 @@ export default function App() {
 
         {/* SEARCH BAR & QUICK COMMANDS */}
         <SearchBar
-          onSearch={(query) => {
+          onSearch={async (query) => {
             if (query.startsWith("/")) {
               handleQuickCommand(query);
-            } else {
-              // Ask brain
+              return;
+            }
+            setAiLoading(true);
+            setAiAnswer(null);
+            try {
+              const res = await fetch("/api/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: query }),
+              });
+              const data = await res.json();
+              setAiAnswer(data.answer || data.error || "No response");
+            } catch {
+              setAiAnswer("Chat failed. Try again.");
+            } finally {
+              setAiLoading(false);
             }
           }}
+          isLoading={aiLoading}
           onQuickCommand={handleQuickCommand}
           onOpenNexus={() => setIsNexusOpen(true)}
         />
+
+        {(aiLoading || aiAnswer) && (
+          <div className="mx-auto w-full max-w-3xl px-3 -mt-1 mb-2">
+            <div className="rounded-2xl border border-amber-500/30 bg-black/70 px-4 py-3 text-sm text-amber-50/90 whitespace-pre-wrap">
+              {aiLoading ? "Pasiya AI thinking..." : aiAnswer}
+            </div>
+          </div>
+        )}
 
         {/* CENTRAL THREE-COLUMN WORKSPACE: LEFT MENU + CENTER BRAIN + RIGHT ANALYTICS */}
         <main className="flex-1 flex flex-col lg:flex-row gap-3 min-h-0">
@@ -189,3 +216,4 @@ export default function App() {
     </div>
   );
 }
+ 
