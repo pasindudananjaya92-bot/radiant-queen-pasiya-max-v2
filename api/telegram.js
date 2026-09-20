@@ -23,12 +23,12 @@ TikTok: https://tiktok.com/@pasindudananjaya619
 Telegram: https://t.me/goldenbotmdchannel
 GitHub: https://github.com/pasindudananjaya92-bot/radiant-queen-pasiya-max-v2`;
 
-// pending tool mode per user (serverless: best-effort in-memory)
 const pendingTool = new Map();
 
 let aiClient = null;
 let resolvedModel = null;
 let bot = null;
+let bootTime = Date.now();
 
 function getAI() {
   if (!GEMINI_KEY) return null;
@@ -50,8 +50,8 @@ function identityLine(ctx) {
   return `The user is ${name}. Be helpful. Do not call them the founder.`;
 }
 
-function mainMenuKeyboard() {
-  return Markup.inlineKeyboard([
+function mainMenuKeyboard(ctx) {
+  const rows = [
     [
       Markup.button.callback('Ask AI', 'menu_ask'),
       Markup.button.callback('Tools', 'menu_tools'),
@@ -65,7 +65,11 @@ function mainMenuKeyboard() {
       Markup.button.callback('Help', 'menu_help'),
     ],
     [Markup.button.callback('My ID', 'menu_id')],
-  ]);
+  ];
+  if (isAdmin(ctx)) {
+    rows.push([Markup.button.callback('Admin Panel', 'menu_admin')]);
+  }
+  return Markup.inlineKeyboard(rows);
 }
 
 function toolsKeyboard() {
@@ -82,6 +86,23 @@ function toolsKeyboard() {
   ]);
 }
 
+function adminKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('Health', 'admin_health'),
+      Markup.button.callback('Who am I', 'admin_whoami'),
+    ],
+    [
+      Markup.button.callback('Clear tool mode', 'admin_clear'),
+      Markup.button.callback('Model info', 'admin_model'),
+    ],
+    [
+      Markup.button.callback('Links vault', 'admin_links'),
+      Markup.button.callback('Back', 'menu_home'),
+    ],
+  ]);
+}
+
 function statusText(ctx) {
   return (
     `Bot status\n` +
@@ -91,6 +112,13 @@ function statusText(ctx) {
     `You are founder: ${isAdmin(ctx) ? 'yes' : 'no'}\n` +
     `Model: ${resolvedModel || 'not used yet'}`
   );
+}
+
+function uptimeText() {
+  const sec = Math.floor((Date.now() - bootTime) / 1000);
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}m ${s}s (this warm instance)`;
 }
 
 async function generateReply(prompt, ctx, imageBase64, mimeType) {
@@ -152,6 +180,15 @@ function toolPrompt(mode, userText) {
   return userText;
 }
 
+async function requireAdmin(ctx) {
+  if (isAdmin(ctx)) return true;
+  try {
+    await ctx.answerCbQuery('Admin only');
+  } catch (_) {}
+  await ctx.reply('Admin Panel is only for the founder account.');
+  return false;
+}
+
 function buildBot() {
   if (bot) return bot;
   if (!BOT_TOKEN) return null;
@@ -168,13 +205,14 @@ function buildBot() {
         `${who}\n\n` +
           `RADIANT QUEEN • PASIYA MAX\n` +
           `AI hub — chat, vision, tools & links.\n\n` +
+          (isAdmin(ctx) ? `Founder mode ON — Admin Panel unlocked.\n\n` : '') +
           `Pick a button, or type a message.`,
-        mainMenuKeyboard()
+        mainMenuKeyboard(ctx)
       );
     } catch (err) {
       console.error('start handler', err);
       try {
-        await ctx.reply('Welcome to RADIANT QUEEN. Use /help or the buttons.', mainMenuKeyboard());
+        await ctx.reply('Welcome to RADIANT QUEEN. Use /help or the buttons.', mainMenuKeyboard(ctx));
       } catch (_) {}
     }
   });
@@ -187,10 +225,24 @@ function buildBot() {
         `/social — links\n` +
         `/strideclub — running club\n` +
         `/id — your Telegram id\n` +
-        `/status — config check\n\n` +
-        `Tools: Translate, Summarize, Running tip, Rewrite\n` +
+        `/status — config check\n` +
+        (isAdmin(ctx) ? `/admin — founder panel\n` : '') +
+        `\nTools: Translate, Summarize, Running tip, Rewrite\n` +
         `Send a photo for vision analysis.`,
-      mainMenuKeyboard()
+      mainMenuKeyboard(ctx)
+    );
+  });
+
+  bot.command('admin', async (ctx) => {
+    if (!isAdmin(ctx)) {
+      await ctx.reply('Admin only.');
+      return;
+    }
+    await ctx.reply(
+      `Founder Admin Panel\n` +
+        `User: ${ctx.from.first_name || ''} (@${ctx.from.username || 'none'})\n` +
+        `ID: ${ctx.from.id}`,
+      adminKeyboard()
     );
   });
 
@@ -199,13 +251,13 @@ function buildBot() {
       `Your Telegram id: ${ctx.from.id}\n` +
         `Username: @${ctx.from.username || 'none'}\n` +
         `Admin match: ${isAdmin(ctx) ? 'YES — founder' : 'NO'}`,
-      mainMenuKeyboard()
+      mainMenuKeyboard(ctx)
     );
   });
 
   bot.command('status', async (ctx) => {
     try {
-      await ctx.reply(statusText(ctx), mainMenuKeyboard());
+      await ctx.reply(statusText(ctx), mainMenuKeyboard(ctx));
     } catch (err) {
       console.error('status command', err);
       await ctx.reply('Status unavailable right now.');
@@ -213,13 +265,13 @@ function buildBot() {
   });
 
   bot.command('social', async (ctx) => {
-    await ctx.reply(LINKS, mainMenuKeyboard());
+    await ctx.reply(LINKS, mainMenuKeyboard(ctx));
   });
 
   bot.command('strideclub', async (ctx) => {
     await ctx.reply(
       'StrideClub:\nhttps://strideclub-platform-6b71a.containers.snapdeploy.app',
-      mainMenuKeyboard()
+      mainMenuKeyboard(ctx)
     );
   });
 
@@ -228,18 +280,17 @@ function buildBot() {
     if (!q) {
       await ctx.reply(
         'Usage: /ask your question here\nOr just type your question.',
-        mainMenuKeyboard()
+        mainMenuKeyboard(ctx)
       );
       return;
     }
     await ctx.sendChatAction('typing');
-    await ctx.reply(await generateReply(q, ctx), mainMenuKeyboard());
+    await ctx.reply(await generateReply(q, ctx), mainMenuKeyboard(ctx));
   });
 
-  // —— main menu callbacks ——
   bot.action('menu_home', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply('Main menu', mainMenuKeyboard());
+    await ctx.reply('Main menu', mainMenuKeyboard(ctx));
   });
 
   bot.action('menu_ask', async (ctx) => {
@@ -255,13 +306,13 @@ function buildBot() {
 
   bot.action('menu_social', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply(LINKS, mainMenuKeyboard());
+    await ctx.reply(LINKS, mainMenuKeyboard(ctx));
   });
 
   bot.action('menu_status', async (ctx) => {
     try {
       await ctx.answerCbQuery();
-      await ctx.reply(statusText(ctx), mainMenuKeyboard());
+      await ctx.reply(statusText(ctx), mainMenuKeyboard(ctx));
     } catch (err) {
       console.error('menu_status', err);
       try {
@@ -275,7 +326,7 @@ function buildBot() {
     await ctx.answerCbQuery();
     await ctx.reply(
       'StrideClub:\nhttps://strideclub-platform-6b71a.containers.snapdeploy.app',
-      mainMenuKeyboard()
+      mainMenuKeyboard(ctx)
     );
   });
 
@@ -287,7 +338,7 @@ function buildBot() {
         `- Send photo → vision\n` +
         `- Tools → translate / summarize / tips\n` +
         `- /ask question → Gemini`,
-      mainMenuKeyboard()
+      mainMenuKeyboard(ctx)
     );
   });
 
@@ -295,11 +346,73 @@ function buildBot() {
     await ctx.answerCbQuery();
     await ctx.reply(
       `Your Telegram id: ${ctx.from.id}\nAdmin: ${isAdmin(ctx) ? 'YES' : 'NO'}`,
-      mainMenuKeyboard()
+      mainMenuKeyboard(ctx)
     );
   });
 
-  // —— tools callbacks ——
+  bot.action('menu_admin', async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    await ctx.answerCbQuery();
+    await ctx.reply(
+      `Founder Admin Panel\n` +
+        `Only you can see these controls.\n` +
+        `ID: ${ctx.from.id}`,
+      adminKeyboard()
+    );
+  });
+
+  bot.action('admin_health', async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    await ctx.answerCbQuery();
+    await ctx.reply(
+      `Health\n` +
+        `Webhook service: radiant-queen-telegram\n` +
+        `Token: ${BOT_TOKEN ? 'set' : 'MISSING'}\n` +
+        `Gemini: ${GEMINI_KEY ? 'set' : 'MISSING'}\n` +
+        `Admin configured: ${ADMIN_ID ? 'yes' : 'no'}\n` +
+        `Instance uptime: ${uptimeText()}\n` +
+        `Pending tool modes in memory: ${pendingTool.size}`,
+      adminKeyboard()
+    );
+  });
+
+  bot.action('admin_whoami', async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    await ctx.answerCbQuery();
+    await ctx.reply(
+      `Founder identity\n` +
+        `Name: ${ctx.from.first_name || ''} ${ctx.from.last_name || ''}\n` +
+        `Username: @${ctx.from.username || 'none'}\n` +
+        `Telegram ID: ${ctx.from.id}\n` +
+        `Matches ADMIN_ID: YES`,
+      adminKeyboard()
+    );
+  });
+
+  bot.action('admin_clear', async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    await ctx.answerCbQuery();
+    pendingTool.clear();
+    await ctx.reply('Cleared all in-memory tool modes on this instance.', adminKeyboard());
+  });
+
+  bot.action('admin_model', async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    await ctx.answerCbQuery();
+    await ctx.reply(
+      `Model info\n` +
+        `Last resolved: ${resolvedModel || 'none yet'}\n` +
+        `Candidates:\n${MODELS.map((m) => `- ${m}`).join('\n')}`,
+      adminKeyboard()
+    );
+  });
+
+  bot.action('admin_links', async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    await ctx.answerCbQuery();
+    await ctx.reply(LINKS, adminKeyboard());
+  });
+
   bot.action('tool_translate', async (ctx) => {
     await ctx.answerCbQuery();
     pendingTool.set(String(ctx.from.id), 'translate');
@@ -344,9 +457,9 @@ function buildBot() {
       const buf = Buffer.from(await img.arrayBuffer());
       const b64 = buf.toString('base64');
       const mime = (file.file_path || '').endsWith('.png') ? 'image/png' : 'image/jpeg';
-      await ctx.reply(await generateReply(caption, ctx, b64, mime), mainMenuKeyboard());
+      await ctx.reply(await generateReply(caption, ctx, b64, mime), mainMenuKeyboard(ctx));
     } catch {
-      await ctx.reply('Photo analysis failed. Try a smaller image.', mainMenuKeyboard());
+      await ctx.reply('Photo analysis failed. Try a smaller image.', mainMenuKeyboard(ctx));
     }
   });
 
@@ -366,7 +479,7 @@ function buildBot() {
       return;
     }
 
-    await ctx.reply(await generateReply(text, ctx), mainMenuKeyboard());
+    await ctx.reply(await generateReply(text, ctx), mainMenuKeyboard(ctx));
   });
 
   bot.catch((err) => {
@@ -416,4 +529,5 @@ export default async function handler(req, res) {
     console.error('telegram webhook', err);
     return res.status(200).json({ ok: true });
   }
-} 
+}
+ 
