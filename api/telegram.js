@@ -82,6 +82,9 @@ function toolsKeyboard() {
       Markup.button.callback('Running tip', 'tool_run_tip'),
       Markup.button.callback('Rewrite pro', 'tool_rewrite'),
     ],
+    [
+      Markup.button.callback('Caption gen', 'tool_caption'),
+    ],
     [Markup.button.callback('Back to menu', 'menu_home')],
   ]);
 }
@@ -177,6 +180,9 @@ function toolPrompt(mode, userText) {
   if (mode === 'rewrite') {
     return `Rewrite the following text to sound more professional and clear. Keep the same language. Output only the rewritten text.\n\n${userText}`;
   }
+  if (mode === 'caption') {
+    return `Write 3 social media caption options for this idea or photo description. Each caption: max 2 lines + 5 relevant hashtags. Mix English and light Sinhala if it fits. Tone: confident, athletic, premium (Pasiya Max / running / creator brand). Number them 1) 2) 3).\n\nIdea:\n${userText}`;
+  }
   return userText;
 }
 
@@ -227,7 +233,7 @@ function buildBot() {
         `/id — your Telegram id\n` +
         `/status — config check\n` +
         (isAdmin(ctx) ? `/admin — founder panel\n` : '') +
-        `\nTools: Translate, Summarize, Running tip, Rewrite\n` +
+        `\nTools: Translate, Summarize, Running tip, Rewrite pro, Caption gen\n` +
         `Send a photo for vision analysis.`,
       mainMenuKeyboard(ctx)
     );
@@ -336,7 +342,7 @@ function buildBot() {
       `Help\n` +
         `- Type any message → AI reply\n` +
         `- Send photo → vision\n` +
-        `- Tools → translate / summarize / tips\n` +
+        `- Tools → translate / summarize / tips / caption\n` +
         `- /ask question → Gemini`,
       mainMenuKeyboard(ctx)
     );
@@ -429,6 +435,14 @@ function buildBot() {
     await ctx.answerCbQuery();
     pendingTool.set(String(ctx.from.id), 'rewrite');
     await ctx.reply('Rewrite mode — send the text to make professional.');
+  });
+
+  bot.action('tool_caption', async (ctx) => {
+    await ctx.answerCbQuery();
+    pendingTool.set(String(ctx.from.id), 'caption');
+    await ctx.reply(
+      'Caption generator — send your idea or photo description.\nExample: Sunday 10K finish, gold theme, StrideClub'
+    );
   });
 
   bot.action('tool_run_tip', async (ctx) => {
