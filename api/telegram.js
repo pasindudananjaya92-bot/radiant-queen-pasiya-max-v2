@@ -225,6 +225,10 @@ async function isUserGroupAdmin(ctx) {
   }
 }
 
+function hasLink(text = '') {
+  return /https?:\/\/|t\.me\/|www\.|telegram\.me\//i.test(text);
+}
+
 async function generateReply(prompt, ctx, imageBase64, mimeType) {
   const ai = getAI();
   if (!ai) return 'Gemini key missing. Set GEMINI_API_KEY on Vercel.';
@@ -642,6 +646,27 @@ function buildBot() {
     const text = (ctx.message.text || '').trim();
     if (!text || text.startsWith('/')) return;
 
+    // Anti-link moderation (groups only)
+    if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
+      const gKey = String(ctx.chat.id);
+      const settings = groupSettings.get(gKey);
+      if (settings?.antiLink && hasLink(text)) {
+        try {
+          const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
+          const isAdm = member.status === 'administrator' || member.status === 'creator';
+          if (!isAdm) {
+            await ctx.deleteMessage(ctx.message.message_id);
+            await ctx.reply('Links are not allowed in this group (Anti-link ON).', {
+              reply_parameters: undefined,
+            });
+            return;
+          }
+        } catch (err) {
+          console.error('anti-link', err);
+        }
+      }
+    }
+
     // Groups: only when @mentioned or reply-to-bot (saves quota)
     if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
       const botInfo = ctx.botInfo || {};
@@ -827,7 +852,7 @@ function buildBot() {
       if (text === '5') {
         const cur = groupSettings.get(String(chatId)) || {};
         groupSettings.set(String(chatId), { ...cur, antiLink: true });
-        await ctx.reply('Anti-link ON (this instance). Links from non-admins will be handled.');
+        await ctx.reply('Anti-link ON (this instance). Links from non-admins will be deleted.');
         return;
       }
 
