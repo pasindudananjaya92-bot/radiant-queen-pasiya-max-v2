@@ -55,6 +55,25 @@ function identityLine(ctx) {
   return `The user is ${name}. Be helpful. Do not call them the founder.`;
 }
 
+function numberedMainMenuText() {
+  return (
+    `RADIANT QUEEN • PASIYA MAX\n` +
+    `VERSION — 2.0\n` +
+    `PLATFORM — Telegram + Vercel + Gemini\n` +
+    `WEB — radiant-queen-pasiya-max-v2.vercel.app\n` +
+    `STRIDE — strideclub-platform-6b71a.containers.snapdeploy.app\n\n` +
+    `Reply with a number:\n` +
+    `1) OWNER MENU\n` +
+    `2) SOCIAL MENU\n` +
+    `3) AI MENU\n` +
+    `4) GROUP HELP\n` +
+    `5) TOOLS MENU\n` +
+    `6) EDUCATION MENU\n` +
+    `7) CHANNEL / LINKS\n\n` +
+    `Or use the buttons below / type any question.`
+  );
+}
+
 function mainMenuKeyboard(ctx) {
   const rows = [
     [
@@ -339,10 +358,7 @@ function buildBot() {
         : `Hello ${ctx.from?.first_name || 'there'}`;
       await ctx.reply(
         `${who}\n\n` +
-          `RADIANT QUEEN • PASIYA MAX\n` +
-          `Full AI hub — chat, vision, tools, StrideClub, founder controls.\n\n` +
-          (isAdmin(ctx) ? `Founder mode ON.\n\n` : '') +
-          `Pick a button or type a message.`,
+          numberedMainMenuText(),
         mainMenuKeyboard(ctx)
       );
     } catch (err) {
@@ -354,10 +370,7 @@ function buildBot() {
   });
 
   bot.command('menu', async (ctx) => {
-    await ctx.reply(
-      'RADIANT QUEEN • PASIYA MAX — main menu',
-      mainMenuKeyboard(ctx)
-    );
+    await ctx.reply(numberedMainMenuText(), mainMenuKeyboard(ctx));
   });
 
   bot.command('help', async (ctx) => {
@@ -418,18 +431,18 @@ function buildBot() {
   // menus
   bot.action('menu_home', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply('Main menu', mainMenuKeyboard(ctx));
+    await ctx.reply(numberedMainMenuText(), mainMenuKeyboard(ctx));
   });
 
   bot.action('menu_ask', async (ctx) => {
     await ctx.answerCbQuery();
     pendingTool.delete(String(ctx.from.id));
-    await ctx.reply('Ask AI — type your question now.');
+    await ctx.reply('AI MENU — type your question now (Sinhala or English).');
   });
 
   bot.action('menu_tools', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply('Tools panel', toolsKeyboard());
+    await ctx.reply('TOOLS MENU', toolsKeyboard());
   });
 
   bot.action('menu_social', async (ctx) => {
@@ -467,7 +480,11 @@ function buildBot() {
   bot.action('menu_help', async (ctx) => {
     await ctx.answerCbQuery();
     await ctx.reply(
-      `Help\n- Type message → AI\n- Photo → vision\n- Tools → many creators tools\n- StrideClub → running hub\n- Admin only for founder`,
+      `GROUP HELP\n` +
+        `• In groups: mention @${ctx.botInfo?.username || 'PasiyaMaxQueen_bot'} + question\n` +
+        `• Or reply to my messages\n` +
+        `• Full tools work best in private chat\n` +
+        `• /menu — open this menu again`,
       mainMenuKeyboard(ctx)
     );
   });
@@ -589,6 +606,58 @@ function buildBot() {
     }
 
     const uid = String(ctx.from.id);
+
+    // Numbered main menu (1-7)
+    if (/^[1-7]$/.test(text)) {
+      if (text === '1') {
+        if (isAdmin(ctx)) {
+          await ctx.reply('OWNER / FOUNDER MENU', adminKeyboard());
+        } else {
+          await ctx.reply('Owner menu is founder-only. Use /id to see your Telegram id.');
+        }
+        return;
+      }
+      if (text === '2') {
+        await ctx.reply(LINKS, mainMenuKeyboard(ctx));
+        return;
+      }
+      if (text === '3') {
+        pendingTool.delete(uid);
+        await ctx.reply('AI MENU — type your question now (Sinhala or English).');
+        return;
+      }
+      if (text === '4') {
+        await ctx.reply(
+          `GROUP HELP\n` +
+            `• In groups: mention @${ctx.botInfo?.username || 'PasiyaMaxQueen_bot'} + question\n` +
+            `• Or reply to my messages\n` +
+            `• Full tools work best in private chat\n` +
+            `• /menu — open this menu again`
+        );
+        return;
+      }
+      if (text === '5') {
+        await ctx.reply('TOOLS MENU', toolsKeyboard());
+        return;
+      }
+      if (text === '6') {
+        await ctx.sendChatAction('typing');
+        const tip = await generateReply(
+          'Give one short education tip for amateur runners (max 8 lines). Practical. Sinhala or English OK.',
+          ctx
+        );
+        await ctx.reply(`EDUCATION MENU\n\n${tip}`, mainMenuKeyboard(ctx));
+        return;
+      }
+      if (text === '7') {
+        await ctx.reply(
+          LINKS + `\n\nTelegram channel/group: use your official invite links from Social.`,
+          mainMenuKeyboard(ctx)
+        );
+        return;
+      }
+    }
+
     const mode = pendingTool.get(uid);
     await ctx.sendChatAction('typing');
 
