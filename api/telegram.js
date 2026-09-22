@@ -771,12 +771,40 @@ function buildBot() {
     }
 
     if (mode === 'edu_lab') {
-      if (text === '1') {
-        await ctx.reply(`**Daily Running Tip:** Start with the "Conversational Pace" rule. If you are too breathless to speak, slow down!`);
-      } else if (text === '2') {
-        await ctx.reply(`**5K Pacing Guide:** Maintain a steady split for the first 3KM, then push the remaining 2KM.`);
-      } else {
-        await ctx.reply(`Education Lab option selected: ${text}. Type 0 to go back.`);
+      if (text === '0') {
+        pendingTool.delete(uid);
+        await ctx.reply(numberedMainMenuText(), mainMenuKeyboard(ctx));
+        return;
+      }
+
+      const eduPrompts = {
+        '1':
+          'Give ONE practical daily running tip for an amateur runner (max 8 short lines). Clear and actionable. Sinhala or English matching the user if possible; default English is OK.',
+        '2':
+          'Explain a simple 5K race pacing strategy for a beginner-intermediate runner (max 10 lines). Include easy splits idea. No medical claims.',
+        '3':
+          'Create a simple 7-day beginner running week plan (max 12 lines). Include rest. Distances conservative. No medical claims.',
+        '4':
+          'Give a practical warm-up and cool-down routine before/after an easy run (max 10 lines). Simple exercises only.',
+        '5':
+          'Share basic injury-prevention habits for runners (shoes, rest, surface, listening to pain). Max 10 lines. Not medical advice — say see a professional if pain persists.',
+      };
+
+      const prompt = eduPrompts[text];
+      if (!prompt) {
+        await ctx.reply(
+          'Education Lab — reply with:\n1 Daily tip\n2 5K pacing\n3 Beginner week\n4 Warm-up / cool-down\n5 Injury basics\n0 Back'
+        );
+        return;
+      }
+
+      try {
+        await ctx.sendChatAction('typing');
+        const out = await generateReply(prompt, ctx);
+        await ctx.reply(out, mainMenuKeyboard(ctx));
+      } catch (err) {
+        console.error('edu_lab', err);
+        await ctx.reply('Education Lab failed. Try again in a moment.');
       }
       return;
     }
