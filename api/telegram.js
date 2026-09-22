@@ -642,6 +642,27 @@ function buildBot() {
     }
   });
 
+  // New members welcome handler
+  bot.on('new_chat_members', async (ctx) => {
+    try {
+      const chatId = String(ctx.chat.id);
+      const settings = groupSettings.get(chatId) || {};
+      const welcome =
+        settings.welcome ||
+        groupSettings.get('welcome_default')?.welcome ||
+        `Welcome to ${ctx.chat.title || 'the group'}! Use /menu in private chat with the bot for tools.`;
+
+      const members = ctx.message.new_chat_members || [];
+      for (const user of members) {
+        if (user.is_bot) continue;
+        const name = user.first_name || 'friend';
+        await ctx.reply(`${welcome}\n\nHi, ${name}!`);
+      }
+    } catch (err) {
+      console.error('welcome handler', err);
+    }
+  });
+
   bot.on('text', async (ctx) => {
     const text = (ctx.message.text || '').trim();
     if (!text || text.startsWith('/')) return;
@@ -884,8 +905,15 @@ function buildBot() {
 
     if (mode === 'group_welcome_set') {
       pendingTool.delete(uid);
-      groupSettings.set('welcome_default', { welcome: text.slice(0, 500) });
-      await ctx.reply('Welcome text saved for this server instance.');
+      const msg = text.slice(0, 500);
+      if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
+        const cur = groupSettings.get(String(ctx.chat.id)) || {};
+        groupSettings.set(String(ctx.chat.id), { ...cur, welcome: msg });
+        await ctx.reply('Welcome text saved for THIS group.');
+      } else {
+        groupSettings.set('welcome_default', { welcome: msg });
+        await ctx.reply('Welcome text saved as default (this server instance).');
+      }
       return;
     }
 
@@ -919,7 +947,7 @@ export default async function handler(req, res) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             url,
-            allowed_updates: ['message', 'callback_query'],
+            allowed_updates: ['message', 'callback_query', 'chat_member', 'my_chat_member', 'chat_join_request'],
             drop_pending_updates: true,
           }),
         });
