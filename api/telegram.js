@@ -30,6 +30,8 @@ Live: https://strideclub-platform-6b71a.containers.snapdeploy.app
 Open the site for: Dashboard, Logbook, Leaderboard, Events, AI Coach, Agent Logs.`;
 
 const pendingTool = new Map();
+const groupSettings = new Map(); // groupId -> { antiLink: boolean, welcome: string }
+
 let aiClient = null;
 let resolvedModel = null;
 let bot = null;
@@ -194,6 +196,33 @@ function statusText(ctx) {
 function uptimeText() {
   const sec = Math.floor((Date.now() - bootTime) / 1000);
   return `${Math.floor(sec / 60)}m ${sec % 60}s (this warm instance)`;
+}
+
+async function ensureGroupAdmin(ctx) {
+  if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+    await ctx.reply('This command works only inside a group. Add the bot to a group, make it ADMIN, then try again.');
+    return false;
+  }
+  try {
+    const me = await ctx.telegram.getChatMember(ctx.chat.id, ctx.botInfo.id);
+    if (me.status !== 'administrator' && me.status !== 'creator') {
+      await ctx.reply('I need ADMIN rights in this group (restrict members + delete messages recommended).');
+      return false;
+    }
+    return true;
+  } catch (err) {
+    await ctx.reply('Could not check admin rights. Make me admin and retry.');
+    return false;
+  }
+}
+
+async function isUserGroupAdmin(ctx) {
+  try {
+    const m = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
+    return m.status === 'administrator' || m.status === 'creator';
+  } catch {
+    return false;
+  }
 }
 
 async function generateReply(prompt, ctx, imageBase64, mimeType) {
@@ -625,9 +654,10 @@ function buildBot() {
     }
 
     const uid = String(ctx.from.id);
+    const mode = pendingTool.get(uid);
 
     // Numbered main menu (1-9)
-    if (/^[1-9]$/.test(text)) {
+    if (/^[1-9]$/.test(text) && !mode) {
       if (text === '1') {
         if (isAdmin(ctx)) {
           pendingTool.set(uid, 'owner_menu');
@@ -649,8 +679,15 @@ function buildBot() {
       if (text === '4') {
         pendingTool.set(uid, 'group_lab');
         await ctx.reply(
-          `GROUP ADMIN LAB\nBot must be group ADMIN.\n\n` +
-          `1 Group info\n2 Welcome text setup\n3 Lock group\n4 Unlock group\n5 Anti-link ON\n6 Anti-link OFF\n7 Mention admins\n0 Back`
+          `GROUP ADMIN LAB (Run inside group)\n\n` +
+          `1 Group info\n` +
+          `2 Set welcome text\n` +
+          `3 Lock group\n` +
+          `4 Unlock group\n` +
+          `5 Anti-link ON\n` +
+          `6 Anti-link OFF\n` +
+          `7 Mention admins\n` +
+          `0 Back`
         );
         return;
       }
@@ -687,8 +724,6 @@ function buildBot() {
       return;
     }
 
-    const mode = pendingTool.get(uid);
-
     if (mode === 'edu_lab') {
       if (text === '1') {
         await ctx.reply(`**Daily Running Tip:** Start with the "Conversational Pace" rule. If you are too breathless to speak, slow down!`);
@@ -701,7 +736,131 @@ function buildBot() {
     }
 
     if (mode === 'group_lab') {
-      await ctx.reply(`Group Admin action (${text}) received. Make sure bot has admin privileges in this group.`);
+      if (text === '0') {
+        pendingTool.delete(uid);
+        await ctx.reply(numberedMainMenuText(), mainMenuKeyboard(ctx));
+        return;
+      }
+
+      if (text === '2') {
+        pendingTool.set(uid, 'group_welcome_set');
+        await ctx.reply('Send the WELCOME message text now (one message). It will be stored for groups.');
+        return;
+      }
+
+      if (!(await ensureGroupAdmin(ctx))) return;
+      if (!(await isUserGroupAdmin(ctx))) {
+        await ctx.reply('Only group admins can use Group Admin Lab actions.');
+        return;
+      }
+
+      const chatId = ctx.chat.id;
+
+      if (text === '1') {
+        try {
+          const chat = await ctx.telegram.getChat(chatId);
+          const count = await ctx.telegram.getChatMemberCount(chatId);
+          await ctx.reply(
+            `GROUP INFO\n` +
+              `Title: ${chat.title || '-'}\n` +
+              `Type: ${chat.type}\n` +
+              `Members: ${count}\n` +
+              `ID: ${chatId}\n` +
+              `Anti-link: ${groupSettings.get(String(chatId))?.antiLink ? 'ON' : 'OFF'}`
+          );
+        } catch (err) {
+          await ctx.reply(`Group info failed: ${String(err?.message || err).slice(0, 120)}`);
+        }
+        return;
+      }
+
+      if (text === '3') {
+        try {
+          await ctx.telegram.setChatPermissions(chatId, {
+            can_send_messages: false,
+            can_send_audios: false,
+            can_send_documents: false,
+            can_send_photos: false,
+            can_send_videos: false,
+            can_send_video_notes: false,
+            can_send_voice_notes: false,
+            can_send_polls: false,
+            can_send_other_messages: false,
+            can_add_web_page_previews: false,
+            can_change_info: false,
+            can_invite_users: false,
+            can_pin_messages: false,
+            can_manage_topics: false,
+          });
+          await ctx.reply('Group LOCKED — members cannot send messages (admins still can).');
+        } catch (err) {
+          await ctx.reply(`Lock failed: ${String(err?.message || err).slice(0, 150)}. Need permission: Restrict members.`);
+        }
+        return;
+      }
+
+      if (text === '4') {
+        try {
+          await ctx.telegram.setChatPermissions(chatId, {
+            can_send_messages: true,
+            can_send_audios: true,
+            can_send_documents: true,
+            can_send_photos: true,
+            can_send_videos: true,
+            can_send_video_notes: true,
+            can_send_voice_notes: true,
+            can_send_polls: true,
+            can_send_other_messages: true,
+            can_add_web_page_previews: true,
+            can_change_info: false,
+            can_invite_users: true,
+            can_pin_messages: false,
+            can_manage_topics: false,
+          });
+          await ctx.reply('Group UNLOCKED — members can chat again.');
+        } catch (err) {
+          await ctx.reply(`Unlock failed: ${String(err?.message || err).slice(0, 150)}`);
+        }
+        return;
+      }
+
+      if (text === '5') {
+        const cur = groupSettings.get(String(chatId)) || {};
+        groupSettings.set(String(chatId), { ...cur, antiLink: true });
+        await ctx.reply('Anti-link ON (this instance). Links from non-admins will be handled.');
+        return;
+      }
+
+      if (text === '6') {
+        const cur = groupSettings.get(String(chatId)) || {};
+        groupSettings.set(String(chatId), { ...cur, antiLink: false });
+        await ctx.reply('Anti-link OFF.');
+        return;
+      }
+
+      if (text === '7') {
+        try {
+          const admins = await ctx.telegram.getChatAdministrators(chatId);
+          const mentions = admins
+            .filter((a) => !a.user.is_bot)
+            .slice(0, 15)
+            .map((a) => (a.user.username ? `@${a.user.username}` : a.user.first_name))
+            .join(' ');
+          await ctx.reply(mentions ? `Admins: ${mentions}` : 'No human admins found.');
+        } catch (err) {
+          await ctx.reply(`Mention admins failed: ${String(err?.message || err).slice(0, 120)}`);
+        }
+        return;
+      }
+
+      await ctx.reply('Group Lab: use 1–7 or 0 to go back. For lock/unlock, run this inside the group.');
+      return;
+    }
+
+    if (mode === 'group_welcome_set') {
+      pendingTool.delete(uid);
+      groupSettings.set('welcome_default', { welcome: text.slice(0, 500) });
+      await ctx.reply('Welcome text saved for this server instance.');
       return;
     }
 
