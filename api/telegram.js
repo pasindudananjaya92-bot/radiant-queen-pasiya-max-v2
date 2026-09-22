@@ -57,20 +57,39 @@ function identityLine(ctx) {
 
 function numberedMainMenuText() {
   return (
-    `RADIANT QUEEN • PASIYA MAX\n` +
-    `VERSION — 2.0\n` +
-    `PLATFORM — Telegram + Vercel + Gemini\n` +
-    `WEB — radiant-queen-pasiya-max-v2.vercel.app\n` +
-    `STRIDE — strideclub-platform-6b71a.containers.snapdeploy.app\n\n` +
-    `Reply with a number:\n` +
-    `1) OWNER MENU\n` +
-    `2) SOCIAL MENU\n` +
-    `3) AI MENU\n` +
-    `4) GROUP HELP\n` +
-    `5) TOOLS MENU\n` +
-    `6) EDUCATION MENU\n` +
-    `7) CHANNEL / LINKS\n\n` +
-    `Or use the buttons below / type any question.`
+    `╔══════════════════════════════╗\n` +
+    `║  RADIANT QUEEN • PASIYA MAX\n` +
+    `║  VERSION 2.1 | GEMINI AI\n` +
+    `╚══════════════════════════════╝\n\n` +
+    `WEB     radiant-queen-pasiya-max-v2.vercel.app\n` +
+    `STRIDE  strideclub-platform-6b71a.containers.snapdeploy.app\n` +
+    `BOT     @PasiyaMaxQueen_bot\n\n` +
+    `┌─ MAIN (Reply Number) ────────┐\n` +
+    `│  1  OWNER / FOUNDER\n` +
+    `│  2  SOCIAL HUB\n` +
+    `│  3  AI LAB\n` +
+    `│  4  GROUP ADMIN LAB\n` +
+    `│  5  CREATOR TOOLS\n` +
+    `│  6  EDUCATION LAB\n` +
+    `│  7  CHANNELS & LINKS\n` +
+    `│  8  STRIDECLUB HUB\n` +
+    `│  9  STATUS & HELP\n` +
+    `└──────────────────────────────┘\n\n` +
+    `Type 1–9 • buttons work too • or ask anything\n` +
+    `Group Admin Lab needs bot ADMIN rights.`
+  );
+}
+
+function ownerMenuText() {
+  return (
+    `OWNER / FOUNDER MENU\n\n` +
+    `1 Health / Status\n` +
+    `2 Who am I\n` +
+    `3 Model info\n` +
+    `4 GitHub status\n` +
+    `5 Clear tool mode\n` +
+    `6 Links vault\n` +
+    `0 Back`
   );
 }
 
@@ -162,7 +181,7 @@ function adminKeyboard() {
 
 function statusText(ctx) {
   return (
-    `Bot status\n` +
+    `RADIANT QUEEN • PASIYA MAX v2.1\n` +
     `Token: ${BOT_TOKEN ? 'yes' : 'NO'}\n` +
     `Gemini: ${GEMINI_KEY ? 'yes' : 'NO'}\n` +
     `ADMIN_ID: ${ADMIN_ID ? 'yes' : 'NO'}\n` +
@@ -607,11 +626,12 @@ function buildBot() {
 
     const uid = String(ctx.from.id);
 
-    // Numbered main menu (1-7)
-    if (/^[1-7]$/.test(text)) {
+    // Numbered main menu (1-9)
+    if (/^[1-9]$/.test(text)) {
       if (text === '1') {
         if (isAdmin(ctx)) {
-          await ctx.reply('OWNER / FOUNDER MENU', adminKeyboard());
+          pendingTool.set(uid, 'owner_menu');
+          await ctx.reply(ownerMenuText());
         } else {
           await ctx.reply('Owner menu is founder-only. Use /id to see your Telegram id.');
         }
@@ -627,12 +647,10 @@ function buildBot() {
         return;
       }
       if (text === '4') {
+        pendingTool.set(uid, 'group_lab');
         await ctx.reply(
-          `GROUP HELP\n` +
-            `• In groups: mention @${ctx.botInfo?.username || 'PasiyaMaxQueen_bot'} + question\n` +
-            `• Or reply to my messages\n` +
-            `• Full tools work best in private chat\n` +
-            `• /menu — open this menu again`
+          `GROUP ADMIN LAB\nBot must be group ADMIN.\n\n` +
+          `1 Group info\n2 Welcome text setup\n3 Lock group\n4 Unlock group\n5 Anti-link ON\n6 Anti-link OFF\n7 Mention admins\n0 Back`
         );
         return;
       }
@@ -641,24 +659,52 @@ function buildBot() {
         return;
       }
       if (text === '6') {
-        await ctx.sendChatAction('typing');
-        const tip = await generateReply(
-          'Give one short education tip for amateur runners (max 8 lines). Practical. Sinhala or English OK.',
-          ctx
+        pendingTool.set(uid, 'edu_lab');
+        await ctx.reply(
+          `EDUCATION LAB\n\n` +
+          `1 Daily running tip\n2 5K pacing\n3 Beginner week\n4 Warm-up / cool-down\n5 Injury basics\n0 Back`
         );
-        await ctx.reply(`EDUCATION MENU\n\n${tip}`, mainMenuKeyboard(ctx));
         return;
       }
       if (text === '7') {
-        await ctx.reply(
-          LINKS + `\n\nTelegram channel/group: use your official invite links from Social.`,
-          mainMenuKeyboard(ctx)
-        );
+        await ctx.reply(LINKS, mainMenuKeyboard(ctx));
+        return;
+      }
+      if (text === '8') {
+        await ctx.reply(`STRIDECLUB HUB\nhttps://strideclub-platform-6b71a.containers.snapdeploy.app`, strideKeyboard());
+        return;
+      }
+      if (text === '9') {
+        await ctx.reply(statusText(ctx), mainMenuKeyboard(ctx));
         return;
       }
     }
 
+    // Handle submenu navigation back / 0
+    if (text === '0' || text.toLowerCase() === 'back') {
+      pendingTool.delete(uid);
+      await ctx.reply(numberedMainMenuText(), mainMenuKeyboard(ctx));
+      return;
+    }
+
     const mode = pendingTool.get(uid);
+
+    if (mode === 'edu_lab') {
+      if (text === '1') {
+        await ctx.reply(`**Daily Running Tip:** Start with the "Conversational Pace" rule. If you are too breathless to speak, slow down!`);
+      } else if (text === '2') {
+        await ctx.reply(`**5K Pacing Guide:** Maintain a steady split for the first 3KM, then push the remaining 2KM.`);
+      } else {
+        await ctx.reply(`Education Lab option selected: ${text}. Type 0 to go back.`);
+      }
+      return;
+    }
+
+    if (mode === 'group_lab') {
+      await ctx.reply(`Group Admin action (${text}) received. Make sure bot has admin privileges in this group.`);
+      return;
+    }
+
     await ctx.sendChatAction('typing');
 
     if (mode && mode !== 'photo_caption') {
