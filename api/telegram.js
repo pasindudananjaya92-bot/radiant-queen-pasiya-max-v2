@@ -319,6 +319,21 @@ function buildBot() {
 
   bot.start(async (ctx) => {
     try {
+      const isGroup =
+        ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
+
+      if (isGroup) {
+        await ctx.reply(
+          `RADIANT QUEEN in this group.\n\n` +
+            `• Mention me (@${ctx.botInfo?.username || 'bot'}) with a question\n` +
+            `• Or reply to my message\n` +
+            `• Private chat: full menu + tools\n\n` +
+            `Commands: /menu /ask /help /status`,
+          mainMenuKeyboard(ctx)
+        );
+        return;
+      }
+
       const who = isAdmin(ctx)
         ? 'Ayubowan Nirmathru Pasiya Max'
         : `Hello ${ctx.from?.first_name || 'there'}`;
@@ -338,10 +353,18 @@ function buildBot() {
     }
   });
 
+  bot.command('menu', async (ctx) => {
+    await ctx.reply(
+      'RADIANT QUEEN • PASIYA MAX — main menu',
+      mainMenuKeyboard(ctx)
+    );
+  });
+
   bot.command('help', async (ctx) => {
     await ctx.reply(
       `Commands\n` +
-        `/start — main menu\n` +
+        `⁄start — welcome & menu\n` +
+        `/menu — show main buttons\n` +
         `/ask <q> — Gemini\n` +
         `/social /strideclub /id /status\n` +
         (isAdmin(ctx) ? `/admin — founder panel\n` : '') +
