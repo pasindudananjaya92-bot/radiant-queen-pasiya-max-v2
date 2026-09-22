@@ -74,7 +74,7 @@ function numberedMainMenuText() {
     `│  5  CREATOR TOOLS\n` +
     `│  6  EDUCATION LAB\n` +
     `│  7  CHANNELS & LINKS\n` +
-    `│  8  STRIDECLUB HUB\n` +
+    `│  8  CONNECTED PLATFORMS\n` +
     `│  9  STATUS & HELP\n` +
     `└──────────────────────────────┘\n\n` +
     `Type 1–9 • buttons work too • or ask anything\n` +
@@ -93,6 +93,28 @@ function ownerMenuText() {
     `6 Links vault\n` +
     `0 Back`
   );
+}
+
+function platformsPanelText() {
+  return (
+    `CONNECTED PLATFORMS\n\n` +
+    `1  Open Website\n` +
+    `2  Open StrideClub\n` +
+    `3  Social / Channel links\n` +
+    `4  Bot status\n` +
+    `5  GitHub status (founder only)\n` +
+    `0  Back to main\n\n` +
+    `Reply with a number.`
+  );
+}
+
+function platformsKeyboard() {
+  return Markup.inlineKeyboard([
+    [Markup.button.url('Website', 'https://radiant-queen-pasiya-max-v2.vercel.app')],
+    [Markup.button.url('StrideClub', 'https://strideclub-platform-6b71a.containers.snapdeploy.app')],
+    [Markup.button.url('GitHub', 'https://github.com/pasindudananjaya92-bot/radiant-queen-pasiya-max-v2')],
+    [Markup.button.callback('Main menu', 'menu_home')],
+  ]);
 }
 
 function mainMenuKeyboard(ctx) {
@@ -754,7 +776,8 @@ function buildBot() {
         return;
       }
       if (text === '8') {
-        await ctx.reply(`STRIDECLUB HUB\nhttps://strideclub-platform-6b71a.containers.snapdeploy.app`, strideKeyboard());
+        pendingTool.set(uid, 'platforms_lab');
+        await ctx.reply(platformsPanelText(), platformsKeyboard());
         return;
       }
       if (text === '9') {
@@ -767,6 +790,44 @@ function buildBot() {
     if (text === '0' || text.toLowerCase() === 'back') {
       pendingTool.delete(uid);
       await ctx.reply(numberedMainMenuText(), mainMenuKeyboard(ctx));
+      return;
+    }
+
+    if (mode === 'platforms_lab') {
+      if (text === '0') {
+        pendingTool.delete(uid);
+        await ctx.reply(numberedMainMenuText(), mainMenuKeyboard(ctx));
+        return;
+      }
+      if (text === '1') {
+        await ctx.reply('Website:\nhttps://radiant-queen-pasiya-max-v2.vercel.app', platformsKeyboard());
+        return;
+      }
+      if (text === '2') {
+        await ctx.reply(
+          'StrideClub:\nhttps://strideclub-platform-6b71a.containers.snapdeploy.app',
+          platformsKeyboard()
+        );
+        return;
+      }
+      if (text === '3') {
+        await ctx.reply(LINKS, platformsKeyboard());
+        return;
+      }
+      if (text === '4') {
+        await ctx.reply(statusText(ctx), platformsKeyboard());
+        return;
+      }
+      if (text === '5') {
+        if (!isAdmin(ctx)) {
+          await ctx.reply('GitHub status is founder-only.', platformsKeyboard());
+          return;
+        }
+        await ctx.sendChatAction('typing');
+        await ctx.reply(await fetchGitHubStatus(), platformsKeyboard());
+        return;
+      }
+      await ctx.reply(platformsPanelText(), platformsKeyboard());
       return;
     }
 
