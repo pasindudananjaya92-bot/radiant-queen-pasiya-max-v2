@@ -324,11 +324,11 @@ function buildBot() {
 
       if (isGroup) {
         await ctx.reply(
-          `RADIANT QUEEN in this group.\n\n` +
-            `• Mention me (@${ctx.botInfo?.username || 'bot'}) with a question\n` +
-            `• Or reply to my message\n` +
-            `• Private chat: full menu + tools\n\n` +
-            `Commands: /menu /ask /help /status`,
+          `RADIANT QUEEN is active in this group.\n\n` +
+            `• Mention @${ctx.botInfo?.username || 'PasiyaMaxQueen_bot'} + question\n` +
+            `• Or reply to my messages\n` +
+            `• Full tools: open a private chat with me\n\n` +
+            `/help for commands`,
           mainMenuKeyboard(ctx)
         );
         return;
@@ -363,7 +363,7 @@ function buildBot() {
   bot.command('help', async (ctx) => {
     await ctx.reply(
       `Commands\n` +
-        `⁄start — welcome & menu\n` +
+        `/start — welcome & menu\n` +
         `/menu — show main buttons\n` +
         `/ask <q> — Gemini\n` +
         `/social /strideclub /id /status\n` +
@@ -577,11 +577,14 @@ function buildBot() {
     const text = (ctx.message.text || '').trim();
     if (!text || text.startsWith('/')) return;
 
+    // Groups: only when @mentioned or reply-to-bot (saves quota)
     if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
       const botInfo = ctx.botInfo || {};
       const uname = botInfo.username ? `@${botInfo.username}`.toLowerCase() : '';
       const mentioned = uname && text.toLowerCase().includes(uname);
-      const isReplyToBot = ctx.message.reply_to_message?.from?.id === botInfo.id;
+      const isReplyToBot =
+        Boolean(ctx.message.reply_to_message?.from?.id) &&
+        ctx.message.reply_to_message.from.id === botInfo.id;
       if (!mentioned && !isReplyToBot) return;
     }
 
