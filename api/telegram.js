@@ -1,11 +1,22 @@
 import { Telegraf, Markup } from 'telegraf';
 import { GoogleGenAI } from '@google/genai';
+import { createClient } from '@supabase/supabase-js';
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ADMIN_ID = String(process.env.ADMIN_ID || '').trim();
 const GEMINI_KEY = process.env.GEMINI_API_KEY || '';
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
 const GITHUB_REPO = process.env.GITHUB_REPO || 'pasindudananjaya92-bot/radiant-queen-pasiya-max-v2';
+
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+const supabase =
+  SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      })
+    : null;
 
 const MODELS = [
   'gemini-3.5-flash-lite',
@@ -31,6 +42,72 @@ Open the site for: Dashboard, Logbook, Leaderboard, Events, AI Coach, Agent Logs
 
 const pendingTool = new Map();
 const groupSettings = new Map(); // groupId -> { antiLink: boolean, welcome: string }
+
+async function loadGroupSettings(chatId) {
+  const key = String(chatId);
+  if (groupSettings.has(key)) return groupSettings.get(key);
+  if (!supabase) return {};
+
+  const { data, error } = await supabase
+    .from('group_settings')
+    .select('welcome, rate_limit_enabled, group_mode')
+    .eq('chat_id', key)
+    .maybeSingle();
+
+  if (error) {
+    console.error('loadGroupSettings', error.message);
+    return {};
+  }
+
+  const row = {
+    welcome: data?.welcome || '',
+    antiLink: data?.group_mode === 'antilink' || data?.group_mode === 'anti_link',
+    rateLimit: Boolean(data?.rate_limit_enabled),
+    groupMode: data?.group_mode || '',
+  };
+  groupSettings.set(key, row);
+  return row;
+}
+
+async function saveGroupSettings(chatId, patch) {
+  const key = String(chatId);
+  const prev = (await loadGroupSettings(key)) || {};
+  const antiLink =
+    patch.antiLink !== undefined ? patch.antiLink : Boolean(prev.antiLink);
+  const next = {
+    welcome: patch.welcome !== undefined ? patch.welcome : prev.welcome || '',
+    antiLink,
+    rateLimit:
+      patch.rateLimit !== undefined ? patch.rateLimit : Boolean(prev.rateLimit),
+    groupMode:
+      patch.groupMode !== undefined
+        ? patch.groupMode
+        : antiLink
+          ? 'antilink'
+          : prev.groupMode || 'normal',
+  };
+  groupSettings.set(key, next);
+
+  if (!supabase) {
+    return { ok: false, error: 'Supabase env missing on Vercel' };
+  }
+
+  const { error } = await supabase.from('group_settings').upsert(
+    {
+      chat_id: key,
+      welcome: next.welcome || null,
+      group_mode: next.groupMode || (next.antiLink ? 'antilink' : 'normal'),
+      rate_limit_enabled: Boolean(next.rateLimit),
+    },
+    { onConflict: 'chat_id' }
+  );
+
+  if (error) {
+    console.error('saveGroupSettings', error.message);
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
+}
 
 let aiClient = null;
 let resolvedModel = null;
@@ -210,6 +287,7 @@ function statusText(ctx) {
     `Gemini: ${GEMINI_KEY ? 'yes' : 'NO'}\n` +
     `ADMIN_ID: ${ADMIN_ID ? 'yes' : 'NO'}\n` +
     `GitHub token: ${GITHUB_TOKEN ? 'yes' : 'no'}\n` +
+    `Supabase: ${supabase ? 'yes' : 'NO'}\n` +
     `You are founder: ${isAdmin(ctx) ? 'yes' : 'no'}\n` +
     `Model: ${resolvedModel || 'not used yet'}`
   );
@@ -582,7 +660,7 @@ function buildBot() {
     if (!(await requireAdmin(ctx))) return;
     await ctx.answerCbQuery();
     await ctx.reply(
-      `Health\nToken: ${BOT_TOKEN ? 'set' : 'MISSING'}\nGemini: ${GEMINI_KEY ? 'set' : 'MISSING'}\nGitHub: ${GITHUB_TOKEN ? 'set' : 'no'}\nUptime: ${uptimeText()}\nPending modes: ${pendingTool.size}`,
+      `Health\nToken: ${BOT_TOKEN ? 'set' : 'MISSING'}\nGemini: ${GEMINI_KEY ? 'set' : 'MISSING'}\nGitHub: ${GITHUB_TOKEN ? 'set' : 'no'}\nSupabase: ${supabase ? 'set' : 'MISSING'}\nUptime: ${uptimeText()}\nPending modes: ${pendingTool.size}`,
       adminKeyboard()
     );
   });
@@ -668,10 +746,10 @@ function buildBot() {
   bot.on('new_chat_members', async (ctx) => {
     try {
       const chatId = String(ctx.chat.id);
-      const settings = groupSettings.get(chatId) || {};
+      const settings = await loadGroupSettings(chatId);
       const welcome =
         settings.welcome ||
-        groupSettings.get('welcome_default')?.welcome ||
+        (await loadGroupSettings('welcome_default'))?.welcome ||
         `Welcome to ${ctx.chat.title || 'the group'}! Use /menu in private chat with the bot for tools.`;
 
       const members = ctx.message.new_chat_members || [];
@@ -692,7 +770,7 @@ function buildBot() {
     // Anti-link moderation (groups only)
     if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
       const gKey = String(ctx.chat.id);
-      const settings = groupSettings.get(gKey);
+      const settings = await loadGroupSettings(gKey);
       if (settings?.antiLink && hasLink(text)) {
         try {
           const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
@@ -895,13 +973,14 @@ function buildBot() {
         try {
           const chat = await ctx.telegram.getChat(chatId);
           const count = await ctx.telegram.getChatMemberCount(chatId);
+          const settings = await loadGroupSettings(chatId);
           await ctx.reply(
             `GROUP INFO\n` +
               `Title: ${chat.title || '-'}\n` +
               `Type: ${chat.type}\n` +
               `Members: ${count}\n` +
               `ID: ${chatId}\n` +
-              `Anti-link: ${groupSettings.get(String(chatId))?.antiLink ? 'ON' : 'OFF'}`
+              `Anti-link: ${settings?.antiLink ? 'ON' : 'OFF'}`
           );
         } catch (err) {
           await ctx.reply(`Group info failed: ${String(err?.message || err).slice(0, 120)}`);
@@ -960,16 +1039,14 @@ function buildBot() {
       }
 
       if (text === '5') {
-        const cur = groupSettings.get(String(chatId)) || {};
-        groupSettings.set(String(chatId), { ...cur, antiLink: true });
-        await ctx.reply('Anti-link ON (this instance). Links from non-admins will be deleted.');
+        const res = await saveGroupSettings(chatId, { antiLink: true, groupMode: 'antilink' });
+        await ctx.reply(res.ok ? 'Anti-link ON (Supabase).' : `Memory only: ${res.error}`);
         return;
       }
 
       if (text === '6') {
-        const cur = groupSettings.get(String(chatId)) || {};
-        groupSettings.set(String(chatId), { ...cur, antiLink: false });
-        await ctx.reply('Anti-link OFF.');
+        const res = await saveGroupSettings(chatId, { antiLink: false, groupMode: 'normal' });
+        await ctx.reply(res.ok ? 'Anti-link OFF (Supabase).' : `Memory only: ${res.error}`);
         return;
       }
 
@@ -996,12 +1073,15 @@ function buildBot() {
       pendingTool.delete(uid);
       const msg = text.slice(0, 500);
       if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
-        const cur = groupSettings.get(String(ctx.chat.id)) || {};
-        groupSettings.set(String(ctx.chat.id), { ...cur, welcome: msg });
-        await ctx.reply('Welcome text saved for THIS group.');
+        const result = await saveGroupSettings(ctx.chat.id, { welcome: msg });
+        await ctx.reply(
+          result.ok
+            ? 'Welcome text saved for THIS group (Supabase + memory).'
+            : `Memory only. Supabase error: ${result.error}`
+        );
       } else {
         groupSettings.set('welcome_default', { welcome: msg });
-        await ctx.reply('Welcome text saved as default (this server instance).');
+        await ctx.reply('Default welcome in memory only. Save from inside a group for DB.');
       }
       return;
     }
@@ -1050,6 +1130,7 @@ export default async function handler(req, res) {
         hasGemini: Boolean(GEMINI_KEY),
         hasAdmin: Boolean(ADMIN_ID),
         hasGitHub: Boolean(GITHUB_TOKEN),
+        hasSupabase: Boolean(supabase),
       });
     }
 
