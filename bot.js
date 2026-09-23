@@ -6,6 +6,7 @@
 
 import { Telegraf } from "telegraf";
 import { GoogleGenAI } from "@google/genai";
+import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -13,6 +14,8 @@ dotenv.config();
 const BOT_TOKEN = process.env.BOT_TOKEN || "";
 const ADMIN_ID = process.env.ADMIN_ID || "";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const SUPABASE_URL = process.env.SUPABASE_URL || "";
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 
 console.log("⚡ [AI STUDIO AUTO-CONNECT] AI Studio Brain Service (Gemini Flash): " + (GEMINI_API_KEY ? "CONNECTED & ACTIVE ✅" : "WAITING KEY"));
 if (!BOT_TOKEN) {
@@ -20,6 +23,71 @@ if (!BOT_TOKEN) {
 }
 
 const bot = new Telegraf(BOT_TOKEN || "NO_TOKEN_PROVIDED");
+
+const supabase =
+  SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      })
+    : null;
+
+const groupSettings = new Map();
+
+async function loadGroupSettings(chatId) {
+  const key = String(chatId);
+  if (groupSettings.has(key)) return groupSettings.get(key);
+
+  if (!supabase) return {};
+
+  const { data, error } = await supabase
+    .from("group_settings")
+    .select("anti_link, welcome")
+    .eq("chat_id", key)
+    .maybeSingle();
+
+  if (error) {
+    console.error("loadGroupSettings", error.message);
+    return {};
+  }
+
+  const row = {
+    antiLink: Boolean(data?.anti_link),
+    welcome: data?.welcome || "",
+  };
+  groupSettings.set(key, row);
+  return row;
+}
+
+async function saveGroupSettings(chatId, patch) {
+  const key = String(chatId);
+  const prev = (await loadGroupSettings(key)) || {};
+  const next = {
+    antiLink: patch.antiLink !== undefined ? patch.antiLink : Boolean(prev.antiLink),
+    welcome: patch.welcome !== undefined ? patch.welcome : prev.welcome || "",
+  };
+  groupSettings.set(key, next);
+
+  if (!supabase) {
+    console.error("Supabase not configured");
+    return { ok: false, error: "Supabase env missing" };
+  }
+
+  const { error } = await supabase.from("group_settings").upsert(
+    {
+      chat_id: key,
+      anti_link: next.antiLink,
+      welcome: next.welcome || null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "chat_id" }
+  );
+
+  if (error) {
+    console.error("saveGroupSettings", error.message);
+    return { ok: false, error: error.message };
+  }
+  return { ok: true };
+}
 
 const ai = GEMINI_API_KEY
   ? new GoogleGenAI({
@@ -177,3 +245,4 @@ if (BOT_TOKEN && BOT_TOKEN !== "NO_TOKEN_PROVIDED") {
 }
 
 export default bot;
+ 
