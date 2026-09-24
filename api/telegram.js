@@ -201,7 +201,7 @@ function numberedMainMenuText() {
   return (
     `╔══════════════════════════════╗\n` +
     `║  RADIANT QUEEN • PASIYA MAX\n` +
-    `║  VERSION 2.1 | GEMINI AI\n` +
+    `║  VERSION 2.2 | GEMINI AI\n` +
     `╚══════════════════════════════╝\n\n` +
     `WEB     radiant-queen-pasiya-max-v2.vercel.app\n` +
     `STRIDE  strideclub-platform-6b71a.containers.snapdeploy.app\n` +
@@ -345,7 +345,7 @@ function adminKeyboard() {
 
 function statusText(ctx) {
   return (
-    `RADIANT QUEEN • PASIYA MAX v2.1\n` +
+    `RADIANT QUEEN • PASIYA MAX v2.2\n` +
     `Token: ${BOT_TOKEN ? 'yes' : 'NO'}\n` +
     `Gemini: ${GEMINI_KEY ? 'yes' : 'NO'}\n` +
     `ADMIN_ID: ${ADMIN_ID ? 'yes' : 'NO'}\n` +
@@ -606,6 +606,7 @@ function buildBot() {
         `/social /strideclub /id /status\n` +
         `/setwelcome <text> — set group welcome (Admin)\n` +
         `/groupinfo — group + Supabase settings\n` +
+        `/antilink on|off — link filter (admins)\n` +
         (isAdmin(ctx) ? `/admin — founder panel\n` : '') +
         `\nTools: Translate, Summarize, Rewrite, Caption, Hashtags, Bio, Ideas, Photo caption, Running tip\n` +
         `Send a photo anytime for vision.`,
@@ -655,13 +656,11 @@ function buildBot() {
 
       let count = '?';
       try {
-        // Works across Telegraf versions
         count = await ctx.telegram.callApi('getChatMemberCount', {
           chat_id: chatId,
         });
       } catch (e1) {
         try {
-          // Legacy API name fallback
           count = await ctx.telegram.callApi('getChatMembersCount', {
             chat_id: chatId,
           });
@@ -686,11 +685,60 @@ function buildBot() {
           `Bot status: ${botAdmin}\n` +
           `Anti-link: ${settings.antiLink ? 'ON' : 'OFF'}\n` +
           `Welcome: ${settings.welcome ? settings.welcome.slice(0, 120) : '(not set)'}\n\n` +
-          `Commands:\n/setwelcome <text>\n/groupinfo`
+          `Commands:\n/setwelcome <text>\n/groupinfo\n/antilink on|off`
       );
     } catch (err) {
       console.error('groupinfo', err);
       await ctx.reply(`groupinfo failed: ${String(err?.message || err).slice(0, 160)}`);
+    }
+  });
+
+  bot.command('antilink', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply(
+          'Use inside a group:\n/antilink on\n/antilink off\n/antilink'
+        );
+        return;
+      }
+      if (!(await ensureGroupAdmin(ctx))) return;
+      if (!(await isUserGroupAdmin(ctx))) {
+        await ctx.reply('Only group admins can change anti-link.');
+        return;
+      }
+
+      const arg = (ctx.message.text || '')
+        .replace(/^\/antilink(@\w+)?\s*/i, '')
+        .trim()
+        .toLowerCase();
+
+      if (!arg) {
+        const s = await loadGroupSettings(ctx.chat.id);
+        await ctx.reply(
+          `Anti-link: ${s.antiLink ? 'ON' : 'OFF'}\n\n/antilink on\n/antilink off`
+        );
+        return;
+      }
+
+      if (arg !== 'on' && arg !== 'off') {
+        await ctx.reply('Usage:\n/antilink on\n/antilink off\n/antilink');
+        return;
+      }
+
+      const on = arg === 'on';
+      const result = await saveGroupSettings(ctx.chat.id, {
+        antiLink: on,
+        groupMode: on ? 'antilink' : 'normal',
+      });
+
+      await ctx.reply(
+        result.ok
+          ? `Anti-link ${on ? 'ON' : 'OFF'} (Supabase).`
+          : `Failed: ${result.error}`
+      );
+    } catch (err) {
+      console.error('antilink', err);
+      await ctx.reply('antilink failed.');
     }
   });
 
