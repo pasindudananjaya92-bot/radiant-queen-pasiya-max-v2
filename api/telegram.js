@@ -43,6 +43,11 @@ Open the site for: Dashboard, Logbook, Leaderboard, Events, AI Coach, Agent Logs
 const pendingTool = new Map();
 const groupSettings = new Map(); // groupId -> { antiLink: boolean, welcome: string }
 
+function toChatId(chatId) {
+  const n = Number(chatId);
+  return Number.isFinite(n) ? n : chatId;
+}
+
 async function loadGroupSettings(chatId) {
   const key = String(chatId);
   if (groupSettings.has(key)) return groupSettings.get(key);
@@ -50,8 +55,8 @@ async function loadGroupSettings(chatId) {
 
   const { data, error } = await supabase
     .from('group_settings')
-    .select('welcome, rate_limit_enabled, group_mode')
-    .eq('chat_id', key)
+    .select('welcome, rate_limit_enabled, group_mode, anti_link')
+    .eq('chat_id', toChatId(chatId))
     .maybeSingle();
 
   if (error) {
@@ -61,7 +66,10 @@ async function loadGroupSettings(chatId) {
 
   const row = {
     welcome: data?.welcome || '',
-    antiLink: data?.group_mode === 'antilink' || data?.group_mode === 'anti_link',
+    antiLink:
+      Boolean(data?.anti_link) ||
+      data?.group_mode === 'antilink' ||
+      data?.group_mode === 'anti_link',
     rateLimit: Boolean(data?.rate_limit_enabled),
     groupMode: data?.group_mode || '',
   };
@@ -71,7 +79,7 @@ async function loadGroupSettings(chatId) {
 
 async function saveGroupSettings(chatId, patch) {
   const key = String(chatId);
-  const prev = (await loadGroupSettings(key)) || {};
+  const prev = (await loadGroupSettings(chatId)) || {};
   const antiLink =
     patch.antiLink !== undefined ? patch.antiLink : Boolean(prev.antiLink);
   const next = {
@@ -92,15 +100,16 @@ async function saveGroupSettings(chatId, patch) {
     return { ok: false, error: 'Supabase env missing on Vercel' };
   }
 
-  const { error } = await supabase.from('group_settings').upsert(
-    {
-      chat_id: key,
-      welcome: next.welcome || null,
-      group_mode: next.groupMode || (next.antiLink ? 'antilink' : 'normal'),
-      rate_limit_enabled: Boolean(next.rateLimit),
-    },
-    { onConflict: 'chat_id' }
-  );
+  const row = {
+    chat_id: toChatId(chatId),
+    welcome: next.welcome || null,
+    group_mode: next.groupMode || (next.antiLink ? 'antilink' : 'normal'),
+    rate_limit_enabled: Boolean(next.rateLimit),
+  };
+
+  const { error } = await supabase
+    .from('group_settings')
+    .upsert(row, { onConflict: 'chat_id' });
 
   if (error) {
     console.error('saveGroupSettings', error.message);
@@ -532,11 +541,42 @@ function buildBot() {
         `/menu — show main buttons\n` +
         `/ask <q> — Gemini\n` +
         `/social /strideclub /id /status\n` +
+        `/setwelcome <text> — set group welcome (Admin)\n` +
         (isAdmin(ctx) ? `/admin — founder panel\n` : '') +
         `\nTools: Translate, Summarize, Rewrite, Caption, Hashtags, Bio, Ideas, Photo caption, Running tip\n` +
         `Send a photo anytime for vision.`,
       mainMenuKeyboard(ctx)
     );
+  });
+
+  bot.command('setwelcome', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use /setwelcome inside a group.\nExample:\n/setwelcome Welcome to our official group!');
+        return;
+      }
+      if (!(await ensureGroupAdmin(ctx))) return;
+      if (!(await isUserGroupAdmin(ctx))) {
+        await ctx.reply('Only group admins can set welcome.');
+        return;
+      }
+
+      const raw = (ctx.message.text || '').replace(/^\/setwelcome(@\w+)?\s*/i, '').trim();
+      if (!raw) {
+        await ctx.reply('Usage:\n/setwelcome Welcome to our official group!');
+        return;
+      }
+
+      const result = await saveGroupSettings(ctx.chat.id, { welcome: raw.slice(0, 500) });
+      await ctx.reply(
+        result.ok
+          ? `Welcome saved to Supabase for this group.\n\nPreview:\n${raw.slice(0, 200)}`
+          : `Save failed: ${result.error}`
+      );
+    } catch (err) {
+      console.error('setwelcome', err);
+      await ctx.reply('setwelcome failed.');
+    }
   });
 
   bot.command('admin', async (ctx) => {
@@ -827,7 +867,7 @@ function buildBot() {
         await ctx.reply(
           `GROUP ADMIN LAB (Run inside group)\n\n` +
           `1 Group info\n` +
-          `2 Set welcome text\n` +
+          `2 Set welcome text (Use /setwelcome command)\n` +
           `3 Lock group\n` +
           `4 Unlock group\n` +
           `5 Anti-link ON\n` +
@@ -956,8 +996,7 @@ function buildBot() {
       }
 
       if (text === '2') {
-        pendingTool.set(uid, 'group_welcome_set');
-        await ctx.reply('Send the WELCOME message text now (one message). It will be stored for groups.');
+        await ctx.reply('To set welcome securely, use the command:\n/setwelcome Your welcome message here');
         return;
       }
 
@@ -1066,23 +1105,6 @@ function buildBot() {
       }
 
       await ctx.reply('Group Lab: use 1–7 or 0 to go back. For lock/unlock, run this inside the group.');
-      return;
-    }
-
-    if (mode === 'group_welcome_set') {
-      pendingTool.delete(uid);
-      const msg = text.slice(0, 500);
-      if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
-        const result = await saveGroupSettings(ctx.chat.id, { welcome: msg });
-        await ctx.reply(
-          result.ok
-            ? 'Welcome text saved for THIS group (Supabase + memory).'
-            : `Memory only. Supabase error: ${result.error}`
-        );
-      } else {
-        groupSettings.set('welcome_default', { welcome: msg });
-        await ctx.reply('Default welcome in memory only. Save from inside a group for DB.');
-      }
       return;
     }
 
