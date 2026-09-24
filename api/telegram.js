@@ -605,6 +605,7 @@ function buildBot() {
         `/ask <q> — Gemini\n` +
         `/social /strideclub /id /status\n` +
         `/setwelcome <text> — set group welcome (Admin)\n` +
+        `/groupinfo — group + Supabase settings\n` +
         (isAdmin(ctx) ? `/admin — founder panel\n` : '') +
         `\nTools: Translate, Summarize, Rewrite, Caption, Hashtags, Bio, Ideas, Photo caption, Running tip\n` +
         `Send a photo anytime for vision.`,
@@ -639,6 +640,39 @@ function buildBot() {
     } catch (err) {
       console.error('setwelcome', err);
       await ctx.reply('setwelcome failed.');
+    }
+  });
+
+  bot.command('groupinfo', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use /groupinfo inside a group.');
+        return;
+      }
+
+      const chat = await ctx.telegram.getChat(ctx.chat.id);
+      const count = await ctx.telegram.getChatMemberCount(ctx.chat.id);
+      const settings = await loadGroupSettings(ctx.chat.id);
+
+      let botAdmin = 'unknown';
+      try {
+        const me = await ctx.telegram.getChatMember(ctx.chat.id, ctx.botInfo.id);
+        botAdmin = me.status;
+      } catch (_) {}
+
+      await ctx.reply(
+        `GROUP INFO\n` +
+          `Title: ${chat.title || '-'}\n` +
+          `Chat ID: ${ctx.chat.id}\n` +
+          `Members: ${count}\n` +
+          `Bot status: ${botAdmin}\n` +
+          `Anti-link: ${settings.antiLink ? 'ON' : 'OFF'}\n` +
+          `Welcome: ${settings.welcome ? settings.welcome.slice(0, 120) : '(not set)'}\n\n` +
+          `Commands:\n/setwelcome <text>\n/groupinfo`
+      );
+    } catch (err) {
+      console.error('groupinfo', err);
+      await ctx.reply(`groupinfo failed: ${String(err?.message || err).slice(0, 120)}`);
     }
   });
 
