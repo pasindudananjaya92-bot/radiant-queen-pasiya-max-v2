@@ -782,15 +782,16 @@ function buildBot() {
     }
   });
 
-  // New members welcome handler
+  // New members welcome handler (Loads from Supabase)
   bot.on('new_chat_members', async (ctx) => {
     try {
-      const chatId = String(ctx.chat.id);
-      const settings = await loadGroupSettings(chatId);
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') return;
+
+      // Always load from Supabase (not only memory)
+      const settings = await loadGroupSettings(ctx.chat.id);
       const welcome =
-        settings.welcome ||
-        (await loadGroupSettings('welcome_default'))?.welcome ||
-        `Welcome to ${ctx.chat.title || 'the group'}! Use /menu in private chat with the bot for tools.`;
+        (settings.welcome && String(settings.welcome).trim()) ||
+        `Welcome to ${ctx.chat.title || 'the group'}!`;
 
       const members = ctx.message.new_chat_members || [];
       for (const user of members) {
@@ -996,7 +997,11 @@ function buildBot() {
       }
 
       if (text === '2') {
-        await ctx.reply('To set welcome securely, use the command:\n/setwelcome Your welcome message here');
+        await ctx.reply(
+          'Set welcome with this command IN THIS GROUP:\n\n' +
+            '/setwelcome Welcome to our official group!\n\n' +
+            'It saves to Supabase and shows when new members join.'
+        );
         return;
       }
 
@@ -1148,10 +1153,10 @@ export default async function handler(req, res) {
       return res.status(200).json({
         ok: true,
         service: 'radiant-queen-telegram',
-        hasToken: boolean(BOT_TOKEN),
-        hasGemini: boolean(GEMINI_KEY),
-        hasAdmin: boolean(ADMIN_ID),
-        hasGitHub: boolean(GITHUB_TOKEN),
+        hasToken: Boolean(BOT_TOKEN),
+        hasGemini: Boolean(GEMINI_KEY),
+        hasAdmin: Boolean(ADMIN_ID),
+        hasGitHub: Boolean(GITHUB_TOKEN),
         hasSupabase: Boolean(supabase),
       });
     }
