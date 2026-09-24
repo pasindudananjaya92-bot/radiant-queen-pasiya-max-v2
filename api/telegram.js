@@ -650,20 +650,38 @@ function buildBot() {
         return;
       }
 
-      const chat = await ctx.telegram.getChat(ctx.chat.id);
-      const count = await ctx.telegram.getChatMemberCount(ctx.chat.id);
-      const settings = await loadGroupSettings(ctx.chat.id);
+      const chatId = ctx.chat.id;
+      const chat = await ctx.telegram.getChat(chatId);
+
+      let count = '?';
+      try {
+        // Works across Telegraf versions
+        count = await ctx.telegram.callApi('getChatMemberCount', {
+          chat_id: chatId,
+        });
+      } catch (e1) {
+        try {
+          // Legacy API name fallback
+          count = await ctx.telegram.callApi('getChatMembersCount', {
+            chat_id: chatId,
+          });
+        } catch (e2) {
+          count = 'n/a';
+        }
+      }
+
+      const settings = await loadGroupSettings(chatId);
 
       let botAdmin = 'unknown';
       try {
-        const me = await ctx.telegram.getChatMember(ctx.chat.id, ctx.botInfo.id);
+        const me = await ctx.telegram.getChatMember(chatId, ctx.botInfo.id);
         botAdmin = me.status;
       } catch (_) {}
 
       await ctx.reply(
         `GROUP INFO\n` +
           `Title: ${chat.title || '-'}\n` +
-          `Chat ID: ${ctx.chat.id}\n` +
+          `Chat ID: ${chatId}\n` +
           `Members: ${count}\n` +
           `Bot status: ${botAdmin}\n` +
           `Anti-link: ${settings.antiLink ? 'ON' : 'OFF'}\n` +
@@ -672,7 +690,7 @@ function buildBot() {
       );
     } catch (err) {
       console.error('groupinfo', err);
-      await ctx.reply(`groupinfo failed: ${String(err?.message || err).slice(0, 120)}`);
+      await ctx.reply(`groupinfo failed: ${String(err?.message || err).slice(0, 160)}`);
     }
   });
 
@@ -1144,7 +1162,16 @@ function buildBot() {
       if (text === '1') {
         try {
           const chat = await ctx.telegram.getChat(chatId);
-          const count = await ctx.telegram.getChatMemberCount(chatId);
+          let count = '?';
+          try {
+            count = await ctx.telegram.callApi('getChatMemberCount', { chat_id: chatId });
+          } catch (e1) {
+            try {
+              count = await ctx.telegram.callApi('getChatMembersCount', { chat_id: chatId });
+            } catch (e2) {
+              count = 'n/a';
+            }
+          }
           const settings = await loadGroupSettings(chatId);
           await ctx.reply(
             `GROUP INFO\n` +
