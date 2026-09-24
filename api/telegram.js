@@ -42,10 +42,64 @@ Open the site for: Dashboard, Logbook, Leaderboard, Events, AI Coach, Agent Logs
 
 const pendingTool = new Map();
 const groupSettings = new Map(); // groupId -> { antiLink: boolean, welcome: string }
+const rateMap = new Map(); // memory fallback for rate limit
+const RATE_WINDOW_MS = 60 * 1000; // 1 minute
+const RATE_MAX_HITS = 8; // max AI calls per user per window
 
 function toChatId(chatId) {
   const n = Number(chatId);
   return Number.isFinite(n) ? n : chatId;
+}
+
+async function checkRateLimit(userId) {
+  const id = String(userId);
+  const now = Date.now();
+
+  if (!supabase) {
+    const row = rateMap.get(id) || { windowStart: now, hits: 0 };
+    if (now - row.windowStart > RATE_WINDOW_MS) {
+      row.windowStart = now;
+      row.hits = 0;
+    }
+    row.hits += 1;
+    rateMap.set(id, row);
+    if (row.hits > RATE_MAX_HITS) {
+      return {
+        ok: false,
+        waitSec: Math.ceil((RATE_WINDOW_MS - (now - row.windowStart)) / 1000),
+      };
+    }
+    return { ok: true };
+  }
+
+  const { data } = await supabase
+    .from('rq_rate_limits')
+    .select('window_start, hit_count')
+    .eq('user_id', id)
+    .maybeSingle();
+
+  let windowStart = data?.window_start ? new Date(data.window_start).getTime() : now;
+  let hits = data?.hit_count || 0;
+
+  if (now - windowStart > RATE_WINDOW_MS) {
+    windowStart = now;
+    hits = 0;
+  }
+  hits += 1;
+
+  await supabase.from('rq_rate_limits').upsert({
+    user_id: id,
+    window_start: new Date(windowStart).toISOString(),
+    hit_count: hits,
+  });
+
+  if (hits > RATE_MAX_HITS) {
+    return {
+      ok: false,
+      waitSec: Math.ceil((RATE_WINDOW_MS - (now - windowStart)) / 1000),
+    };
+  }
+  return { ok: true };
 }
 
 async function loadGroupSettings(chatId) {
@@ -464,6 +518,15 @@ async function fetchGitHubStatus() {
 async function handlePhoto(ctx) {
   const uid = String(ctx.from.id);
   const mode = pendingTool.get(uid);
+
+  if (!isAdmin(ctx)) {
+    const rate = await checkRateLimit(uid);
+    if (!rate.ok) {
+      await ctx.reply(`Slow down. Retry in ~${rate.waitSec}s (free-tier protection).`);
+      return;
+    }
+  }
+
   const photos = ctx.message.photo || [];
   const best = photos[photos.length - 1];
   const caption = ctx.message.caption || '';
@@ -611,6 +674,15 @@ function buildBot() {
   });
 
   bot.command('ask', async (ctx) => {
+    const uid = String(ctx.from.id);
+    if (!isAdmin(ctx)) {
+      const rate = await checkRateLimit(uid);
+      if (!rate.ok) {
+        await ctx.reply(`Slow down a bit. Try again in ~${rate.waitSec}s (free-tier protection).`);
+        return;
+      }
+    }
+
     const q = (ctx.message.text || '').replace(/^\/ask(@\w+)?\s*/i, '').trim();
     if (!q) {
       await ctx.reply('Usage: /ask your question', mainMenuKeyboard(ctx));
@@ -661,6 +733,14 @@ function buildBot() {
 
   bot.action('stride_summary', async (ctx) => {
     await ctx.answerCbQuery();
+    const uid = String(ctx.from.id);
+    if (!isAdmin(ctx)) {
+      const rate = await checkRateLimit(uid);
+      if (!rate.ok) {
+        await ctx.answerCbQuery(`Slow down. Retry in ~${rate.waitSec}s`);
+        return;
+      }
+    }
     await ctx.sendChatAction('typing');
     const out = await generateReply(
       'In 5 short lines, explain what StrideClub is (running club platform: log runs, leaderboard, events, AI coach) and why a runner should open the live link.',
@@ -764,7 +844,15 @@ function buildBot() {
 
   bot.action('tool_run_tip', async (ctx) => {
     await ctx.answerCbQuery();
-    pendingTool.delete(String(ctx.from.id));
+    const uid = String(ctx.from.id);
+    if (!isAdmin(ctx)) {
+      const rate = await checkRateLimit(uid);
+      if (!rate.ok) {
+        await ctx.answerCbQuery(`Slow down. Retry in ~${rate.waitSec}s`);
+        return;
+      }
+    }
+    pendingTool.delete(uid);
     await ctx.sendChatAction('typing');
     const tip = await generateReply(
       'Give one practical running tip for today (max 6 lines). Sri Lankan amateur runner context OK.',
@@ -787,7 +875,6 @@ function buildBot() {
     try {
       if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') return;
 
-      // Always load from Supabase (not only memory)
       const settings = await loadGroupSettings(ctx.chat.id);
       const welcome =
         (settings.welcome && String(settings.welcome).trim()) ||
@@ -979,6 +1066,13 @@ function buildBot() {
       }
 
       try {
+        if (!isAdmin(ctx)) {
+          const rate = await checkRateLimit(uid);
+          if (!rate.ok) {
+            await ctx.reply(`Slow down. Retry in ~${rate.waitSec}s.`);
+            return;
+          }
+        }
         await ctx.sendChatAction('typing');
         const out = await generateReply(prompt, ctx);
         await ctx.reply(out, mainMenuKeyboard(ctx));
@@ -1111,6 +1205,14 @@ function buildBot() {
 
       await ctx.reply('Group Lab: use 1–7 or 0 to go back. For lock/unlock, run this inside the group.');
       return;
+    }
+
+    if (!isAdmin(ctx)) {
+      const rate = await checkRateLimit(uid);
+      if (!rate.ok) {
+        await ctx.reply(`Slow down. Retry in ~${rate.waitSec}s.`);
+        return;
+      }
     }
 
     await ctx.sendChatAction('typing');
