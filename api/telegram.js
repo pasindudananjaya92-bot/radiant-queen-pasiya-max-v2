@@ -1,4 +1,4 @@
-Import { Telegraf, Markup } from 'telegraf';
+import { Telegraf, Markup } from 'telegraf';
 import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 
