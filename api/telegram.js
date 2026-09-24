@@ -1,4 +1,4 @@
-import { Telegraf, Markup } from 'telegraf';
+Import { Telegraf, Markup } from 'telegraf';
 import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
 
@@ -607,6 +607,7 @@ function buildBot() {
         `/setwelcome <text> — set group welcome (Admin)\n` +
         `/groupinfo — group + Supabase settings\n` +
         `/antilink on|off — link filter (admins)\n` +
+        `/usage — founder usage snapshot\n` +
         (isAdmin(ctx) ? `/admin — founder panel\n` : '') +
         `\nTools: Translate, Summarize, Rewrite, Caption, Hashtags, Bio, Ideas, Photo caption, Running tip\n` +
         `Send a photo anytime for vision.`,
@@ -739,6 +740,49 @@ function buildBot() {
     } catch (err) {
       console.error('antilink', err);
       await ctx.reply('antilink failed.');
+    }
+  });
+
+  bot.command('usage', async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only.');
+        return;
+      }
+
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+
+      const { count: groupCount, error: gErr } = await supabase
+        .from('group_settings')
+        .select('*', { count: 'exact', head: true });
+
+      const { data: rates, error: rErr } = await supabase
+        .from('rq_rate_limits')
+        .select('user_id, hit_count, window_start')
+        .order('hit_count', { ascending: false })
+        .limit(5);
+
+      if (gErr) console.error(gErr);
+      if (rErr) console.error(rErr);
+
+      const top =
+        (rates || [])
+          .map((r, i) => `${i + 1}. ${r.user_id} — ${r.hit_count} hits`)
+          .join('\n') || '(no rate rows yet)';
+
+      await ctx.reply(
+        `FOUNDER USAGE SNAPSHOT\n` +
+          `Groups configured: ${groupCount ?? 0}\n` +
+          `Supabase: yes\n` +
+          `Uptime (this instance): ${Math.round((Date.now() - bootTime) / 1000)}s\n\n` +
+          `Top rate rows:\n${top}`
+      );
+    } catch (err) {
+      console.error('usage', err);
+      await ctx.reply(`usage failed: ${String(err?.message || err).slice(0, 120)}`);
     }
   });
 
