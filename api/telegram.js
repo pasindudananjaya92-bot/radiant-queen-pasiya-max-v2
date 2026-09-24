@@ -1148,10 +1148,10 @@ export default async function handler(req, res) {
       return res.status(200).json({
         ok: true,
         service: 'radiant-queen-telegram',
-        hasToken: Boolean(BOT_TOKEN),
-        hasGemini: Boolean(GEMINI_KEY),
-        hasAdmin: Boolean(ADMIN_ID),
-        hasGitHub: Boolean(GITHUB_TOKEN),
+        hasToken: boolean(BOT_TOKEN),
+        hasGemini: boolean(GEMINI_KEY),
+        hasAdmin: boolean(ADMIN_ID),
+        hasGitHub: boolean(GITHUB_TOKEN),
         hasSupabase: Boolean(supabase),
       });
     }
