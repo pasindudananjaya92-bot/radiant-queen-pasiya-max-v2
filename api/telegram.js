@@ -607,6 +607,7 @@ function buildBot() {
         `/setwelcome <text> — set group welcome (Admin)\n` +
         `/groupinfo — group + Supabase settings\n` +
         `/antilink on|off — link filter (admins)\n` +
+        `/warn — warn a user (reply, admins)\n` +
         `/usage — founder usage snapshot\n` +
         (isAdmin(ctx) ? `/admin — founder panel\n` : '') +
         `\nTools: Translate, Summarize, Rewrite, Caption, Hashtags, Bio, Ideas, Photo caption, Running tip\n` +
@@ -740,6 +741,74 @@ function buildBot() {
     } catch (err) {
       console.error('antilink', err);
       await ctx.reply('antilink failed.');
+    }
+  });
+
+  bot.command('warn', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use /warn in a group. Reply to a user message:\n/warn spam');
+        return;
+      }
+      if (!(await ensureGroupAdmin(ctx))) return;
+      if (!(await isUserGroupAdmin(ctx))) {
+        await ctx.reply('Only group admins can warn.');
+        return;
+      }
+
+      const target = ctx.message.reply_to_message?.from;
+      if (!target || target.is_bot) {
+        await ctx.reply('Reply to the user message, then send:\n/warn reason');
+        return;
+      }
+
+      const reason =
+        (ctx.message.text || '').replace(/^\/warn(@\w+)?\s*/i, '').trim() ||
+        'No reason';
+
+      const chatId = toChatId(ctx.chat.id);
+      const userId = Number(target.id);
+
+      if (!supabase) {
+        await ctx.reply('Supabase not connected — cannot store warns.');
+        return;
+      }
+
+      const { data: prev } = await supabase
+        .from('rq_warns')
+        .select('warn_count')
+        .eq('chat_id', chatId)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      const nextCount = (prev?.warn_count || 0) + 1;
+
+      const { error } = await supabase.from('rq_warns').upsert(
+        {
+          chat_id: chatId,
+          user_id: userId,
+          warn_count: nextCount,
+          last_reason: reason.slice(0, 200),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'chat_id,user_id' }
+      );
+
+      if (error) {
+        await ctx.reply(`Warn save failed: ${error.message}`);
+        return;
+      }
+
+      const name = target.username
+        ? `@${target.username}`
+        : target.first_name || String(userId);
+
+      await ctx.reply(
+        `Warning issued.\nUser: ${name}\nCount: ${nextCount}\nReason: ${reason.slice(0, 120)}`
+      );
+    } catch (err) {
+      console.error('warn', err);
+      await ctx.reply('warn failed.');
     }
   });
 
