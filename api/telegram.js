@@ -609,6 +609,7 @@ function buildBot() {
         `/setrules <text> — set group rules (Admin)\n` +
         `/rules — read group rules\n` +
         `/groupinfo — group + Supabase settings\n` +
+        `/modcheck — check bot admin perms & features\n` +
         `/antilink on|off — link filter (admins)\n` +
         `/warn — warn a user (reply, admins)\n` +
         `/unwarn — remove one warn (reply, admins)\n` +
@@ -768,6 +769,47 @@ function buildBot() {
     } catch (err) {
       console.error('groupinfo', err);
       await ctx.reply(`groupinfo failed: ${String(err?.message || err).slice(0, 160)}`);
+    }
+  });
+
+  bot.command('modcheck', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use /modcheck inside a group to check bot configuration & permissions.');
+        return;
+      }
+
+      const chatId = ctx.chat.id;
+      let me;
+      try {
+        me = await ctx.telegram.getChatMember(chatId, ctx.botInfo.id);
+      } catch (err) {
+        await ctx.reply('Could not query bot membership.');
+        return;
+      }
+
+      const isAdm = me.status === 'administrator' || me.status === 'creator';
+      const settings = await loadGroupSettings(chatId);
+
+      let statusEmoji = isAdm ? '✅' : '❌';
+      let deleteMsg = me.can_delete_messages ? '✅' : '❌';
+      let restrictMem = me.can_restrict_members ? '✅' : '❌';
+      let inviteMem = me.can_invite_users ? '✅' : '❌';
+
+      await ctx.reply(
+        `🛡️ **RADIANT QUEEN MODCHECK** 🛡️\n\n` +
+        `• Bot Admin Status: ${statusEmoji} (${me.status})\n` +
+        `• Delete Messages: ${deleteMsg}\n` +
+        `• Restrict / Ban Members: ${restrictMem}\n` +
+        `• Add Users / Invite: ${inviteMem}\n` +
+        `• Anti-Link Protection: ${settings.antiLink ? '✅ ON' : '⚠️ OFF'}\n` +
+        `• Welcome & Captcha: ${settings.welcome ? '✅ Configured' : '⚠️ Default'}\n` +
+        `• Supabase DB Sync: ${supabase ? '✅ Connected' : '❌ Missing'}\n\n` +
+        `Tip: Make sure all permissions show ✅ for full automated protection!`
+      );
+    } catch (err) {
+      console.error('modcheck', err);
+      await ctx.reply('modcheck failed.');
     }
   });
 
