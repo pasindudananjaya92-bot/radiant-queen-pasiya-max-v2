@@ -107,7 +107,7 @@ async function loadGroupSettings(chatId) {
 
   const { data, error } = await supabase
     .from('group_settings')
-    .select('welcome, rate_limit_enabled, group_mode, anti_link')
+    .select('welcome, rate_limit_enabled, group_mode, anti_link, rules_text')
     .eq('chat_id', toChatId(chatId))
     .maybeSingle();
 
@@ -124,6 +124,7 @@ async function loadGroupSettings(chatId) {
       data?.group_mode === 'anti_link',
     rateLimit: Boolean(data?.rate_limit_enabled),
     groupMode: data?.group_mode || '',
+    rulesText: data?.rules_text || '',
   };
   groupSettings.set(key, row);
   return row;
@@ -145,6 +146,7 @@ async function saveGroupSettings(chatId, patch) {
         : antiLink
           ? 'antilink'
           : prev.groupMode || 'normal',
+    rulesText: patch.rulesText !== undefined ? patch.rulesText : prev.rulesText || '',
   };
   groupSettings.set(key, next);
 
@@ -157,6 +159,7 @@ async function saveGroupSettings(chatId, patch) {
     welcome: next.welcome || null,
     group_mode: next.groupMode || (next.antiLink ? 'antilink' : 'normal'),
     rate_limit_enabled: Boolean(next.rateLimit),
+    rules_text: next.rulesText || null,
   };
 
   const { error } = await supabase
@@ -603,6 +606,8 @@ function buildBot() {
         `/ask <q> — Gemini\n` +
         `/social /strideclub /id /status\n` +
         `/setwelcome <text> — set group welcome (Admin)\n` +
+        `/setrules <text> — set group rules (Admin)\n` +
+        `/rules — read group rules\n` +
         `/groupinfo — group + Supabase settings\n` +
         `/antilink on|off — link filter (admins)\n` +
         `/warn — warn a user (reply, admins)\n` +
@@ -642,6 +647,78 @@ function buildBot() {
     } catch (err) {
       console.error('setwelcome', err);
       await ctx.reply('setwelcome failed.');
+    }
+  });
+
+  bot.command('setrules', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use in a group:\n/setrules No spam. Be respectful. No links without admin OK.');
+        return;
+      }
+      if (!(await ensureGroupAdmin(ctx))) return;
+      if (!(await isUserGroupAdmin(ctx))) {
+        await ctx.reply('Only group admins can set rules.');
+        return;
+      }
+      const raw = (ctx.message.text || '').replace(/^\/setrules(@\w+)?\s*/i, '').trim();
+      if (!raw) {
+        await ctx.reply('Usage:\n/setrules Your group rules here...');
+        return;
+      }
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const chatId = toChatId(ctx.chat.id);
+      const { error } = await supabase.from('group_settings').upsert(
+        {
+          chat_id: chatId,
+          rules_text: raw.slice(0, 3500),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'chat_id' }
+      );
+      if (error) {
+        const r2 = await supabase.from('group_settings').upsert(
+          { chat_id: chatId, rules_text: raw.slice(0, 3500) },
+          { onConflict: 'chat_id' }
+        );
+        if (r2.error) {
+          await ctx.reply(`Save failed: ${r2.error.message}`);
+          return;
+        }
+      }
+      await ctx.reply('Rules saved. Members can use /rules');
+    } catch (err) {
+      console.error('setrules', err);
+      await ctx.reply('setrules failed.');
+    }
+  });
+
+  bot.command('rules', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use /rules inside a group.');
+        return;
+      }
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const { data } = await supabase
+        .from('group_settings')
+        .select('rules_text, welcome')
+        .eq('chat_id', toChatId(ctx.chat.id))
+        .maybeSingle();
+
+      const text =
+        (data?.rules_text && data.rules_text.trim()) ||
+        'No rules set yet. Admins: /setrules Your rules here';
+      await ctx.reply(`GROUP RULES\n\n${text.slice(0, 3500)}`);
+    } catch (err) {
+      console.error('rules', err);
+      await ctx.reply('rules failed.');
     }
   });
 
@@ -686,7 +763,7 @@ function buildBot() {
           `Bot status: ${botAdmin}\n` +
           `Anti-link: ${settings.antiLink ? 'ON' : 'OFF'}\n` +
           `Welcome: ${settings.welcome ? settings.welcome.slice(0, 120) : '(not set)'}\n\n` +
-          `Commands:\n/setwelcome <text>\n/groupinfo\n/antilink on|off`
+          `Commands:\n/setwelcome <text>\n/setrules <text>\n/rules\n/groupinfo\n/antilink on|off`
       );
     } catch (err) {
       console.error('groupinfo', err);
@@ -1176,6 +1253,49 @@ function buildBot() {
     await ctx.reply(tip, toolsKeyboard());
   });
 
+  bot.action(/^verify_join:(.+):(\d+)$/, async (ctx) => {
+    try {
+      const chatId = ctx.match[1];
+      const userId = Number(ctx.match[2]);
+
+      if (ctx.from.id !== userId) {
+        await ctx.answerCbQuery('Only the new member can verify.');
+        return;
+      }
+
+      await ctx.telegram.restrictChatMember(chatId, userId, {
+        permissions: {
+          can_send_messages: true,
+          can_send_audios: true,
+          can_send_documents: true,
+          can_send_photos: true,
+          can_send_videos: true,
+          can_send_video_notes: true,
+          can_send_voice_notes: true,
+          can_send_polls: true,
+          can_send_other_messages: true,
+          can_add_web_page_previews: true,
+        },
+      });
+
+      if (supabase) {
+        await supabase
+          .from('rq_pending_joins')
+          .delete()
+          .eq('chat_id', toChatId(chatId))
+          .eq('user_id', userId);
+      }
+
+      await ctx.answerCbQuery('Verified!');
+      await ctx.reply(`Verified: ${ctx.from.first_name || 'member'} can chat now. /rules`);
+    } catch (err) {
+      console.error('verify_join', err);
+      try {
+        await ctx.answerCbQuery('Verify failed — bot needs Restrict members');
+      } catch (_) {}
+    }
+  });
+
   bot.on('photo', async (ctx) => {
     try {
       await handlePhoto(ctx);
@@ -1185,7 +1305,7 @@ function buildBot() {
     }
   });
 
-  // New members welcome handler (Loads from Supabase)
+  // New members welcome handler & Captcha restriction
   bot.on('new_chat_members', async (ctx) => {
     try {
       if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') return;
@@ -1198,8 +1318,46 @@ function buildBot() {
       const members = ctx.message.new_chat_members || [];
       for (const user of members) {
         if (user.is_bot) continue;
+
+        try {
+          await ctx.telegram.restrictChatMember(ctx.chat.id, user.id, {
+            permissions: {
+              can_send_messages: false,
+              can_send_audios: false,
+              can_send_documents: false,
+              can_send_photos: false,
+              can_send_videos: false,
+              can_send_video_notes: false,
+              can_send_voice_notes: false,
+              can_send_polls: false,
+              can_send_other_messages: false,
+              can_add_web_page_previews: false,
+            },
+          });
+        } catch (e) {
+          console.error('join restrict', e);
+        }
+
+        if (supabase) {
+          await supabase.from('rq_pending_joins').upsert({
+            chat_id: toChatId(ctx.chat.id),
+            user_id: Number(user.id),
+            created_at: new Date().toISOString(),
+          });
+        }
+
         const name = user.first_name || 'friend';
-        await ctx.reply(`${welcome}\n\nHi, ${name}!`);
+        await ctx.reply(
+          `${welcome}\n\nHi, ${name}!\nPress VERIFY to chat. Read /rules`,
+          Markup.inlineKeyboard([
+            [
+              Markup.button.callback(
+                'VERIFY ✅',
+                `verify_join:${ctx.chat.id}:${user.id}`
+              ),
+            ],
+          ])
+        );
       }
     } catch (err) {
       console.error('welcome handler', err);
