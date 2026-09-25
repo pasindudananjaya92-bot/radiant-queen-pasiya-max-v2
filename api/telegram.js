@@ -1231,6 +1231,29 @@ function buildBot() {
 
   bot.command('stride', async (ctx) => {
     try {
+      const arg = (ctx.message.text || '')
+        .replace(/^\/stride(@\w+)?\s*/i, '')
+        .trim()
+        .toLowerCase();
+
+      if (arg === 'agents' || arg === 'agent') {
+        await ctx.reply(
+          `STRIDECLUB + TELEGRAM = 6 AGENTS\n\n` +
+            `Web agents (StrideClub site):\n` +
+            `1) Pasiya AI Coach — training plans\n` +
+            `2) Community Moderator — spam scan\n` +
+            `3) Events & Reminders — group runs\n` +
+            `4) Data Sync — activities\n` +
+            `5) Social Poster — captions / posts\n\n` +
+            `6) Telegram Bridge (this bot)\n` +
+            `   /runxp /xptop /dailytip /modcheck\n` +
+            `   /warn /antilink /setwelcome\n\n` +
+            `Open hub:\n${STRIDE_BASE}\n\n` +
+            `/stride — live health + leaderboard`
+        );
+        return;
+      }
+
       await ctx.sendChatAction('typing');
       const health = await fetchStrideJson('/api/health');
       const board = await fetchStrideJson('/api/leaderboard');
@@ -1260,7 +1283,7 @@ function buildBot() {
         msg += `\nLeaderboard: ${board.error || 'unavailable'}\n`;
       }
 
-      msg += `\nSite: ${STRIDE_BASE}\nXP here: /runxp | /xptop`;
+      msg += `\nSite: ${STRIDE_BASE}\nAgents: /stride agents\nXP: /runxp | /xptop | /logrun`;
       await ctx.reply(msg.slice(0, 3500));
     } catch (err) {
       console.error('stride', err);
@@ -1279,6 +1302,111 @@ function buildBot() {
     } catch (err) {
       console.error('dailytip', err);
       await ctx.reply('dailytip failed.');
+    }
+  });
+
+
+
+  bot.command('logrun', async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+
+      const uid = String(ctx.from.id);
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply(`Slow down. Retry in ~${rate.waitSec}s.`);
+          return;
+        }
+      }
+
+      // Self honor log: +3 XP max once per rate window (soft)
+      const note = (ctx.message.text || '')
+        .replace(/^\/logrun(@\w+)?\s*/i, '')
+        .trim()
+        .slice(0, 80);
+
+      const res = await addRunXp(
+        ctx.from,
+        3,
+        ctx.chat?.id,
+        note ? `logrun: ${note}` : 'logrun self'
+      );
+
+      if (!res.ok) {
+        await ctx.reply(`logrun failed: ${res.error}`);
+        return;
+      }
+
+      await ctx.reply(
+        `RUN LOGGED (+3 XP)\n` +
+          `XP: ${res.xp} | Level ${res.level}\n` +
+          `Honor runs: ${res.runs}\n` +
+          (note ? `Note: ${note}\n` : '') +
+          `Top: /xptop | Bridge: /stride`
+      );
+    } catch (err) {
+      console.error('logrun', err);
+      await ctx.reply('logrun failed.');
+    }
+  });
+
+  bot.command('broadcast', async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only.');
+        return;
+      }
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+
+      const text = (ctx.message.text || '')
+        .replace(/^\/broadcast(@\w+)?\s*/i, '')
+        .trim();
+      if (!text) {
+        await ctx.reply('Usage:\n/broadcast Your message to all configured groups');
+        return;
+      }
+
+      const { data: groups, error } = await supabase
+        .from('group_settings')
+        .select('chat_id')
+        .limit(50);
+
+      if (error) {
+        await ctx.reply(`broadcast failed: ${error.message}`);
+        return;
+      }
+
+      const ids = (groups || []).map((g) => g.chat_id).filter(Boolean);
+      if (!ids.length) {
+        await ctx.reply('No groups in group_settings yet.');
+        return;
+      }
+
+      let ok = 0;
+      let fail = 0;
+      for (const id of ids) {
+        try {
+          await ctx.telegram.sendMessage(
+            id,
+            `ANNOUNCEMENT\n\n${text.slice(0, 3000)}`
+          );
+          ok += 1;
+        } catch {
+          fail += 1;
+        }
+      }
+
+      await ctx.reply(`Broadcast done.\nSent: ${ok}\nFailed: ${fail}\nTargets: ${ids.length}`);
+    } catch (err) {
+      console.error('broadcast', err);
+      await ctx.reply('broadcast failed.');
     }
   });
 
