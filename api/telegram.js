@@ -49,6 +49,66 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
+const STRIDE_BASE =
+  process.env.STRIDE_API_BASE ||
+  'https://strideclub-platform-6b71a.containers.snapdeploy.app';
+
+function xpLevel(xp) {
+  const x = Math.max(0, xp || 0);
+  const level = Math.floor(Math.sqrt(x / 10)) + 1;
+  const nextAt = 10 * level * level;
+  return { level, nextAt, xp: x };
+}
+
+async function addRunXp(user, delta, chatId, reason) {
+  if (!supabase) return { ok: false, error: 'No Supabase' };
+  const userId = Number(user.id);
+  const { data: prev } = await supabase
+    .from('rq_run_xp')
+    .select('xp, runs_logged')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  const xp = (prev?.xp || 0) + delta;
+  const runs = (prev?.runs_logged || 0) + (delta > 0 ? 1 : 0);
+
+  const { error } = await supabase.from('rq_run_xp').upsert({
+    user_id: userId,
+    username: user.username || user.first_name || String(userId),
+    xp,
+    runs_logged: runs,
+    updated_at: new Date().toISOString(),
+  });
+
+  if (error) return { ok: false, error: error.message };
+
+  await supabase.from('rq_run_xp_log').insert({
+    user_id: userId,
+    chat_id: chatId ? toChatId(chatId) : null,
+    delta,
+    reason: (reason || '').slice(0, 120),
+  });
+
+  return { ok: true, xp, runs, ...xpLevel(xp) };
+}
+
+async function fetchStrideJson(path) {
+  try {
+    const r = await fetch(`${STRIDE_BASE}${path}`, {
+      headers: { Accept: 'application/json' },
+      signal: AbortSignal.timeout(12000),
+    });
+    const text = await r.text();
+    if (!r.ok || text.trim().startsWith('<')) {
+      return { ok: false, error: `HTTP ${r.status} (sleep or HTML)` };
+    }
+    return { ok: true, data: JSON.parse(text) };
+  } catch (e) {
+    return { ok: false, error: String(e?.message || e).slice(0, 120) };
+  }
+}
+
+
 async function checkRateLimit(userId) {
   const id = String(userId);
   const now = Date.now();
@@ -1075,6 +1135,153 @@ function buildBot() {
       await ctx.reply(`usage failed: ${String(err?.message || err).slice(0, 120)}`);
     }
   });
+
+
+  bot.command('runxp', async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+
+      const arg = (ctx.message.text || '')
+        .replace(/^\/runxp(@\w+)?\s*/i, '')
+        .trim();
+
+      // Admin award: reply + /runxp 5
+      if (arg && /^-?\d+$/.test(arg) && ctx.message.reply_to_message?.from) {
+        if (!(await isUserGroupAdmin(ctx)) && !isAdmin(ctx)) {
+          await ctx.reply('Only admins can award XP.');
+          return;
+        }
+        const delta = Math.max(-50, Math.min(50, parseInt(arg, 10)));
+        const target = ctx.message.reply_to_message.from;
+        const res = await addRunXp(
+          target,
+          delta,
+          ctx.chat?.id,
+          `admin award by ${ctx.from.id}`
+        );
+        if (!res.ok) {
+          await ctx.reply(`XP failed: ${res.error}`);
+          return;
+        }
+        await ctx.reply(
+          `XP ${delta >= 0 ? '+' : ''}${delta} → ${target.first_name || target.id}\n` +
+            `Total XP: ${res.xp} | Level ${res.level} | Runs: ${res.runs}`
+        );
+        return;
+      }
+
+      const userId = Number(ctx.from.id);
+      const { data } = await supabase
+        .from('rq_run_xp')
+        .select('xp, runs_logged, username')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      const xp = data?.xp || 0;
+      const runs = data?.runs_logged || 0;
+      const lv = xpLevel(xp);
+
+      await ctx.reply(
+        `RUNNER XP\n` +
+          `Name: ${data?.username || ctx.from.first_name}\n` +
+          `XP: ${lv.xp}\n` +
+          `Level: ${lv.level}\n` +
+          `Next level at: ${lv.nextAt} XP\n` +
+          `Honor runs logged: ${runs}\n\n` +
+          `Admins: reply to user → /runxp 5\n` +
+          `Top: /xptop\n` +
+          `StrideClub: /stride`
+      );
+    } catch (err) {
+      console.error('runxp', err);
+      await ctx.reply('runxp failed.');
+    }
+  });
+
+  bot.command('xptop', async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const { data, error } = await supabase
+        .from('rq_run_xp')
+        .select('username, xp, runs_logged')
+        .order('xp', { ascending: false })
+        .limit(10);
+      if (error) {
+        await ctx.reply(`xptop failed: ${error.message}`);
+        return;
+      }
+      const lines = (data || [])
+        .map(
+          (r, i) =>
+            `${i + 1}. ${r.username || 'runner'} — ${r.xp} XP (L${xpLevel(r.xp).level})`
+        )
+        .join('\n');
+      await ctx.reply(`RUNNER XP TOP 10\n\n${lines || '(empty)'}`);
+    } catch (err) {
+      console.error('xptop', err);
+      await ctx.reply('xptop failed.');
+    }
+  });
+
+  bot.command('stride', async (ctx) => {
+    try {
+      await ctx.sendChatAction('typing');
+      const health = await fetchStrideJson('/api/health');
+      const board = await fetchStrideJson('/api/leaderboard');
+
+      let msg = `STRIDECLUB BRIDGE (Agent 6 — Telegram)\nBase: ${STRIDE_BASE}\n\n`;
+
+      if (health.ok) {
+        msg += `Health: OK\n`;
+        if (health.data?.ok !== undefined) msg += `ok: ${health.data.ok}\n`;
+      } else {
+        msg += `Health: offline/sleep — ${health.error}\nOpen site to wake.\n`;
+      }
+
+      if (board.ok && board.data) {
+        const rows = board.data.leaderboard || board.data.runners || board.data;
+        if (Array.isArray(rows) && rows.length) {
+          msg += `\nLeaderboard (top):\n`;
+          rows.slice(0, 5).forEach((r, i) => {
+            const name = r.displayName || r.name || r.user_name || r.uid || 'runner';
+            const km = r.totalKm ?? r.distanceKm ?? r.total_distance ?? '?';
+            msg += `${i + 1}. ${name} — ${km} km\n`;
+          });
+        } else {
+          msg += `\nLeaderboard: loaded (format varies)\n`;
+        }
+      } else {
+        msg += `\nLeaderboard: ${board.error || 'unavailable'}\n`;
+      }
+
+      msg += `\nSite: ${STRIDE_BASE}\nXP here: /runxp | /xptop`;
+      await ctx.reply(msg.slice(0, 3500));
+    } catch (err) {
+      console.error('stride', err);
+      await ctx.reply('stride bridge failed.');
+    }
+  });
+
+  bot.command('dailytip', async (ctx) => {
+    try {
+      await ctx.sendChatAction('typing');
+      const out = await generateReply(
+        'Give ONE practical running tip for club amateurs (max 6 short lines). Actionable. No medical claims.',
+        ctx
+      );
+      await ctx.reply(`DAILY RUNNING TIP\n\n${out}`);
+    } catch (err) {
+      console.error('dailytip', err);
+      await ctx.reply('dailytip failed.');
+    }
+  });
+
 
   bot.command('admin', async (ctx) => {
     if (!isAdmin(ctx)) {
