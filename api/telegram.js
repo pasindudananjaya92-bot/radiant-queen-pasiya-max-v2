@@ -606,6 +606,7 @@ function buildBot() {
         `/groupinfo — group + Supabase settings\n` +
         `/antilink on|off — link filter (admins)\n` +
         `/warn — warn a user (reply, admins)\n` +
+        `/unwarn — remove one warn (reply, admins)\n` +
         `/usage — founder usage snapshot\n` +
         (isAdmin(ctx) ? `/admin — founder panel\n` : '') +
         `\nTools: Translate, Summarize, Rewrite, Caption, Hashtags, Bio, Ideas, Photo caption, Running tip\n` +
@@ -797,16 +798,119 @@ function buildBot() {
         return;
       }
 
+      let extra = '';
+      if (nextCount >= 3) {
+        try {
+          const until = Math.floor(Date.now() / 1000) + 60 * 60; // 1 hour
+          await ctx.telegram.restrictChatMember(ctx.chat.id, userId, {
+            permissions: {
+              can_send_messages: false,
+              can_send_audios: false,
+              can_send_documents: false,
+              can_send_photos: false,
+              can_send_videos: false,
+              can_send_video_notes: false,
+              can_send_voice_notes: false,
+              can_send_polls: false,
+              can_send_other_messages: false,
+              can_add_web_page_previews: false,
+            },
+            until_date: until,
+          });
+          extra = '\nAuto-mute: 1 hour (3+ warns).';
+        } catch (muteErr) {
+          extra =
+            '\nAuto-mute failed (bot needs Restrict members): ' +
+            String(muteErr?.message || muteErr).slice(0, 80);
+        }
+      }
+
       const name = target.username
         ? `@${target.username}`
         : target.first_name || String(userId);
 
       await ctx.reply(
-        `Warning issued.\nUser: ${name}\nCount: ${nextCount}\nReason: ${reason.slice(0, 120)}`
+        `Warning issued.\nUser: ${name}\nCount: ${nextCount}\nReason: ${reason.slice(0, 120)}${extra}`
       );
     } catch (err) {
       console.error('warn', err);
       await ctx.reply('warn failed.');
+    }
+  });
+
+  bot.command('unwarn', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use /unwarn in a group. Reply to the user.');
+        return;
+      }
+      if (!(await ensureGroupAdmin(ctx))) return;
+      if (!(await isUserGroupAdmin(ctx))) {
+        await ctx.reply('Only group admins can unwarn.');
+        return;
+      }
+
+      const target = ctx.message.reply_to_message?.from;
+      if (!target) {
+        await ctx.reply('Reply to the user, then send /unwarn');
+        return;
+      }
+
+      const chatId = toChatId(ctx.chat.id);
+      const userId = Number(target.id);
+
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+
+      const { data: prev } = await supabase
+        .from('rq_warns')
+        .select('warn_count')
+        .eq('chat_id', chatId)
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      const nextCount = Math.max(0, (prev?.warn_count || 0) - 1);
+
+      await supabase.from('rq_warns').upsert(
+        {
+          chat_id: chatId,
+          user_id: userId,
+          warn_count: nextCount,
+          last_reason: 'unwarn',
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'chat_id,user_id' }
+      );
+
+      try {
+        await ctx.telegram.restrictChatMember(ctx.chat.id, userId, {
+          permissions: {
+            can_send_messages: true,
+            can_send_audios: true,
+            can_send_documents: true,
+            can_send_photos: true,
+            can_send_videos: true,
+            can_send_video_notes: true,
+            can_send_voice_notes: true,
+            can_send_polls: true,
+            can_send_other_messages: true,
+            can_add_web_page_previews: true,
+          },
+        });
+      } catch (_) {}
+
+      const name = target.username
+        ? `@${target.username}`
+        : target.first_name || String(userId);
+
+      await ctx.reply(
+        `Unwarn: ${name}\nWarn count now: ${nextCount}\nUnmuted if restricted.`
+      );
+    } catch (err) {
+      console.error('unwarn', err);
+      await ctx.reply('unwarn failed.');
     }
   });
 
@@ -1438,7 +1542,7 @@ function buildBot() {
     await ctx.sendChatAction('typing');
 
     if (mode && mode !== 'photo_caption') {
-      pendingTool.delete(uid);
+      pendingTool.clear();
       const out = await generateReply(toolPrompt(mode, text), ctx);
       await ctx.reply(out, afterReplyKeyboard(ctx));
       return;
