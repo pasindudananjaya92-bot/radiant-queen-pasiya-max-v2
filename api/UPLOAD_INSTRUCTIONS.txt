@@ -1,19 +1,17 @@
-RADIANT QUEEN Phase A — upload instructions
+PHASE B upload
 
-1. Download this zip and extract.
-2. On GitHub: open repo pasindudananjaya92-bot/radiant-queen-pasiya-max-v2
-3. Go to folder: api/
-4. Upload / replace file: telegram.js
-   (GitHub: Add file → Upload files → drop api/telegram.js → Commit)
-5. Wait for Vercel deploy = Ready
-6. Optional Vercel env: STRIDE_API_BASE=https://strideclub-platform-6b71a.containers.snapdeploy.app
-7. Test in Telegram:
+1. Extract zip
+2. GitHub → api/ → replace telegram.js
+3. Commit → Vercel Ready
+4. Test:
+   /stride agents
+   /stride
+   /logrun easy 5k
    /runxp
    /xptop
-   /stride
-   /dailytip
-   Admin: reply to user message then /runxp 5
+   Founder: /broadcast Hello club
 
-Supabase tables required (already ran SQL):
-- rq_run_xp
-- rq_run_xp_log
+New commands:
+- /stride agents — list 6 agents story
+- /logrun [note] — +3 XP self honor log
+- /broadcast <text> — founder → all group_settings chats
