@@ -60,25 +60,48 @@ function xpLevel(xp) {
   return { level, nextAt, xp: x };
 }
 
-async function addRunXp(user, delta, chatId, reason) {
+async function addRunXp(user, delta, chatId, reason, opts = {}) {
   if (!supabase) return { ok: false, error: 'No Supabase' };
   const userId = Number(user.id);
   const { data: prev } = await supabase
     .from('rq_run_xp')
-    .select('xp, runs_logged')
+    .select('xp, runs_logged, streak, last_logrun_date')
     .eq('user_id', userId)
     .maybeSingle();
 
   const xp = (prev?.xp || 0) + delta;
   const runs = (prev?.runs_logged || 0) + (delta > 0 ? 1 : 0);
 
-  const { error } = await supabase.from('rq_run_xp').upsert({
+  let streak = prev?.streak || 0;
+  let lastDate = prev?.last_logrun_date || null;
+  const today = new Date().toISOString().slice(0, 10);
+
+  if (opts.updateStreak && delta > 0) {
+    if (lastDate === today) {
+      // same day — keep streak, still allow XP
+    } else {
+      const y = new Date();
+      y.setUTCDate(y.getUTCDate() - 1);
+      const yesterday = y.toISOString().slice(0, 10);
+      if (lastDate === yesterday) streak = (streak || 0) + 1;
+      else streak = 1;
+      lastDate = today;
+    }
+  }
+
+  const row = {
     user_id: userId,
     username: user.username || user.first_name || String(userId),
     xp,
     runs_logged: runs,
     updated_at: new Date().toISOString(),
-  });
+  };
+  if (opts.updateStreak) {
+    row.streak = streak;
+    row.last_logrun_date = lastDate;
+  }
+
+  const { error } = await supabase.from('rq_run_xp').upsert(row);
 
   if (error) return { ok: false, error: error.message };
 
@@ -89,7 +112,13 @@ async function addRunXp(user, delta, chatId, reason) {
     reason: (reason || '').slice(0, 120),
   });
 
-  return { ok: true, xp, runs, ...xpLevel(xp) };
+  return {
+    ok: true,
+    xp,
+    runs,
+    streak: opts.updateStreak ? streak : prev?.streak || 0,
+    ...xpLevel(xp),
+  };
 }
 
 async function fetchStrideJson(path) {
@@ -1323,7 +1352,6 @@ function buildBot() {
         }
       }
 
-      // Self honor log: +3 XP max once per rate window (soft)
       const note = (ctx.message.text || '')
         .replace(/^\/logrun(@\w+)?\s*/i, '')
         .trim()
@@ -1333,7 +1361,8 @@ function buildBot() {
         ctx.from,
         3,
         ctx.chat?.id,
-        note ? `logrun: ${note}` : 'logrun self'
+        note ? `logrun: ${note}` : 'logrun self',
+        { updateStreak: true }
       );
 
       if (!res.ok) {
@@ -1344,15 +1373,24 @@ function buildBot() {
       await ctx.reply(
         `RUN LOGGED (+3 XP)\n` +
           `XP: ${res.xp} | Level ${res.level}\n` +
+          `Streak: ${res.streak || 0} day(s)\n` +
           `Honor runs: ${res.runs}\n` +
           (note ? `Note: ${note}\n` : '') +
-          `Top: /xptop | Bridge: /stride`
+          `Top: /xptop | Streak: /streak | Bridge: /stride`
       );
+
+      // optional group energy
+      if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
+        try {
+          await ctx.react('🔥');
+        } catch (_) {}
+      }
     } catch (err) {
       console.error('logrun', err);
       await ctx.reply('logrun failed.');
     }
   });
+
 
   bot.command('broadcast', async (ctx) => {
     try {
@@ -1407,6 +1445,112 @@ function buildBot() {
     } catch (err) {
       console.error('broadcast', err);
       await ctx.reply('broadcast failed.');
+    }
+  });
+
+
+
+  bot.command('streak', async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const userId = Number(ctx.from.id);
+      const { data } = await supabase
+        .from('rq_run_xp')
+        .select('xp, streak, last_logrun_date, runs_logged, username')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      const xp = data?.xp || 0;
+      const lv = xpLevel(xp);
+      await ctx.reply(
+        `STREAK\n` +
+          `Name: ${data?.username || ctx.from.first_name}\n` +
+          `Streak: ${data?.streak || 0} day(s)\n` +
+          `Last logrun: ${data?.last_logrun_date || 'never'}\n` +
+          `XP: ${lv.xp} | Level ${lv.level}\n` +
+          `Honor runs: ${data?.runs_logged || 0}\n\n` +
+          `Keep it going: /logrun`
+      );
+    } catch (err) {
+      console.error('streak', err);
+      await ctx.reply('streak failed.');
+    }
+  });
+
+  bot.command('weekly', async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const { data, error } = await supabase
+        .from('rq_run_xp')
+        .select('user_id, username, xp, streak, runs_logged')
+        .order('xp', { ascending: false })
+        .limit(50);
+      if (error) {
+        await ctx.reply(`weekly failed: ${error.message}`);
+        return;
+      }
+      const rows = data || [];
+      const top = rows.slice(0, 5)
+        .map((r, i) => `${i + 1}. ${r.username || r.user_id} — ${r.xp} XP (🔥${r.streak || 0})`)
+        .join('\n');
+
+      const me = rows.findIndex((r) => Number(r.user_id) === Number(ctx.from.id));
+      const rankLine =
+        me >= 0
+          ? `Your rank: #${me + 1} — ${rows[me].xp} XP`
+          : 'Your rank: not ranked yet (/logrun)';
+
+      await ctx.reply(
+        `WEEKLY CLUB BOARD\n\nTop 5:\n${top || '(empty)'}\n\n${rankLine}\n\n/xptop | /logrun | /streak`
+      );
+    } catch (err) {
+      console.error('weekly', err);
+      await ctx.reply('weekly failed.');
+    }
+  });
+
+  bot.command('agentpulse', async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only.');
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const health = await fetchStrideJson('/api/health');
+
+      let groupCount = '?';
+      let xpUsers = '?';
+      if (supabase) {
+        const g = await supabase.from('group_settings').select('*', { count: 'exact', head: true });
+        const x = await supabase.from('rq_run_xp').select('*', { count: 'exact', head: true });
+        groupCount = g.count ?? 0;
+        xpUsers = x.count ?? 0;
+      }
+
+      await ctx.reply(
+        `AGENT PULSE (Founder)\n\n` +
+          `Bot\n` +
+          `• Token: ${BOT_TOKEN ? 'yes' : 'no'}\n` +
+          `• Gemini: ${GEMINI_KEY ? 'yes' : 'no'}\n` +
+          `• Supabase: ${supabase ? 'yes' : 'no'}\n` +
+          `• Uptime: ${Math.round((Date.now() - bootTime) / 1000)}s\n\n` +
+          `Data\n` +
+          `• Groups configured: ${groupCount}\n` +
+          `• XP runners: ${xpUsers}\n\n` +
+          `StrideClub\n` +
+          `• Base: ${STRIDE_BASE}\n` +
+          `• Health: ${health.ok ? 'OK' : 'offline — ' + (health.error || '')}\n\n` +
+          `Agents: /stride agents`
+      );
+    } catch (err) {
+      console.error('agentpulse', err);
+      await ctx.reply('agentpulse failed.');
     }
   });
 

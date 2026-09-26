@@ -1,17 +1,18 @@
-PHASE B upload
+PHASE C upload
 
 1. Extract zip
-2. GitHub → api/ → replace telegram.js
+2. GitHub → api/telegram.js → replace
 3. Commit → Vercel Ready
 4. Test:
-   /stride agents
-   /stride
-   /logrun easy 5k
+   /logrun morning jog
+   /streak
+   /weekly
    /runxp
-   /xptop
-   Founder: /broadcast Hello club
+   Founder: /agentpulse
 
-New commands:
-- /stride agents — list 6 agents story
-- /logrun [note] — +3 XP self honor log
-- /broadcast <text> — founder → all group_settings chats
+New:
+- Streak tracking on /logrun
+- /streak — your streak
+- /weekly — top 5 + your rank
+- /agentpulse — founder pulse (bot + Stride)
+- Group /logrun may react 🔥
