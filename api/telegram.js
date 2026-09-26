@@ -50,7 +50,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.5-phase-q';
+const BOT_VERSION = 'v2.5-phase-r';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -2878,6 +2878,30 @@ function buildBot() {
     } catch (err) {
       console.error('speak', err);
       await ctx.reply('speak failed.');
+    }
+  });
+
+
+
+  bot.command('links', async (ctx) => {
+    try {
+      await ctx.reply(
+        `QUICK LINKS\n\n` +
+          `Bot web: https://radiant-queen-pasiya-max-v2.vercel.app\n` +
+          `StrideClub: ${typeof STRIDE_BASE !== 'undefined' ? STRIDE_BASE : 'https://strideclub-platform-6b71a.containers.snapdeploy.app'}\n` +
+          `GitHub: https://github.com/pasindudananjaya92-bot/radiant-queen-pasiya-max-v2\n` +
+          `Telegram: https://t.me/PasiyaMaxQueen_bot\n\n` +
+          `/social · /stride · /menu`,
+        Markup.inlineKeyboard([
+          [Markup.button.url('Website', 'https://radiant-queen-pasiya-max-v2.vercel.app')],
+          [Markup.button.url('StrideClub', typeof STRIDE_BASE !== 'undefined' ? STRIDE_BASE : 'https://strideclub-platform-6b71a.containers.snapdeploy.app')],
+          [Markup.button.url('GitHub', 'https://github.com/pasindudananjaya92-bot/radiant-queen-pasiya-max-v2')],
+          [Markup.button.callback('Main menu', 'menu_home')],
+        ])
+      );
+    } catch (err) {
+      console.error('links', err);
+      await ctx.reply('links failed.');
     }
   });
 
