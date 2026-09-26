@@ -50,7 +50,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.5-phase-n';
+const BOT_VERSION = 'v2.5-phase-o';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -2715,6 +2715,62 @@ function buildBot() {
     } catch (err) {
       console.error('warns', err);
       await ctx.reply('warns failed.');
+    }
+  });
+
+
+
+  bot.command('me', async (ctx) => {
+    try {
+      const u = ctx.from;
+      const name = u.username ? `@${u.username}` : u.first_name || String(u.id);
+      let xpLine = 'XP: — (start with /logrun)';
+      let badgeLine = 'Badges: —';
+      let strideLine = '';
+      let warnLine = '';
+
+      if (supabase) {
+        const { data } = await supabase
+          .from('rq_run_xp')
+          .select('xp, streak, runs_logged, stride_name, username')
+          .eq('user_id', Number(u.id))
+          .maybeSingle();
+        if (data) {
+          const lv = xpLevel(data.xp || 0);
+          xpLine =
+            `XP: ${lv.xp} · Level ${lv.level}\n` +
+            `Streak: ${data.streak || 0}d · Runs: ${data.runs_logged || 0}`;
+          if (data.stride_name) strideLine = `Stride: ${data.stride_name}\n`;
+          const badges = computeBadges(data);
+          badgeLine = badges.length
+            ? `Badges: ${badges.slice(0, 6).join(', ')}`
+            : 'Badges: none yet';
+        }
+
+        if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
+          const { data: w } = await supabase
+            .from('rq_warns')
+            .select('warn_count')
+            .eq('chat_id', toChatId(ctx.chat.id))
+            .eq('user_id', Number(u.id))
+            .maybeSingle();
+          if (w?.warn_count) warnLine = `Warns here: ${w.warn_count}\n`;
+        }
+      }
+
+      await ctx.reply(
+        `PROFILE\n` +
+          `Name: ${name}\n` +
+          `ID: ${u.id}\n` +
+          strideLine +
+          `${xpLine}\n` +
+          warnLine +
+          `${badgeLine}\n\n` +
+          `/runxp · /streak · /badges · /logrun`
+      );
+    } catch (err) {
+      console.error('me', err);
+      await ctx.reply('me failed.');
     }
   });
 
