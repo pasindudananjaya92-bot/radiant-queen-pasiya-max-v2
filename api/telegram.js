@@ -1771,6 +1771,170 @@ function buildBot() {
   });
 
 
+
+  bot.command('mute', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use in a group. Reply to user:\n/mute 10');
+        return;
+      }
+      if (!(await ensureGroupAdmin(ctx))) return;
+      if (!(await isUserGroupAdmin(ctx))) {
+        await ctx.reply('Only group admins can mute.');
+        return;
+      }
+      const target = ctx.message.reply_to_message?.from;
+      if (!target || target.is_bot) {
+        await ctx.reply('Reply to the user, then:\n/mute 10\n(minutes, 1–1440)');
+        return;
+      }
+      const arg = (ctx.message.text || '')
+        .replace(/^\/mute(@\w+)?\s*/i, '')
+        .trim();
+      let mins = parseInt(arg, 10);
+      if (!Number.isFinite(mins)) mins = 10;
+      mins = Math.max(1, Math.min(1440, mins));
+      const until = Math.floor(Date.now() / 1000) + mins * 60;
+      await ctx.telegram.restrictChatMember(ctx.chat.id, target.id, {
+        permissions: {
+          can_send_messages: false,
+          can_send_audios: false,
+          can_send_documents: false,
+          can_send_photos: false,
+          can_send_videos: false,
+          can_send_video_notes: false,
+          can_send_voice_notes: false,
+          can_send_polls: false,
+          can_send_other_messages: false,
+          can_add_web_page_previews: false,
+        },
+        until_date: until,
+      });
+      const name = target.username ? `@${target.username}` : target.first_name;
+      await ctx.reply(`Muted ${name} for ${mins} min.\nUnmute: reply + /unmute`);
+    } catch (err) {
+      console.error('mute', err);
+      await ctx.reply(
+        `mute failed: ${String(err?.message || err).slice(0, 120)}\nBot needs Restrict members.`
+      );
+    }
+  });
+
+  bot.command('unmute', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use in a group. Reply to user:\n/unmute');
+        return;
+      }
+      if (!(await ensureGroupAdmin(ctx))) return;
+      if (!(await isUserGroupAdmin(ctx))) {
+        await ctx.reply('Only group admins can unmute.');
+        return;
+      }
+      const target = ctx.message.reply_to_message?.from;
+      if (!target) {
+        await ctx.reply('Reply to the user, then /unmute');
+        return;
+      }
+      await ctx.telegram.restrictChatMember(ctx.chat.id, target.id, {
+        permissions: {
+          can_send_messages: true,
+          can_send_audios: true,
+          can_send_documents: true,
+          can_send_photos: true,
+          can_send_videos: true,
+          can_send_video_notes: true,
+          can_send_voice_notes: true,
+          can_send_polls: true,
+          can_send_other_messages: true,
+          can_add_web_page_previews: true,
+        },
+      });
+      const name = target.username ? `@${target.username}` : target.first_name;
+      await ctx.reply(`Unmuted ${name}.`);
+    } catch (err) {
+      console.error('unmute', err);
+      await ctx.reply(`unmute failed: ${String(err?.message || err).slice(0, 120)}`);
+    }
+  });
+
+  bot.command('slow', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use in a group:\n/slow 30\n/slow 0');
+        return;
+      }
+      if (!(await ensureGroupAdmin(ctx))) return;
+      if (!(await isUserGroupAdmin(ctx))) {
+        await ctx.reply('Only group admins can set slow mode.');
+        return;
+      }
+      const arg = (ctx.message.text || '')
+        .replace(/^\/slow(@\w+)?\s*/i, '')
+        .trim();
+      let sec = parseInt(arg, 10);
+      if (!Number.isFinite(sec)) {
+        await ctx.reply('Usage:\n/slow 30\n/slow 0 (off)\nSeconds: 0–600');
+        return;
+      }
+      sec = Math.max(0, Math.min(600, sec));
+      await ctx.telegram.callApi('setChatSlowModeDelay', {
+        chat_id: ctx.chat.id,
+        seconds: sec,
+      });
+      await ctx.reply(
+        sec === 0
+          ? 'Slow mode OFF.'
+          : `Slow mode ON: ${sec}s between messages.`
+      );
+    } catch (err) {
+      console.error('slow', err);
+      await ctx.reply(
+        `slow failed: ${String(err?.message || err).slice(0, 120)}\nBot needs manage chat / admin rights.`
+      );
+    }
+  });
+
+  bot.command('title', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use /title inside a group.');
+        return;
+      }
+      const chat = await ctx.telegram.getChat(ctx.chat.id);
+      let members = '?';
+      try {
+        members = await ctx.telegram.callApi('getChatMemberCount', {
+          chat_id: ctx.chat.id,
+        });
+      } catch (_) {
+        try {
+          members = await ctx.telegram.callApi('getChatMembersCount', {
+            chat_id: ctx.chat.id,
+          });
+        } catch (_) {}
+      }
+      let anti = 'unknown';
+      try {
+        const s = await loadGroupSettings(ctx.chat.id);
+        anti = s?.antiLink ? 'ON' : 'OFF';
+      } catch (_) {}
+      await ctx.reply(
+        `GROUP\n` +
+          `Title: ${chat.title || ctx.chat.title || '—'}\n` +
+          `Chat ID: ${ctx.chat.id}\n` +
+          `Members: ${members}\n` +
+          `Anti-link: ${anti}\n` +
+          `Type: ${ctx.chat.type}\n\n` +
+          `/groupinfo · /rules · /challenge`
+      );
+    } catch (err) {
+      console.error('title', err);
+      await ctx.reply('title failed.');
+    }
+  });
+
+
   bot.command('admin', async (ctx) => {
     if (!isAdmin(ctx)) {
       await ctx.reply('Admin only.');
