@@ -1,1 +1,3 @@
-Replace api/telegram.js — slow mode fix only
+1. Run SQL from chat (not this zip)
+2. Upload api/telegram.js
+3. Test /note /notes /clearnote
