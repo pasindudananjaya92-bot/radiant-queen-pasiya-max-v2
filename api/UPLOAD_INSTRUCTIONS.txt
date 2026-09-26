@@ -1,3 +1,1 @@
-1. Run SQL from chat (not this zip)
-2. Upload api/telegram.js
-3. Test /note /notes /clearnote
+api/telegram.js only — SQL in chat
