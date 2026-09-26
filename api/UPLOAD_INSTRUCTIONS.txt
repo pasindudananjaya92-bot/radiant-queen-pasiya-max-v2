@@ -1,11 +1,15 @@
-HOTFIX for Phase C no-reply
+PHASE E — Badges + Club Challenge
 
-1. Replace api/telegram.js on GitHub
-2. Vercel Ready
-3. Open once: https://radiant-queen-pasiya-max-v2.vercel.app/api/telegram?setup=1
-4. Test /start then /logrun test then /streak
+1. Supabase SQL Editor → run SQL_PHASE_E.sql
+2. GitHub → replace api/telegram.js
+3. Vercel Ready
+4. Test:
+   /badges
+   /challenge
+   Founder: /challenge set Run 4 times this week — post a photo in group
+   /logrun easy
+   /badges again
 
-Changes:
-- Removed ctx.react (breaks some Telegraf builds)
-- Uses setMessageReaction via callApi (ignored if fails)
-- addRunXp resilient if streak columns missing
+BotFather:
+badges - Your runner badges
+challenge - Club weekly challenge
