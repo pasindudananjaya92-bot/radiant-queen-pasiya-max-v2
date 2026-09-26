@@ -1,1 +1,13 @@
-UPLOAD: replace root README.md on GitHub with this file
+PHASE D upload
+
+1. Replace GitHub api/telegram.js
+2. Replace root README.md (optional but recommended)
+3. Vercel Ready
+4. Test:
+   /linkstride Pasiya Max
+   /logrun day7 test
+   /streak
+   (At streak 3,7,14... you get MILESTONE message)
+
+BotFather add:
+linkstride - Link StrideClub display name
