@@ -2116,6 +2116,120 @@ function buildBot() {
   });
 
 
+
+  bot.command('stats', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use /stats inside a group.');
+        return;
+      }
+
+      let members = '?';
+      try {
+        members = await ctx.telegram.callApi('getChatMemberCount', {
+          chat_id: ctx.chat.id,
+        });
+      } catch (_) {
+        try {
+          members = await ctx.telegram.callApi('getChatMembersCount', {
+            chat_id: ctx.chat.id,
+          });
+        } catch (_) {}
+      }
+
+      const settings = await loadGroupSettings(ctx.chat.id);
+      let notesCount = 0;
+      let reportsCount = 0;
+      if (supabase) {
+        const chatId = toChatId(ctx.chat.id);
+        const n = await supabase
+          .from('rq_group_notes')
+          .select('*', { count: 'exact', head: true })
+          .eq('chat_id', chatId);
+        notesCount = n.count ?? 0;
+        const r = await supabase
+          .from('rq_group_reports')
+          .select('*', { count: 'exact', head: true })
+          .eq('chat_id', chatId);
+        reportsCount = r.count ?? 0;
+      }
+
+      await ctx.reply(
+        `GROUP STATS\n` +
+          `Title: ${ctx.chat.title || '—'}\n` +
+          `Members: ${members}\n` +
+          `Anti-link: ${settings?.antiLink ? 'ON' : 'OFF'}\n` +
+          `Slow mode: ${settings?.slowSeconds || 0}s\n` +
+          `Notes: ${notesCount}\n` +
+          `Reports logged: ${reportsCount}\n\n` +
+          `/notes · /challenge · /title · /modcheck`
+      );
+    } catch (err) {
+      console.error('stats', err);
+      await ctx.reply('stats failed.');
+    }
+  });
+
+  bot.command('report', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use /report in a group. Reply to a message:\n/report spam');
+        return;
+      }
+
+      const targetMsg = ctx.message.reply_to_message;
+      if (!targetMsg) {
+        await ctx.reply('Reply to the message you want to report, then:\n/report reason');
+        return;
+      }
+
+      const reason =
+        (ctx.message.text || '')
+          .replace(/^\/report(@\w+)?\s*/i, '')
+          .trim()
+          .slice(0, 200) || 'No reason';
+
+      const reported = targetMsg.from;
+      const reportedName = reported?.username
+        ? `@${reported.username}`
+        : reported?.first_name || String(reported?.id || '?');
+
+      if (supabase) {
+        await supabase.from('rq_group_reports').insert({
+          chat_id: toChatId(ctx.chat.id),
+          reporter_id: Number(ctx.from.id),
+          reporter_name: ctx.from.username || ctx.from.first_name || String(ctx.from.id),
+          reported_id: reported?.id ? Number(reported.id) : null,
+          reported_name: reportedName,
+          message_id: targetMsg.message_id,
+          reason,
+        });
+      }
+
+      await ctx.reply(
+        `Report logged.\nTarget: ${reportedName}\nReason: ${reason}\nAdmins can review.`
+      );
+
+      // Notify founder if configured
+      if (ADMIN_ID) {
+        try {
+          await ctx.telegram.sendMessage(
+            ADMIN_ID,
+            `REPORT\nGroup: ${ctx.chat.title || ctx.chat.id}\n` +
+              `From: ${ctx.from.username || ctx.from.id}\n` +
+              `Target: ${reportedName}\n` +
+              `Reason: ${reason}\n` +
+              `Msg id: ${targetMsg.message_id}`
+          );
+        } catch (_) {}
+      }
+    } catch (err) {
+      console.error('report', err);
+      await ctx.reply('report failed.');
+    }
+  });
+
+
   bot.command('admin', async (ctx) => {
     if (!isAdmin(ctx)) {
       await ctx.reply('Admin only.');
