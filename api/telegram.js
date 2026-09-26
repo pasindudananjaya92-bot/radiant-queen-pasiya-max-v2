@@ -53,6 +53,25 @@ const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
 
+
+function computeBadges(row) {
+  const xp = row?.xp || 0;
+  const streak = row?.streak || 0;
+  const runs = row?.runs_logged || 0;
+  const badges = [];
+  if (runs >= 1) badges.push('First Steps');
+  if (runs >= 10) badges.push('Consistent');
+  if (runs >= 50) badges.push('Road Warrior');
+  if (streak >= 3) badges.push('Spark');
+  if (streak >= 7) badges.push('Week Flame');
+  if (streak >= 30) badges.push('Iron Month');
+  if (xp >= 50) badges.push('XP 50');
+  if (xp >= 200) badges.push('XP 200');
+  if (xp >= 500) badges.push('XP Elite');
+  if (row?.stride_name) badges.push('Stride Linked');
+  return badges;
+}
+
 function xpLevel(xp) {
   const x = Math.max(0, xp || 0);
   const level = Math.floor(Math.sqrt(x / 10)) + 1;
@@ -1646,6 +1665,108 @@ function buildBot() {
     } catch (err) {
       console.error('linkstride', err);
       await ctx.reply('linkstride failed.');
+    }
+  });
+
+
+
+  bot.command('badges', async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const userId = Number(ctx.from.id);
+      const { data } = await supabase
+        .from('rq_run_xp')
+        .select('xp, streak, runs_logged, username, stride_name')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      const list = computeBadges(data || {});
+      const lv = xpLevel(data?.xp || 0);
+      await ctx.reply(
+        `BADGES\n` +
+          `Name: ${data?.username || ctx.from.first_name}\n` +
+          (data?.stride_name ? `Stride: ${data.stride_name}\n` : '') +
+          `XP ${lv.xp} | L${lv.level} | Streak ${data?.streak || 0} | Runs ${data?.runs_logged || 0}\n\n` +
+          (list.length ? list.map((b) => `• ${b}`).join('\n') : '• None yet — try /logrun') +
+          `\n\nChallenge: /challenge`
+      );
+    } catch (err) {
+      console.error('badges', err);
+      await ctx.reply('badges failed.');
+    }
+  });
+
+  bot.command('challenge', async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+
+      const arg = (ctx.message.text || '')
+        .replace(/^\/challenge(@\w+)?\s*/i, '')
+        .trim();
+
+      // Founder set: /challenge set <text>
+      if (arg.toLowerCase().startsWith('set ')) {
+        if (!isAdmin(ctx)) {
+          await ctx.reply('Only founder can set the club challenge.');
+          return;
+        }
+        const text = arg.slice(4).trim().slice(0, 300);
+        if (!text) {
+          await ctx.reply('Usage:\n/challenge set Run 3 times this week');
+          return;
+        }
+        const { error } = await supabase.from('rq_club_meta').upsert({
+          key: 'weekly_challenge',
+          value: text,
+          updated_at: new Date().toISOString(),
+        });
+        if (error) {
+          await ctx.reply(`Save failed: ${error.message}\nCreate table rq_club_meta if needed.`);
+          return;
+        }
+        await ctx.reply(`Club challenge set:\n${text}`);
+        return;
+      }
+
+      const { data } = await supabase
+        .from('rq_club_meta')
+        .select('value, updated_at')
+        .eq('key', 'weekly_challenge')
+        .maybeSingle();
+
+      const challenge =
+        data?.value ||
+        'Default: Log at least 3 runs this week with /logrun. Climb /weekly board.';
+
+      // personal progress hint
+      let progress = '';
+      const userId = Number(ctx.from.id);
+      const { data: me } = await supabase
+        .from('rq_run_xp')
+        .select('runs_logged, streak, xp')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (me) {
+        progress =
+          `\n\nYour pulse:\n` +
+          `Runs: ${me.runs_logged || 0} | Streak: ${me.streak || 0} | XP: ${me.xp || 0}\n` +
+          `/logrun · /badges · /weekly`;
+      }
+
+      await ctx.reply(
+        `CLUB CHALLENGE\n\n${challenge}` +
+          (data?.updated_at ? `\n\nUpdated: ${String(data.updated_at).slice(0, 10)}` : '') +
+          progress
+      );
+    } catch (err) {
+      console.error('challenge', err);
+      await ctx.reply('challenge failed.');
     }
   });
 
