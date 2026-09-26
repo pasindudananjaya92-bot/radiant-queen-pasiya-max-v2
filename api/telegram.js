@@ -39,7 +39,8 @@ Live: https://strideclub-platform-6b71a.containers.snapdeploy.app
 Open the site for: Dashboard, Logbook, Leaderboard, Events, AI Coach, Agent Logs.`;
 
 const pendingTool = new Map();
-const groupSettings = new Map(); // groupId -> { antiLink: boolean, welcome: string }
+const groupSettings = new Map(); // groupId -> settings
+const slowLastMsg = new Map(); // `${chatId}:${userId}` -> timestamp ms
 const rateMap = new Map(); // memory fallback for rate limit
 const RATE_WINDOW_MS = 60 * 1000; // 1 minute
 const RATE_MAX_HITS = 8; // max AI calls per user per window
@@ -240,13 +241,33 @@ async function loadGroupSettings(chatId) {
 
   const { data, error } = await supabase
     .from('group_settings')
-    .select('welcome, rate_limit_enabled, group_mode, anti_link, rules_text')
+    .select('welcome, rate_limit_enabled, group_mode, anti_link, rules_text, slow_seconds')
     .eq('chat_id', toChatId(chatId))
     .maybeSingle();
 
   if (error) {
     console.error('loadGroupSettings', error.message);
-    return {};
+    // fallback without slow_seconds column
+    const q0 = await supabase
+      .from('group_settings')
+      .select('welcome, rate_limit_enabled, group_mode, anti_link, rules_text')
+      .eq('chat_id', toChatId(chatId))
+      .maybeSingle();
+    if (q0.error) return {};
+    const d = q0.data;
+    const row0 = {
+      welcome: d?.welcome || '',
+      antiLink:
+        Boolean(d?.anti_link) ||
+        d?.group_mode === 'antilink' ||
+        d?.group_mode === 'anti_link',
+      rateLimit: Boolean(d?.rate_limit_enabled),
+      groupMode: d?.group_mode || '',
+      rulesText: d?.rules_text || '',
+      slowSeconds: 0,
+    };
+    groupSettings.set(key, row0);
+    return row0;
   }
 
   const row = {
@@ -258,6 +279,7 @@ async function loadGroupSettings(chatId) {
     rateLimit: Boolean(data?.rate_limit_enabled),
     groupMode: data?.group_mode || '',
     rulesText: data?.rules_text || '',
+    slowSeconds: Number(data?.slow_seconds) || 0,
   };
   groupSettings.set(key, row);
   return row;
@@ -280,6 +302,10 @@ async function saveGroupSettings(chatId, patch) {
           ? 'antilink'
           : prev.groupMode || 'normal',
     rulesText: patch.rulesText !== undefined ? patch.rulesText : prev.rulesText || '',
+    slowSeconds:
+      patch.slowSeconds !== undefined
+        ? Number(patch.slowSeconds) || 0
+        : Number(prev.slowSeconds) || 0,
   };
   groupSettings.set(key, next);
 
@@ -293,11 +319,19 @@ async function saveGroupSettings(chatId, patch) {
     group_mode: next.groupMode || (next.antiLink ? 'antilink' : 'normal'),
     rate_limit_enabled: Boolean(next.rateLimit),
     rules_text: next.rulesText || null,
+    slow_seconds: Number(next.slowSeconds) || 0,
   };
 
-  const { error } = await supabase
+  let { error } = await supabase
     .from('group_settings')
     .upsert(row, { onConflict: 'chat_id' });
+
+  if (error && String(error.message || '').includes('slow_seconds')) {
+    const basic = { ...row };
+    delete basic.slow_seconds;
+    const r2 = await supabase.from('group_settings').upsert(basic, { onConflict: 'chat_id' });
+    error = r2.error;
+  }
 
   if (error) {
     console.error('saveGroupSettings', error.message);
@@ -1860,12 +1894,8 @@ function buildBot() {
 
   bot.command('slow', async (ctx) => {
     try {
-      if (ctx.chat?.type !== 'supergroup') {
-        await ctx.reply(
-          'Slow mode works only in SUPERGROUPS.\n' +
-            'Convert group to supergroup (history visible to new members), then try again.\n' +
-            'Allowed: /slow 0 | 10 | 30 | 60 | 300 | 900 | 3600'
-        );
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use in a group:\n/slow 30\n/slow 0');
         return;
       }
       if (!(await ensureGroupAdmin(ctx))) return;
@@ -1878,46 +1908,32 @@ function buildBot() {
         .trim();
       let sec = parseInt(arg, 10);
       if (!Number.isFinite(sec)) {
+        const cur = await loadGroupSettings(ctx.chat.id);
         await ctx.reply(
-          'Usage:\n/slow 30\n/slow 0 (off)\n\nAllowed seconds only:\n0, 10, 30, 60, 300, 900, 3600'
+          `Bot slow mode (enforced by bot, works everywhere).\n` +
+            `Current: ${cur.slowSeconds || 0}s\n\n` +
+            `Usage:\n/slow 30\n/slow 0 (off)\n` +
+            `Range: 0–300 seconds`
         );
         return;
       }
-      const allowed = [0, 10, 30, 60, 300, 900, 3600];
-      // snap to nearest allowed Telegram value
-      sec = allowed.reduce((best, v) =>
-        Math.abs(v - sec) < Math.abs(best - sec) ? v : best
-      );
-      try {
-        if (typeof ctx.telegram.setChatSlowModeDelay === 'function') {
-          await ctx.telegram.setChatSlowModeDelay(ctx.chat.id, sec);
-        } else {
-          await ctx.telegram.callApi('setChatSlowModeDelay', {
-            chat_id: ctx.chat.id,
-            seconds: sec,
-          });
-        }
-      } catch (e1) {
-        // some stacks expect slow_mode_delay name
-        await ctx.telegram.callApi('setChatSlowModeDelay', {
-          chat_id: ctx.chat.id,
-          slow_mode_delay: sec,
-        });
+      sec = Math.max(0, Math.min(300, sec));
+      const result = await saveGroupSettings(ctx.chat.id, { slowSeconds: sec });
+      if (!result.ok) {
+        await ctx.reply(`Save failed: ${result.error}\nRun SQL to add slow_seconds column.`);
+        return;
       }
       await ctx.reply(
         sec === 0
-          ? 'Slow mode OFF.'
-          : `Slow mode ON: ${sec}s between messages.`
+          ? 'Bot slow mode OFF.'
+          : `Bot slow mode ON: ${sec}s between member messages.\nAdmins ignored. Needs Delete messages permission.`
       );
     } catch (err) {
       console.error('slow', err);
-      await ctx.reply(
-        `slow failed: ${String(err?.message || err).slice(0, 160)}\n` +
-          `Need: supergroup + bot admin with manage chat.\n` +
-          `Try exactly: /slow 30`
-      );
+      await ctx.reply(`slow failed: ${String(err?.message || err).slice(0, 160)}`);
     }
   });
+
 
 
   bot.command('title', async (ctx) => {
@@ -2311,6 +2327,34 @@ function buildBot() {
           }
         } catch (err) {
           console.error('anti-link', err);
+        }
+      }
+
+      // Bot-enforced slow mode (Telegram API setChatSlowModeDelay returns 404 on some hosts)
+      const slowSec = Number(settings?.slowSeconds) || 0;
+      if (slowSec > 0) {
+        try {
+          const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
+          const isAdm = member.status === 'administrator' || member.status === 'creator';
+          if (!isAdm && !isAdmin(ctx)) {
+            const sk = `${ctx.chat.id}:${ctx.from.id}`;
+            const now = Date.now();
+            const last = slowLastMsg.get(sk) || 0;
+            const waitMs = slowSec * 1000 - (now - last);
+            if (waitMs > 0) {
+              try {
+                await ctx.deleteMessage(ctx.message.message_id);
+              } catch (_) {}
+              await ctx.reply(
+                `Slow mode ${slowSec}s. Wait ~${Math.ceil(waitMs / 1000)}s.`,
+                { reply_parameters: undefined }
+              );
+              return;
+            }
+            slowLastMsg.set(sk, now);
+          }
+        } catch (err) {
+          console.error('slow-mode', err);
         }
       }
     }
