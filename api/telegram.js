@@ -50,7 +50,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.5-phase-l';
+const BOT_VERSION = 'v2.5-phase-m';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -2535,6 +2535,139 @@ function buildBot() {
     } catch (err) {
       console.error('feedbacks', err);
       await ctx.reply('feedbacks failed.');
+    }
+  });
+
+
+
+  bot.command('faqset', async (ctx) => {
+    try {
+      if (!(await isUserGroupAdmin(ctx)) && !isAdmin(ctx)) {
+        // allow founder in private too
+        if (!(ctx.chat?.type === 'private' && isAdmin(ctx))) {
+          await ctx.reply('Admins only.\nUsage:\n/faqset rules Club rules text here');
+          return;
+        }
+      }
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const raw = (ctx.message.text || '')
+        .replace(/^\/faqset(@\w+)?\s*/i, '')
+        .trim();
+      const sp = raw.indexOf(' ');
+      if (sp < 1) {
+        await ctx.reply('Usage:\n/faqset <key> <answer text>\nExample:\n/faqset meetup We meet Sunday 6AM at the gate');
+        return;
+      }
+      const key = raw.slice(0, sp).toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 40);
+      const answer = raw.slice(sp + 1).trim().slice(0, 1500);
+      if (!key || !answer) {
+        await ctx.reply('Need key and answer text.');
+        return;
+      }
+      const chatId =
+        ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup'
+          ? toChatId(ctx.chat.id)
+          : 0;
+      const { error } = await supabase.from('rq_faq').upsert(
+        {
+          chat_id: chatId,
+          key,
+          answer,
+          updated_by: Number(ctx.from.id),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'chat_id,key' }
+      );
+      if (error) {
+        await ctx.reply(`faqset failed: ${error.message}\nRun Phase M SQL.`);
+        return;
+      }
+      await ctx.reply(`FAQ saved.\nKey: ${key}\nRead: /faq ${key}`);
+    } catch (err) {
+      console.error('faqset', err);
+      await ctx.reply('faqset failed.');
+    }
+  });
+
+  bot.command('faq', async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const key = (ctx.message.text || '')
+        .replace(/^\/faq(@\w+)?\s*/i, '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, '')
+        .slice(0, 40);
+      if (!key) {
+        await ctx.reply('Usage:\n/faq meetup\nList: /faqs');
+        return;
+      }
+      const chatId =
+        ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup'
+          ? toChatId(ctx.chat.id)
+          : 0;
+      let { data } = await supabase
+        .from('rq_faq')
+        .select('key, answer')
+        .eq('chat_id', chatId)
+        .eq('key', key)
+        .maybeSingle();
+      if (!data && chatId !== 0) {
+        const g = await supabase
+          .from('rq_faq')
+          .select('key, answer')
+          .eq('chat_id', 0)
+          .eq('key', key)
+          .maybeSingle();
+        data = g.data;
+      }
+      if (!data) {
+        await ctx.reply(`No FAQ for "${key}".\n/faqs`);
+        return;
+      }
+      await ctx.reply(`FAQ · ${data.key}\n\n${data.answer}`);
+    } catch (err) {
+      console.error('faq', err);
+      await ctx.reply('faq failed.');
+    }
+  });
+
+  bot.command('faqs', async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const chatId =
+        ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup'
+          ? toChatId(ctx.chat.id)
+          : 0;
+      const { data, error } = await supabase
+        .from('rq_faq')
+        .select('key')
+        .eq('chat_id', chatId)
+        .order('key')
+        .limit(40);
+      if (error) {
+        await ctx.reply(`faqs failed: ${error.message}`);
+        return;
+      }
+      if (!data?.length) {
+        await ctx.reply('No FAQs yet.\nAdmins: /faqset key answer');
+        return;
+      }
+      await ctx.reply(
+        `FAQ KEYS\n${data.map((r) => `• ${r.key}`).join('\n')}\n\nOpen: /faq <key>`
+      );
+    } catch (err) {
+      console.error('faqs', err);
+      await ctx.reply('faqs failed.');
     }
   });
 
