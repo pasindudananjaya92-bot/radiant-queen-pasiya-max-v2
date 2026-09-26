@@ -50,6 +50,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
+const BOT_VERSION = 'v2.5-phase-k';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -2405,6 +2406,57 @@ function buildBot() {
     } catch (err) {
       await ctx.reply('pick failed.');
     }
+  });
+
+
+
+  bot.command('ping', async (ctx) => {
+    const t0 = Date.now();
+    const msg = await ctx.reply('Pong…');
+    const ms = Date.now() - t0;
+    try {
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        msg.message_id,
+        undefined,
+        `Pong · ${ms}ms · uptime ${Math.round((Date.now() - bootTime) / 1000)}s`
+      );
+    } catch (_) {
+      await ctx.reply(`Pong · ${ms}ms`);
+    }
+  });
+
+  bot.command('version', async (ctx) => {
+    await ctx.reply(
+      `RADIANT QUEEN · PASIYA MAX\n` +
+        `Version: ${typeof BOT_VERSION !== 'undefined' ? BOT_VERSION : 'v2.5'}\n` +
+        `Gemini: ${GEMINI_KEY ? 'yes' : 'no'}\n` +
+        `Supabase: ${supabase ? 'yes' : 'no'}\n` +
+        `Stride bridge: Agent 6\n` +
+        `/commands · /agentpulse · /stride`
+    );
+  });
+
+  bot.command('commands', async (ctx) => {
+    await ctx.reply(
+      `COMMAND MAP\n\n` +
+        `AI & menu\n` +
+        `/menu /ask /quote /dailytip /help /status /id\n\n` +
+        `Runner\n` +
+        `/runxp /xptop /logrun /streak /weekly /badges /linkstride\n` +
+        `/pace /split /convert /challenge\n\n` +
+        `Stride\n` +
+        `/stride /stride agents /strideclub\n\n` +
+        `Group mod\n` +
+        `/setwelcome /setrules /rules /groupinfo /antilink\n` +
+        `/warn /unwarn /mute /unmute /slow /title /modcheck\n` +
+        `/note /notes /clearnote /stats /report\n\n` +
+        `Fun\n` +
+        `/roll /pick\n\n` +
+        `Founder\n` +
+        `/admin /usage /broadcast /agentpulse /version /ping\n\n` +
+        `Buttons: /menu`
+    );
   });
 
 
