@@ -1,1 +1,1 @@
-Upload api/telegram.js to GitHub. No new SQL required for Phase F.
+Replace api/telegram.js — slow mode fix only
