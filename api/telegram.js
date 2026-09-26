@@ -50,7 +50,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.5-phase-k';
+const BOT_VERSION = 'v2.5-phase-l';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -2457,6 +2457,85 @@ function buildBot() {
         `/admin /usage /broadcast /agentpulse /version /ping\n\n` +
         `Buttons: /menu`
     );
+  });
+
+
+
+  bot.command('feedback', async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const text = (ctx.message.text || '')
+        .replace(/^\/feedback(@\w+)?\s*/i, '')
+        .trim()
+        .slice(0, 1000);
+      if (!text) {
+        await ctx.reply(
+          'Send feedback to the founder:\n/feedback Your message here'
+        );
+        return;
+      }
+      const { error } = await supabase.from('rq_feedback').insert({
+        user_id: Number(ctx.from.id),
+        username: ctx.from.username || ctx.from.first_name || String(ctx.from.id),
+        chat_id: ctx.chat?.id ? toChatId(ctx.chat.id) : null,
+        text,
+      });
+      if (error) {
+        await ctx.reply(`feedback failed: ${error.message}\nRun Phase L SQL.`);
+        return;
+      }
+      await ctx.reply('Thanks — feedback saved for the founder.');
+      if (ADMIN_ID) {
+        try {
+          await ctx.telegram.sendMessage(
+            ADMIN_ID,
+            `FEEDBACK\nFrom: ${ctx.from.username || ctx.from.id}\n${text.slice(0, 500)}`
+          );
+        } catch (_) {}
+      }
+    } catch (err) {
+      console.error('feedback', err);
+      await ctx.reply('feedback failed.');
+    }
+  });
+
+  bot.command('feedbacks', async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only.');
+        return;
+      }
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const { data, error } = await supabase
+        .from('rq_feedback')
+        .select('id, username, text, created_at')
+        .order('created_at', { ascending: false })
+        .limit(10);
+      if (error) {
+        await ctx.reply(`feedbacks failed: ${error.message}`);
+        return;
+      }
+      if (!data?.length) {
+        await ctx.reply('No feedback yet.');
+        return;
+      }
+      const lines = data
+        .map(
+          (f, i) =>
+            `${i + 1}. #${f.id} ${f.username || '?'}\n${String(f.text || '').slice(0, 140)}`
+        )
+        .join('\n\n');
+      await ctx.reply(`LATEST FEEDBACK\n\n${lines}`);
+    } catch (err) {
+      console.error('feedbacks', err);
+      await ctx.reply('feedbacks failed.');
+    }
   });
 
 
