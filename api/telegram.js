@@ -1860,8 +1860,12 @@ function buildBot() {
 
   bot.command('slow', async (ctx) => {
     try {
-      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
-        await ctx.reply('Use in a group:\n/slow 30\n/slow 0');
+      if (ctx.chat?.type !== 'supergroup') {
+        await ctx.reply(
+          'Slow mode works only in SUPERGROUPS.\n' +
+            'Convert group to supergroup (history visible to new members), then try again.\n' +
+            'Allowed: /slow 0 | 10 | 30 | 60 | 300 | 900 | 3600'
+        );
         return;
       }
       if (!(await ensureGroupAdmin(ctx))) return;
@@ -1874,14 +1878,32 @@ function buildBot() {
         .trim();
       let sec = parseInt(arg, 10);
       if (!Number.isFinite(sec)) {
-        await ctx.reply('Usage:\n/slow 30\n/slow 0 (off)\nSeconds: 0–600');
+        await ctx.reply(
+          'Usage:\n/slow 30\n/slow 0 (off)\n\nAllowed seconds only:\n0, 10, 30, 60, 300, 900, 3600'
+        );
         return;
       }
-      sec = Math.max(0, Math.min(600, sec));
-      await ctx.telegram.callApi('setChatSlowModeDelay', {
-        chat_id: ctx.chat.id,
-        seconds: sec,
-      });
+      const allowed = [0, 10, 30, 60, 300, 900, 3600];
+      // snap to nearest allowed Telegram value
+      sec = allowed.reduce((best, v) =>
+        Math.abs(v - sec) < Math.abs(best - sec) ? v : best
+      );
+      try {
+        if (typeof ctx.telegram.setChatSlowModeDelay === 'function') {
+          await ctx.telegram.setChatSlowModeDelay(ctx.chat.id, sec);
+        } else {
+          await ctx.telegram.callApi('setChatSlowModeDelay', {
+            chat_id: ctx.chat.id,
+            seconds: sec,
+          });
+        }
+      } catch (e1) {
+        // some stacks expect slow_mode_delay name
+        await ctx.telegram.callApi('setChatSlowModeDelay', {
+          chat_id: ctx.chat.id,
+          slow_mode_delay: sec,
+        });
+      }
       await ctx.reply(
         sec === 0
           ? 'Slow mode OFF.'
@@ -1890,10 +1912,13 @@ function buildBot() {
     } catch (err) {
       console.error('slow', err);
       await ctx.reply(
-        `slow failed: ${String(err?.message || err).slice(0, 120)}\nBot needs manage chat / admin rights.`
+        `slow failed: ${String(err?.message || err).slice(0, 160)}\n` +
+          `Need: supergroup + bot admin with manage chat.\n` +
+          `Try exactly: /slow 30`
       );
     }
   });
+
 
   bot.command('title', async (ctx) => {
     try {
