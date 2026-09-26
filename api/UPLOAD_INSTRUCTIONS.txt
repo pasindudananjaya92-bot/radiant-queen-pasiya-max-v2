@@ -1,18 +1,11 @@
-PHASE C upload
+HOTFIX for Phase C no-reply
 
-1. Extract zip
-2. GitHub → api/telegram.js → replace
-3. Commit → Vercel Ready
-4. Test:
-   /logrun morning jog
-   /streak
-   /weekly
-   /runxp
-   Founder: /agentpulse
+1. Replace api/telegram.js on GitHub
+2. Vercel Ready
+3. Open once: https://radiant-queen-pasiya-max-v2.vercel.app/api/telegram?setup=1
+4. Test /start then /logrun test then /streak
 
-New:
-- Streak tracking on /logrun
-- /streak — your streak
-- /weekly — top 5 + your rank
-- /agentpulse — founder pulse (bot + Stride)
-- Group /logrun may react 🔥
+Changes:
+- Removed ctx.react (breaks some Telegraf builds)
+- Uses setMessageReaction via callApi (ignored if fails)
+- addRunXp resilient if streak columns missing
