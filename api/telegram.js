@@ -50,7 +50,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.5-phase-p';
+const BOT_VERSION = 'v2.5-phase-q';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -263,7 +263,7 @@ async function loadGroupSettings(chatId) {
 
   const { data, error } = await supabase
     .from('group_settings')
-    .select('welcome, rate_limit_enabled, group_mode, anti_link, rules_text, slow_seconds')
+    .select('welcome, rate_limit_enabled, group_mode, anti_link, rules_text, slow_seconds, bot_quiet')
     .eq('chat_id', toChatId(chatId))
     .maybeSingle();
 
@@ -287,6 +287,7 @@ async function loadGroupSettings(chatId) {
       groupMode: d?.group_mode || '',
       rulesText: d?.rules_text || '',
       slowSeconds: 0,
+      botQuiet: false,
     };
     groupSettings.set(key, row0);
     return row0;
@@ -302,6 +303,7 @@ async function loadGroupSettings(chatId) {
     groupMode: data?.group_mode || '',
     rulesText: data?.rules_text || '',
     slowSeconds: Number(data?.slow_seconds) || 0,
+    botQuiet: Boolean(data?.bot_quiet),
   };
   groupSettings.set(key, row);
   return row;
@@ -328,6 +330,10 @@ async function saveGroupSettings(chatId, patch) {
       patch.slowSeconds !== undefined
         ? Number(patch.slowSeconds) || 0
         : Number(prev.slowSeconds) || 0,
+    botQuiet:
+      patch.botQuiet !== undefined
+        ? Boolean(patch.botQuiet)
+        : Boolean(prev.botQuiet),
   };
   groupSettings.set(key, next);
 
@@ -342,6 +348,7 @@ async function saveGroupSettings(chatId, patch) {
     rate_limit_enabled: Boolean(next.rateLimit),
     rules_text: next.rulesText || null,
     slow_seconds: Number(next.slowSeconds) || 0,
+    bot_quiet: Boolean(next.botQuiet),
   };
 
   let { error } = await supabase
@@ -2827,6 +2834,54 @@ function buildBot() {
   });
 
 
+
+  bot.command('shutup', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use /shutup in a group.');
+        return;
+      }
+      if (!(await ensureGroupAdmin(ctx))) return;
+      if (!(await isUserGroupAdmin(ctx)) && !isAdmin(ctx)) {
+        await ctx.reply('Admins only.');
+        return;
+      }
+      const res = await saveGroupSettings(ctx.chat.id, { botQuiet: true });
+      await ctx.reply(
+        res.ok
+          ? 'Quiet mode ON.\nBot ignores casual chat (commands still work).\nOff: /speak'
+          : `Failed: ${res.error}\nRun Phase Q SQL for bot_quiet.`
+      );
+    } catch (err) {
+      console.error('shutup', err);
+      await ctx.reply('shutup failed.');
+    }
+  });
+
+  bot.command('speak', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use /speak in a group.');
+        return;
+      }
+      if (!(await ensureGroupAdmin(ctx))) return;
+      if (!(await isUserGroupAdmin(ctx)) && !isAdmin(ctx)) {
+        await ctx.reply('Admins only.');
+        return;
+      }
+      const res = await saveGroupSettings(ctx.chat.id, { botQuiet: false });
+      await ctx.reply(
+        res.ok
+          ? 'Quiet mode OFF.\nBot can reply when mentioned / replied.'
+          : `Failed: ${res.error}`
+      );
+    } catch (err) {
+      console.error('speak', err);
+      await ctx.reply('speak failed.');
+    }
+  });
+
+
   bot.command('admin', async (ctx) => {
     if (!isAdmin(ctx)) {
       await ctx.reply('Admin only.');
@@ -3212,6 +3267,10 @@ function buildBot() {
 
     // Groups: only when @mentioned or reply-to-bot (saves quota)
     if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
+      const qset = await loadGroupSettings(ctx.chat.id);
+      if (qset?.botQuiet && !isAdmin(ctx)) {
+        return; // quiet mode: no AI chat replies
+      }
       const botInfo = ctx.botInfo || {};
       const uname = botInfo.username ? `@${botInfo.username}`.toLowerCase() : '';
       const mentioned = uname && text.toLowerCase().includes(uname);
