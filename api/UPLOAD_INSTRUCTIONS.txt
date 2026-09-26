@@ -1,15 +1,1 @@
-PHASE E — Badges + Club Challenge
-
-1. Supabase SQL Editor → run SQL_PHASE_E.sql
-2. GitHub → replace api/telegram.js
-3. Vercel Ready
-4. Test:
-   /badges
-   /challenge
-   Founder: /challenge set Run 4 times this week — post a photo in group
-   /logrun easy
-   /badges again
-
-BotFather:
-badges - Your runner badges
-challenge - Club weekly challenge
+Upload api/telegram.js to GitHub. No new SQL required for Phase F.
