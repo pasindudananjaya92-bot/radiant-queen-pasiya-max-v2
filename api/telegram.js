@@ -73,6 +73,27 @@ function computeBadges(row) {
   return badges;
 }
 
+
+function parseTimeToSec(s) {
+  const t = String(s || '').trim();
+  if (!t) return null;
+  const parts = t.split(':').map((x) => parseInt(x, 10));
+  if (parts.some((n) => !Number.isFinite(n) || n < 0)) return null;
+  if (parts.length === 1) return parts[0]; // seconds
+  if (parts.length === 2) return parts[0] * 60 + parts[1]; // mm:ss
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2]; // hh:mm:ss
+  return null;
+}
+
+function formatSec(sec) {
+  sec = Math.max(0, Math.round(sec));
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
 function xpLevel(xp) {
   const x = Math.max(0, xp || 0);
   const level = Math.floor(Math.sqrt(x / 10)) + 1;
@@ -2226,6 +2247,98 @@ function buildBot() {
     } catch (err) {
       console.error('report', err);
       await ctx.reply('report failed.');
+    }
+  });
+
+
+
+  bot.command('pace', async (ctx) => {
+    try {
+      const raw = (ctx.message.text || '').replace(/^\/pace(@\w+)?\s*/i, '').trim();
+      const parts = raw.split(/\s+/).filter(Boolean);
+      if (parts.length < 2) {
+        await ctx.reply(
+          'PACE calculator\n\nUsage:\n/pace <km> <time>\n\nExamples:\n/pace 5 25:00\n/pace 10 55:30\n/pace 21.1 2:05:00'
+        );
+        return;
+      }
+      const km = parseFloat(parts[0]);
+      const sec = parseTimeToSec(parts[1]);
+      if (!Number.isFinite(km) || km <= 0 || !sec || sec <= 0) {
+        await ctx.reply('Invalid input.\nExample: /pace 5 25:00');
+        return;
+      }
+      const pace = sec / km;
+      await ctx.reply(
+        `PACE\n` +
+          `Distance: ${km} km\n` +
+          `Time: ${formatSec(sec)}\n` +
+          `Pace: ${formatSec(pace)} /km\n` +
+          `Speed: ${(km / (sec / 3600)).toFixed(2)} km/h\n\n` +
+          `/split · /logrun`
+      );
+    } catch (err) {
+      console.error('pace', err);
+      await ctx.reply('pace failed.');
+    }
+  });
+
+  bot.command('split', async (ctx) => {
+    try {
+      const raw = (ctx.message.text || '').replace(/^\/split(@\w+)?\s*/i, '').trim();
+      const parts = raw.split(/\s+/).filter(Boolean);
+      if (parts.length < 2) {
+        await ctx.reply(
+          'SPLIT / finish-time predictor\n\nUsage:\n/split <pace_per_km> <km>\n\nExamples:\n/split 5:30 10\n/split 6:00 21.1'
+        );
+        return;
+      }
+      const paceSec = parseTimeToSec(parts[0]);
+      const km = parseFloat(parts[1]);
+      if (!paceSec || paceSec <= 0 || !Number.isFinite(km) || km <= 0) {
+        await ctx.reply('Invalid input.\nExample: /split 5:30 10');
+        return;
+      }
+      const total = paceSec * km;
+      await ctx.reply(
+        `SPLIT PLAN\n` +
+          `Pace: ${formatSec(paceSec)} /km\n` +
+          `Distance: ${km} km\n` +
+          `Predicted time: ${formatSec(total)}\n\n` +
+          `/pace · /dailytip · /logrun`
+      );
+    } catch (err) {
+      console.error('split', err);
+      await ctx.reply('split failed.');
+    }
+  });
+
+  bot.command('convert', async (ctx) => {
+    try {
+      const raw = (ctx.message.text || '').replace(/^\/convert(@\w+)?\s*/i, '').trim().toLowerCase();
+      const m = raw.match(/^([\d.]+)\s*(km|mi|mile|miles)?$/i);
+      if (!m) {
+        await ctx.reply(
+          'Distance convert\n\nUsage:\n/convert 10 km\n/convert 6.2 mi'
+        );
+        return;
+      }
+      const n = parseFloat(m[1]);
+      const unit = (m[2] || 'km').toLowerCase();
+      if (!Number.isFinite(n) || n <= 0) {
+        await ctx.reply('Invalid number.');
+        return;
+      }
+      if (unit.startsWith('mi')) {
+        const km = n * 1.60934;
+        await ctx.reply(`CONVERT\n${n} mi → ${km.toFixed(2)} km`);
+      } else {
+        const mi = n / 1.60934;
+        await ctx.reply(`CONVERT\n${n} km → ${mi.toFixed(2)} mi`);
+      }
+    } catch (err) {
+      console.error('convert', err);
+      await ctx.reply('convert failed.');
     }
   });
 
