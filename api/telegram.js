@@ -1976,6 +1976,146 @@ function buildBot() {
   });
 
 
+
+  bot.command('note', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use /note inside a group.\nExample:\n/note Practice 6AM Sunday');
+        return;
+      }
+      if (!(await ensureGroupAdmin(ctx))) return;
+      if (!(await isUserGroupAdmin(ctx)) && !isAdmin(ctx)) {
+        await ctx.reply('Only group admins can add notes.');
+        return;
+      }
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const text = (ctx.message.text || '')
+        .replace(/^\/note(@\w+)?\s*/i, '')
+        .trim()
+        .slice(0, 500);
+      if (!text) {
+        await ctx.reply('Usage:\n/note Your group note text');
+        return;
+      }
+      const chatId = toChatId(ctx.chat.id);
+      const { error } = await supabase.from('rq_group_notes').insert({
+        chat_id: chatId,
+        text,
+        created_by: Number(ctx.from.id),
+        created_by_name: ctx.from.username || ctx.from.first_name || String(ctx.from.id),
+      });
+      if (error) {
+        await ctx.reply(`note failed: ${error.message}\nRun Phase G SQL in Supabase.`);
+        return;
+      }
+      await ctx.reply(`Note saved.\nView: /notes`);
+    } catch (err) {
+      console.error('note', err);
+      await ctx.reply('note failed.');
+    }
+  });
+
+  bot.command('notes', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use /notes inside a group.');
+        return;
+      }
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const chatId = toChatId(ctx.chat.id);
+      const { data, error } = await supabase
+        .from('rq_group_notes')
+        .select('id, text, created_by_name, created_at')
+        .eq('chat_id', chatId)
+        .order('created_at', { ascending: false })
+        .limit(15);
+      if (error) {
+        await ctx.reply(`notes failed: ${error.message}`);
+        return;
+      }
+      if (!data?.length) {
+        await ctx.reply('No notes yet.\nAdmins: /note Your text');
+        return;
+      }
+      const lines = data
+        .map((n, i) => {
+          const who = n.created_by_name || 'admin';
+          const t = String(n.text || '').slice(0, 120);
+          return `${i + 1}. [${n.id}] ${t}\n   — ${who}`;
+        })
+        .join('\n\n');
+      await ctx.reply(
+        `GROUP NOTES (latest)\n\n${lines}\n\nAdd: /note text\nClear one: /clearnote <id>\nClear all: /clearnote all`
+      );
+    } catch (err) {
+      console.error('notes', err);
+      await ctx.reply('notes failed.');
+    }
+  });
+
+  bot.command('clearnote', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use /clearnote inside a group.');
+        return;
+      }
+      if (!(await ensureGroupAdmin(ctx))) return;
+      if (!(await isUserGroupAdmin(ctx)) && !isAdmin(ctx)) {
+        await ctx.reply('Only group admins can clear notes.');
+        return;
+      }
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const arg = (ctx.message.text || '')
+        .replace(/^\/clearnote(@\w+)?\s*/i, '')
+        .trim()
+        .toLowerCase();
+      const chatId = toChatId(ctx.chat.id);
+
+      if (arg === 'all') {
+        const { error } = await supabase
+          .from('rq_group_notes')
+          .delete()
+          .eq('chat_id', chatId);
+        if (error) {
+          await ctx.reply(`clear failed: ${error.message}`);
+          return;
+        }
+        await ctx.reply('All notes cleared for this group.');
+        return;
+      }
+
+      const id = parseInt(arg, 10);
+      if (!Number.isFinite(id)) {
+        await ctx.reply('Usage:\n/clearnote 3\n/clearnote all\n(see ids in /notes)');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('rq_group_notes')
+        .delete()
+        .eq('chat_id', chatId)
+        .eq('id', id);
+      if (error) {
+        await ctx.reply(`clear failed: ${error.message}`);
+        return;
+      }
+      await ctx.reply(`Note #${id} removed.`);
+    } catch (err) {
+      console.error('clearnote', err);
+      await ctx.reply('clearnote failed.');
+    }
+  });
+
+
   bot.command('admin', async (ctx) => {
     if (!isAdmin(ctx)) {
       await ctx.reply('Admin only.');
