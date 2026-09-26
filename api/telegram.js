@@ -1395,14 +1395,26 @@ function buildBot() {
         return;
       }
 
+      const streakNow = res.streak || 0;
+      let milestone = '';
+      if ([3, 7, 14, 30, 60, 100].includes(streakNow)) {
+        milestone =
+          `\n\nMILESTONE 🔥 ${streakNow}-day streak!\n` +
+          `Keep showing up. Club sees this energy.`;
+      }
+
       await ctx.reply(
         `RUN LOGGED (+3 XP)\n` +
           `XP: ${res.xp} | Level ${res.level}\n` +
-          `Streak: ${res.streak || 0} day(s)\n` +
+          `Streak: ${streakNow} day(s)\n` +
           `Honor runs: ${res.runs}\n` +
           (note ? `Note: ${note}\n` : '') +
-          `Top: /xptop | Streak: /streak | Bridge: /stride`
+          `Top: /xptop | Streak: /streak | Bridge: /stride` +
+          milestone
       );
+
+      // optional group energy (Bot API setMessageReaction — safe fallback)
+
 
       // optional group energy (Bot API setMessageReaction — safe fallback)
       if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
@@ -1488,7 +1500,7 @@ function buildBot() {
       const userId = Number(ctx.from.id);
       const { data } = await supabase
         .from('rq_run_xp')
-        .select('xp, streak, last_logrun_date, runs_logged, username')
+        .select('xp, streak, last_logrun_date, runs_logged, username, stride_name')
         .eq('user_id', userId)
         .maybeSingle();
 
@@ -1580,6 +1592,60 @@ function buildBot() {
     } catch (err) {
       console.error('agentpulse', err);
       await ctx.reply('agentpulse failed.');
+    }
+  });
+
+
+
+  bot.command('linkstride', async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const name = (ctx.message.text || '')
+        .replace(/^\/linkstride(@\w+)?\s*/i, '')
+        .trim()
+        .slice(0, 40);
+      if (!name) {
+        await ctx.reply(
+          'Link your StrideClub display name:\n' +
+            '/linkstride YourName\n\n' +
+            'Example:\n/linkstride Pasiya Max'
+        );
+        return;
+      }
+
+      const userId = Number(ctx.from.id);
+      const { data: prev } = await supabase
+        .from('rq_run_xp')
+        .select('xp, runs_logged, streak')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      const { error } = await supabase.from('rq_run_xp').upsert({
+        user_id: userId,
+        username: ctx.from.username || ctx.from.first_name || String(userId),
+        stride_name: name,
+        xp: prev?.xp || 0,
+        runs_logged: prev?.runs_logged || 0,
+        streak: prev?.streak || 0,
+        updated_at: new Date().toISOString(),
+      });
+
+      if (error) {
+        await ctx.reply(`linkstride failed: ${error.message}`);
+        return;
+      }
+
+      await ctx.reply(
+        `Stride name linked: ${name}\n` +
+          `Telegram XP: /runxp\n` +
+          `Club site: ${STRIDE_BASE}`
+      );
+    } catch (err) {
+      console.error('linkstride', err);
+      await ctx.reply('linkstride failed.');
     }
   });
 
