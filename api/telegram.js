@@ -50,7 +50,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.5-phase-o';
+const BOT_VERSION = 'v2.5-phase-p';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -2771,6 +2771,58 @@ function buildBot() {
     } catch (err) {
       console.error('me', err);
       await ctx.reply('me failed.');
+    }
+  });
+
+
+
+  bot.command('today', async (ctx) => {
+    try {
+      await ctx.sendChatAction('typing');
+      let challenge = 'Log a run with /logrun. Climb /weekly.';
+      let streak = 0;
+      let xp = 0;
+      let level = 1;
+
+      if (supabase) {
+        const { data: ch } = await supabase
+          .from('rq_club_meta')
+          .select('value')
+          .eq('key', 'weekly_challenge')
+          .maybeSingle();
+        if (ch?.value) challenge = ch.value;
+
+        const { data: me } = await supabase
+          .from('rq_run_xp')
+          .select('xp, streak')
+          .eq('user_id', Number(ctx.from.id))
+          .maybeSingle();
+        if (me) {
+          streak = me.streak || 0;
+          const lv = xpLevel(me.xp || 0);
+          xp = lv.xp;
+          level = lv.level;
+        }
+      }
+
+      let tip = 'Easy miles build the engine. Stay consistent.';
+      try {
+        tip = await generateReply(
+          'One short practical running tip for today (max 2 sentences). No medical claims.',
+          ctx
+        );
+      } catch (_) {}
+
+      await ctx.reply(
+        `TODAY\n\n` +
+          `Challenge:\n${challenge}\n\n` +
+          `You: Level ${level} · ${xp} XP · Streak ${streak}d\n\n` +
+          `Tip:\n${tip}\n\n` +
+          `/logrun · /pace · /me · /challenge`
+      );
+    } catch (err) {
+      console.error('today', err);
+      await ctx.reply('today failed.');
     }
   });
 
