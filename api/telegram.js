@@ -2343,6 +2343,71 @@ function buildBot() {
   });
 
 
+
+  bot.command('quote', async (ctx) => {
+    try {
+      const uid = String(ctx.from.id);
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply(`Slow down. Retry in ~${rate.waitSec}s.`);
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const out = await generateReply(
+        'Write ONE short motivational line for amateur runners (max 2 sentences). No medical claims. Sinhala or English matching the user vibe; default English if unclear.',
+        ctx
+      );
+      await ctx.reply(`QUOTE\n\n${out}`);
+    } catch (err) {
+      console.error('quote', err);
+      await ctx.reply('quote failed (AI busy). Try /dailytip');
+    }
+  });
+
+  bot.command('roll', async (ctx) => {
+    try {
+      const arg = (ctx.message.text || '')
+        .replace(/^\/roll(@\w+)?\s*/i, '')
+        .trim();
+      let sides = parseInt(arg, 10);
+      if (!Number.isFinite(sides)) sides = 6;
+      sides = Math.max(2, Math.min(100, sides));
+      const n = 1 + Math.floor(Math.random() * sides);
+      await ctx.reply(`ROLL d${sides} → ${n}`);
+    } catch (err) {
+      await ctx.reply('roll failed.');
+    }
+  });
+
+  bot.command('pick', async (ctx) => {
+    try {
+      const raw = (ctx.message.text || '')
+        .replace(/^\/pick(@\w+)?\s*/i, '')
+        .trim();
+      if (!raw) {
+        await ctx.reply('Usage:\n/pick option1 | option2 | option3\nExample:\n/pick Track | Long run | Rest');
+        return;
+      }
+      const options = raw
+        .split('|')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (options.length < 2) {
+        await ctx.reply('Need at least 2 options separated by |\n/pick A | B | C');
+        return;
+      }
+      const choice = options[Math.floor(Math.random() * options.length)];
+      await ctx.reply(
+        `PICK\nOptions: ${options.join(' · ')}\n\nChosen: ${choice}`
+      );
+    } catch (err) {
+      await ctx.reply('pick failed.');
+    }
+  });
+
+
   bot.command('admin', async (ctx) => {
     if (!isAdmin(ctx)) {
       await ctx.reply('Admin only.');
