@@ -2885,25 +2885,49 @@ function buildBot() {
 
   bot.command('links', async (ctx) => {
     try {
-      await ctx.reply(
+      const site = 'https://radiant-queen-pasiya-max-v2.vercel.app';
+      const stride =
+        (typeof STRIDE_BASE === 'string' && STRIDE_BASE.startsWith('http')
+          ? STRIDE_BASE
+          : 'https://strideclub-platform-6b71a.containers.snapdeploy.app'
+        ).replace(/\/$/, '');
+      const github = 'https://github.com/pasindudananjaya92-bot/radiant-queen-pasiya-max-v2';
+      const tg = 'https://t.me/PasiyaMaxQueen_bot';
+
+      const text =
         `QUICK LINKS\n\n` +
-          `Bot web: https://radiant-queen-pasiya-max-v2.vercel.app\n` +
-          `StrideClub: ${typeof STRIDE_BASE !== 'undefined' ? STRIDE_BASE : 'https://strideclub-platform-6b71a.containers.snapdeploy.app'}\n` +
-          `GitHub: https://github.com/pasindudananjaya92-bot/radiant-queen-pasiya-max-v2\n` +
-          `Telegram: https://t.me/PasiyaMaxQueen_bot\n\n` +
-          `/social · /stride · /menu`,
+        `Bot web: ${site}\n` +
+        `StrideClub: ${stride}\n` +
+        `GitHub: ${github}\n` +
+        `Telegram: ${tg}\n\n` +
+        `/social · /stride · /menu`;
+
+      await ctx.reply(
+        text,
         Markup.inlineKeyboard([
-          [Markup.button.url('Website', 'https://radiant-queen-pasiya-max-v2.vercel.app')],
-          [Markup.button.url('StrideClub', typeof STRIDE_BASE !== 'undefined' ? STRIDE_BASE : 'https://strideclub-platform-6b71a.containers.snapdeploy.app')],
-          [Markup.button.url('GitHub', 'https://github.com/pasindudananjaya92-bot/radiant-queen-pasiya-max-v2')],
+          [Markup.button.url('Website', site)],
+          [Markup.button.url('StrideClub', stride)],
+          [Markup.button.url('GitHub', github)],
+          [Markup.button.url('Bot', tg)],
           [Markup.button.callback('Main menu', 'menu_home')],
         ])
       );
     } catch (err) {
       console.error('links', err);
-      await ctx.reply('links failed.');
+      try {
+        await ctx.reply(
+          `QUICK LINKS\n\n` +
+            `Web: https://radiant-queen-pasiya-max-v2.vercel.app\n` +
+            `Stride: https://strideclub-platform-6b71a.containers.snapdeploy.app\n` +
+            `GitHub: https://github.com/pasindudananjaya92-bot/radiant-queen-pasiya-max-v2\n` +
+            `Bot: https://t.me/PasiyaMaxQueen_bot`
+        );
+      } catch (e2) {
+        await ctx.reply(`links failed: ${String(err?.message || err).slice(0, 120)}`);
+      }
     }
   });
+
 
 
   bot.command('admin', async (ctx) => {
