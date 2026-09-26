@@ -63,11 +63,25 @@ function xpLevel(xp) {
 async function addRunXp(user, delta, chatId, reason, opts = {}) {
   if (!supabase) return { ok: false, error: 'No Supabase' };
   const userId = Number(user.id);
-  const { data: prev } = await supabase
-    .from('rq_run_xp')
-    .select('xp, runs_logged, streak, last_logrun_date')
-    .eq('user_id', userId)
-    .maybeSingle();
+  let prev = null;
+  {
+    const q1 = await supabase
+      .from('rq_run_xp')
+      .select('xp, runs_logged, streak, last_logrun_date')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (q1.error) {
+      const q0 = await supabase
+        .from('rq_run_xp')
+        .select('xp, runs_logged')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (q0.error) return { ok: false, error: q0.error.message };
+      prev = q0.data;
+    } else {
+      prev = q1.data;
+    }
+  }
 
   const xp = (prev?.xp || 0) + delta;
   const runs = (prev?.runs_logged || 0) + (delta > 0 ? 1 : 0);
@@ -101,8 +115,19 @@ async function addRunXp(user, delta, chatId, reason, opts = {}) {
     row.last_logrun_date = lastDate;
   }
 
-  const { error } = await supabase.from('rq_run_xp').upsert(row);
-
+  let { error } = await supabase.from('rq_run_xp').upsert(row);
+  if (error && opts.updateStreak) {
+    // retry without streak columns if migration partial
+    const basic = {
+      user_id: row.user_id,
+      username: row.username,
+      xp: row.xp,
+      runs_logged: row.runs_logged,
+      updated_at: row.updated_at,
+    };
+    const r2 = await supabase.from('rq_run_xp').upsert(basic);
+    error = r2.error;
+  }
   if (error) return { ok: false, error: error.message };
 
   await supabase.from('rq_run_xp_log').insert({
@@ -1379,10 +1404,14 @@ function buildBot() {
           `Top: /xptop | Streak: /streak | Bridge: /stride`
       );
 
-      // optional group energy
+      // optional group energy (Bot API setMessageReaction — safe fallback)
       if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
         try {
-          await ctx.react('🔥');
+          await ctx.telegram.callApi('setMessageReaction', {
+            chat_id: ctx.chat.id,
+            message_id: ctx.message.message_id,
+            reaction: [{ type: 'emoji', emoji: '🔥' }],
+          });
         } catch (_) {}
       }
     } catch (err) {
