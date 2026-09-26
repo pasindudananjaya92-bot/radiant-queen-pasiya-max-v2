@@ -50,7 +50,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.5-phase-m';
+const BOT_VERSION = 'v2.5-phase-n';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -2668,6 +2668,53 @@ function buildBot() {
     } catch (err) {
       console.error('faqs', err);
       await ctx.reply('faqs failed.');
+    }
+  });
+
+
+
+  bot.command('warns', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use /warns inside a group.');
+        return;
+      }
+      if (!(await isUserGroupAdmin(ctx)) && !isAdmin(ctx)) {
+        await ctx.reply('Admins only.');
+        return;
+      }
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const chatId = toChatId(ctx.chat.id);
+      const { data, error } = await supabase
+        .from('rq_warns')
+        .select('user_id, warn_count, last_reason, updated_at')
+        .eq('chat_id', chatId)
+        .order('warn_count', { ascending: false })
+        .limit(15);
+      if (error) {
+        await ctx.reply(`warns failed: ${error.message}`);
+        return;
+      }
+      if (!data?.length) {
+        await ctx.reply('No warns stored for this group.');
+        return;
+      }
+      const lines = data
+        .map(
+          (w, i) =>
+            `${i + 1}. User ${w.user_id} — ${w.warn_count} warn(s)\n` +
+            `   Last: ${String(w.last_reason || '—').slice(0, 80)}`
+        )
+        .join('\n');
+      await ctx.reply(
+        `WARN BOARD\n\n${lines}\n\n/warn (reply) · /unwarn (reply)`
+      );
+    } catch (err) {
+      console.error('warns', err);
+      await ctx.reply('warns failed.');
     }
   });
 
