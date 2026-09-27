@@ -50,7 +50,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.6-phase-x';
+const BOT_VERSION = 'v2.6-phase-y';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -3615,6 +3615,108 @@ function buildBot() {
     } catch (err) {
       console.error('done', err);
       await ctx.reply('done failed.');
+    }
+  });
+
+
+
+  bot.command('habit', async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const name = (ctx.message.text || '')
+        .replace(/^\/habit(@\w+)?\s*/i, '')
+        .trim()
+        .slice(0, 40)
+        .toLowerCase() || 'run';
+      const uid = Number(ctx.from.id);
+      const day = new Date().toISOString().slice(0, 10); // UTC date key
+
+      const { data: prev } = await supabase
+        .from('rq_habits')
+        .select('id, streak, last_day, total')
+        .eq('user_id', uid)
+        .eq('habit', name)
+        .maybeSingle();
+
+      if (prev?.last_day === day) {
+        await ctx.reply(
+          `HABIT · ${name}\nAlready checked in today.\nStreak: ${prev.streak || 0}\nTotal: ${prev.total || 0}`
+        );
+        return;
+      }
+
+      let streak = 1;
+      let total = 1;
+      if (prev) {
+        total = (prev.total || 0) + 1;
+        const last = prev.last_day ? new Date(prev.last_day + 'T00:00:00Z') : null;
+        const today = new Date(day + 'T00:00:00Z');
+        const diffDays = last
+          ? Math.round((today - last) / 86400000)
+          : 999;
+        streak = diffDays === 1 ? (prev.streak || 0) + 1 : 1;
+      }
+
+      const { error } = await supabase.from('rq_habits').upsert(
+        {
+          user_id: uid,
+          username: ctx.from.username || ctx.from.first_name || String(uid),
+          habit: name,
+          streak,
+          total,
+          last_day: day,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,habit' }
+      );
+      if (error) {
+        await ctx.reply(`habit failed: ${error.message}\nRun Phase Y SQL.`);
+        return;
+      }
+      await ctx.reply(
+        `HABIT · ${name}\nChecked in for ${day} (UTC).\nStreak: ${streak}\nTotal: ${total}\n\n/habits`
+      );
+    } catch (err) {
+      console.error('habit', err);
+      await ctx.reply('habit failed.');
+    }
+  });
+
+  bot.command('habits', async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const { data, error } = await supabase
+        .from('rq_habits')
+        .select('habit, streak, total, last_day')
+        .eq('user_id', Number(ctx.from.id))
+        .order('streak', { ascending: false })
+        .limit(15);
+      if (error) {
+        await ctx.reply(`habits failed: ${error.message}`);
+        return;
+      }
+      if (!data?.length) {
+        await ctx.reply(
+          'No habits yet.\nExamples:\n/habit run\n/habit stretch\n/habit water'
+        );
+        return;
+      }
+      const lines = data
+        .map(
+          (h) =>
+            `• ${h.habit} — streak ${h.streak || 0} · total ${h.total || 0} · last ${h.last_day || '—'}`
+        )
+        .join('\n');
+      await ctx.reply(`YOUR HABITS\n\n${lines}\n\nCheck in: /habit <name>`);
+    } catch (err) {
+      console.error('habits', err);
+      await ctx.reply('habits failed.');
     }
   });
 
