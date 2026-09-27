@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.9-weather';
+const BOT_VERSION = 'v2.9-forecast';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -876,6 +876,29 @@ async function geocodePlace(name) {
     lat: hit.latitude,
     lon: hit.longitude,
   };
+}
+
+
+async function fetchForecast(lat, lon, days = 3) {
+  const d = Math.max(1, Math.min(7, Number(days) || 3));
+  const url =
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max` +
+    `&timezone=auto&forecast_days=${d}`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+  const j = await r.json();
+  const daily = j.daily || {};
+  const dates = daily.time || [];
+  const lines = dates.map((date, i) => {
+    const code = daily.weather_code?.[i];
+    const tmax = daily.temperature_2m_max?.[i];
+    const tmin = daily.temperature_2m_min?.[i];
+    const rain = daily.precipitation_sum?.[i];
+    const wind = daily.wind_speed_10m_max?.[i];
+    return `${date}: ${weatherCodeText(code)} · ${tmin}–${tmax}°C · rain ${rain}mm · wind ${wind}km/h`;
+  });
+  return { ok: true, timezone: j.timezone || '', lines };
 }
 
 async function fetchWeather(lat, lon) {
@@ -4329,6 +4352,56 @@ bot.command('commands', async (ctx) => {
     } catch (err) {
       console.error('weather', err);
       await ctx.reply('weather failed.');
+    }
+  });
+
+
+
+  bot.command('forecast', async (ctx) => {
+    try {
+      const raw = (ctx.message.text || '')
+        .replace(/^\/forecast(@\w+)?\s*/i, '')
+        .trim();
+      if (!raw) {
+        await ctx.reply(
+          'Usage:\n/forecast Colombo\n/forecast Kotte 5\n\nDays: 1–7 (default 3)'
+        );
+        return;
+      }
+      const parts = raw.split(/\s+/);
+      let days = 3;
+      let place = raw;
+      const last = parts[parts.length - 1];
+      if (/^\d+$/.test(last) && parts.length >= 2) {
+        days = parseInt(last, 10);
+        place = parts.slice(0, -1).join(' ');
+      }
+      const uid = String(ctx.from.id);
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply(`Slow down. Retry in ~${rate.waitSec}s.`);
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const geo = await geocodePlace(place);
+      if (!geo) {
+        await ctx.reply('Place not found. Try another name.');
+        return;
+      }
+      const f = await fetchForecast(geo.lat, geo.lon, days);
+      if (!f.ok) {
+        await ctx.reply(`forecast failed: ${f.error}`);
+        return;
+      }
+      const label = [geo.name, geo.admin1, geo.country].filter(Boolean).join(', ');
+      await ctx.reply(
+        `FORECAST · ${label}\nTZ: ${f.timezone}\n\n${f.lines.join('\n')}`.slice(0, 3500)
+      );
+    } catch (err) {
+      console.error('forecast', err);
+      await ctx.reply('forecast failed.');
     }
   });
 
