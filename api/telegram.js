@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.9-video-backup';
+const BOT_VERSION = 'v2.9-location-ocr';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -1006,6 +1006,19 @@ async function handlePhoto(ctx) {
   const mime = (file.file_path || '').endsWith('.png') ? 'image/png' : 'image/jpeg';
 
   await ctx.sendChatAction('typing');
+
+  if (mode === 'ocr') {
+    pendingTool.delete(uid);
+    const out = await generateReply(
+      'Extract all readable text from this image (OCR). Preserve line breaks when useful. ' +
+        'If little text, say so. Then one-line summary.\n\nUser note: ' + (caption || '(none)'),
+      ctx,
+      b64,
+      mime
+    );
+    await ctx.reply(('OCR\n\n' + out).slice(0, 3500), afterReplyKeyboard(ctx));
+    return;
+  }
 
   if (mode === 'photo_caption') {
     pendingTool.delete(uid);
@@ -4194,6 +4207,20 @@ bot.command('commands', async (ctx) => {
   });
 
 
+
+  bot.command('ocr', async (ctx) => {
+    try {
+      const uid = String(ctx.from.id);
+      pendingTool.set(uid, 'ocr');
+      await ctx.reply(
+        'OCR mode ON.\nSend a photo of text (receipt, whiteboard, screenshot).\nCancel: send any other /command'
+      );
+    } catch (err) {
+      await ctx.reply('ocr failed.');
+    }
+  });
+
+
   bot.command('admin', async (ctx) => {
     if (!isAdmin(ctx)) {
       await ctx.reply('Admin only.');
@@ -4595,6 +4622,45 @@ bot.command('commands', async (ctx) => {
       console.error('video', err);
       try {
         await ctx.reply('Video AI failed. Try a photo or shorter clip.');
+      } catch (_) {}
+    }
+  });
+
+
+
+  bot.on('location', async (ctx) => {
+    try {
+      const loc = ctx.message.location;
+      if (!loc) return;
+      const isPrivate = ctx.chat?.type === 'private';
+      if (!isPrivate && !isAdmin(ctx)) {
+        // groups: only if not quiet
+        const q = await loadGroupSettings(ctx.chat.id);
+        if (q?.botQuiet && !isAdmin(ctx)) return;
+      }
+      const uid = String(ctx.from.id);
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply(`Slow down. Retry in ~${rate.waitSec}s.`);
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const out = await generateReply(
+        `User shared GPS location for a run/walk.\\n` +
+          `Latitude: ${loc.latitude}\\nLongitude: ${loc.longitude}\\n` +
+          `Give practical outdoor guidance (hydration, visibility, pacing, safety). ` +
+          `Do not invent weather. Max 10 lines. User language Sinhala or English.`,
+        ctx
+      );
+      await ctx.reply(
+        `LOCATION COACH\\n${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}\\n\\n${out}`.slice(0, 3500)
+      );
+    } catch (err) {
+      console.error('location', err);
+      try {
+        await ctx.reply('Location coach failed. Try /dailytip');
       } catch (_) {}
     }
   });
