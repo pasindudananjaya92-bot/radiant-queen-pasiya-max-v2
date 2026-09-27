@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.9-location-ocr';
+const BOT_VERSION = 'v2.9-weather';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -858,6 +858,69 @@ async function githubRecentCommits(limit = 5) {
     return `${i + 1}. ${sha} — ${msg}\n   ${who} · ${when.slice(0, 16)}`;
   });
   return { ok: true, lines, repo };
+}
+
+
+async function geocodePlace(name) {
+  const q = encodeURIComponent(String(name).trim());
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${q}&count=1&language=en&format=json`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!r.ok) return null;
+  const j = await r.json();
+  const hit = j?.results?.[0];
+  if (!hit) return null;
+  return {
+    name: hit.name,
+    country: hit.country || '',
+    admin1: hit.admin1 || '',
+    lat: hit.latitude,
+    lon: hit.longitude,
+  };
+}
+
+async function fetchWeather(lat, lon) {
+  const url =
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m` +
+    `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum` +
+    `&timezone=auto&forecast_days=1`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+  const j = await r.json();
+  const c = j.current || {};
+  const d = j.daily || {};
+  return {
+    ok: true,
+    timezone: j.timezone || '',
+    temp: c.temperature_2m,
+    feels: c.apparent_temperature,
+    humidity: c.relative_humidity_2m,
+    precip: c.precipitation,
+    wind: c.wind_speed_10m,
+    code: c.weather_code,
+    tmax: d.temperature_2m_max?.[0],
+    tmin: d.temperature_2m_min?.[0],
+    precipDay: d.precipitation_sum?.[0],
+  };
+}
+
+function weatherCodeText(code) {
+  const map = {
+    0: 'Clear',
+    1: 'Mainly clear',
+    2: 'Partly cloudy',
+    3: 'Overcast',
+    45: 'Fog',
+    48: 'Depositing rime fog',
+    51: 'Light drizzle',
+    61: 'Light rain',
+    63: 'Rain',
+    65: 'Heavy rain',
+    71: 'Snow',
+    80: 'Rain showers',
+    95: 'Thunderstorm',
+  };
+  return map[code] || `Code ${code}`;
 }
 
 async function generateReply(prompt, ctx, imageBase64, mimeType) {
@@ -4221,6 +4284,55 @@ bot.command('commands', async (ctx) => {
   });
 
 
+
+  bot.command('weather', async (ctx) => {
+    try {
+      const place = (ctx.message.text || '')
+        .replace(/^\/weather(@\w+)?\s*/i, '')
+        .trim();
+      if (!place) {
+        await ctx.reply(
+          'Usage:\n/weather Colombo\n/weather Kotte\n\nOr share a Telegram location.'
+        );
+        return;
+      }
+      const uid = String(ctx.from.id);
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply(`Slow down. Retry in ~${rate.waitSec}s.`);
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const geo = await geocodePlace(place);
+      if (!geo) {
+        await ctx.reply('Place not found. Try another name.');
+        return;
+      }
+      const w = await fetchWeather(geo.lat, geo.lon);
+      if (!w.ok) {
+        await ctx.reply(`weather failed: ${w.error}`);
+        return;
+      }
+      const label = [geo.name, geo.admin1, geo.country].filter(Boolean).join(', ');
+      await ctx.reply(
+        `WEATHER · ${label}\n` +
+          `Now: ${w.temp}°C (feels ${w.feels}°C)\n` +
+          `Condition: ${weatherCodeText(w.code)}\n` +
+          `Humidity: ${w.humidity}% · Wind: ${w.wind} km/h\n` +
+          `Precip now: ${w.precip} mm\n` +
+          `Today: ${w.tmin}°C – ${w.tmax}°C · Rain day: ${w.precipDay} mm\n` +
+          `TZ: ${w.timezone}\n\n` +
+          `Tip: Hydrate early if heat/humidity high. Reflective gear if dark.`
+      );
+    } catch (err) {
+      console.error('weather', err);
+      await ctx.reply('weather failed.');
+    }
+  });
+
+
   bot.command('admin', async (ctx) => {
     if (!isAdmin(ctx)) {
       await ctx.reply('Admin only.');
@@ -4647,15 +4759,26 @@ bot.command('commands', async (ctx) => {
         }
       }
       await ctx.sendChatAction('typing');
+      let weatherLine = 'Weather: (unavailable)';
+      try {
+        const w = await fetchWeather(loc.latitude, loc.longitude);
+        if (w.ok) {
+          weatherLine =
+            `Weather now: ${w.temp}°C feels ${w.feels}°C · ${weatherCodeText(w.code)} · ` +
+            `Humidity ${w.humidity}% · Wind ${w.wind} km/h · Precip ${w.precip} mm`;
+        }
+      } catch (_) {}
       const out = await generateReply(
-        `User shared GPS location for a run/walk.\\n` +
-          `Latitude: ${loc.latitude}\\nLongitude: ${loc.longitude}\\n` +
-          `Give practical outdoor guidance (hydration, visibility, pacing, safety). ` +
-          `Do not invent weather. Max 10 lines. User language Sinhala or English.`,
+        `User shared GPS for outdoor activity.\n` +
+          `Lat: ${loc.latitude} Lon: ${loc.longitude}\n` +
+          `${weatherLine}\n` +
+          `Give practical outdoor guidance using the REAL weather numbers above. ` +
+          `Hydration, visibility, pacing, safety. Max 10 lines. Match user language.`,
         ctx
       );
       await ctx.reply(
-        `LOCATION COACH\\n${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}\\n\\n${out}`.slice(0, 3500)
+        `LOCATION COACH\n${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}\n${weatherLine}\n\n${out}`.slice(0, 3500)
+      );
       );
     } catch (err) {
       console.error('location', err);
