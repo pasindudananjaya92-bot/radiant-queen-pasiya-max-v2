@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.8-voice-ghlog';
+const BOT_VERSION = 'v2.9-video-backup';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -4127,6 +4127,73 @@ bot.command('commands', async (ctx) => {
   });
 
 
+
+  bot.command('sysbackup', async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only.');
+        return;
+      }
+      if (ctx.chat?.type !== 'private') {
+        await ctx.reply('Use /sysbackup in private chat.');
+        return;
+      }
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      await ctx.sendChatAction('typing');
+
+      const tables = [
+        'group_settings',
+        'rq_run_xp',
+        'rq_warns',
+        'rq_group_notes',
+        'rq_feedback',
+        'rq_faq',
+        'rq_saves',
+        'rq_todos',
+        'rq_habits',
+        'rq_group_reports',
+      ];
+      const snapshot = {
+        exported_at: new Date().toISOString(),
+        by: ctx.from.id,
+        admin_email: typeof ADMIN_EMAIL !== 'undefined' ? ADMIN_EMAIL : null,
+        repo: GITHUB_REPO,
+        version: typeof BOT_VERSION !== 'undefined' ? BOT_VERSION : 'v2.9',
+        tables: {},
+      };
+
+      for (const t of tables) {
+        try {
+          const { data, error, count } = await supabase
+            .from(t)
+            .select('*', { count: 'exact' })
+            .limit(100);
+          snapshot.tables[t] = error
+            ? { error: error.message }
+            : { count: count ?? (data?.length || 0), sample: data || [] };
+        } catch (e) {
+          snapshot.tables[t] = { error: String(e?.message || e) };
+        }
+      }
+
+      const json = JSON.stringify(snapshot, null, 2);
+      await ctx.replyWithDocument(
+        {
+          source: Buffer.from(json, 'utf8'),
+          filename: `sysbackup-${Date.now()}.json`,
+        },
+        { caption: 'Founder system backup (samples up to 100 rows/table). Keep private.' }
+      );
+    } catch (err) {
+      console.error('sysbackup', err);
+      await ctx.reply(`sysbackup failed: ${String(err?.message || err).slice(0, 150)}`);
+    }
+  });
+
+
   bot.command('admin', async (ctx) => {
     if (!isAdmin(ctx)) {
       await ctx.reply('Admin only.');
@@ -4453,6 +4520,84 @@ bot.command('commands', async (ctx) => {
     }
   });
 
+
+
+
+  async function handleVideoLike(ctx, fileId, kind) {
+    const isPrivate = ctx.chat?.type === 'private';
+    if (!isPrivate && !isAdmin(ctx)) return;
+    if (!isPrivate) {
+      const q = await loadGroupSettings(ctx.chat.id);
+      if (q?.botQuiet && !isAdmin(ctx)) return;
+    }
+    const uid = String(ctx.from.id);
+    if (!isAdmin(ctx)) {
+      const rate = await checkRateLimit(uid);
+      if (!rate.ok) {
+        await ctx.reply(`Slow down. Retry in ~${rate.waitSec}s.`);
+        return;
+      }
+    }
+    await ctx.sendChatAction('typing');
+    const file = await ctx.telegram.getFile(fileId);
+    const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+    const res = await fetch(fileUrl);
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length > 8_000_000) {
+      await ctx.reply('Video too large for free-tier analysis. Send a shorter clip.');
+      return;
+    }
+    const b64 = buf.toString('base64');
+    const path = file.file_path || '';
+    const mime = path.endsWith('.mp4')
+      ? 'video/mp4'
+      : path.endsWith('.webm')
+        ? 'video/webm'
+        : 'video/mp4';
+    const caption = ctx.message.caption || ctx.message.text || '';
+    const out = await generateReply(
+      `This is a short ${kind}. Describe what you see/hear that is useful. If running-related, give practical coaching tips. ` +
+        `User caption/context: ${caption || '(none)'}. Max 12 lines.`,
+      ctx,
+      b64,
+      mime
+    );
+    await ctx.reply(out.slice(0, 3500));
+  }
+
+  bot.on('video_note', async (ctx) => {
+    try {
+      const vn = ctx.message.video_note;
+      if (!vn?.file_id) return;
+      await handleVideoLike(ctx, vn.file_id, 'video note (round)');
+    } catch (err) {
+      console.error('video_note', err);
+      try {
+        await ctx.reply('Video note AI failed. Try a photo or text.');
+      } catch (_) {}
+    }
+  });
+
+  bot.on('video', async (ctx) => {
+    try {
+      const v = ctx.message.video;
+      if (!v?.file_id) return;
+      // only if private or admin, and prefer short videos
+      if (v.duration && v.duration > 45) {
+        const isPrivate = ctx.chat?.type === 'private';
+        if (isPrivate || isAdmin(ctx)) {
+          await ctx.reply('Video longer than 45s — analysis skipped (free tier). Send a shorter clip.');
+        }
+        return;
+      }
+      await handleVideoLike(ctx, v.file_id, 'video');
+    } catch (err) {
+      console.error('video', err);
+      try {
+        await ctx.reply('Video AI failed. Try a photo or shorter clip.');
+      } catch (_) {}
+    }
+  });
 
 
   bot.on('voice', async (ctx) => {
