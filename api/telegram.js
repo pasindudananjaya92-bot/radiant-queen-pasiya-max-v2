@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ADMIN_ID = String(process.env.ADMIN_ID || '').trim();
+const ADMIN_EMAIL = String(process.env.ADMIN_EMAIL || 'pasindudananjaya92@gmail.com').trim();
 const GEMINI_KEY = process.env.GEMINI_API_KEY || '';
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
 const GITHUB_REPO = process.env.GITHUB_REPO || 'pasindudananjaya92-bot/radiant-queen-pasiya-max-v2';
@@ -39,6 +40,7 @@ Live: https://strideclub-platform-6b71a.containers.snapdeploy.app
 Open the site for: Dashboard, Logbook, Leaderboard, Events, AI Coach, Agent Logs.`;
 
 const pendingTool = new Map();
+const pendingGhPath = new Map(); // admin userId -> repo path
 const groupSettings = new Map(); // groupId -> settings
 const slowLastMsg = new Map(); // `${chatId}:${userId}` -> timestamp ms
 const rateMap = new Map(); // memory fallback for rate limit
@@ -50,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.7-phase-z';
+const BOT_VERSION = 'v2.7-github-upload';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -547,6 +549,7 @@ function statusText(ctx) {
     `Gemini: ${GEMINI_KEY ? 'yes' : 'NO'}\n` +
     `ADMIN_ID: ${ADMIN_ID ? 'yes' : 'NO'}\n` +
     `GitHub token: ${GITHUB_TOKEN ? 'yes' : 'no'}\n` +
+    `Admin email: ${ADMIN_EMAIL}\n` +
     `Supabase: ${supabase ? 'yes' : 'NO'}\n` +
     `You are founder: ${isAdmin(ctx) ? 'yes' : 'no'}\n` +
     `Model: ${resolvedModel || 'not used yet'}`
@@ -682,6 +685,62 @@ async function fetchPublicPageText(url) {
   } catch (e) {
     return { ok: false, error: String(e?.message || e).slice(0, 120) };
   }
+}
+
+
+async function githubPutFile(path, contentBuffer, message) {
+  if (!GITHUB_TOKEN) {
+    return { ok: false, error: 'GITHUB_TOKEN missing on Vercel' };
+  }
+  const repo = GITHUB_REPO || 'pasindudananjaya92-bot/radiant-queen-pasiya-max-v2';
+  const cleanPath = String(path || '')
+    .replace(/^\/+/, '')
+    .replace(/\.\./g, '')
+    .slice(0, 200);
+  if (!cleanPath || cleanPath.includes('..')) {
+    return { ok: false, error: 'Invalid path' };
+  }
+  const headers = {
+    Authorization: `Bearer ${GITHUB_TOKEN}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    'Content-Type': 'application/json',
+  };
+  let sha;
+  try {
+    const getRes = await fetch(
+      `https://api.github.com/repos/${repo}/contents/${cleanPath}`,
+      { headers }
+    );
+    if (getRes.ok) {
+      const j = await getRes.json();
+      sha = j.sha;
+    }
+  } catch (_) {}
+
+  const body = {
+    message: message || `bot: update ${cleanPath}`,
+    content: contentBuffer.toString('base64'),
+    branch: 'main',
+  };
+  if (sha) body.sha = sha;
+
+  const putRes = await fetch(
+    `https://api.github.com/repos/${repo}/contents/${cleanPath}`,
+    { method: 'PUT', headers, body: JSON.stringify(body) }
+  );
+  const text = await putRes.text();
+  if (!putRes.ok) {
+    return {
+      ok: false,
+      error: `GitHub HTTP ${putRes.status}: ${text.slice(0, 200)}`,
+    };
+  }
+  let html = '';
+  try {
+    html = JSON.parse(text)?.content?.html_url || '';
+  } catch (_) {}
+  return { ok: true, path: cleanPath, url: html, repo };
 }
 
 async function generateReply(prompt, ctx, imageBase64, mimeType) {
@@ -3741,6 +3800,63 @@ bot.command('commands', async (ctx) => {
     );
   });
 
+
+  bot.command('ghpath', async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only.');
+        return;
+      }
+      if (ctx.chat?.type !== 'private') {
+        await ctx.reply('Use /ghpath only in private chat with the bot.');
+        return;
+      }
+      const path = (ctx.message.text || '')
+        .replace(/^\/ghpath(@\w+)?\s*/i, '')
+        .trim()
+        .replace(/^\/+/, '');
+      if (!path) {
+        await ctx.reply(
+          'Founder GitHub upload\n\n' +
+            '1) /ghpath api/telegram.js\n' +
+            '2) Send the file (document) in this private chat\n\n' +
+            'Or send a document with caption:\ngh api/telegram.js\n\n' +
+            `Repo: ${GITHUB_REPO}\nToken: ${GITHUB_TOKEN ? 'yes' : 'NO — set GITHUB_TOKEN with Contents: Read and write'}\n` +
+            `Admin email (meta): ${ADMIN_EMAIL}`
+        );
+        return;
+      }
+      pendingGhPath.set(String(ctx.from.id), path);
+      await ctx.reply(
+        `Ready.\nPath: ${path}\nNow send the file as a Document (not photo) in this private chat.`
+      );
+    } catch (err) {
+      console.error('ghpath', err);
+      await ctx.reply('ghpath failed.');
+    }
+  });
+
+  bot.command('ghstatus', async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only.');
+        return;
+      }
+      await ctx.reply(
+        `GitHub upload\n` +
+          `Repo: ${GITHUB_REPO}\n` +
+          `Token: ${GITHUB_TOKEN ? 'yes' : 'NO'}\n` +
+          `Admin Telegram ID: ${ADMIN_ID || '—'}\n` +
+          `Admin email: ${ADMIN_EMAIL}\n` +
+          `Pending path: ${pendingGhPath.get(String(ctx.from.id)) || 'none'}\n\n` +
+          `/ghpath api/telegram.js  then send file`
+      );
+    } catch (err) {
+      await ctx.reply('ghstatus failed.');
+    }
+  });
+
+
   bot.command('admin', async (ctx) => {
     if (!isAdmin(ctx)) {
       await ctx.reply('Admin only.');
@@ -4002,6 +4118,71 @@ bot.command('commands', async (ctx) => {
       } catch (_) {}
     }
   });
+
+
+  bot.on('document', async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) return;
+      if (ctx.chat?.type !== 'private') {
+        // ignore group document spam
+        return;
+      }
+      if (!GITHUB_TOKEN) {
+        await ctx.reply('GITHUB_TOKEN not set on Vercel (need Contents: Read and write).');
+        return;
+      }
+
+      const caption = (ctx.message.caption || '').trim();
+      let path = pendingGhPath.get(String(ctx.from.id));
+
+      // caption: "gh api/telegram.js" or "upload:README.md"
+      const cap = caption.match(/^(?:gh|upload)\s*:?\s*(\S+)/i);
+      if (cap) path = cap[1].replace(/^\/+/, '');
+
+      const doc = ctx.message.document;
+      if (!path && doc?.file_name) {
+        // default: upload to repo root with same filename
+        path = doc.file_name;
+      }
+      if (!path) {
+        await ctx.reply('Set path first:\n/ghpath api/telegram.js\nor caption: gh api/telegram.js');
+        return;
+      }
+
+      // size limit ~4.5MB for GitHub API practicality on serverless
+      if (doc.file_size && doc.file_size > 4_500_000) {
+        await ctx.reply('File too large for bot upload (max ~4.5MB). Use GitHub web UI.');
+        return;
+      }
+
+      await ctx.reply(`Uploading to ${GITHUB_REPO}:${path} …`);
+      const file = await ctx.telegram.getFile(doc.file_id);
+      const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+      const res = await fetch(fileUrl);
+      const buf = Buffer.from(await res.arrayBuffer());
+
+      const result = await githubPutFile(
+        path,
+        buf,
+        `bot-upload: ${path} by founder`
+      );
+      pendingGhPath.delete(String(ctx.from.id));
+
+      if (!result.ok) {
+        await ctx.reply(`Upload failed:\n${result.error}`);
+        return;
+      }
+      await ctx.reply(
+        `Uploaded.\nRepo: ${result.repo}\nPath: ${result.path}\n${result.url || 'Open GitHub repo to verify.'}\n\nVercel will redeploy if this is the linked repo.`
+      );
+    } catch (err) {
+      console.error('document', err);
+      try {
+        await ctx.reply(`document upload failed: ${String(err?.message || err).slice(0, 150)}`);
+      } catch (_) {}
+    }
+  });
+
 
   bot.on('photo', async (ctx) => {
     try {
