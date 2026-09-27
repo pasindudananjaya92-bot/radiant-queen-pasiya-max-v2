@@ -1,39 +1,50 @@
-# RADIANT QUEEN • PASIYA MAX v2.4
+# RADIANT QUEEN · PASIYA MAX (Telegram Bot)
 
-Gemini Telegram bot + web chat on **Vercel**, **Supabase** persistence, Runner XP / streaks, and **StrideClub** bridge (Agent 6).
+**Bot:** [@PasiyaMaxQueen_bot](https://t.me/PasiyaMaxQueen_bot)  
+**Web:** https://radiant-queen-pasiya-max-v2.vercel.app  
+**StrideClub:** https://strideclub-platform-6b71a.containers.snapdeploy.app  
 
-## Live
-- Bot: https://t.me/PasiyaMaxQueen_bot
-- Web: https://radiant-queen-pasiya-max-v2.vercel.app
-- StrideClub: https://strideclub-platform-6b71a.containers.snapdeploy.app
-- Repo: https://github.com/pasindudananjaya92-bot/radiant-queen-pasiya-max-v2
+Gemini-powered Telegram bot + Supabase persistence + StrideClub bridge.  
+Hosted on **Vercel** (webhook). Free-tier oriented.
 
 ## Stack
-Vercel serverless · Telegraf · Gemini · Supabase · StrideClub (SnapDeploy)
 
-## 6 Agents
-1–5 on StrideClub web · **6 = this Telegram bot** (`/stride agents`)
+- `api/telegram.js` — Telegraf webhook handler
+- Supabase (Postgres) — group settings, XP, warns, notes, FAQ, todos, habits, saves
+- Google Gemini — chat, vision, tools
+- GitHub API — founder can upload files from private Telegram chat
 
-## Highlight commands
-| Command | Description |
-|---------|-------------|
-| `/runxp` `/xptop` `/logrun` | XP + honor runs |
-| `/streak` `/weekly` | Streak + club board |
-| `/linkstride <name>` | Link Stride display name |
-| `/stride` `/stride agents` | Club health + agent map |
-| `/dailytip` | AI running tip |
-| `/setwelcome` `/rules` `/antilink` | Group tools |
-| `/warn` `/unwarn` | Warn + auto-mute at 3 |
-| `/broadcast` `/agentpulse` `/usage` | Founder tools |
+## Environment (Vercel)
 
-## Phases
-- **A:** XP, Stride bridge, dailytip
-- **B:** agents list, logrun, broadcast
-- **C:** streak, weekly, agentpulse
-- **D:** linkstride, streak milestones (3/7/14/30/60/100)
+| Variable | Required | Notes |
+|----------|----------|--------|
+| `BOT_TOKEN` | yes | BotFather token |
+| `GEMINI_API_KEY` | yes | Google AI |
+| `ADMIN_ID` | yes | Your Telegram numeric id |
+| `ADMIN_EMAIL` | optional | e.g. pasindudananjaya92@gmail.com (meta only) |
+| `SUPABASE_URL` | yes | |
+| `SUPABASE_SERVICE_ROLE_KEY` | yes | |
+| `GITHUB_TOKEN` | for upload | Classic/fine-grained with **Contents: Read and write** |
+| `GITHUB_REPO` | optional | default `pasindudananjaya92-bot/radiant-queen-pasiya-max-v2` |
+| `STRIDE_API_BASE` | optional | StrideClub base URL |
 
-## Env
-`BOT_TOKEN` `GEMINI_API_KEY` `ADMIN_ID` `SUPABASE_URL` `SUPABASE_SERVICE_ROLE_KEY` `STRIDE_API_BASE`
+## Founder: upload file to GitHub from Telegram
 
-## Notes
-Serverless → one-shot commands. Official Bot API only. Stride may sleep on free tier.
+1. Open **private chat** with the bot (not a group).
+2. `/ghpath api/telegram.js`
+3. Send the file as a **Document** (paperclip → File).
+4. Or send document with caption: `gh api/telegram.js`
+
+Only `ADMIN_ID` can do this. Token needs **Contents: Read and write**.
+
+## Quick commands
+
+- `/menu` `/commands` `/about` `/version`
+- Runner: `/logrun` `/me` `/pace` `/habit`
+- Knowledge: `/wiki` `/web` `/code`
+- Group: `/setwelcome` `/antilink` `/warn` `/slow`
+- Founder: `/ghpath` `/ghstatus` `/broadcast` `/admin`
+
+## License
+
+Private / educational project for Pasiya Max · StrideClub.
