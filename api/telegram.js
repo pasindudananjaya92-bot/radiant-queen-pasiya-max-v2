@@ -4779,7 +4779,7 @@ bot.command('commands', async (ctx) => {
       await ctx.reply(
         `LOCATION COACH\n${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}\n${weatherLine}\n\n${out}`.slice(0, 3500)
       );
-      );
+      
     } catch (err) {
       console.error('location', err);
       try {
