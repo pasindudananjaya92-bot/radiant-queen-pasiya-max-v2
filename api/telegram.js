@@ -50,7 +50,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.6-phase-v';
+const BOT_VERSION = 'v2.6-phase-w';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -3383,6 +3383,119 @@ function buildBot() {
     } catch (err) {
       console.error('hash', err);
       await ctx.reply('hash failed.');
+    }
+  });
+
+
+
+  bot.command('save', async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const text = (ctx.message.text || '')
+        .replace(/^\/save(@\w+)?\s*/i, '')
+        .trim()
+        .slice(0, 500);
+      if (!text) {
+        await ctx.reply(
+          'Save a personal note/link:\n/save https://...\n/save Buy new shoes\n\nList: /saves'
+        );
+        return;
+      }
+      const { error } = await supabase.from('rq_saves').insert({
+        user_id: Number(ctx.from.id),
+        username: ctx.from.username || ctx.from.first_name || String(ctx.from.id),
+        text,
+      });
+      if (error) {
+        await ctx.reply(`save failed: ${error.message}\nRun Phase W SQL.`);
+        return;
+      }
+      await ctx.reply('Saved.\nView: /saves');
+    } catch (err) {
+      console.error('save', err);
+      await ctx.reply('save failed.');
+    }
+  });
+
+  bot.command('saves', async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const { data, error } = await supabase
+        .from('rq_saves')
+        .select('id, text, created_at')
+        .eq('user_id', Number(ctx.from.id))
+        .order('created_at', { ascending: false })
+        .limit(15);
+      if (error) {
+        await ctx.reply(`saves failed: ${error.message}`);
+        return;
+      }
+      if (!data?.length) {
+        await ctx.reply('No saves yet.\n/save your note or link');
+        return;
+      }
+      const lines = data
+        .map((r, i) => `${i + 1}. [${r.id}] ${String(r.text).slice(0, 120)}`)
+        .join('\n');
+      await ctx.reply(
+        `YOUR SAVES\n\n${lines}\n\nRemove: /unsave <id>\nClear all: /unsave all`
+      );
+    } catch (err) {
+      console.error('saves', err);
+      await ctx.reply('saves failed.');
+    }
+  });
+
+  bot.command('unsave', async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const arg = (ctx.message.text || '')
+        .replace(/^\/unsave(@\w+)?\s*/i, '')
+        .trim()
+        .toLowerCase();
+      const uid = Number(ctx.from.id);
+
+      if (arg === 'all') {
+        const { error } = await supabase
+          .from('rq_saves')
+          .delete()
+          .eq('user_id', uid);
+        if (error) {
+          await ctx.reply(`unsave failed: ${error.message}`);
+          return;
+        }
+        await ctx.reply('All your saves cleared.');
+        return;
+      }
+
+      const id = parseInt(arg, 10);
+      if (!Number.isFinite(id)) {
+        await ctx.reply('Usage:\n/unsave 3\n/unsave all');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('rq_saves')
+        .delete()
+        .eq('user_id', uid)
+        .eq('id', id);
+      if (error) {
+        await ctx.reply(`unsave failed: ${error.message}`);
+        return;
+      }
+      await ctx.reply(`Removed save #${id}.`);
+    } catch (err) {
+      console.error('unsave', err);
+      await ctx.reply('unsave failed.');
     }
   });
 
