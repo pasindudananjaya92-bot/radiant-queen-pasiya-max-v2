@@ -50,7 +50,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.6-phase-u';
+const BOT_VERSION = 'v2.6-phase-v';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -3311,6 +3311,78 @@ function buildBot() {
       await ctx.reply(`UUID\n${id}`);
     } catch (err) {
       await ctx.reply('uuid failed.');
+    }
+  });
+
+
+
+  bot.command('pw', async (ctx) => {
+    try {
+      const arg = (ctx.message.text || '')
+        .replace(/^\/pw(@\w+)?\s*/i, '')
+        .trim();
+      let len = parseInt(arg, 10);
+      if (!Number.isFinite(len)) len = 16;
+      len = Math.max(8, Math.min(64, len));
+      const chars =
+        'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+      let out = '';
+      for (let i = 0; i < len; i++) {
+        out += chars[Math.floor(Math.random() * chars.length)];
+      }
+      await ctx.reply(
+        `PASSWORD (${len})\n${out}\n\nDo not share in public groups.`
+      );
+    } catch (err) {
+      await ctx.reply('pw failed.');
+    }
+  });
+
+  bot.command('b64', async (ctx) => {
+    try {
+      const raw = (ctx.message.text || '')
+        .replace(/^\/b64(@\w+)?\s*/i, '')
+        .trim();
+      const m = raw.match(/^(enc|dec)\s+([\s\S]+)$/i);
+      if (!m) {
+        await ctx.reply(
+          'Base64\n\nUsage:\n/b64 enc Hello\n/b64 dec SGVsbG8='
+        );
+        return;
+      }
+      const mode = m[1].toLowerCase();
+      const payload = m[2].trim();
+      if (mode === 'enc') {
+        const encoded = Buffer.from(payload, 'utf8').toString('base64');
+        await ctx.reply(`B64 ENC\n${encoded.slice(0, 3000)}`);
+      } else {
+        try {
+          const decoded = Buffer.from(payload, 'base64').toString('utf8');
+          await ctx.reply(`B64 DEC\n${decoded.slice(0, 3000)}`);
+        } catch {
+          await ctx.reply('Invalid base64.');
+        }
+      }
+    } catch (err) {
+      await ctx.reply('b64 failed.');
+    }
+  });
+
+  bot.command('hash', async (ctx) => {
+    try {
+      const text = (ctx.message.text || '')
+        .replace(/^\/hash(@\w+)?\s*/i, '')
+        .trim();
+      if (!text) {
+        await ctx.reply('Usage:\n/hash some text');
+        return;
+      }
+      const crypto = await import('crypto');
+      const sha = crypto.createHash('sha256').update(text, 'utf8').digest('hex');
+      await ctx.reply(`SHA-256\n${sha}`);
+    } catch (err) {
+      console.error('hash', err);
+      await ctx.reply('hash failed.');
     }
   });
 
