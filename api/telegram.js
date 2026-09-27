@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.9-currency-fix';
+const BOT_VERSION = 'v2.9-quota-safe';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -1200,12 +1200,21 @@ ${LINKS}`;
       const msg = String(err?.message || err).toLowerCase();
       if (msg.includes('404') || msg.includes('not found') || msg.includes('no longer available')) continue;
       if (msg.includes('429') || msg.includes('quota')) {
-        return 'Gemini free-tier quota resting. Wait a minute and try a shorter question.';
+        return (
+          'AI temporarily unavailable (Gemini free-tier limit).\n\n'
+          + 'Try non-AI commands now:\n'
+          + '/ping /version /currency USD LKR /moon /weather Colombo\n'
+          + '/sun Colombo /aqi Colombo /calc 10*5 /todos /habits\n\n'
+          + 'Wait a bit, then retry AI (/ask, voice, Tools).'
+        );
       }
       break;
     }
   }
-  return `AI error: ${String(lastErr?.message || lastErr).slice(0, 180)}`;
+  return (
+    `AI error: ${String(lastErr?.message || lastErr).slice(0, 120)}\n\n` +
+    `Non-AI still works: /ping /currency USD LKR /weather Colombo /moon /calc 1+1`
+  );
 }
 
 function toolPrompt(mode, userText) {
