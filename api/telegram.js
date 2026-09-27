@@ -50,7 +50,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.6-phase-s';
+const BOT_VERSION = 'v2.6-phase-t';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -3123,6 +3123,100 @@ function buildBot() {
     } catch (err) {
       console.error('code', err);
       await ctx.reply('code failed (AI busy). Try again.');
+    }
+  });
+
+
+
+  bot.command('define', async (ctx) => {
+    try {
+      const word = (ctx.message.text || '')
+        .replace(/^\/define(@\w+)?\s*/i, '')
+        .trim();
+      if (!word) {
+        await ctx.reply('Usage:\n/define resilience\n/define අධිෂ්ඨානය');
+        return;
+      }
+      const uid = String(ctx.from.id);
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply(`Slow down. Retry in ~${rate.waitSec}s.`);
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      // try free dictionary API first (English), else Gemini
+      let out = '';
+      try {
+        if (/^[a-zA-Z][a-zA-Z\s-]{0,40}$/.test(word)) {
+          const r = await fetch(
+            `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word.split(/\s+/)[0])}`,
+            { signal: AbortSignal.timeout(10000) }
+          );
+          if (r.ok) {
+            const j = await r.json();
+            const e0 = j?.[0];
+            const meaning = e0?.meanings?.[0];
+            const def = meaning?.definitions?.[0]?.definition;
+            const part = meaning?.partOfSpeech || '';
+            if (def) {
+              out =
+                `DEFINE\n${e0.word}${part ? ` (${part})` : ''}\n\n${def}` +
+                (meaning?.definitions?.[0]?.example
+                  ? `\nExample: ${meaning.definitions[0].example}`
+                  : '');
+            }
+          }
+        }
+      } catch (_) {}
+
+      if (!out) {
+        out = await generateReply(
+          `Define this word/phrase simply for a runner community user. Max 6 lines. Include part of speech if clear.\n\nWORD: ${word}`,
+          ctx
+        );
+        out = `DEFINE\n\n${out}`;
+      }
+      await ctx.reply(out.slice(0, 3000));
+    } catch (err) {
+      console.error('define', err);
+      await ctx.reply('define failed.');
+    }
+  });
+
+  bot.command('tr', async (ctx) => {
+    try {
+      const raw = (ctx.message.text || '')
+        .replace(/^\/tr(@\w+)?\s*/i, '')
+        .trim();
+      // /tr si Hello world  OR  /tr en මම යනවා
+      const m = raw.match(/^([a-zA-Z]{2,5})\s+([\s\S]+)$/);
+      if (!m) {
+        await ctx.reply(
+          'Translate\n\nUsage:\n/tr si Hello, how are you?\n/tr en මම හොඳින් ඉන්නවා\n\nLang codes: si, en, ta, hi, ...'
+        );
+        return;
+      }
+      const lang = m[1].toLowerCase();
+      const text = m[2].trim().slice(0, 1500);
+      const uid = String(ctx.from.id);
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply(`Slow down. Retry in ~${rate.waitSec}s.`);
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const out = await generateReply(
+        `Translate the text into language code "${lang}". Return only the translation, keep meaning natural.\n\nTEXT:\n${text}`,
+        ctx
+      );
+      await ctx.reply(`TR → ${lang}\n\n${out}`.slice(0, 3000));
+    } catch (err) {
+      console.error('tr', err);
+      await ctx.reply('tr failed.');
     }
   });
 
