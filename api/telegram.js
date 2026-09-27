@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.9-nonai-guard';
+const BOT_VERSION = 'v2.9-currency-fix';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -984,13 +984,30 @@ function moonPhaseInfo(date = new Date()) {
 async function fetchFxRate(base, symbols) {
   const b = String(base || 'USD').toUpperCase();
   const s = String(symbols || 'LKR').toUpperCase();
-  const url = `https://api.frankfurter.app/latest?from=${encodeURIComponent(b)}&to=${encodeURIComponent(s)}`;
+  // open.er-api.com free tier — includes LKR (Frankfurter/ECB does not)
+  const url = `https://open.er-api.com/v6/latest/${encodeURIComponent(b)}`;
   const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
   if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
   const j = await r.json();
+  if (j.result && j.result !== 'success') {
+    return { ok: false, error: j['error-type'] || 'API error' };
+  }
   const rate = j?.rates?.[s];
-  if (rate == null) return { ok: false, error: 'Rate not found' };
-  return { ok: true, base: j.base || b, symbol: s, rate, date: j.date };
+  if (rate == null) {
+    return { ok: false, error: `Symbol ${s} not found for base ${b}` };
+  }
+  const date =
+    j.time_last_update_utc ||
+    (j.time_last_update_unix
+      ? new Date(j.time_last_update_unix * 1000).toISOString().slice(0, 10)
+      : '');
+  return {
+    ok: true,
+    base: j.base_code || b,
+    symbol: s,
+    rate,
+    date,
+  };
 }
 
 async function fetchWeather(lat, lon) {
@@ -1074,7 +1091,7 @@ async function handleCurrencyCommand(ctx) {
       `${amount} ${fx.base} = ${total} ${fx.symbol}\n` +
       `Rate: 1 ${fx.base} = ${fx.rate} ${fx.symbol}\n` +
       `Date: ${fx.date}\n` +
-      `(Frankfurter / ECB reference)`
+      `(open.er-api.com free rates)`
   );
 }
 
