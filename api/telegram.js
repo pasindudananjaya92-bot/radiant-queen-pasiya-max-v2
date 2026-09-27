@@ -50,7 +50,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.6-phase-y';
+const BOT_VERSION = 'v2.7-phase-z';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -2539,27 +2539,34 @@ function buildBot() {
     );
   });
 
-  bot.command('commands', async (ctx) => {
+bot.command('commands', async (ctx) => {
     await ctx.reply(
-      `COMMAND MAP\n\n` +
-        `AI & menu\n` +
-        `/menu /ask /quote /dailytip /help /status /id\n\n` +
+      `RADIANT QUEEN · PASIYA MAX  ${typeof BOT_VERSION !== 'undefined' ? BOT_VERSION : 'v2.7'}\n` +
+        `COMMAND MAP\n\n` +
+        `AI & chat\n` +
+        `/menu /ask /quote /dailytip /help /status /id /today\n\n` +
+        `Knowledge\n` +
+        `/wiki /web /code /define /tr\n\n` +
         `Runner\n` +
         `/runxp /xptop /logrun /streak /weekly /badges /linkstride\n` +
-        `/pace /split /convert /challenge\n\n` +
+        `/pace /split /convert /challenge /me /habit /habits\n\n` +
         `Stride\n` +
-        `/stride /stride agents /strideclub\n\n` +
+        `/stride /strideclub /links\n\n` +
+        `Personal\n` +
+        `/save /saves /unsave /todo /todos /done\n\n` +
         `Group mod\n` +
         `/setwelcome /setrules /rules /groupinfo /antilink\n` +
-        `/warn /unwarn /mute /unmute /slow /title /modcheck\n` +
-        `/note /notes /clearnote /stats /report\n\n` +
-        `Fun\n` +
-        `/roll /pick\n\n` +
+        `/warn /unwarn /warns /mute /unmute /slow /title /modcheck\n` +
+        `/note /notes /clearnote /stats /report /shutup /speak\n` +
+        `/faqset /faq /faqs\n\n` +
+        `Tools\n` +
+        `/calc /time /uuid /pw /b64 /hash /roll /pick\n\n` +
         `Founder\n` +
-        `/admin /usage /broadcast /agentpulse /version /ping\n\n` +
+        `/admin /usage /broadcast /agentpulse /version /ping /feedback /feedbacks\n\n` +
         `Buttons: /menu`
     );
   });
+
 
 
 
@@ -3720,6 +3727,19 @@ function buildBot() {
     }
   });
 
+
+
+  bot.command('about', async (ctx) => {
+    await ctx.reply(
+      `RADIANT QUEEN · PASIYA MAX\n` +
+        `Version: ${typeof BOT_VERSION !== 'undefined' ? BOT_VERSION : 'v2.7'}\n` +
+        `Gemini AI · Supabase · StrideClub bridge\n` +
+        `Bot: @PasiyaMaxQueen_bot\n` +
+        `Web: https://radiant-queen-pasiya-max-v2.vercel.app\n` +
+        `Stride: https://strideclub-platform-6b71a.containers.snapdeploy.app\n\n` +
+        `/commands · /menu · /version`
+    );
+  });
 
   bot.command('admin', async (ctx) => {
     if (!isAdmin(ctx)) {
