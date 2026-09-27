@@ -50,7 +50,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.5-phase-r';
+const BOT_VERSION = 'v2.6-phase-s';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -587,6 +587,101 @@ async function isUserGroupAdmin(ctx) {
 
 function hasLink(text = '') {
   return /https?:\/\/|t\.me\/|www\.|telegram\.me\//i.test(text);
+}
+
+
+function isSafePublicHttpUrl(raw) {
+  try {
+    const u = new URL(String(raw).trim());
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+    const host = (u.hostname || '').toLowerCase();
+    if (!host || host === 'localhost' || host.endsWith('.local')) return false;
+    if (
+      host === '127.0.0.1' ||
+      host === '0.0.0.0' ||
+      host === '::1' ||
+      host.startsWith('10.') ||
+      host.startsWith('192.168.') ||
+      host.startsWith('169.254.') ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function stripHtml(html) {
+  return String(html || '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function fetchWikipediaSummary(topic) {
+  const title = encodeURIComponent(String(topic).trim().replace(/\s+/g, '_'));
+  for (const lang of ['en', 'si']) {
+    const api = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${title}`;
+    try {
+      const r = await fetch(api, {
+        headers: { Accept: 'application/json', 'User-Agent': 'PasiyaMaxQueenBot/2.6 (Telegram; educational)' },
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!r.ok) continue;
+      const j = await r.json();
+      if (j.type === 'disambiguation') {
+        return {
+          ok: true,
+          text:
+            `Wikipedia (${lang}) disambiguation for "${topic}".\n` +
+            `Try a more specific title.\n${j.content_urls?.desktop?.page || ''}`,
+        };
+      }
+      const extract = j.extract || j.description || '';
+      if (!extract) continue;
+      const url = j.content_urls?.desktop?.page || `https://${lang}.wikipedia.org/wiki/${title}`;
+      return {
+        ok: true,
+        text: `WIKI (${lang.toUpperCase()})\n${j.title || topic}\n\n${extract.slice(0, 1200)}\n\n${url}`,
+      };
+    } catch (_) {}
+  }
+  return { ok: false, error: 'No Wikipedia summary found. Try another spelling.' };
+}
+
+async function fetchPublicPageText(url) {
+  if (!isSafePublicHttpUrl(url)) {
+    return { ok: false, error: 'Only public http(s) URLs allowed.' };
+  }
+  try {
+    const r = await fetch(url, {
+      headers: {
+        Accept: 'text/html,application/xhtml+xml',
+        'User-Agent': 'PasiyaMaxQueenBot/2.6 (Telegram; summary-only)',
+      },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+    const ct = (r.headers.get('content-type') || '').toLowerCase();
+    if (!ct.includes('text') && !ct.includes('html') && !ct.includes('json')) {
+      return { ok: false, error: 'Unsupported content type' };
+    }
+    const body = await r.text();
+    const text = stripHtml(body).slice(0, 8000);
+    if (text.length < 40) return { ok: false, error: 'Page text too short or blocked' };
+    return { ok: true, text, finalUrl: r.url || url };
+  } catch (e) {
+    return { ok: false, error: String(e?.message || e).slice(0, 120) };
+  }
 }
 
 async function generateReply(prompt, ctx, imageBase64, mimeType) {
@@ -2928,6 +3023,108 @@ function buildBot() {
     }
   });
 
+
+
+
+  bot.command('wiki', async (ctx) => {
+    try {
+      const topic = (ctx.message.text || '')
+        .replace(/^\/wiki(@\w+)?\s*/i, '')
+        .trim();
+      if (!topic) {
+        await ctx.reply('Usage:\n/wiki Albert Einstein\n/wiki Sri Lanka');
+        return;
+      }
+      const uid = String(ctx.from.id);
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply(`Slow down. Retry in ~${rate.waitSec}s.`);
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const res = await fetchWikipediaSummary(topic);
+      if (!res.ok) {
+        await ctx.reply(res.error || 'wiki failed');
+        return;
+      }
+      await ctx.reply(res.text.slice(0, 3500));
+    } catch (err) {
+      console.error('wiki', err);
+      await ctx.reply('wiki failed.');
+    }
+  });
+
+  bot.command('web', async (ctx) => {
+    try {
+      const url = (ctx.message.text || '')
+        .replace(/^\/web(@\w+)?\s*/i, '')
+        .trim()
+        .split(/\s+/)[0];
+      if (!url) {
+        await ctx.reply(
+          'Usage:\n/web https://example.com\n\nPublic pages only. No logins/paywalls.'
+        );
+        return;
+      }
+      const uid = String(ctx.from.id);
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply(`Slow down. Retry in ~${rate.waitSec}s.`);
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const page = await fetchPublicPageText(url);
+      if (!page.ok) {
+        await ctx.reply(`web failed: ${page.error}`);
+        return;
+      }
+      const summary = await generateReply(
+        `Summarize this public webpage for a user in clear short bullets (max 12 lines). ` +
+          `Include main topic and 3 key points. If not useful, say so.\n\nURL: ${page.finalUrl}\n\nCONTENT:\n${page.text.slice(0, 6000)}`,
+        ctx
+      );
+      await ctx.reply(`WEB SUMMARY\n${page.finalUrl}\n\n${summary}`.slice(0, 3500));
+    } catch (err) {
+      console.error('web', err);
+      await ctx.reply('web failed.');
+    }
+  });
+
+  bot.command('code', async (ctx) => {
+    try {
+      const q = (ctx.message.text || '')
+        .replace(/^\/code(@\w+)?\s*/i, '')
+        .trim();
+      if (!q) {
+        await ctx.reply(
+          'Coding assistant\n\nUsage:\n/code How to sort an array in JS?\n/code Fix this error: ...'
+        );
+        return;
+      }
+      const uid = String(ctx.from.id);
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply(`Slow down. Retry in ~${rate.waitSec}s.`);
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const out = await generateReply(
+        `You are a senior software engineer. Answer the coding question with clear steps and a minimal correct example. ` +
+          `Prefer JavaScript/TypeScript when unspecified. No fluff.\n\nQUESTION:\n${q}`,
+        ctx
+      );
+      await ctx.reply(`CODE\n\n${out}`.slice(0, 3500));
+    } catch (err) {
+      console.error('code', err);
+      await ctx.reply('code failed (AI busy). Try again.');
+    }
+  });
 
 
   bot.command('admin', async (ctx) => {
