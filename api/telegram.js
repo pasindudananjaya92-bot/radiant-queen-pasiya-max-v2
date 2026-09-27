@@ -50,7 +50,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.6-phase-w';
+const BOT_VERSION = 'v2.6-phase-x';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -3496,6 +3496,125 @@ function buildBot() {
     } catch (err) {
       console.error('unsave', err);
       await ctx.reply('unsave failed.');
+    }
+  });
+
+
+
+  bot.command('todo', async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const text = (ctx.message.text || '')
+        .replace(/^\/todo(@\w+)?\s*/i, '')
+        .trim()
+        .slice(0, 300);
+      if (!text) {
+        await ctx.reply(
+          'Add a personal todo:\n/todo Stretch after run\n\nList: /todos\nDone: /done <id>'
+        );
+        return;
+      }
+      const { error } = await supabase.from('rq_todos').insert({
+        user_id: Number(ctx.from.id),
+        username: ctx.from.username || ctx.from.first_name || String(ctx.from.id),
+        text,
+        done: false,
+      });
+      if (error) {
+        await ctx.reply(`todo failed: ${error.message}\nRun Phase X SQL.`);
+        return;
+      }
+      await ctx.reply('Todo added.\n/todos');
+    } catch (err) {
+      console.error('todo', err);
+      await ctx.reply('todo failed.');
+    }
+  });
+
+  bot.command('todos', async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const { data, error } = await supabase
+        .from('rq_todos')
+        .select('id, text, done, created_at')
+        .eq('user_id', Number(ctx.from.id))
+        .order('done', { ascending: true })
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (error) {
+        await ctx.reply(`todos failed: ${error.message}`);
+        return;
+      }
+      if (!data?.length) {
+        await ctx.reply('No todos.\n/todo Your task');
+        return;
+      }
+      const lines = data
+        .map((t) => {
+          const mark = t.done ? '✅' : '⬜';
+          return `${mark} [${t.id}] ${String(t.text).slice(0, 100)}`;
+        })
+        .join('\n');
+      await ctx.reply(
+        `YOUR TODOS\n\n${lines}\n\nDone: /done <id>\nClear done: /done clear`
+      );
+    } catch (err) {
+      console.error('todos', err);
+      await ctx.reply('todos failed.');
+    }
+  });
+
+  bot.command('done', async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const arg = (ctx.message.text || '')
+        .replace(/^\/done(@\w+)?\s*/i, '')
+        .trim()
+        .toLowerCase();
+      const uid = Number(ctx.from.id);
+
+      if (arg === 'clear') {
+        const { error } = await supabase
+          .from('rq_todos')
+          .delete()
+          .eq('user_id', uid)
+          .eq('done', true);
+        if (error) {
+          await ctx.reply(`done clear failed: ${error.message}`);
+          return;
+        }
+        await ctx.reply('Cleared completed todos.');
+        return;
+      }
+
+      const id = parseInt(arg, 10);
+      if (!Number.isFinite(id)) {
+        await ctx.reply('Usage:\n/done 3\n/done clear');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('rq_todos')
+        .update({ done: true })
+        .eq('user_id', uid)
+        .eq('id', id);
+      if (error) {
+        await ctx.reply(`done failed: ${error.message}`);
+        return;
+      }
+      await ctx.reply(`Todo #${id} marked done.`);
+    } catch (err) {
+      console.error('done', err);
+      await ctx.reply('done failed.');
     }
   });
 
