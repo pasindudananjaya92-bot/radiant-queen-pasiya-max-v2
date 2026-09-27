@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.9-sun-aqi';
+const BOT_VERSION = 'v2.9-currency-moon';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -950,6 +950,47 @@ function aqiLabel(eaqi) {
   if (n <= 80) return 'Poor';
   if (n <= 100) return 'Very poor';
   return 'Extremely poor';
+}
+
+
+function moonPhaseInfo(date = new Date()) {
+  // Simple illuminated fraction / phase name (approx)
+  const yp = date.getFullYear();
+  const mp = date.getMonth();
+  const dp = date.getDate();
+  let r = yp % 100;
+  r %= 19;
+  if (r > 9) r -= 19;
+  r = ((r * 11) % 30) + mp + dp;
+  if (mp < 2) r += 2;
+  const t = date.getHours() / 24;
+  let age = (r + t) % 30;
+  if (age < 0) age += 30;
+  const names = [
+    'New Moon',
+    'Waxing Crescent',
+    'First Quarter',
+    'Waxing Gibbous',
+    'Full Moon',
+    'Waning Gibbous',
+    'Last Quarter',
+    'Waning Crescent',
+  ];
+  const idx = Math.min(7, Math.floor((age / 30) * 8));
+  const illum = Math.round((1 - Math.cos((age / 30) * 2 * Math.PI)) * 50);
+  return { age: age.toFixed(1), name: names[idx], illum };
+}
+
+async function fetchFxRate(base, symbols) {
+  const b = String(base || 'USD').toUpperCase();
+  const s = String(symbols || 'LKR').toUpperCase();
+  const url = `https://api.frankfurter.app/latest?from=${encodeURIComponent(b)}&to=${encodeURIComponent(s)}`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+  const j = await r.json();
+  const rate = j?.rates?.[s];
+  if (rate == null) return { ok: false, error: 'Rate not found' };
+  return { ok: true, base: j.base || b, symbol: s, rate, date: j.date };
 }
 
 async function fetchWeather(lat, lon) {
@@ -4526,6 +4567,69 @@ bot.command('commands', async (ctx) => {
     } catch (err) {
       console.error('aqi', err);
       await ctx.reply('aqi failed.');
+    }
+  });
+
+
+
+  bot.command('currency', async (ctx) => {
+    try {
+      const raw = (ctx.message.text || '')
+        .replace(/^\/currency(@\w+)?\s*/i, '')
+        .trim()
+        .toUpperCase();
+      // /currency USD LKR   or  /currency 100 USD LKR
+      const parts = raw.split(/\s+/).filter(Boolean);
+      if (parts.length < 2) {
+        await ctx.reply(
+          'Usage:\n/currency USD LKR\n/currency 100 USD LKR\n/currency EUR LKR'
+        );
+        return;
+      }
+      let amount = 1;
+      let base;
+      let sym;
+      if (parts.length >= 3 && !Number.isNaN(parseFloat(parts[0]))) {
+        amount = parseFloat(parts[0]);
+        base = parts[1];
+        sym = parts[2];
+      } else {
+        base = parts[0];
+        sym = parts[1];
+      }
+      await ctx.sendChatAction('typing');
+      const fx = await fetchFxRate(base, sym);
+      if (!fx.ok) {
+        await ctx.reply(`currency failed: ${fx.error}`);
+        return;
+      }
+      const total = (amount * fx.rate).toFixed(4);
+      await ctx.reply(
+        `CURRENCY\n` +
+          `${amount} ${fx.base} = ${total} ${fx.symbol}\n` +
+          `Rate: 1 ${fx.base} = ${fx.rate} ${fx.symbol}\n` +
+          `Date: ${fx.date}\n` +
+          `(Frankfurter / ECB reference)`
+      );
+    } catch (err) {
+      console.error('currency', err);
+      await ctx.reply('currency failed.');
+    }
+  });
+
+  bot.command('moon', async (ctx) => {
+    try {
+      const info = moonPhaseInfo(new Date());
+      await ctx.reply(
+        `MOON\n` +
+          `Phase: ${info.name}\n` +
+          `Approx age: ${info.age} days\n` +
+          `Illumination: ~${info.illum}%\n\n` +
+          `Tip: Full moon nights can be brighter for evening easy runs.`
+      );
+    } catch (err) {
+      console.error('moon', err);
+      await ctx.reply('moon failed.');
     }
   });
 
