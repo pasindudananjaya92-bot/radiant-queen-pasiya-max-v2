@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.8-gh-read-export';
+const BOT_VERSION = 'v2.8-voice-ghlog';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -824,6 +824,40 @@ async function githubPutFile(path, contentBuffer, message) {
     html = JSON.parse(text)?.content?.html_url || '';
   } catch (_) {}
   return { ok: true, path: cleanPath, url: html, repo };
+}
+
+
+async function githubRecentCommits(limit = 5) {
+  if (!GITHUB_TOKEN) return { ok: false, error: 'GITHUB_TOKEN missing' };
+  const repo = GITHUB_REPO || 'pasindudananjaya92-bot/radiant-queen-pasiya-max-v2';
+  const n = Math.max(1, Math.min(15, Number(limit) || 5));
+  const headers = {
+    Authorization: `Bearer ${GITHUB_TOKEN}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+  const res = await fetch(
+    `https://api.github.com/repos/${repo}/commits?per_page=${n}`,
+    { headers }
+  );
+  const text = await res.text();
+  if (!res.ok) {
+    return { ok: false, error: `HTTP ${res.status}: ${text.slice(0, 180)}` };
+  }
+  let arr;
+  try {
+    arr = JSON.parse(text);
+  } catch {
+    return { ok: false, error: 'Bad JSON' };
+  }
+  const lines = (arr || []).map((c, i) => {
+    const msg = (c.commit?.message || '').split('\n')[0].slice(0, 80);
+    const who = c.commit?.author?.name || c.author?.login || '?';
+    const sha = (c.sha || '').slice(0, 7);
+    const when = c.commit?.author?.date || '';
+    return `${i + 1}. ${sha} — ${msg}\n   ${who} · ${when.slice(0, 16)}`;
+  });
+  return { ok: true, lines, repo };
 }
 
 async function generateReply(prompt, ctx, imageBase64, mimeType) {
@@ -4062,6 +4096,37 @@ bot.command('commands', async (ctx) => {
   });
 
 
+
+  bot.command('ghlog', async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only.');
+        return;
+      }
+      if (ctx.chat?.type !== 'private') {
+        await ctx.reply('Use /ghlog in private chat.');
+        return;
+      }
+      const arg = (ctx.message.text || '')
+        .replace(/^\/ghlog(@\w+)?\s*/i, '')
+        .trim();
+      const n = parseInt(arg, 10) || 5;
+      await ctx.sendChatAction('typing');
+      const res = await githubRecentCommits(n);
+      if (!res.ok) {
+        await ctx.reply(`ghlog failed:\n${res.error}`);
+        return;
+      }
+      await ctx.reply(
+        `GITHUB COMMITS · ${res.repo}\n\n${res.lines.join('\n\n')}`.slice(0, 3500)
+      );
+    } catch (err) {
+      console.error('ghlog', err);
+      await ctx.reply('ghlog failed.');
+    }
+  });
+
+
   bot.command('admin', async (ctx) => {
     if (!isAdmin(ctx)) {
       await ctx.reply('Admin only.');
@@ -4384,6 +4449,59 @@ bot.command('commands', async (ctx) => {
       console.error('document', err);
       try {
         await ctx.reply(`document upload failed: ${String(err?.message || err).slice(0, 150)}`);
+      } catch (_) {}
+    }
+  });
+
+
+
+  bot.on('voice', async (ctx) => {
+    try {
+      // private: always; groups: only for admin or when not quiet (keep simple: private + admin anywhere)
+      const isPrivate = ctx.chat?.type === 'private';
+      if (!isPrivate && !isAdmin(ctx)) {
+        return;
+      }
+      if (!isPrivate && ctx.chat?.type !== 'private') {
+        const q = await loadGroupSettings(ctx.chat.id);
+        if (q?.botQuiet && !isAdmin(ctx)) return;
+      }
+
+      const uid = String(ctx.from.id);
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply(`Slow down. Retry in ~${rate.waitSec}s.`);
+          return;
+        }
+      }
+
+      const voice = ctx.message.voice;
+      if (!voice) return;
+      if (voice.file_size && voice.file_size > 4_000_000) {
+        await ctx.reply('Voice note too long/large. Send a shorter one.');
+        return;
+      }
+
+      await ctx.sendChatAction('typing');
+      const file = await ctx.telegram.getFile(voice.file_id);
+      const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+      const res = await fetch(fileUrl);
+      const buf = Buffer.from(await res.arrayBuffer());
+      const b64 = buf.toString('base64');
+      const mime = 'audio/ogg';
+
+      const out = await generateReply(
+        'This is a voice message. Transcribe it briefly, then answer helpfully in the user language (Sinhala or English). Keep under 12 lines.',
+        ctx,
+        b64,
+        mime
+      );
+      await ctx.reply(out.slice(0, 3500), isPrivate ? undefined : undefined);
+    } catch (err) {
+      console.error('voice', err);
+      try {
+        await ctx.reply('Voice AI failed (model may not accept audio on free tier). Try text.');
       } catch (_) {}
     }
   });
