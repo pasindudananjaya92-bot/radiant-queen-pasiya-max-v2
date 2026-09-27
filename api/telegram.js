@@ -50,7 +50,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.6-phase-t';
+const BOT_VERSION = 'v2.6-phase-u';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -3217,6 +3217,100 @@ function buildBot() {
     } catch (err) {
       console.error('tr', err);
       await ctx.reply('tr failed.');
+    }
+  });
+
+
+
+  bot.command('calc', async (ctx) => {
+    try {
+      const expr = (ctx.message.text || '')
+        .replace(/^\/calc(@\w+)?\s*/i, '')
+        .trim();
+      if (!expr) {
+        await ctx.reply('Usage:\n/calc 12 * (5 + 3)\n/calc 10 / 4');
+        return;
+      }
+      // safe math only: digits, operators, parentheses, decimal, spaces
+      if (!/^[0-9+\-*/().%\s]+$/.test(expr)) {
+        await ctx.reply('Only numbers and + - * / % ( ) allowed.');
+        return;
+      }
+      if (expr.length > 80) {
+        await ctx.reply('Expression too long.');
+        return;
+      }
+      // eslint-disable-next-line no-new-func
+      const result = Function(`"use strict"; return (${expr});`)();
+      if (typeof result !== 'number' || !Number.isFinite(result)) {
+        await ctx.reply('Could not calculate.');
+        return;
+      }
+      await ctx.reply(`CALC\n${expr}\n= ${result}`);
+    } catch (err) {
+      await ctx.reply('calc failed. Check expression.');
+    }
+  });
+
+  bot.command('time', async (ctx) => {
+    try {
+      const arg = (ctx.message.text || '')
+        .replace(/^\/time(@\w+)?\s*/i, '')
+        .trim()
+        .toLowerCase();
+      const zones = {
+        lk: 'Asia/Colombo',
+        colombo: 'Asia/Colombo',
+        sri: 'Asia/Colombo',
+        utc: 'UTC',
+        india: 'Asia/Kolkata',
+        dubai: 'Asia/Dubai',
+        london: 'Europe/London',
+        ny: 'America/New_York',
+        tokyo: 'Asia/Tokyo',
+      };
+      const zone = zones[arg] || (arg.includes('/') ? arg : 'Asia/Colombo');
+      const now = new Date();
+      let formatted;
+      try {
+        formatted = now.toLocaleString('en-GB', {
+          timeZone: zone,
+          weekday: 'short',
+          year: 'numeric',
+          month: 'short',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        });
+      } catch {
+        await ctx.reply(
+          'Unknown timezone.\nExamples:\n/time\n/time lk\n/time utc\n/time dubai\n/time London'
+        );
+        return;
+      }
+      await ctx.reply(
+        `TIME\nZone: ${zone}\n${formatted}\n\nShortcuts: lk · utc · india · dubai · london · ny · tokyo`
+      );
+    } catch (err) {
+      await ctx.reply('time failed.');
+    }
+  });
+
+  bot.command('uuid', async (ctx) => {
+    try {
+      const id =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+              const r = (Math.random() * 16) | 0;
+              const v = c === 'x' ? r : (r & 0x3) | 0x8;
+              return v.toString(16);
+            });
+      await ctx.reply(`UUID\n${id}`);
+    } catch (err) {
+      await ctx.reply('uuid failed.');
     }
   });
 
