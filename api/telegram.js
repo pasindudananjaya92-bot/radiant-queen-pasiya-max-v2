@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.9-forecast';
+const BOT_VERSION = 'v2.9-sun-aqi';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -899,6 +899,57 @@ async function fetchForecast(lat, lon, days = 3) {
     return `${date}: ${weatherCodeText(code)} · ${tmin}–${tmax}°C · rain ${rain}mm · wind ${wind}km/h`;
   });
   return { ok: true, timezone: j.timezone || '', lines };
+}
+
+
+async function fetchSun(lat, lon) {
+  const url =
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&daily=sunrise,sunset,daylight_duration` +
+    `&timezone=auto&forecast_days=1`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+  const j = await r.json();
+  const d = j.daily || {};
+  return {
+    ok: true,
+    timezone: j.timezone || '',
+    sunrise: d.sunrise?.[0] || '—',
+    sunset: d.sunset?.[0] || '—',
+    daylight: d.daylight_duration?.[0],
+  };
+}
+
+async function fetchAqi(lat, lon) {
+  const url =
+    `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}` +
+    `&current=european_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,ozone` +
+    `&timezone=auto`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+  const j = await r.json();
+  const c = j.current || {};
+  return {
+    ok: true,
+    timezone: j.timezone || '',
+    eaqi: c.european_aqi,
+    pm10: c.pm10,
+    pm25: c.pm2_5,
+    co: c.carbon_monoxide,
+    no2: c.nitrogen_dioxide,
+    o3: c.ozone,
+  };
+}
+
+function aqiLabel(eaqi) {
+  const n = Number(eaqi);
+  if (!Number.isFinite(n)) return 'Unknown';
+  if (n <= 20) return 'Good';
+  if (n <= 40) return 'Fair';
+  if (n <= 60) return 'Moderate';
+  if (n <= 80) return 'Poor';
+  if (n <= 100) return 'Very poor';
+  return 'Extremely poor';
 }
 
 async function fetchWeather(lat, lon) {
@@ -4402,6 +4453,79 @@ bot.command('commands', async (ctx) => {
     } catch (err) {
       console.error('forecast', err);
       await ctx.reply('forecast failed.');
+    }
+  });
+
+
+
+  bot.command('sun', async (ctx) => {
+    try {
+      const place = (ctx.message.text || '')
+        .replace(/^\/sun(@\w+)?\s*/i, '')
+        .trim();
+      if (!place) {
+        await ctx.reply('Usage:\n/sun Colombo\n/sun Kotte\n\nSunrise / sunset for runners.');
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const geo = await geocodePlace(place);
+      if (!geo) {
+        await ctx.reply('Place not found.');
+        return;
+      }
+      const s = await fetchSun(geo.lat, geo.lon);
+      if (!s.ok) {
+        await ctx.reply(`sun failed: ${s.error}`);
+        return;
+      }
+      const label = [geo.name, geo.admin1, geo.country].filter(Boolean).join(', ');
+      const dayH = s.daylight != null ? (Number(s.daylight) / 3600).toFixed(1) : '—';
+      await ctx.reply(
+        `SUN · ${label}\n` +
+          `Sunrise: ${s.sunrise}\n` +
+          `Sunset: ${s.sunset}\n` +
+          `Daylight: ~${dayH} h\n` +
+          `TZ: ${s.timezone}\n\n` +
+          `Tip: Early run after sunrise or finish before sunset for visibility.`
+      );
+    } catch (err) {
+      console.error('sun', err);
+      await ctx.reply('sun failed.');
+    }
+  });
+
+  bot.command('aqi', async (ctx) => {
+    try {
+      const place = (ctx.message.text || '')
+        .replace(/^\/aqi(@\w+)?\s*/i, '')
+        .trim();
+      if (!place) {
+        await ctx.reply('Usage:\n/aqi Colombo\n/aqi Kotte\n\nAir quality for outdoor training.');
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const geo = await geocodePlace(place);
+      if (!geo) {
+        await ctx.reply('Place not found.');
+        return;
+      }
+      const a = await fetchAqi(geo.lat, geo.lon);
+      if (!a.ok) {
+        await ctx.reply(`aqi failed: ${a.error}`);
+        return;
+      }
+      const label = [geo.name, geo.admin1, geo.country].filter(Boolean).join(', ');
+      await ctx.reply(
+        `AQI · ${label}\n` +
+          `European AQI: ${a.eaqi} (${aqiLabel(a.eaqi)})\n` +
+          `PM2.5: ${a.pm25} · PM10: ${a.pm10}\n` +
+          `NO2: ${a.no2} · O3: ${a.o3} · CO: ${a.co}\n` +
+          `TZ: ${a.timezone}\n\n` +
+          `Tip: If AQI is Poor or worse, prefer easy indoor / shorter outdoor sessions.`
+      );
+    } catch (err) {
+      console.error('aqi', err);
+      await ctx.reply('aqi failed.');
     }
   });
 
