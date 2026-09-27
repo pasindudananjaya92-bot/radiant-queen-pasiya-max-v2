@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.7-github-upload';
+const BOT_VERSION = 'v2.8-gh-read-export';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -687,6 +687,89 @@ async function fetchPublicPageText(url) {
   }
 }
 
+
+
+async function githubGetFile(path) {
+  if (!GITHUB_TOKEN) return { ok: false, error: 'GITHUB_TOKEN missing' };
+  const repo = GITHUB_REPO || 'pasindudananjaya92-bot/radiant-queen-pasiya-max-v2';
+  const cleanPath = String(path || '').replace(/^\/+/, '').replace(/\.\./g, '');
+  if (!cleanPath) return { ok: false, error: 'Invalid path' };
+  const headers = {
+    Authorization: `Bearer ${GITHUB_TOKEN}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+  const res = await fetch(
+    `https://api.github.com/repos/${repo}/contents/${cleanPath}`,
+    { headers }
+  );
+  const text = await res.text();
+  if (!res.ok) {
+    return { ok: false, error: `HTTP ${res.status}: ${text.slice(0, 180)}` };
+  }
+  let j;
+  try {
+    j = JSON.parse(text);
+  } catch {
+    return { ok: false, error: 'Bad JSON from GitHub' };
+  }
+  if (Array.isArray(j)) {
+    return { ok: false, error: 'Path is a directory. Use /ghlist ' + cleanPath };
+  }
+  if (j.encoding === 'base64' && j.content) {
+    const buf = Buffer.from(j.content.replace(/\n/g, ''), 'base64');
+    const isText = !/\.(png|jpg|jpeg|gif|webp|zip|pdf|exe|bin)$/i.test(cleanPath);
+    return {
+      ok: true,
+      path: cleanPath,
+      size: j.size,
+      url: j.html_url,
+      text: isText ? buf.toString('utf8') : null,
+      binary: !isText,
+      sha: j.sha,
+    };
+  }
+  return { ok: false, error: 'Unsupported content' };
+}
+
+async function githubListPath(path) {
+  if (!GITHUB_TOKEN) return { ok: false, error: 'GITHUB_TOKEN missing' };
+  const repo = GITHUB_REPO || 'pasindudananjaya92-bot/radiant-queen-pasiya-max-v2';
+  const cleanPath = String(path || '').replace(/^\/+/, '').replace(/\.\./g, '');
+  const headers = {
+    Authorization: `Bearer ${GITHUB_TOKEN}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+  const url = cleanPath
+    ? `https://api.github.com/repos/${repo}/contents/${cleanPath}`
+    : `https://api.github.com/repos/${repo}/contents`;
+  const res = await fetch(url, { headers });
+  const text = await res.text();
+  if (!res.ok) {
+    return { ok: false, error: `HTTP ${res.status}: ${text.slice(0, 180)}` };
+  }
+  let j;
+  try {
+    j = JSON.parse(text);
+  } catch {
+    return { ok: false, error: 'Bad JSON' };
+  }
+  if (!Array.isArray(j)) {
+    return {
+      ok: true,
+      lines: [`FILE ${j.name} (${j.size || 0} bytes)`],
+      path: cleanPath || '/',
+    };
+  }
+  const lines = j
+    .slice(0, 40)
+    .map((item) => {
+      const tag = item.type === 'dir' ? 'DIR ' : 'FILE';
+      return `${tag} ${item.name}${item.type === 'file' && item.size != null ? ` (${item.size})` : ''}`;
+    });
+  return { ok: true, lines, path: cleanPath || '/' };
+}
 
 async function githubPutFile(path, contentBuffer, message) {
   if (!GITHUB_TOKEN) {
@@ -3853,6 +3936,128 @@ bot.command('commands', async (ctx) => {
       );
     } catch (err) {
       await ctx.reply('ghstatus failed.');
+    }
+  });
+
+
+
+  bot.command('ghlist', async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only.');
+        return;
+      }
+      if (ctx.chat?.type !== 'private') {
+        await ctx.reply('Use /ghlist in private chat.');
+        return;
+      }
+      const path = (ctx.message.text || '')
+        .replace(/^\/ghlist(@\w+)?\s*/i, '')
+        .trim();
+      await ctx.sendChatAction('typing');
+      const res = await githubListPath(path);
+      if (!res.ok) {
+        await ctx.reply(`ghlist failed:\n${res.error}`);
+        return;
+      }
+      await ctx.reply(
+        `GITHUB LIST · ${GITHUB_REPO}\nPath: ${res.path}\n\n${res.lines.join('\n')}`.slice(0, 3500)
+      );
+    } catch (err) {
+      console.error('ghlist', err);
+      await ctx.reply('ghlist failed.');
+    }
+  });
+
+  bot.command('ghget', async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only.');
+        return;
+      }
+      if (ctx.chat?.type !== 'private') {
+        await ctx.reply('Use /ghget in private chat.');
+        return;
+      }
+      const path = (ctx.message.text || '')
+        .replace(/^\/ghget(@\w+)?\s*/i, '')
+        .trim()
+        .replace(/^\/+/, '');
+      if (!path) {
+        await ctx.reply('Usage:\n/ghget api/telegram.js\n/ghget README.md');
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const res = await githubGetFile(path);
+      if (!res.ok) {
+        await ctx.reply(`ghget failed:\n${res.error}`);
+        return;
+      }
+      if (res.binary) {
+        await ctx.reply(
+          `Binary file (${res.size || '?'} bytes).\nOpen on GitHub:\n${res.url || path}`
+        );
+        return;
+      }
+      const body = res.text || '';
+      if (body.length <= 3500) {
+        await ctx.reply(
+          `GITHUB FILE · ${res.path}\n${res.url || ''}\n\n${body}`.slice(0, 4000)
+        );
+      } else {
+        // send as document
+        const buf = Buffer.from(body, 'utf8');
+        await ctx.replyWithDocument(
+          { source: buf, filename: path.split('/').pop() || 'file.txt' },
+          { caption: `From GitHub: ${res.path}` }
+        );
+      }
+    } catch (err) {
+      console.error('ghget', err);
+      await ctx.reply(`ghget failed: ${String(err?.message || err).slice(0, 120)}`);
+    }
+  });
+
+  bot.command('export', async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Supabase not connected.');
+        return;
+      }
+      const uid = Number(ctx.from.id);
+      await ctx.sendChatAction('typing');
+
+      const [xp, saves, todos, habits] = await Promise.all([
+        supabase.from('rq_run_xp').select('*').eq('user_id', uid).maybeSingle(),
+        supabase.from('rq_saves').select('id, text, created_at').eq('user_id', uid).order('created_at', { ascending: false }).limit(50),
+        supabase.from('rq_todos').select('id, text, done, created_at').eq('user_id', uid).order('created_at', { ascending: false }).limit(50),
+        supabase.from('rq_habits').select('habit, streak, total, last_day').eq('user_id', uid).limit(30),
+      ]);
+
+      const payload = {
+        exported_at: new Date().toISOString(),
+        telegram_id: uid,
+        username: ctx.from.username || ctx.from.first_name || null,
+        run_xp: xp.data || null,
+        saves: saves.data || [],
+        todos: todos.data || [],
+        habits: habits.data || [],
+      };
+      const json = JSON.stringify(payload, null, 2);
+      if (json.length < 3000) {
+        await ctx.reply(`EXPORT (JSON)\n\n${json}`.slice(0, 4000));
+      } else {
+        await ctx.replyWithDocument(
+          {
+            source: Buffer.from(json, 'utf8'),
+            filename: `pasiya-export-${uid}.json`,
+          },
+          { caption: 'Your personal data export (Supabase)' }
+        );
+      }
+    } catch (err) {
+      console.error('export', err);
+      await ctx.reply('export failed.');
     }
   });
 
