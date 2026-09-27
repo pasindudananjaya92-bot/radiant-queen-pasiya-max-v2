@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.9-currency-moon';
+const BOT_VERSION = 'v2.9-nonai-guard';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -1036,6 +1036,116 @@ function weatherCodeText(code) {
     95: 'Thunderstorm',
   };
   return map[code] || `Code ${code}`;
+}
+
+
+async function handleCurrencyCommand(ctx) {
+  const raw = (ctx.message.text || '')
+    .replace(/^\/currency(@\w+)?\s*/i, '')
+    .trim()
+    .toUpperCase();
+  const parts = raw.split(/\s+/).filter(Boolean);
+  if (parts.length < 2) {
+    await ctx.reply(
+      'Usage:\n/currency USD LKR\n/currency 100 USD LKR\n/currency EUR LKR'
+    );
+    return;
+  }
+  let amount = 1;
+  let base;
+  let sym;
+  if (parts.length >= 3 && !Number.isNaN(parseFloat(parts[0]))) {
+    amount = parseFloat(parts[0]);
+    base = parts[1];
+    sym = parts[2];
+  } else {
+    base = parts[0];
+    sym = parts[1];
+  }
+  await ctx.sendChatAction('typing');
+  const fx = await fetchFxRate(base, sym);
+  if (!fx.ok) {
+    await ctx.reply(`currency failed: ${fx.error}`);
+    return;
+  }
+  const total = (amount * fx.rate).toFixed(4);
+  await ctx.reply(
+    `CURRENCY\n` +
+      `${amount} ${fx.base} = ${total} ${fx.symbol}\n` +
+      `Rate: 1 ${fx.base} = ${fx.rate} ${fx.symbol}\n` +
+      `Date: ${fx.date}\n` +
+      `(Frankfurter / ECB reference)`
+  );
+}
+
+async function handleMoonCommand(ctx) {
+  const info = moonPhaseInfo(new Date());
+  await ctx.reply(
+    `MOON\n` +
+      `Phase: ${info.name}\n` +
+      `Approx age: ${info.age} days\n` +
+      `Illumination: ~${info.illum}%\n\n` +
+      `Tip: Full moon nights can be brighter for evening easy runs.`
+  );
+}
+
+async function handleSunCommand(ctx) {
+  const place = (ctx.message.text || '')
+    .replace(/^\/sun(@\w+)?\s*/i, '')
+    .trim();
+  if (!place) {
+    await ctx.reply('Usage:\n/sun Colombo\n/sun Kotte');
+    return;
+  }
+  await ctx.sendChatAction('typing');
+  const geo = await geocodePlace(place);
+  if (!geo) {
+    await ctx.reply('Place not found.');
+    return;
+  }
+  const s = await fetchSun(geo.lat, geo.lon);
+  if (!s.ok) {
+    await ctx.reply(`sun failed: ${s.error}`);
+    return;
+  }
+  const label = [geo.name, geo.admin1, geo.country].filter(Boolean).join(', ');
+  const dayH = s.daylight != null ? (Number(s.daylight) / 3600).toFixed(1) : '—';
+  await ctx.reply(
+    `SUN · ${label}\n` +
+      `Sunrise: ${s.sunrise}\n` +
+      `Sunset: ${s.sunset}\n` +
+      `Daylight: ~${dayH} h\n` +
+      `TZ: ${s.timezone}`
+  );
+}
+
+async function handleAqiCommand(ctx) {
+  const place = (ctx.message.text || '')
+    .replace(/^\/aqi(@\w+)?\s*/i, '')
+    .trim();
+  if (!place) {
+    await ctx.reply('Usage:\n/aqi Colombo\n/aqi Kotte');
+    return;
+  }
+  await ctx.sendChatAction('typing');
+  const geo = await geocodePlace(place);
+  if (!geo) {
+    await ctx.reply('Place not found.');
+    return;
+  }
+  const a = await fetchAqi(geo.lat, geo.lon);
+  if (!a.ok) {
+    await ctx.reply(`aqi failed: ${a.error}`);
+    return;
+  }
+  const label = [geo.name, geo.admin1, geo.country].filter(Boolean).join(', ');
+  await ctx.reply(
+    `AQI · ${label}\n` +
+      `European AQI: ${a.eaqi} (${aqiLabel(a.eaqi)})\n` +
+      `PM2.5: ${a.pm25} · PM10: ${a.pm10}\n` +
+      `NO2: ${a.no2} · O3: ${a.o3} · CO: ${a.co}\n` +
+      `TZ: ${a.timezone}`
+  );
 }
 
 async function generateReply(prompt, ctx, imageBase64, mimeType) {
@@ -4574,43 +4684,7 @@ bot.command('commands', async (ctx) => {
 
   bot.command('currency', async (ctx) => {
     try {
-      const raw = (ctx.message.text || '')
-        .replace(/^\/currency(@\w+)?\s*/i, '')
-        .trim()
-        .toUpperCase();
-      // /currency USD LKR   or  /currency 100 USD LKR
-      const parts = raw.split(/\s+/).filter(Boolean);
-      if (parts.length < 2) {
-        await ctx.reply(
-          'Usage:\n/currency USD LKR\n/currency 100 USD LKR\n/currency EUR LKR'
-        );
-        return;
-      }
-      let amount = 1;
-      let base;
-      let sym;
-      if (parts.length >= 3 && !Number.isNaN(parseFloat(parts[0]))) {
-        amount = parseFloat(parts[0]);
-        base = parts[1];
-        sym = parts[2];
-      } else {
-        base = parts[0];
-        sym = parts[1];
-      }
-      await ctx.sendChatAction('typing');
-      const fx = await fetchFxRate(base, sym);
-      if (!fx.ok) {
-        await ctx.reply(`currency failed: ${fx.error}`);
-        return;
-      }
-      const total = (amount * fx.rate).toFixed(4);
-      await ctx.reply(
-        `CURRENCY\n` +
-          `${amount} ${fx.base} = ${total} ${fx.symbol}\n` +
-          `Rate: 1 ${fx.base} = ${fx.rate} ${fx.symbol}\n` +
-          `Date: ${fx.date}\n` +
-          `(Frankfurter / ECB reference)`
-      );
+      await handleCurrencyCommand(ctx);
     } catch (err) {
       console.error('currency', err);
       await ctx.reply('currency failed.');
@@ -4619,14 +4693,7 @@ bot.command('commands', async (ctx) => {
 
   bot.command('moon', async (ctx) => {
     try {
-      const info = moonPhaseInfo(new Date());
-      await ctx.reply(
-        `MOON\n` +
-          `Phase: ${info.name}\n` +
-          `Approx age: ${info.age} days\n` +
-          `Illumination: ~${info.illum}%\n\n` +
-          `Tip: Full moon nights can be brighter for evening easy runs.`
-      );
+      await handleMoonCommand(ctx);
     } catch (err) {
       console.error('moon', err);
       await ctx.reply('moon failed.');
@@ -5212,7 +5279,41 @@ bot.command('commands', async (ctx) => {
 
   bot.on('text', async (ctx) => {
     const text = (ctx.message.text || '').trim();
-    if (!text || text.startsWith('/')) return;
+    if (!text) return;
+
+    // Non-AI slash commands (guard: never send these to Gemini)
+    try {
+      if (/^\/currency(@\w+)?(\s|$)/i.test(text)) {
+        await handleCurrencyCommand(ctx);
+        return;
+      }
+      if (/^\/moon(@\w+)?(\s|$)/i.test(text)) {
+        await handleMoonCommand(ctx);
+        return;
+      }
+      if (/^\/sun(@\w+)?(\s|$)/i.test(text)) {
+        await handleSunCommand(ctx);
+        return;
+      }
+      if (/^\/aqi(@\w+)?(\s|$)/i.test(text)) {
+        await handleAqiCommand(ctx);
+        return;
+      }
+      if (/^\/weather(@\w+)?(\s|$)/i.test(text)) {
+        // let bot.command('weather') handle if present; fallback message
+        // fall through only if not matched — still never Gemini:
+        return;
+      }
+      if (/^\/forecast(@\w+)?(\s|$)/i.test(text)) {
+        return;
+      }
+    } catch (err) {
+      console.error('non-ai cmd', err);
+      await ctx.reply('Command failed. Try again.');
+      return;
+    }
+
+    if (text.startsWith('/')) return;
 
     // Anti-link moderation (groups only)
     if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
