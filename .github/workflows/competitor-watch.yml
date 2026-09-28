@@ -1,1 +1,33 @@
+# Radiant Queen · Competitor Watch
+# Mondays ~09:00 Asia/Colombo = 03:30 UTC
+name: competitor-watch
 
+on:
+  schedule:
+    - cron: "30 3 * * 1"
+  workflow_dispatch:
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Radiant Queen competitor-watch API
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_URL: ${{ secrets.APP_URL }}
+        run: |
+          set -e
+          BASE="${APP_URL:-https://radiant-queen-pasiya-max-v2.vercel.app}"
+          BASE="${BASE%/}"
+          if [ -z "$CRON_SECRET" ]; then
+            echo "Missing GitHub secret CRON_SECRET"
+            exit 1
+          fi
+          echo "Calling ${BASE}/api/competitor-watch"
+          curl -sS -f -X POST \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            "${BASE}/api/competitor-watch" \
+            | tee /tmp/out.json
+          grep -q '"ok":true' /tmp/out.json || grep -q '"ok": true' /tmp/out.json
+          echo "OK" 
