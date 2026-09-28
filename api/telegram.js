@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.9-stable';
+const BOT_VERSION = 'v2.9-stride-fix';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -190,19 +190,39 @@ async function addRunXp(user, delta, chatId, reason, opts = {}) {
   };
 }
 
-async function fetchStrideJson(path) {
+async function fetchStrideJson(path, timeoutMs = 8000) {
   try {
-    const r = await fetch(`${STRIDE_BASE}${path}`, {
-      headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(12000),
-    });
-    const text = await r.text();
-    if (!r.ok || text.trim().startsWith('<')) {
-      return { ok: false, error: `HTTP ${r.status} (sleep or HTML)` };
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    let r;
+    try {
+      r = await fetch(`${STRIDE_BASE}${path}`, {
+        headers: { Accept: 'application/json' },
+        signal: ctrl.signal,
+      });
+    } finally {
+      clearTimeout(t);
     }
-    return { ok: true, data: JSON.parse(text) };
+    const text = await r.text();
+    if (!r.ok) {
+      return { ok: false, error: `HTTP ${r.status}`, status: r.status };
+    }
+    if (text.trim().startsWith('<')) {
+      return { ok: false, error: 'HTML response (waking/proxy)', status: r.status };
+    }
+    try {
+      return { ok: true, data: JSON.parse(text), status: r.status };
+    } catch {
+      return { ok: false, error: 'Invalid JSON', status: r.status };
+    }
   } catch (e) {
-    return { ok: false, error: String(e?.message || e).slice(0, 120) };
+    const msg = String(e?.message || e);
+    const waking = /abort|timeout|network/i.test(msg);
+    return {
+      ok: false,
+      error: msg.slice(0, 120),
+      waking,
+    };
   }
 }
 
@@ -1964,6 +1984,7 @@ function buildBot() {
   });
 
 
+
   bot.command('stride', async (ctx) => {
     try {
       const arg = (ctx.message.text || '')
@@ -1975,10 +1996,10 @@ function buildBot() {
         await ctx.reply(
           `STRIDECLUB BRIDGE\n\n` +
             `/stride — health + leaderboard + club pulse\n` +
-            `/stride agents — agent / system hints\n` +
+            `/stride agents — agent pulse\n` +
             `/stride site — open link\n` +
             `/runxp /xptop /logrun /streak /me\n\n` +
-            `Note: SnapDeploy free tier may sleep; first call can take 30–60s.`
+            `SnapDeploy free tier may sleep (30–60s wake).`
         );
         return;
       }
@@ -1995,79 +2016,99 @@ function buildBot() {
 
       await ctx.sendChatAction('typing');
 
-      // try several common endpoints (deeper bridge)
-      const health = await fetchStrideJson('/api/health');
-      const board = await fetchStrideJson('/api/leaderboard');
-      const runs = await fetchStrideJson('/api/runs');
-      const events = await fetchStrideJson('/api/events');
+      // Parallel, short timeouts — never hard-fail whole command if one path fails
+      const [healthR, boardR, runsR, eventsR] = await Promise.all([
+        fetchStrideJson('/api/health', 8000),
+        fetchStrideJson('/api/leaderboard', 8000),
+        fetchStrideJson('/api/runs', 8000),
+        fetchStrideJson('/api/events', 8000),
+      ]);
 
       if (arg === 'agents') {
-        let msg =
-          `STRIDE AGENTS / PULSE\nBase: ${STRIDE_BASE}\n\n` +
-          `Health: ${health.ok ? 'OK' : 'SLEEPING or down'}\n`;
-        if (health.ok && health.data) {
-          const d = health.data;
+        let msg = `STRIDE AGENTS / PULSE\nBase: ${STRIDE_BASE}\n\n`;
+        if (healthR.ok && healthR.data) {
+          const d = healthR.data;
+          const c = d.counts || {};
+          msg += `Health: OK\n`;
           msg += `ok: ${d.ok}\n`;
-          if (d.services) msg += `services: ${JSON.stringify(d.services).slice(0, 200)}\n`;
-          if (d.users != null) msg += `users: ${d.users}\n`;
-          if (d.runs != null) msg += `runs: ${d.runs}\n`;
-          if (d.events != null) msg += `events: ${d.events}\n`;
+          if (c.users != null) msg += `users: ${c.users}\n`;
+          if (c.runs != null) msg += `runs: ${c.runs}\n`;
+          if (c.events != null) msg += `events: ${c.events}\n`;
+          if (c.agentLogs != null) msg += `agentLogs: ${c.agentLogs}\n`;
+          if (d.checks) {
+            msg += `checks: ${JSON.stringify(d.checks).slice(0, 220)}\n`;
+          }
         } else {
-          msg +=
-            `Tip: Open the site once to wake the free container, then retry /stride.\n`;
+          msg += `Health: ${healthR.error || 'down'}\n`;
+          if (healthR.waking || (healthR.status && healthR.status >= 500)) {
+            msg += `Tip: Open site once, wait 30–60s, retry.\n`;
+          }
         }
-        msg += `\nTelegram side: /agentpulse /runxp /xptop`;
+        msg += `\nTelegram: /agentpulse /runxp /xptop`;
         await ctx.reply(msg.slice(0, 3500));
         return;
       }
 
+      // Default /stride
       let msg = `STRIDECLUB BRIDGE\nBase: ${STRIDE_BASE}\n\n`;
 
-      if (health.ok) {
-        const d = health.data || {};
+      if (healthR.ok && healthR.data) {
+        const d = healthR.data;
+        const c = d.counts || {};
         msg += `HEALTH: OK\n`;
         if (d.ok != null) msg += `ok: ${d.ok}\n`;
-        if (d.users != null) msg += `Users: ${d.users}\n`;
-        if (d.runs != null) msg += `Runs: ${d.runs}\n`;
-        if (d.events != null) msg += `Events: ${d.events}\n`;
-        if (d.logs != null) msg += `Logs: ${d.logs}\n`;
+        if (c.users != null) msg += `Users: ${c.users}\n`;
+        if (c.runs != null) msg += `Runs: ${c.runs}\n`;
+        if (c.events != null) msg += `Events: ${c.events}\n`;
+        if (c.agentLogs != null) msg += `Agent logs: ${c.agentLogs}\n`;
       } else {
-        msg +=
-          `HEALTH: unreachable (container may be waking)\n` +
-          `Open site → wait → /stride again\n`;
+        msg += `HEALTH: ${healthR.error || 'unavailable'}\n`;
+        if (healthR.waking || healthR.status === 503 || (healthR.error || '').includes('HTML')) {
+          msg += `(Container may be waking — open site, wait, retry)\n`;
+        }
       }
 
-      // leaderboard top 5
-      if (board.ok && board.data) {
-        const rows = board.data.leaderboard || board.data.runners || board.data.rows || board.data;
-        msg += `\nLEADERBOARD\n`;
+      msg += `\nLEADERBOARD\n`;
+      if (boardR.ok && boardR.data) {
+        const data = boardR.data;
+        let rows = data.leaderboard || data.runners || data.rows || data.items || data;
+        if (!Array.isArray(rows) && data && typeof data === 'object') {
+          rows = Object.values(data).find((v) => Array.isArray(v)) || [];
+        }
         if (Array.isArray(rows) && rows.length) {
           rows.slice(0, 5).forEach((r, i) => {
-            const name = r.display_name || r.name || r.username || r.user_name || `User ${i + 1}`;
-            const km = r.total_km ?? r.distance_km ?? r.km ?? r.totalDistance ?? '—';
-            const runsN = r.runs ?? r.run_count ?? r.count ?? '';
-            msg += `${i + 1}. ${name} — ${km} km${runsN !== '' ? ` (${runsN} runs)` : ''}\n`;
+            if (!r || typeof r !== 'object') return;
+            const name =
+              r.display_name || r.name || r.username || r.user_name || `User ${i + 1}`;
+            const km =
+              r.total_km ?? r.distance_km ?? r.km ?? r.totalDistance ?? r.distance ?? '—';
+            const runsN = r.runs ?? r.run_count ?? r.count;
+            msg += `${i + 1}. ${name} — ${km} km${runsN != null ? ` (${runsN} runs)` : ''}\n`;
           });
         } else {
-          msg += `(no rows parsed)\n`;
+          msg += `(no leaderboard rows)\n`;
         }
       } else {
-        msg += `\nLEADERBOARD: unavailable now\n`;
+        msg += `(unavailable: ${boardR.error || 'n/a'})\n`;
       }
 
-      // runs sample count
-      if (runs.ok && runs.data) {
-        const list = Array.isArray(runs.data) ? runs.data : runs.data.runs || runs.data.items || [];
+      if (runsR.ok && runsR.data) {
+        const list = Array.isArray(runsR.data)
+          ? runsR.data
+          : runsR.data.runs || runsR.data.items || [];
         if (Array.isArray(list)) {
-          msg += `\nRecent runs endpoint: ${list.length} item(s) returned\n`;
+          msg += `\nRuns API: ${list.length} item(s)\n`;
         }
       }
 
-      if (events.ok && events.data) {
-        const list = Array.isArray(events.data) ? events.data : events.data.events || events.data.items || [];
-        if (Array.isArray(list)) {
-          msg += `Events endpoint: ${list.length} item(s)\n`;
+      if (eventsR.ok && eventsR.data) {
+        const list = Array.isArray(eventsR.data)
+          ? eventsR.data
+          : eventsR.data.events || eventsR.data.items || [];
+        if (Array.isArray(list) && list.length) {
+          msg += `Events API: ${list.length} item(s)\n`;
           list.slice(0, 3).forEach((e, i) => {
+            if (!e || typeof e !== 'object') return;
             const title = e.title || e.name || `Event ${i + 1}`;
             const when = e.event_date || e.date || e.starts_at || '';
             msg += `  • ${title}${when ? ` (${when})` : ''}\n`;
@@ -2075,18 +2116,30 @@ function buildBot() {
         }
       }
 
-      msg += `\nSite: ${STRIDE_BASE}\n/stride agents · /runxp · /xptop · /logrun`;
-      await ctx.reply(
-        msg.slice(0, 3500),
-        Markup.inlineKeyboard([[Markup.button.url('Open StrideClub', STRIDE_BASE)]])
-      );
+      msg += `\n/stride agents · /runxp · /xptop · /logrun`;
+
+      try {
+        await ctx.reply(
+          msg.slice(0, 3500),
+          Markup.inlineKeyboard([
+            [Markup.button.url('Open StrideClub', STRIDE_BASE)],
+          ])
+        );
+      } catch (replyErr) {
+        // keyboard optional — never fail whole command
+        console.error('stride reply kb', replyErr);
+        await ctx.reply(msg.slice(0, 3500));
+      }
     } catch (err) {
       console.error('stride', err);
       await ctx.reply(
-        `Stride bridge error.\nBase: ${STRIDE_BASE}\nOpen the site to wake free hosting, then retry.`
+        `Stride bridge error: ${String(err?.message || err).slice(0, 150)}\n` +
+          `Base: ${STRIDE_BASE}\n` +
+          `Try /stride agents or open the site once if hosting slept.`
       );
     }
   });
+
 
 
   bot.command('dailytip', async (ctx) => {
