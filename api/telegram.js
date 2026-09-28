@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.9-competitor';
+const BOT_VERSION = 'v2.9-tenant';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -1286,6 +1286,91 @@ async function spendGold(ctx, costKey) {
     username: ctx.from?.username || ctx.from?.first_name || null,
   });
   return { ok: true, gold: next, spent: cost };
+}
+
+
+/** Multi-tenant: user-owned Telegram bots powered by Radiant Queen engine */
+async function saveUserBot(ownerId, token, meta = {}) {
+  if (!supabase) return { ok: false, error: 'Supabase missing' };
+  const uid = Number(ownerId);
+  const { error } = await supabase.from('rq_user_bots').upsert(
+    {
+      owner_id: uid,
+      bot_token: token,
+      bot_id: meta.bot_id || null,
+      bot_username: meta.bot_username || null,
+      bot_name: meta.bot_name || null,
+      is_active: true,
+      webhook_set: !!meta.webhook_set,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'owner_id' }
+  );
+  return { ok: !error, error: error?.message };
+}
+
+async function getUserBot(ownerId) {
+  if (!supabase) return null;
+  const { data } = await supabase
+    .from('rq_user_bots')
+    .select('*')
+    .eq('owner_id', Number(ownerId))
+    .maybeSingle();
+  return data || null;
+}
+
+async function getUserBotByOwnerKey(ownerKey) {
+  if (!supabase) return null;
+  const { data } = await supabase
+    .from('rq_user_bots')
+    .select('*')
+    .eq('owner_id', Number(ownerKey))
+    .eq('is_active', true)
+    .maybeSingle();
+  return data || null;
+}
+
+async function deleteUserBot(ownerId) {
+  if (!supabase) return { ok: false };
+  const row = await getUserBot(ownerId);
+  if (row?.bot_token) {
+    try {
+      await fetch(
+        `https://api.telegram.org/bot${row.bot_token}/deleteWebhook?drop_pending_updates=true`
+      );
+    } catch (_) {}
+  }
+  const { error } = await supabase
+    .from('rq_user_bots')
+    .delete()
+    .eq('owner_id', Number(ownerId));
+  return { ok: !error, error: error?.message };
+}
+
+async function telegramGetMe(token) {
+  const r = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+  const j = await r.json();
+  if (!j.ok) return { ok: false, error: j.description || 'getMe failed' };
+  return {
+    ok: true,
+    bot_id: j.result.id,
+    bot_username: j.result.username,
+    bot_name: j.result.first_name,
+  };
+}
+
+async function telegramSetWebhook(token, url) {
+  const r = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      url,
+      drop_pending_updates: true,
+      allowed_updates: ['message', 'callback_query'],
+    }),
+  });
+  const j = await r.json();
+  return { ok: !!j.ok, error: j.description, result: j };
 }
 
 async function generateReply(prompt, ctx, imageBase64, mimeType) {
@@ -4980,6 +5065,116 @@ bot.command('commands', async (ctx) => {
     } catch (err) {
       console.error('competitor', err);
       await ctx.reply(`competitor failed: ${String(err?.message || err).slice(0, 150)}`);
+    }
+  });
+
+
+
+  bot.command('setbot', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'private') {
+        await ctx.reply('For safety, /setbot works only in private chat.');
+        return;
+      }
+      const token = (ctx.message.text || '')
+        .replace(/^\/setbot(@\w+)?\s*/i, '')
+        .trim();
+      if (!token || token.length < 30 || !token.includes(':')) {
+        await ctx.reply(
+          `Radiant Queen · Host your bot\n\n` +
+            `1) @BotFather → /newbot\n` +
+            `2) Copy the HTTP API token\n` +
+            `3) Send:\n/setbot 123456:ABC-DEF...\n\n` +
+            `Your bot will answer with the Radiant Queen engine.\n` +
+            `Token is stored in Supabase (service role). Private chat only.`
+        );
+        return;
+      }
+      // try delete user message to reduce token leak in chat history
+      try {
+        await ctx.deleteMessage();
+      } catch (_) {}
+
+      await ctx.reply('Validating token with Telegram…');
+      const me = await telegramGetMe(token);
+      if (!me.ok) {
+        await ctx.reply(`Invalid token: ${me.error}`);
+        return;
+      }
+
+      const host =
+        process.env.VERCEL_URL ||
+        process.env.APP_URL?.replace(/^https?:\/\//, '') ||
+        'radiant-queen-pasiya-max-v2.vercel.app';
+      const base = host.startsWith('http') ? host : `https://${host}`;
+      const hook = `${base.replace(/\/$/, '')}/api/tenant-webhook?owner=${ctx.from.id}`;
+
+      const wh = await telegramSetWebhook(token, hook);
+      if (!wh.ok) {
+        await ctx.reply(`Webhook failed: ${wh.error || 'unknown'}\nToken not saved.`);
+        return;
+      }
+
+      const saved = await saveUserBot(ctx.from.id, token, {
+        bot_id: me.bot_id,
+        bot_username: me.bot_username,
+        bot_name: me.bot_name,
+        webhook_set: true,
+      });
+      if (!saved.ok) {
+        await ctx.reply(`DB save failed: ${saved.error}`);
+        return;
+      }
+
+      await ctx.reply(
+        `Radiant Queen tenant bot linked!\n\n` +
+          `Bot: @${me.bot_username} (${me.bot_name})\n` +
+          `Webhook: set\n` +
+          `Engine: Radiant Queen\n\n` +
+          `Open your bot and send /start\n` +
+          `/mybot · /delbot`
+      );
+    } catch (err) {
+      console.error('setbot', err);
+      await ctx.reply(`setbot failed: ${String(err?.message || err).slice(0, 150)}`);
+    }
+  });
+
+  bot.command('mybot', async (ctx) => {
+    try {
+      const row = await getUserBot(ctx.from.id);
+      if (!row) {
+        await ctx.reply('No tenant bot linked.\nUse /setbot <token> in private chat.');
+        return;
+      }
+      await ctx.reply(
+        `YOUR RADIANT QUEEN TENANT BOT\n\n` +
+          `Username: @${row.bot_username || '—'}\n` +
+          `Name: ${row.bot_name || '—'}\n` +
+          `Active: ${row.is_active ? 'yes' : 'no'}\n` +
+          `Webhook: ${row.webhook_set ? 'yes' : 'no'}\n` +
+          `Owner ID: ${row.owner_id}\n\n` +
+          `/delbot to remove`
+      );
+    } catch (err) {
+      await ctx.reply('mybot failed.');
+    }
+  });
+
+  bot.command('delbot', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'private') {
+        await ctx.reply('Use /delbot in private chat.');
+        return;
+      }
+      const r = await deleteUserBot(ctx.from.id);
+      if (!r.ok) {
+        await ctx.reply(`delbot failed: ${r.error || 'error'}`);
+        return;
+      }
+      await ctx.reply('Tenant bot removed + webhook deleted.');
+    } catch (err) {
+      await ctx.reply('delbot failed.');
     }
   });
 
