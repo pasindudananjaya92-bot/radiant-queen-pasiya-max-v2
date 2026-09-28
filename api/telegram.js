@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.9-tenant';
+const BOT_VERSION = 'v2.9-tenant-fix';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -5102,12 +5102,16 @@ bot.command('commands', async (ctx) => {
         return;
       }
 
-      const host =
-        process.env.VERCEL_URL ||
-        process.env.APP_URL?.replace(/^https?:\/\//, '') ||
-        'radiant-queen-pasiya-max-v2.vercel.app';
-      const base = host.startsWith('http') ? host : `https://${host}`;
-      const hook = `${base.replace(/\/$/, '')}/api/tenant-webhook?owner=${ctx.from.id}`;
+      const appBase = (
+        process.env.APP_URL ||
+        process.env.PUBLIC_APP_URL ||
+        'https://radiant-queen-pasiya-max-v2.vercel.app'
+      )
+        .trim()
+        .replace(/\/$/, '');
+      const base = appBase.startsWith('http') ? appBase : `https://${appBase}`;
+      // Prefer stable production URL — never ephemeral VERCEL_URL preview host
+      const hook = `${base}/api/tenant-webhook?owner=${ctx.from.id}`;
 
       const wh = await telegramSetWebhook(token, hook);
       if (!wh.ok) {
@@ -5139,6 +5143,48 @@ bot.command('commands', async (ctx) => {
       await ctx.reply(`setbot failed: ${String(err?.message || err).slice(0, 150)}`);
     }
   });
+
+
+  bot.command('resyncbot', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'private') {
+        await ctx.reply('Use /resyncbot in private chat.');
+        return;
+      }
+      const row = await getUserBot(ctx.from.id);
+      if (!row?.bot_token) {
+        await ctx.reply('No bot linked. Use /setbot <token> first.');
+        return;
+      }
+      const appBase = (
+        process.env.APP_URL ||
+        process.env.PUBLIC_APP_URL ||
+        'https://radiant-queen-pasiya-max-v2.vercel.app'
+      )
+        .trim()
+        .replace(/\/$/, '');
+      const base = appBase.startsWith('http') ? appBase : `https://${appBase}`;
+      const hook = `${base}/api/tenant-webhook?owner=${ctx.from.id}`;
+      const wh = await telegramSetWebhook(row.bot_token, hook);
+      if (!wh.ok) {
+        await ctx.reply(`Webhook re-set failed: ${wh.error || 'unknown'}`);
+        return;
+      }
+      await saveUserBot(ctx.from.id, row.bot_token, {
+        bot_id: row.bot_id,
+        bot_username: row.bot_username,
+        bot_name: row.bot_name,
+        webhook_set: true,
+      });
+      await ctx.reply(
+        `Webhook re-synced!\nURL:\n${hook}\n\nOpen @${row.bot_username || 'your_bot'} and send /start again.`
+      );
+    } catch (err) {
+      console.error('resyncbot', err);
+      await ctx.reply(`resyncbot failed: ${String(err?.message || err).slice(0, 150)}`);
+    }
+  });
+
 
   bot.command('mybot', async (ctx) => {
     try {

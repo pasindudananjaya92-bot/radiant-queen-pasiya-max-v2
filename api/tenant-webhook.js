@@ -1,8 +1,6 @@
 /**
- * Radiant Queen · Tenant webhook
+ * Radiant Queen · Tenant webhook (fixed)
  * URL: /api/tenant-webhook?owner=<telegram_user_id>
- * Each user bot sets webhook here; engine = Radiant Queen (Gemini).
- * Brand: Radiant Queen / Pasiya Max — do not rebrand.
  */
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenAI } from '@google/genai';
@@ -31,7 +29,7 @@ async function tg(token, method, body) {
 
 async function aiReply(userText) {
   if (!GEMINI_KEY) {
-    return 'Radiant Queen engine: GEMINI_API_KEY not configured on host.';
+    return 'Radiant Queen engine online. GEMINI_API_KEY missing on host — text echo mode.';
   }
   const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
   const prompt =
@@ -53,6 +51,19 @@ async function aiReply(userText) {
   return 'Radiant Queen AI is busy (free tier). Try again shortly.';
 }
 
+function parseBody(req) {
+  let body = req.body;
+  if (body == null) return {};
+  if (typeof body === 'string') {
+    try {
+      return JSON.parse(body);
+    } catch {
+      return {};
+    }
+  }
+  return body;
+}
+
 export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
@@ -60,6 +71,8 @@ export default async function handler(req, res) {
         ok: true,
         service: 'radiant-queen-tenant-webhook',
         brand: 'Radiant Queen · Pasiya Max',
+        hasDb: Boolean(supabase),
+        hasGemini: Boolean(GEMINI_KEY),
       });
     }
     if (req.method !== 'POST') {
@@ -67,58 +80,64 @@ export default async function handler(req, res) {
     }
 
     const owner = Number(req.query?.owner || req.query?.o || 0);
-    if (!owner || !supabase) {
-      return res.status(400).json({ ok: false, error: 'owner or db missing' });
+    if (!owner) {
+      return res.status(200).json({ ok: false, error: 'owner query missing' });
+    }
+    if (!supabase) {
+      return res.status(200).json({ ok: false, error: 'supabase missing' });
     }
 
-    const { data: row } = await supabase
+    const { data: row, error: dbErr } = await supabase
       .from('rq_user_bots')
       .select('*')
       .eq('owner_id', owner)
       .eq('is_active', true)
       .maybeSingle();
 
-    if (!row?.bot_token) {
-      return res.status(404).json({ ok: false, error: 'tenant bot not found' });
+    if (dbErr || !row?.bot_token) {
+      console.error('tenant bot lookup', dbErr || 'no row');
+      return res.status(200).json({ ok: false, error: 'tenant bot not found' });
     }
 
-    const update = req.body || {};
-    const msg = update.message;
+    const update = parseBody(req);
+    const msg = update.message || update.edited_message;
     if (!msg) {
       return res.status(200).json({ ok: true, ignored: true });
     }
 
     const chatId = msg.chat.id;
-    const text = (msg.text || '').trim();
+    const text = (msg.text || msg.caption || '').trim();
 
-    if (text === '/start' || text.startsWith('/start ')) {
-      await tg(row.bot_token, 'sendMessage', {
+    if (text === '/start' || text.startsWith('/start')) {
+      const out = await tg(row.bot_token, 'sendMessage', {
         chat_id: chatId,
         text:
           `Welcome — powered by RADIANT QUEEN · PASIYA MAX\n\n` +
-          `Owner linked bot: @${row.bot_username || 'bot'}\n` +
-          `Send any message for AI help.\n` +
-          `Main official bot: @PasiyaMaxQueen_bot`,
+          `Bot: @${row.bot_username || 'bot'}\n` +
+          `Send any text for AI help.\n` +
+          `Official bot: @PasiyaMaxQueen_bot`,
       });
-      return res.status(200).json({ ok: true });
+      if (!out.ok) console.error('tenant start send', out);
+      return res.status(200).json({ ok: true, start: true, telegram: out.ok });
     }
 
     if (!text) {
       await tg(row.bot_token, 'sendMessage', {
         chat_id: chatId,
-        text: 'Send text for Radiant Queen AI. (Media support on main bot @PasiyaMaxQueen_bot)',
+        text: 'Send text for Radiant Queen AI. Full tools: @PasiyaMaxQueen_bot',
       });
       return res.status(200).json({ ok: true });
     }
 
     const answer = await aiReply(text);
-    await tg(row.bot_token, 'sendMessage', {
+    const out = await tg(row.bot_token, 'sendMessage', {
       chat_id: chatId,
       text: `${answer}\n\n— Radiant Queen engine`,
     });
-    return res.status(200).json({ ok: true });
+    if (!out.ok) console.error('tenant reply send', out);
+    return res.status(200).json({ ok: true, telegram: out.ok });
   } catch (err) {
     console.error('tenant-webhook', err);
-    return res.status(200).json({ ok: true });
+    return res.status(200).json({ ok: true, error: String(err?.message || err).slice(0, 100) });
   }
 }
