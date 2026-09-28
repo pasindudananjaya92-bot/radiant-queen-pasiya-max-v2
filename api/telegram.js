@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.9-quota-safe';
+const BOT_VERSION = 'v2.9-stable';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -1963,6 +1963,7 @@ function buildBot() {
     }
   });
 
+
   bot.command('stride', async (ctx) => {
     try {
       const arg = (ctx.message.text || '')
@@ -1970,60 +1971,123 @@ function buildBot() {
         .trim()
         .toLowerCase();
 
-      if (arg === 'agents' || arg === 'agent') {
+      if (arg === 'help' || arg === '?') {
         await ctx.reply(
-          `STRIDECLUB + TELEGRAM = 6 AGENTS\n\n` +
-            `Web agents (StrideClub site):\n` +
-            `1) Pasiya AI Coach — training plans\n` +
-            `2) Community Moderator — spam scan\n` +
-            `3) Events & Reminders — group runs\n` +
-            `4) Data Sync — activities\n` +
-            `5) Social Poster — captions / posts\n\n` +
-            `6) Telegram Bridge (this bot)\n` +
-            `   /runxp /xptop /dailytip /modcheck\n` +
-            `   /warn /antilink /setwelcome\n\n` +
-            `Open hub:\n${STRIDE_BASE}\n\n` +
-            `/stride — live health + leaderboard`
+          `STRIDECLUB BRIDGE\n\n` +
+            `/stride — health + leaderboard + club pulse\n` +
+            `/stride agents — agent / system hints\n` +
+            `/stride site — open link\n` +
+            `/runxp /xptop /logrun /streak /me\n\n` +
+            `Note: SnapDeploy free tier may sleep; first call can take 30–60s.`
+        );
+        return;
+      }
+
+      if (arg === 'site' || arg === 'open') {
+        await ctx.reply(
+          `Open StrideClub:\n${STRIDE_BASE}`,
+          Markup.inlineKeyboard([
+            [Markup.button.url('Open StrideClub', STRIDE_BASE)],
+          ])
         );
         return;
       }
 
       await ctx.sendChatAction('typing');
+
+      // try several common endpoints (deeper bridge)
       const health = await fetchStrideJson('/api/health');
       const board = await fetchStrideJson('/api/leaderboard');
+      const runs = await fetchStrideJson('/api/runs');
+      const events = await fetchStrideJson('/api/events');
 
-      let msg = `STRIDECLUB BRIDGE (Agent 6 — Telegram)\nBase: ${STRIDE_BASE}\n\n`;
+      if (arg === 'agents') {
+        let msg =
+          `STRIDE AGENTS / PULSE\nBase: ${STRIDE_BASE}\n\n` +
+          `Health: ${health.ok ? 'OK' : 'SLEEPING or down'}\n`;
+        if (health.ok && health.data) {
+          const d = health.data;
+          msg += `ok: ${d.ok}\n`;
+          if (d.services) msg += `services: ${JSON.stringify(d.services).slice(0, 200)}\n`;
+          if (d.users != null) msg += `users: ${d.users}\n`;
+          if (d.runs != null) msg += `runs: ${d.runs}\n`;
+          if (d.events != null) msg += `events: ${d.events}\n`;
+        } else {
+          msg +=
+            `Tip: Open the site once to wake the free container, then retry /stride.\n`;
+        }
+        msg += `\nTelegram side: /agentpulse /runxp /xptop`;
+        await ctx.reply(msg.slice(0, 3500));
+        return;
+      }
+
+      let msg = `STRIDECLUB BRIDGE\nBase: ${STRIDE_BASE}\n\n`;
 
       if (health.ok) {
-        msg += `Health: OK\n`;
-        if (health.data?.ok !== undefined) msg += `ok: ${health.data.ok}\n`;
+        const d = health.data || {};
+        msg += `HEALTH: OK\n`;
+        if (d.ok != null) msg += `ok: ${d.ok}\n`;
+        if (d.users != null) msg += `Users: ${d.users}\n`;
+        if (d.runs != null) msg += `Runs: ${d.runs}\n`;
+        if (d.events != null) msg += `Events: ${d.events}\n`;
+        if (d.logs != null) msg += `Logs: ${d.logs}\n`;
       } else {
-        msg += `Health: offline/sleep — ${health.error}\nOpen site to wake.\n`;
+        msg +=
+          `HEALTH: unreachable (container may be waking)\n` +
+          `Open site → wait → /stride again\n`;
       }
 
+      // leaderboard top 5
       if (board.ok && board.data) {
-        const rows = board.data.leaderboard || board.data.runners || board.data;
+        const rows = board.data.leaderboard || board.data.runners || board.data.rows || board.data;
+        msg += `\nLEADERBOARD\n`;
         if (Array.isArray(rows) && rows.length) {
-          msg += `\nLeaderboard (top):\n`;
           rows.slice(0, 5).forEach((r, i) => {
-            const name = r.displayName || r.name || r.user_name || r.uid || 'runner';
-            const km = r.totalKm ?? r.distanceKm ?? r.total_distance ?? '?';
-            msg += `${i + 1}. ${name} — ${km} km\n`;
+            const name = r.display_name || r.name || r.username || r.user_name || `User ${i + 1}`;
+            const km = r.total_km ?? r.distance_km ?? r.km ?? r.totalDistance ?? '—';
+            const runsN = r.runs ?? r.run_count ?? r.count ?? '';
+            msg += `${i + 1}. ${name} — ${km} km${runsN !== '' ? ` (${runsN} runs)` : ''}\n`;
           });
         } else {
-          msg += `\nLeaderboard: loaded (format varies)\n`;
+          msg += `(no rows parsed)\n`;
         }
       } else {
-        msg += `\nLeaderboard: ${board.error || 'unavailable'}\n`;
+        msg += `\nLEADERBOARD: unavailable now\n`;
       }
 
-      msg += `\nSite: ${STRIDE_BASE}\nAgents: /stride agents\nXP: /runxp | /xptop | /logrun`;
-      await ctx.reply(msg.slice(0, 3500));
+      // runs sample count
+      if (runs.ok && runs.data) {
+        const list = Array.isArray(runs.data) ? runs.data : runs.data.runs || runs.data.items || [];
+        if (Array.isArray(list)) {
+          msg += `\nRecent runs endpoint: ${list.length} item(s) returned\n`;
+        }
+      }
+
+      if (events.ok && events.data) {
+        const list = Array.isArray(events.data) ? events.data : events.data.events || events.data.items || [];
+        if (Array.isArray(list)) {
+          msg += `Events endpoint: ${list.length} item(s)\n`;
+          list.slice(0, 3).forEach((e, i) => {
+            const title = e.title || e.name || `Event ${i + 1}`;
+            const when = e.event_date || e.date || e.starts_at || '';
+            msg += `  • ${title}${when ? ` (${when})` : ''}\n`;
+          });
+        }
+      }
+
+      msg += `\nSite: ${STRIDE_BASE}\n/stride agents · /runxp · /xptop · /logrun`;
+      await ctx.reply(
+        msg.slice(0, 3500),
+        Markup.inlineKeyboard([[Markup.button.url('Open StrideClub', STRIDE_BASE)]])
+      );
     } catch (err) {
       console.error('stride', err);
-      await ctx.reply('stride bridge failed.');
+      await ctx.reply(
+        `Stride bridge error.\nBase: ${STRIDE_BASE}\nOpen the site to wake free hosting, then retry.`
+      );
     }
   });
+
 
   bot.command('dailytip', async (ctx) => {
     try {
@@ -4241,6 +4305,7 @@ bot.command('commands', async (ctx) => {
         `Web: https://radiant-queen-pasiya-max-v2.vercel.app\n` +
         `Stride: https://strideclub-platform-6b71a.containers.snapdeploy.app\n\n` +
         `/commands · /menu · /version`
+        + `\nStatus: STABLE v2.9 — core feature freeze OK to pause`
     );
   });
 
