@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.9-stride-fix';
+const BOT_VERSION = 'v2.9-gold';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -1185,6 +1185,109 @@ async function handleAqiCommand(ctx) {
   );
 }
 
+
+const GOLD_START = 400;
+const GOLD_DAILY = 50;
+const GOLD_COST = {
+  ask: 5,
+  vision: 10,
+  voice: 10,
+  stride: 5,
+};
+
+async function getOrCreateGold(userId, username) {
+  const uid = Number(userId);
+  if (!supabase || !Number.isFinite(uid)) {
+    return { ok: false, gold: 0, premium: false, error: 'no_db' };
+  }
+  const { data, error } = await supabase
+    .from('rq_gold')
+    .select('user_id, username, gold, premium, last_daily')
+    .eq('user_id', uid)
+    .maybeSingle();
+  if (error) {
+    return { ok: false, gold: 0, premium: false, error: error.message };
+  }
+  if (data) {
+    return {
+      ok: true,
+      gold: Number(data.gold) || 0,
+      premium: !!data.premium,
+      last_daily: data.last_daily || null,
+      username: data.username || username || null,
+    };
+  }
+  const row = {
+    user_id: uid,
+    username: username || null,
+    gold: GOLD_START,
+    premium: false,
+    last_daily: null,
+    updated_at: new Date().toISOString(),
+  };
+  const { error: insErr } = await supabase.from('rq_gold').upsert(row, {
+    onConflict: 'user_id',
+  });
+  if (insErr) {
+    return { ok: false, gold: 0, premium: false, error: insErr.message };
+  }
+  return {
+    ok: true,
+    gold: GOLD_START,
+    premium: false,
+    last_daily: null,
+    username: username || null,
+    newUser: true,
+  };
+}
+
+async function setGold(userId, gold, extra = {}) {
+  const uid = Number(userId);
+  if (!supabase || !Number.isFinite(uid)) return { ok: false };
+  const payload = {
+    user_id: uid,
+    gold: Math.max(0, Math.floor(Number(gold) || 0)),
+    updated_at: new Date().toISOString(),
+    ...extra,
+  };
+  const { error } = await supabase.from('rq_gold').upsert(payload, {
+    onConflict: 'user_id',
+  });
+  return { ok: !error, error: error?.message };
+}
+
+/** Founder = free. Returns { ok, gold, need } */
+async function spendGold(ctx, costKey) {
+  if (isAdmin(ctx)) {
+    return { ok: true, gold: null, free: true };
+  }
+  const cost = GOLD_COST[costKey] || 0;
+  if (cost <= 0) return { ok: true, gold: null, free: true };
+  const uid = ctx.from?.id;
+  const g = await getOrCreateGold(uid, ctx.from?.username || ctx.from?.first_name);
+  if (!g.ok) {
+    // fail open if DB missing so bot still works
+    return { ok: true, gold: null, free: true, dbError: g.error };
+  }
+  if (g.premium) return { ok: true, gold: g.gold, free: true };
+  if (g.gold < cost) {
+    return {
+      ok: false,
+      gold: g.gold,
+      need: cost,
+      message:
+        `Not enough Radiant Gold.\n` +
+        `Balance: ${g.gold} · Need: ${cost}\n` +
+        `/daily for +${GOLD_DAILY} · /balance`,
+    };
+  }
+  const next = g.gold - cost;
+  await setGold(uid, next, {
+    username: ctx.from?.username || ctx.from?.first_name || null,
+  });
+  return { ok: true, gold: next, spent: cost };
+}
+
 async function generateReply(prompt, ctx, imageBase64, mimeType) {
   const ai = getAI();
   if (!ai) return 'Gemini key missing. Set GEMINI_API_KEY on Vercel.';
@@ -1376,6 +1479,9 @@ function buildBot() {
   bot = new Telegraf(BOT_TOKEN);
 
   bot.start(async (ctx) => {
+    try {
+      await getOrCreateGold(ctx.from.id, ctx.from.username || ctx.from.first_name);
+    } catch (_) {}
     try {
       const isGroup =
         ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
@@ -2015,6 +2121,14 @@ function buildBot() {
       }
 
       await ctx.sendChatAction('typing');
+      {
+        const payS = await spendGold(ctx, 'stride');
+        if (!payS.ok) {
+          await ctx.reply(payS.message || 'Not enough gold. /balance');
+          return;
+        }
+      }
+
 
       // Parallel, short timeouts — never hard-fail whole command if one path fails
       const [healthR, boardR, runsR, eventsR] = await Promise.all([
@@ -4845,6 +4959,72 @@ bot.command('commands', async (ctx) => {
   });
 
 
+
+  bot.command('balance', async (ctx) => {
+    try {
+      const g = await getOrCreateGold(
+        ctx.from.id,
+        ctx.from.username || ctx.from.first_name
+      );
+      if (!g.ok && g.error === 'no_db') {
+        await ctx.reply('Gold DB not connected (Supabase).');
+        return;
+      }
+      if (!g.ok) {
+        await ctx.reply(`balance failed: ${g.error}`);
+        return;
+      }
+      await ctx.reply(
+        `RADIANT GOLD\n` +
+          `Balance: ${g.gold}\n` +
+          `Premium: ${g.premium ? 'yes' : 'no'}\n` +
+          (g.newUser ? `Welcome bonus: ${GOLD_START} gold\n` : '') +
+          `\nCosts: /ask ${GOLD_COST.ask} · vision ${GOLD_COST.vision} · voice ${GOLD_COST.voice}\n` +
+          `/daily +${GOLD_DAILY} once per day\n` +
+          (isAdmin(ctx) ? `Founder: unlimited (no charge)\n` : '')
+      );
+    } catch (err) {
+      console.error('balance', err);
+      await ctx.reply('balance failed.');
+    }
+  });
+
+  bot.command('daily', async (ctx) => {
+    try {
+      if (isAdmin(ctx)) {
+        await ctx.reply('Founder account — unlimited gold (no daily claim needed).');
+        return;
+      }
+      const g = await getOrCreateGold(
+        ctx.from.id,
+        ctx.from.username || ctx.from.first_name
+      );
+      if (!g.ok) {
+        await ctx.reply(`daily failed: ${g.error || 'db'}`);
+        return;
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      if (g.last_daily === today) {
+        await ctx.reply(
+          `Already claimed today.\nBalance: ${g.gold}\nCome back tomorrow for +${GOLD_DAILY}.`
+        );
+        return;
+      }
+      const next = g.gold + GOLD_DAILY;
+      await setGold(ctx.from.id, next, {
+        username: ctx.from.username || ctx.from.first_name || null,
+        last_daily: today,
+      });
+      await ctx.reply(
+        `Daily claim OK!\n+${GOLD_DAILY} Radiant Gold\nBalance: ${next}`
+      );
+    } catch (err) {
+      console.error('daily', err);
+      await ctx.reply('daily failed.');
+    }
+  });
+
+
   bot.command('admin', async (ctx) => {
     if (!isAdmin(ctx)) {
       await ctx.reply('Admin only.');
@@ -5303,6 +5483,12 @@ bot.command('commands', async (ctx) => {
 
   bot.on('voice', async (ctx) => {
     try {
+      const payV = await spendGold(ctx, 'voice');
+      if (!payV.ok) {
+        await ctx.reply(payV.message || 'Not enough gold. /balance');
+        return;
+      }
+
       // private: always; groups: only for admin or when not quiet (keep simple: private + admin anywhere)
       const isPrivate = ctx.chat?.type === 'private';
       if (!isPrivate && !isAdmin(ctx)) {
@@ -5355,6 +5541,12 @@ bot.command('commands', async (ctx) => {
 
   bot.on('photo', async (ctx) => {
     try {
+      const payP = await spendGold(ctx, 'vision');
+      if (!payP.ok) {
+        await ctx.reply(payP.message || 'Not enough gold. /balance');
+        return;
+      }
+
       await handlePhoto(ctx);
     } catch (err) {
       console.error('photo', err);
@@ -5829,7 +6021,19 @@ bot.command('commands', async (ctx) => {
       return;
     }
 
-    await ctx.reply(await generateReply(text, ctx), afterReplyKeyboard(ctx));
+    {
+      const pay = await spendGold(ctx, 'ask');
+      if (!pay.ok) {
+        await ctx.reply(pay.message || 'Not enough Radiant Gold. /balance /daily');
+        return;
+      }
+      const out = await generateReply(text, ctx);
+      const suffix =
+        pay.free || pay.gold == null
+          ? ''
+          : `\n\n— ${pay.spent || GOLD_COST.ask} gold · bal ${pay.gold}`;
+      await ctx.reply((out + suffix).slice(0, 4000), afterReplyKeyboard(ctx));
+    }
   });
 
   bot.catch((err) => console.error('telegram bot error', err));
