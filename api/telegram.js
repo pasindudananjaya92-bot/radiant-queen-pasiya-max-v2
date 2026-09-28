@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.9-tenant-fix';
+const BOT_VERSION = 'v3.0-phase5';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -1371,6 +1371,19 @@ async function telegramSetWebhook(token, url) {
   });
   const j = await r.json();
   return { ok: !!j.ok, error: j.description, result: j };
+}
+
+
+async function setTenantWelcome(ownerId, text) {
+  if (!supabase) return { ok: false, error: 'no db' };
+  const { error } = await supabase
+    .from('rq_user_bots')
+    .update({
+      welcome_text: String(text || '').slice(0, 1500),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('owner_id', Number(ownerId));
+  return { ok: !error, error: error?.message };
 }
 
 async function generateReply(prompt, ctx, imageBase64, mimeType) {
@@ -5141,6 +5154,67 @@ bot.command('commands', async (ctx) => {
     } catch (err) {
       console.error('setbot', err);
       await ctx.reply(`setbot failed: ${String(err?.message || err).slice(0, 150)}`);
+    }
+  });
+
+
+
+  bot.command('settenantwelcome', async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'private') {
+        await ctx.reply('Private chat only.');
+        return;
+      }
+      const text = (ctx.message.text || '')
+        .replace(/^\/settenantwelcome(@\w+)?\s*/i, '')
+        .trim();
+      if (!text) {
+        await ctx.reply(
+          `Set welcome for YOUR tenant bot:\n` +
+            `/settenantwelcome Welcome to my Radiant Queen powered bot!\n\n` +
+            `Clear: /settenantwelcome clear`
+        );
+        return;
+      }
+      const row = await getUserBot(ctx.from.id);
+      if (!row) {
+        await ctx.reply('No tenant bot. /setbot first.');
+        return;
+      }
+      if (text.toLowerCase() === 'clear') {
+        const r = await setTenantWelcome(ctx.from.id, '');
+        await ctx.reply(r.ok ? 'Tenant welcome cleared (default used).' : `Fail: ${r.error}`);
+        return;
+      }
+      const r = await setTenantWelcome(ctx.from.id, text);
+      if (!r.ok) {
+        await ctx.reply(
+          `Save failed: ${r.error}\n` +
+            `If column missing, run SQL:\n` +
+            `alter table public.rq_user_bots add column if not exists welcome_text text;`
+        );
+        return;
+      }
+      await ctx.reply(
+        `Tenant welcome saved for @${row.bot_username || 'bot'}.\n` +
+          `Users see it on /start.\n\nPreview:\n${text.slice(0, 500)}`
+      );
+    } catch (err) {
+      await ctx.reply(`settenantwelcome failed: ${String(err?.message || err).slice(0, 120)}`);
+    }
+  });
+
+  bot.command('tenantwelcome', async (ctx) => {
+    try {
+      const row = await getUserBot(ctx.from.id);
+      if (!row) {
+        await ctx.reply('No tenant bot.');
+        return;
+      }
+      const w = row.welcome_text || '(default Radiant Queen welcome)';
+      await ctx.reply(`Current tenant welcome:\n\n${w}`);
+    } catch (err) {
+      await ctx.reply('tenantwelcome failed.');
     }
   });
 

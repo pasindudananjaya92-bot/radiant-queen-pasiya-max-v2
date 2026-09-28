@@ -1,6 +1,6 @@
 /**
- * Radiant Queen · Tenant webhook (fixed)
- * URL: /api/tenant-webhook?owner=<telegram_user_id>
+ * Radiant Queen · Tenant webhook — Phase 5
+ * Personality + /help + custom welcome
  */
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenAI } from '@google/genai';
@@ -18,6 +18,11 @@ const supabase =
 
 const MODELS = ['gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
 
+const PERSONALITY =
+  'You are Pasiya AI for RADIANT QUEEN · PASIYA MAX. ' +
+  'Warm, confident, short answers. Sinhala or English matching the user. ' +
+  'Never claim to be another brand. Full power tools live on @PasiyaMaxQueen_bot.';
+
 async function tg(token, method, body) {
   const r = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
     method: 'POST',
@@ -29,12 +34,10 @@ async function tg(token, method, body) {
 
 async function aiReply(userText) {
   if (!GEMINI_KEY) {
-    return 'Radiant Queen engine online. GEMINI_API_KEY missing on host — text echo mode.';
+    return 'Radiant Queen engine online. AI key missing on host.';
   }
   const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
-  const prompt =
-    `You are Pasiya AI for RADIANT QUEEN · PASIYA MAX. ` +
-    `Short helpful reply. User language Sinhala or English.\n\nUser: ${userText}`;
+  const prompt = `${PERSONALITY}\n\nUser: ${userText}`;
   for (const model of MODELS) {
     try {
       const result = await ai.models.generateContent({
@@ -48,7 +51,7 @@ async function aiReply(userText) {
       if (text && String(text).trim()) return String(text).trim().slice(0, 3500);
     } catch (_) {}
   }
-  return 'Radiant Queen AI is busy (free tier). Try again shortly.';
+  return 'Radiant Queen AI is busy (free tier). Try again shortly.\nFull tools: @PasiyaMaxQueen_bot';
 }
 
 function parseBody(req) {
@@ -64,12 +67,36 @@ function parseBody(req) {
   return body;
 }
 
+function defaultWelcome(row) {
+  return (
+    `Ayubowan — powered by RADIANT QUEEN · PASIYA MAX\n\n` +
+    `Bot: @${row.bot_username || 'bot'}\n` +
+    `Send any text for AI help.\n` +
+    `/help — commands\n\n` +
+    `Full menu & group tools: @PasiyaMaxQueen_bot`
+  );
+}
+
+function helpText(row) {
+  return (
+    `RADIANT QUEEN · TENANT BOT\n` +
+    `@${row.bot_username || 'bot'}\n\n` +
+    `/start — welcome\n` +
+    `/help — this message\n` +
+    `Any text — AI reply (Queen personality)\n\n` +
+    `Owner tools (on main bot):\n` +
+    `@PasiyaMaxQueen_bot → /settenantwelcome /mybot /resyncbot\n\n` +
+    `— Radiant Queen engine`
+  );
+}
+
 export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       return res.status(200).json({
         ok: true,
         service: 'radiant-queen-tenant-webhook',
+        phase: '5-personality',
         brand: 'Radiant Queen · Pasiya Max',
         hasDb: Boolean(supabase),
         hasGemini: Boolean(GEMINI_KEY),
@@ -80,22 +107,18 @@ export default async function handler(req, res) {
     }
 
     const owner = Number(req.query?.owner || req.query?.o || 0);
-    if (!owner) {
-      return res.status(200).json({ ok: false, error: 'owner query missing' });
-    }
-    if (!supabase) {
-      return res.status(200).json({ ok: false, error: 'supabase missing' });
+    if (!owner || !supabase) {
+      return res.status(200).json({ ok: false, error: 'owner or db missing' });
     }
 
-    const { data: row, error: dbErr } = await supabase
+    const { data: row } = await supabase
       .from('rq_user_bots')
       .select('*')
       .eq('owner_id', owner)
       .eq('is_active', true)
       .maybeSingle();
 
-    if (dbErr || !row?.bot_token) {
-      console.error('tenant bot lookup', dbErr || 'no row');
+    if (!row?.bot_token) {
       return res.status(200).json({ ok: false, error: 'tenant bot not found' });
     }
 
@@ -109,22 +132,27 @@ export default async function handler(req, res) {
     const text = (msg.text || msg.caption || '').trim();
 
     if (text === '/start' || text.startsWith('/start')) {
+      const custom = (row.welcome_text || '').trim();
+      const body = custom || defaultWelcome(row);
       const out = await tg(row.bot_token, 'sendMessage', {
         chat_id: chatId,
-        text:
-          `Welcome — powered by RADIANT QUEEN · PASIYA MAX\n\n` +
-          `Bot: @${row.bot_username || 'bot'}\n` +
-          `Send any text for AI help.\n` +
-          `Official bot: @PasiyaMaxQueen_bot`,
+        text: body.slice(0, 4000),
       });
-      if (!out.ok) console.error('tenant start send', out);
       return res.status(200).json({ ok: true, start: true, telegram: out.ok });
+    }
+
+    if (text === '/help' || text.startsWith('/help')) {
+      const out = await tg(row.bot_token, 'sendMessage', {
+        chat_id: chatId,
+        text: helpText(row),
+      });
+      return res.status(200).json({ ok: true, help: true, telegram: out.ok });
     }
 
     if (!text) {
       await tg(row.bot_token, 'sendMessage', {
         chat_id: chatId,
-        text: 'Send text for Radiant Queen AI. Full tools: @PasiyaMaxQueen_bot',
+        text: 'Send text for Radiant Queen AI.\n/help · Full tools: @PasiyaMaxQueen_bot',
       });
       return res.status(200).json({ ok: true });
     }
@@ -132,12 +160,11 @@ export default async function handler(req, res) {
     const answer = await aiReply(text);
     const out = await tg(row.bot_token, 'sendMessage', {
       chat_id: chatId,
-      text: `${answer}\n\n— Radiant Queen engine`,
+      text: `${answer}\n\n— Radiant Queen · @PasiyaMaxQueen_bot`,
     });
-    if (!out.ok) console.error('tenant reply send', out);
     return res.status(200).json({ ok: true, telegram: out.ok });
   } catch (err) {
     console.error('tenant-webhook', err);
-    return res.status(200).json({ ok: true, error: String(err?.message || err).slice(0, 100) });
+    return res.status(200).json({ ok: true });
   }
 }
