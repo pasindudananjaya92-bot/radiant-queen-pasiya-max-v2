@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v3.0-phase6';
+const BOT_VERSION = 'v3.0-phase7';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -5337,7 +5337,8 @@ bot.command('commands', async (ctx) => {
   });
 
 
-  bot.command('balance', async (ctx) => {
+
+  bot.command(['balance', 'gold'], async (ctx) => {
     try {
       const g = await getOrCreateGold(
         ctx.from.id,
@@ -5351,25 +5352,51 @@ bot.command('commands', async (ctx) => {
         await ctx.reply(`balance failed: ${g.error}`);
         return;
       }
-      await ctx.reply(
-        `RADIANT GOLD\n` +
-          `Balance: ${g.gold}\n` +
-          `Premium: ${g.premium ? 'yes' : 'no'}\n` +
-          (g.newUser ? `Welcome bonus: ${GOLD_START} gold\n` : '') +
-          `\nCosts: /ask ${GOLD_COST.ask} · vision ${GOLD_COST.vision} · voice ${GOLD_COST.voice}\n` +
-          `/daily +${GOLD_DAILY} once per day\n` +
-          (isAdmin(ctx) ? `Founder: unlimited (no charge)\n` : '')
-      );
+      const name = ctx.from.first_name || ctx.from.username || 'Runner';
+      const lines = [
+        'RADIANT GOLD · WALLET',
+        `Hi ${name}`,
+        '',
+        `Balance: ${g.gold} gold`,
+        `Premium: ${g.premium ? 'YES' : 'no'}`,
+      ];
+      if (g.newUser) {
+        lines.push(`Welcome bonus applied: ${GOLD_START}`);
+      }
+      if (g.last_daily) {
+        lines.push(`Last daily: ${g.last_daily}`);
+      }
+      lines.push('');
+      lines.push('Earn');
+      lines.push(`/daily → +${GOLD_DAILY} once per day`);
+      lines.push('');
+      lines.push('Spend');
+      lines.push(`AI text / ask → ${GOLD_COST.ask}`);
+      lines.push(`Vision / photo → ${GOLD_COST.vision}`);
+      lines.push(`Voice → ${GOLD_COST.voice}`);
+      lines.push(`Stride bridge → ${GOLD_COST.stride}`);
+      if (isAdmin(ctx)) {
+        lines.push('');
+        lines.push('Founder: unlimited (no charge)');
+      }
+      lines.push('');
+      lines.push('— Radiant Queen · Pasiya Max');
+      await ctx.reply(lines.join('\n'));
     } catch (err) {
       console.error('balance', err);
       await ctx.reply('balance failed.');
     }
   });
 
-  bot.command('daily', async (ctx) => {
+
+
+  bot.command(['daily', 'claim'], async (ctx) => {
     try {
       if (isAdmin(ctx)) {
-        await ctx.reply('Founder account — unlimited gold (no daily claim needed).');
+        await ctx.reply(
+          'Founder account — unlimited Radiant Gold.\n' +
+            'No daily claim needed.\n/balance · /gold'
+        );
         return;
       }
       const g = await getOrCreateGold(
@@ -5383,7 +5410,10 @@ bot.command('commands', async (ctx) => {
       const today = new Date().toISOString().slice(0, 10);
       if (g.last_daily === today) {
         await ctx.reply(
-          `Already claimed today.\nBalance: ${g.gold}\nCome back tomorrow for +${GOLD_DAILY}.`
+          `Already claimed today.\n` +
+            `Balance: ${g.gold} gold\n` +
+            `Come back tomorrow for +${GOLD_DAILY}.\n\n` +
+            `/balance · /gold`
         );
         return;
       }
@@ -5393,13 +5423,35 @@ bot.command('commands', async (ctx) => {
         last_daily: today,
       });
       await ctx.reply(
-        `Daily claim OK!\n+${GOLD_DAILY} Radiant Gold\nBalance: ${next}`
+        `DAILY CLAIM OK\n` +
+          `+${GOLD_DAILY} Radiant Gold\n` +
+          `New balance: ${next}\n\n` +
+          `Use it for AI help, vision, voice.\n` +
+          `/balance · /gold · /menu\n` +
+          `— Radiant Queen`
       );
     } catch (err) {
       console.error('daily', err);
       await ctx.reply('daily failed.');
     }
   });
+
+
+  bot.command(['prices', 'costs'], async (ctx) => {
+    await ctx.reply(
+      `RADIANT GOLD · PRICES\n\n` +
+        `Start bonus: ${GOLD_START}\n` +
+        `Daily claim: +${GOLD_DAILY}\n\n` +
+        `AI text / ask: ${GOLD_COST.ask}\n` +
+        `Vision / photo: ${GOLD_COST.vision}\n` +
+        `Voice: ${GOLD_COST.voice}\n` +
+        `Stride: ${GOLD_COST.stride}\n\n` +
+        `/daily · /balance · /gold\n` +
+        `— Radiant Queen`
+    );
+  });
+
+
 
 
   bot.command('admin', async (ctx) => {
