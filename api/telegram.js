@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v3.0-phase5';
+const BOT_VERSION = 'v3.0-phase6';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -1638,6 +1638,44 @@ function buildBot() {
       mainMenuKeyboard(ctx)
     );
   });
+
+
+  bot.command(['groupadmin', 'gadmin'], async (ctx) => {
+    try {
+      const chat = ctx.chat;
+      const isGroup = chat && (chat.type === 'group' || chat.type === 'supergroup');
+      const lines = [
+        'RADIANT QUEEN · GROUP ADMIN PACK',
+        isGroup ? `Chat: ${chat.title || chat.id}` : '(Best used inside a group)',
+        '',
+        'SETUP',
+        '/setwelcome <text>',
+        '/setrules <text>',
+        '/rules',
+        '/antilink on|off|status',
+        '/modcheck',
+        '/groupinfo',
+        '',
+        'MODERATION',
+        '/warn (reply) · /unwarn (reply) · /warns',
+        '/mute · /unmute (reply)',
+        '/slow <sec> · /shutup · /speak',
+        '',
+        'NOTES & FAQ',
+        '/note · /notes · /clearnote',
+        '/faqset · /faq · /faqs',
+        '/stats · /report',
+        '',
+        'Promote bot as Admin (Delete + Restrict) for full power.',
+        '— Radiant Queen · Pasiya Max',
+      ];
+      await ctx.reply(lines.join('\n').slice(0, 4000));
+    } catch (err) {
+      console.error('groupadmin', err);
+      await ctx.reply('groupadmin failed.');
+    }
+  });
+
 
   bot.command('setwelcome', async (ctx) => {
     try {
