@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v2.9-gold';
+const BOT_VERSION = 'v2.9-competitor';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -4958,6 +4958,30 @@ bot.command('commands', async (ctx) => {
     }
   });
 
+
+
+
+  bot.command('competitor', async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only.');
+        return;
+      }
+      await ctx.reply('Running Radiant Queen competitor watch (Gemini)…');
+      await ctx.sendChatAction('typing');
+      const prompt =
+        `You are a product strategist for STRIDECLUB (AI running club by Radiant Queen / Pasiya Max).\n` +
+        `Write a concise COMPETITOR POSITIONING brief (max 400 words) on Strava, Nike Run Club, Adidas Running.\n` +
+        `End with 5 free-tier feature ideas for StrideClub. Plain text. Brands: StrideClub, Radiant Queen only.`;
+      const out = await generateReply(prompt, ctx);
+      await ctx.reply(
+        (`RADIANT QUEEN · COMPETITOR WATCH\n\n` + out).slice(0, 4000)
+      );
+    } catch (err) {
+      console.error('competitor', err);
+      await ctx.reply(`competitor failed: ${String(err?.message || err).slice(0, 150)}`);
+    }
+  });
 
 
   bot.command('balance', async (ctx) => {
