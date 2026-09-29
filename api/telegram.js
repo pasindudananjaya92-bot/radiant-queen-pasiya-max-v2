@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v3.1-touch';
+const BOT_VERSION = 'v3.2-sinhala-guide';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -420,7 +420,7 @@ function numberedMainMenuText() {
   return (
     `╔══════════════════════════════╗\n` +
     `║  RADIANT QUEEN • PASIYA MAX\n` +
-    `║  STABLE v3.1 · TOUCH + TYPE\n` +
+    `║  v3.2 · TOUCH + සිංහල GUIDE\n` +
     `╚══════════════════════════════╝\n\n` +
     `WEB     radiant-queen-pasiya-max-v2.vercel.app\n` +
     `HUB     /bot/  ·  BOT  @PasiyaMaxQueen_bot\n\n` +
@@ -434,9 +434,10 @@ function numberedMainMenuText() {
     `│  7  CHANNELS & LINKS\n` +
     `│  8  CONNECTED PLATFORMS\n` +
     `│  9  STATUS & HELP\n` +
+    `│ 10  සිංහල සම්පූර්ණ GUIDE\n` +
     `└──────────────────────────────┘\n\n` +
-    `Type 1–9 · tap buttons below · or ask anything\n` +
-    `Also: /tools /balance /groupadmin /invite`
+    `Type 1–10 · tap buttons · or ask anything\n` +
+    `සිංහලෙන් සියල්ල: 10 හෝ /si`
   );
 }
 
@@ -491,6 +492,9 @@ function mainMenuKeyboard(ctx) {
       Markup.button.callback('7️⃣ Links', 'menu_links'),
       Markup.button.callback('8️⃣ Platforms', 'menu_platforms'),
       Markup.button.callback('9️⃣ Status', 'menu_status'),
+    ],
+    [
+      Markup.button.callback('🔟 සිංහල Guide', 'menu_si_home'),
     ],
     [
       Markup.button.callback('💰 Gold', 'menu_gold'),
@@ -598,6 +602,210 @@ function gadminKeyboard() {
     [Markup.button.callback('🏠 Menu', 'menu_home')],
   ]);
 }
+
+function siGuideHomeKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('🤖 AI කතා', 'si_cat_ai'),
+      Markup.button.callback('💰 Gold', 'si_cat_gold'),
+    ],
+    [
+      Markup.button.callback('⛅ කාලගුණය', 'si_cat_weather'),
+      Markup.button.callback('🧮 ගණන්/මුදල්', 'si_cat_math'),
+    ],
+    [
+      Markup.button.callback('👥 Group Admin', 'si_cat_group'),
+      Markup.button.callback('🏃 දිවීම Stride', 'si_cat_run'),
+    ],
+    [
+      Markup.button.callback('🧰 Tools', 'si_cat_tools'),
+      Markup.button.callback('📚 ඉගෙනීම', 'si_cat_learn'),
+    ],
+    [
+      Markup.button.callback('📝 මගේ ලැයිස්තු', 'si_cat_personal'),
+      Markup.button.callback('🔐 රහස් මෙවලම්', 'si_cat_crypto'),
+    ],
+    [
+      Markup.button.callback('⚙️ System', 'si_cat_system'),
+      Markup.button.callback('🤖 මගේ Bot', 'si_cat_tenant'),
+    ],
+    [
+      Markup.button.callback('🔗 Links / Invite', 'si_cat_links'),
+      Markup.button.callback('🏠 ප්‍රධාන මෙනුව', 'menu_home'),
+    ],
+  ]);
+}
+
+function siBackKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('🔙 කාණ්ඩ ලැයිස්තුව', 'menu_si_home'),
+      Markup.button.callback('🏠 ප්‍රධාන මෙනුව', 'menu_home'),
+    ],
+  ]);
+}
+
+function siGuideIntroText() {
+  return (
+    `🔟 සිංහල සම්පූර්ණ GUIDE\n\n` +
+    `මෙය බොට් එකේ හැම කොටසක්ම සරල සිංහලෙන්.\n` +
+    `පහත බොත්තම් වලින් කාණ්ඩයක් තෝරන්න.\n` +
+    `කාණ්ඩයක් තුළ විධානය කුමක්ද කියලා පැහැදිලිව තියෙනවා.\n\n` +
+    `ඉංග්‍රීසි නොදන්නත් කමක් නැහැ.\n` +
+    `බොත්තම් ඔබන්න හෝ /si ටයිප් කරන්න.`
+  );
+}
+
+const SI_CAT = {
+  system: (
+    `⚙️ SYSTEM — පද්ධතිය\n\n` +
+    `/start — බොට් එක පටන් ගන්න / මෙනුව\n` +
+    `/menu — ප්‍රධාන මෙනුව + බොත්තම්\n` +
+    `/si — මේ සිංහල GUIDE එක\n` +
+    `/help — උදව් ලැයිස්තුව\n` +
+    `/ping — බොට් ජීවමානද බලන්න\n` +
+    `/version — බොට් version එක\n` +
+    `/about — බොට් ගැන කෙටි කතාව\n` +
+    `/id — ඔබේ Telegram ID එක\n` +
+    `/status — තත්ත්වය\n` +
+    `/commands — විධාන ලැයිස්තුව`
+  ),
+  gold: (
+    `💰 GOLD — රන් ලකුණු\n\n` +
+    `මෙය AI භාවිතයට තියෙන නොමිලේ ලකුණු පද්ධතියයි.\n\n` +
+    `/balance හෝ /gold — මගේ gold කීයද\n` +
+    `/daily හෝ /claim — දවසට +50 ගන්න (දවසකට වරක්)\n` +
+    `/prices හෝ /costs — මිල ලැයිස්තුව\n\n` +
+    `මිල (සාමාන්‍ය):\n` +
+    `• AI පෙළ පිළිතුර — 5\n` +
+    `• රූප/vision — 10\n` +
+    `• හඬ/voice — 10\n` +
+    `• Stride — 5\n\n` +
+    `පටන් ගන්නාම ආසන්න වශයෙන් 400 ලැබේ.`
+  ),
+  weather: (
+    `⛅ කාලගුණය හා අහස\n\n` +
+    `/weather Colombo — නගරයේ කාලගුණය\n` +
+    `/forecast Colombo — ඉදිරි දින කාලගුණය\n` +
+    `/sun Colombo — ඉර උදාව / බැසීම\n` +
+    `/aqi Colombo — වායු තත්ත්වය (AQI)\n` +
+    `/moon — සඳ ගැන\n\n` +
+    `Colombo වෙනුවට ඔබේ නගරය දාන්න.`
+  ),
+  math: (
+    `🧮 ගණන් හා මුදල්\n\n` +
+    `/currency USD LKR — ඩොලර් → රුපියල්\n` +
+    `/calc 10*5 — ගණන් කරන්න\n` +
+    `/time — වේලාව\n` +
+    `/uuid — අහඹු ID එකක්`
+  ),
+  crypto: (
+    `🔐 රහස් / කේත මෙවලම්\n\n` +
+    `/pw — ශක්තිමත් මුරපදයක් හදන්න\n` +
+    `/b64 — Base64 කේතනය\n` +
+    `/hash — hash අගයක් හදන්න\n\n` +
+    `මේවා AI නැතිවත් වැඩ කරයි.`
+  ),
+  personal: (
+    `📝 මගේ ලැයිස්තු (පුද්ගලික)\n\n` +
+    `/todo ටෙක්ස්ට් — කළ යුතු දෙයක් දාන්න\n` +
+    `/todos — ලැයිස්තුව බලන්න\n` +
+    `/done අංකය — ඉවරයි කියලා මකන්න\n\n` +
+    `/save ටෙක්ස්ට් — සටහනක් සේව්\n` +
+    `/saves — සේව් ලැයිස්තුව\n` +
+    `/unsave අංකය — මකන්න\n\n` +
+    `/habit නම — පුරුද්දක් එකතු\n` +
+    `/habits — පුරුදු බලන්න\n` +
+    `/export — දත්ත export`
+  ),
+  run: (
+    `🏃 දිවීම / StrideClub\n\n` +
+    `/pace 5 25:00 — වේගය ගණන්\n` +
+    `/split 5:30 10 — කොටස් වේලා\n` +
+    `/convert 21.1 km — km ↔ miles\n` +
+    `/stride — StrideClub bridge\n` +
+    `/runxp — දිවීම් XP\n` +
+    `/xptop — XP ලීඩර්බෝඩ්\n` +
+    `/logrun සටහන — රන් ලොග්\n` +
+    `/streak — දින දිගටි පුරුද්ද\n` +
+    `/me — මගේ පැතිකඩ`
+  ),
+  group: (
+    `👥 GROUP ADMIN — සමූහ පාලනය\n\n` +
+    `බොට්ව group එකේ Admin කරන්න (Delete + Restrict).\n\n` +
+    `/groupadmin හෝ /gadmin — admin මෙනුව\n` +
+    `/setwelcome පෙළ — ආචාර පණිවිඩය\n` +
+    `/setrules පෙළ — නීති\n` +
+    `/rules — නීති කියවන්න\n` +
+    `/antilink on|off|status — ලින්ක් අවහිර\n` +
+    `/modcheck — බොට්ට බලතල තියෙනවද\n` +
+    `/groupinfo — සමූහ තොරතුරු\n` +
+    `/warn (reply) — අනතුරු ඇඟවීම\n` +
+    `/unwarn (reply) — warn අඩු\n` +
+    `/warns — warn ලැයිස්තුව\n` +
+    `/mute /unmute — නිහඬ / නිදහස්\n` +
+    `/slow තත් — slow mode\n` +
+    `/note /notes — සටහන්\n` +
+    `/faqset /faq — නිති ප්‍රශ්න`
+  ),
+  tools: (
+    `🧰 CREATOR TOOLS\n\n` +
+    `මෙනුවෙන් Tools බොත්තම ඔබන්න.\n` +
+    `හෝ /tools\n\n` +
+    `තියෙනවා:\n` +
+    `• Translate — පරිවර්තනය\n` +
+    `• Summarize — කෙටි කරන්න\n` +
+    `• Rewrite — නැවත ලියන්න\n` +
+    `• Caption — caption හදන්න\n` +
+    `• Hashtags — හෑෂ්ටැග්\n` +
+    `• Bio — bio ලියන්න\n` +
+    `• Ideas — අදහස්\n` +
+    `• Running tip — දිවීම් උපදෙස්\n` +
+    `• Photo caption — රූපයට caption`
+  ),
+  learn: (
+    `📚 ඉගෙනීම / AI උපකාර\n\n` +
+    `/wiki මාතෘකාව — විස්තර\n` +
+    `/web ප්‍රශ්නය — වෙබ් උපකාර\n` +
+    `/code ප්‍රශ්නය — කේත උපකාර\n` +
+    `/define වචනය — අර්ථය\n` +
+    `/tr පෙළ — පරිවර්තනය\n\n` +
+    `සාමාන්‍ය පෙළ යැවුවත් AI උත්තර දෙයි.\n` +
+    `(Gold / quota අනුව)`
+  ),
+  ai: (
+    `🤖 AI කතා කිරීම\n\n` +
+    `1) ප්‍රශ්නය සෘජුව ටයිප් කරන්න\n` +
+    `2) හෝ මෙනුවෙන් 1️⃣ AI ඔබන්න\n` +
+    `3) රූපයක් යවන්න — vision විශ්ලේෂණය\n` +
+    `4) හඬ පණිවිඩයක් — voice\n\n` +
+    `AI නැවතී නම්:\n` +
+    `/tools බලන්න — නොමිලේ මෙවලම් තවමත් වැඩ කරයි.\n\n` +
+    `Gold වියදම් වේ — /balance /prices`
+  ),
+  tenant: (
+    `🤖 මගේ Bot (Tenant)\n\n` +
+    `ඔබේම Telegram bot එකක් Radiant Queen engine එකට සම්බන්ධ කරන්න.\n\n` +
+    `/setbot ටෝකන් — bot එක සම්බන්ධ කරන්න\n` +
+    `/mybot — මගේ bot තොරතුරු\n` +
+    `/resyncbot — webhook නැවත සකසන්න\n` +
+    `/settenantwelcome පෙළ — ආචාර පණිවිඩය\n` +
+    `/tenantwelcome — දැන් තියෙන welcome\n\n` +
+    `ටෝකන් BotFather ගෙන් ගන්න.\n` +
+    `ටෝකන් public group එකක දාන්න එපා.`
+  ),
+  links: (
+    `🔗 Links හා Invite\n\n` +
+    `/links — නිල ලින්ක් ඔක්කොම\n` +
+    `/invite හෝ /share — යාළුවන්ට යවන පෙළ\n\n` +
+    `Bot: https://t.me/PasiyaMaxQueen_bot\n` +
+    `Web: https://radiant-queen-pasiya-max-v2.vercel.app\n` +
+    `Hub: https://radiant-queen-pasiya-max-v2.vercel.app/bot/\n\n` +
+    `Landing එකේත් share පෙළ තියෙනවා.`
+  ),
+};
+
+
 
 
 function strideKeyboard() {
@@ -5731,6 +5939,47 @@ bot.command('commands', async (ctx) => {
     );
   });
 
+  bot.action('menu_si_home', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply(siGuideIntroText(), siGuideHomeKeyboard());
+  });
+
+  bot.command(['si', 'sinhala', 'guide'], async (ctx) => {
+    await ctx.reply(siGuideIntroText(), siGuideHomeKeyboard());
+  });
+
+  bot.hears(/^(10|🔟)$/, async (ctx) => {
+    try {
+      await ctx.reply(siGuideIntroText(), siGuideHomeKeyboard());
+    } catch (e) {
+      console.error('si10', e);
+    }
+  });
+
+
+
+  async function replySiCat(ctx, key) {
+    await ctx.answerCbQuery();
+    const body = SI_CAT[key] || 'කාණ්ඩය හමු නොවීය.';
+    await ctx.reply(body.slice(0, 4000), siBackKeyboard());
+  }
+
+  bot.action('si_cat_system', (ctx) => replySiCat(ctx, 'system'));
+  bot.action('si_cat_gold', (ctx) => replySiCat(ctx, 'gold'));
+  bot.action('si_cat_weather', (ctx) => replySiCat(ctx, 'weather'));
+  bot.action('si_cat_math', (ctx) => replySiCat(ctx, 'math'));
+  bot.action('si_cat_crypto', (ctx) => replySiCat(ctx, 'crypto'));
+  bot.action('si_cat_personal', (ctx) => replySiCat(ctx, 'personal'));
+  bot.action('si_cat_run', (ctx) => replySiCat(ctx, 'run'));
+  bot.action('si_cat_group', (ctx) => replySiCat(ctx, 'group'));
+  bot.action('si_cat_tools', (ctx) => replySiCat(ctx, 'tools'));
+  bot.action('si_cat_learn', (ctx) => replySiCat(ctx, 'learn'));
+  bot.action('si_cat_ai', (ctx) => replySiCat(ctx, 'ai'));
+  bot.action('si_cat_tenant', (ctx) => replySiCat(ctx, 'tenant'));
+  bot.action('si_cat_links', (ctx) => replySiCat(ctx, 'links'));
+
+
+
   bot.action('tap_balance', async (ctx) => {
     await ctx.answerCbQuery();
     try {
@@ -6462,7 +6711,7 @@ bot.command('commands', async (ctx) => {
     const mode = pendingTool.get(uid);
 
     // Numbered main menu (1-9)
-    if (/^[1-9]$/.test(text) && !mode) {
+    if (/^(10|[1-9])$/.test(text) && !mode) {
       if (text === '1') {
         if (isAdmin(ctx)) {
           pendingTool.set(uid, 'owner_menu');
@@ -6519,6 +6768,10 @@ bot.command('commands', async (ctx) => {
       }
       if (text === '9') {
         await ctx.reply(statusText(ctx), mainMenuKeyboard(ctx));
+        return;
+      }
+      if (text === '10') {
+        await ctx.reply(siGuideIntroText(), siGuideHomeKeyboard());
         return;
       }
     }
