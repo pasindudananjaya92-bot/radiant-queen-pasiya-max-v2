@@ -59,7 +59,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-factory-p3-fix'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
+const BOT_VERSION = 'v4.0-factory-p3-fix2'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -665,22 +665,56 @@ async function applyTemplateWelcome(ownerId, templateId) {
   const text = TEMPLATE_WELCOMES[id];
   if (!text || !supabase) return { ok: false, error: 'no welcome preset' };
   try {
-    const { data: row } = await supabase
-      .from('rq_user_bots')
-      .select('id,bot_username')
-      .eq('owner_id', Number(ownerId))
-      .eq('is_active', true)
-      .maybeSingle();
+    // Same lookup as /mybot (getUserBot) — do NOT require is_active=true filter
+    // (column type / null / truthy mismatch was blocking welcome apply)
+    let row = null;
+    if (typeof getUserBot === 'function') {
+      row = await getUserBot(ownerId);
+    }
+    if (!row && supabase) {
+      const q = await supabase
+        .from('rq_user_bots')
+        .select('id,bot_username,is_active,owner_id')
+        .eq('owner_id', Number(ownerId))
+        .maybeSingle();
+      row = q.data || null;
+    }
+    if (!row) {
+      // fallback: string owner_id match
+      const q2 = await supabase
+        .from('rq_user_bots')
+        .select('id,bot_username,is_active,owner_id')
+        .eq('owner_id', String(ownerId))
+        .maybeSingle();
+      row = q2.data || null;
+    }
     if (!row) return { ok: false, error: 'no tenant bot — /setbot first' };
+
+    const uid = Number(ownerId);
     const { error } = await supabase
       .from('rq_user_bots')
-      .update({ welcome_text: text })
-      .eq('owner_id', Number(ownerId))
-      .eq('is_active', true);
-    if (error) return { ok: false, error: error.message };
-    return { ok: true, bot_username: row.bot_username, welcome: text };
+      .update({
+        welcome_text: text,
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('owner_id', uid);
+    if (error) {
+      // retry without updated_at if column missing
+      const r2 = await supabase
+        .from('rq_user_bots')
+        .update({ welcome_text: text, is_active: true })
+        .eq('owner_id', uid);
+      if (r2.error) return { ok: false, error: r2.error.message };
+    }
+    return {
+      ok: true,
+      bot_username: row.bot_username,
+      welcome: text,
+      owner_id: row.owner_id,
+    };
   } catch (e) {
-    return { ok: false, error: e.message };
+    return { ok: false, error: e.message || String(e) };
   }
 }
 
@@ -2138,11 +2172,20 @@ async function saveUserBot(ownerId, token, meta = {}) {
 
 async function getUserBot(ownerId) {
   if (!supabase) return null;
-  const { data } = await supabase
+  const uid = Number(ownerId);
+  let { data, error } = await supabase
     .from('rq_user_bots')
     .select('*')
-    .eq('owner_id', Number(ownerId))
+    .eq('owner_id', uid)
     .maybeSingle();
+  if (!data && !error) {
+    const q2 = await supabase
+      .from('rq_user_bots')
+      .select('*')
+      .eq('owner_id', String(ownerId))
+      .maybeSingle();
+    data = q2.data || null;
+  }
   return data || null;
 }
 
