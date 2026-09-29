@@ -56,7 +56,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v3.3-3mode-digital';
+const BOT_VERSION = 'v3.3.1-clean-fix';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -443,11 +443,13 @@ function modeButtonLabel(uid) {
 function digitalFrame(body) {
   const core = String(body || '').trim();
   return (
-    `╔════════════════════════════╗\n` +
-    `║ ⚡ RADIANT QUEEN DIGITAL ⚡\n` +
-    `║ SCREEN · v3.3 · 3-MODE UI\n` +
-    `╚════════════════════════════╝\n\n` +
-    core
+    `┏━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n` +
+    `┃ ⚡ RADIANT QUEEN DIGITAL ┃\n` +
+    `┃ ◆ SCREEN v3.3.1 · 3-MODE ◆\n` +
+    `┗━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n` +
+    core +
+    `\n\n────────────────────\n` +
+    `💎 Touch UI · Type 1-10 still works`
   );
 }
 
@@ -466,31 +468,59 @@ function buildUiMarkup(ctx, baseMarkup) {
   const uid = ctx.from?.id;
   const mode = getUiMode(uid);
   const rows = extractRows(baseMarkup);
+  // Mode cycle always visible
   rows.push([Markup.button.callback(modeButtonLabel(uid), 'ui_mode_cycle')]);
+  // Clean mode: every box gets dismiss + collapse
   if (mode === 'clean') {
     rows.push([
-      Markup.button.callback('🔼', 'ui_collapse'),
-      Markup.button.callback('❌', 'ui_dismiss'),
+      Markup.button.callback('🔼 Fold', 'ui_collapse'),
+      Markup.button.callback('❌ Close', 'ui_dismiss'),
     ]);
   }
   return Markup.inlineKeyboard(rows);
 }
 
+function setPhoneFrame(uid, messageId) {
+  if (uid && messageId) phoneAnchor.set(String(uid), Number(messageId));
+}
+
+function getPhoneFrame(uid) {
+  return phoneAnchor.get(String(uid));
+}
+
+/**
+ * Universal UI sender — ALL menu navigations must use this.
+ * Phone: edit same messageId (device screen)
+ * Clean: new message + ❌ 🔼 on every box
+ * Normal: new message, digital frame only
+ */
 async function uiReply(ctx, text, baseMarkup) {
   const uid = ctx.from?.id;
   const mode = getUiMode(uid);
   const framed = digitalFrame(text).slice(0, 4090);
-  const extra = buildUiMarkup(ctx, baseMarkup);
+  const extra = buildUiMarkup(ctx, baseMarkup || Markup.inlineKeyboard([]));
 
+  // --- PHONE MODE: must stay on one message ---
   if (mode === 'phone') {
-    if (ctx.callbackQuery?.message) {
+    // 1) Prefer editing the callback's own message (same box user tapped)
+    if (ctx.callbackQuery?.message?.message_id) {
       try {
-        await ctx.editMessageText(framed, extra);
-        phoneAnchor.set(String(uid), ctx.callbackQuery.message.message_id);
+        await ctx.telegram.editMessageText(
+          ctx.chat.id,
+          ctx.callbackQuery.message.message_id,
+          undefined,
+          framed,
+          extra
+        );
+        setPhoneFrame(uid, ctx.callbackQuery.message.message_id);
         return;
-      } catch (_) {}
+      } catch (err) {
+        // message is not modified / parse issues — try anchor
+        console.error('phone edit callback msg', err?.message || err);
+      }
     }
-    const anchorId = phoneAnchor.get(String(uid));
+    // 2) Edit stored phone frame
+    const anchorId = getPhoneFrame(uid);
     if (anchorId && ctx.chat?.id) {
       try {
         await ctx.telegram.editMessageText(
@@ -501,15 +531,22 @@ async function uiReply(ctx, text, baseMarkup) {
           extra
         );
         return;
-      } catch (_) {}
+      } catch (err) {
+        console.error('phone edit anchor', err?.message || err);
+      }
     }
+    // 3) First paint — create frame and remember id
     const sent = await ctx.reply(framed, extra);
-    if (sent?.message_id) phoneAnchor.set(String(uid), sent.message_id);
+    if (sent?.message_id) setPhoneFrame(uid, sent.message_id);
     return;
   }
 
-  await ctx.reply(framed, extra);
+  // --- CLEAN + NORMAL: new message (clean markup has ❌ 🔼) ---
+  const sent = await ctx.reply(framed, extra);
+  return sent;
 }
+
+
 
 function numberedMainMenuText() {
   return (
@@ -1952,14 +1989,11 @@ function buildBot() {
         ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
 
       if (isGroup) {
-        await ctx.reply(
-          `RADIANT QUEEN is active in this group.\n\n` +
+        await uiReply(ctx, `RADIANT QUEEN is active in this group.\n\n` +
             `• Mention @${ctx.botInfo?.username || 'PasiyaMaxQueen_bot'} + question\n` +
             `• Or reply to my messages\n` +
             `• Full tools: open a private chat with me\n\n` +
-            `/help for commands`,
-          mainMenuKeyboard(ctx)
-        );
+            `/help for commands`, mainMenuKeyboard(ctx));
         return;
       }
 
@@ -1974,7 +2008,7 @@ function buildBot() {
     } catch (err) {
       console.error('start', err);
       try {
-        await ctx.reply('Welcome. Use /help or the buttons.', mainMenuKeyboard(ctx));
+        await uiReply(ctx, 'Welcome. Use /help or the buttons.', mainMenuKeyboard(ctx));
       } catch (_) {}
     }
   });
@@ -1984,8 +2018,7 @@ function buildBot() {
   });
 
   bot.command('help', async (ctx) => {
-    await ctx.reply(
-      `Commands\n` +
+    await uiReply(ctx, `Commands\n` +
         `/start — welcome & menu\n` +
         `/menu — show main buttons\n` +
         `/ask <q> — Gemini\n` +
@@ -2001,9 +2034,7 @@ function buildBot() {
         `/usage — founder usage snapshot\n` +
         (isAdmin(ctx) ? `/admin — founder panel\n` : '') +
         `\nTools: Translate, Summarize, Rewrite, Caption, Hashtags, Bio, Ideas, Photo caption, Running tip\n` +
-        `Send a photo anytime for vision.`,
-      mainMenuKeyboard(ctx)
-    );
+        `Send a photo anytime for vision.`, mainMenuKeyboard(ctx));
   });
 
 
@@ -2036,7 +2067,7 @@ function buildBot() {
         'Promote bot as Admin (Delete + Restrict) for full power.',
         '— Radiant Queen · Pasiya Max',
       ];
-      await ctx.reply(lines.join('\n').slice(0, 4000), gadminKeyboard());
+      await uiReply(ctx, lines.join('\n').slice(0, 4000), gadminKeyboard());
     } catch (err) {
       console.error('groupadmin', err);
       await ctx.reply('groupadmin failed.');
@@ -5741,7 +5772,7 @@ bot.command('commands', async (ctx) => {
       `/wiki · /web · /code · /define · /tr\n\n` +
       `When AI is busy → use this list.\n` +
       `— Radiant Queen · Pasiya Max`;
-    await ctx.reply(msg.slice(0, 4000), toolsKeyboard());
+    await uiReply(ctx, msg.slice(0, 4000), toolsKeyboard());
   });
 
 
@@ -5788,7 +5819,7 @@ bot.command('commands', async (ctx) => {
       }
       lines.push('');
       lines.push('— Radiant Queen · Pasiya Max');
-      await ctx.reply(lines.join('\n'), goldKeyboard());
+      await uiReply(ctx, lines.join('\n'), goldKeyboard());
     } catch (err) {
       console.error('balance', err);
       await ctx.reply('balance failed.');
@@ -5866,26 +5897,23 @@ bot.command('commands', async (ctx) => {
       await ctx.reply('Admin only.');
       return;
     }
-    await ctx.reply(`Founder Admin Panel\nID: ${ctx.from.id}`, adminKeyboard());
+    await uiReply(ctx, `Founder Admin Panel\nID: ${ctx.from.id}`, adminKeyboard());
   });
 
   bot.command('id', async (ctx) => {
-    await ctx.reply(
-      `Your Telegram id: ${ctx.from.id}\nUsername: @${ctx.from.username || 'none'}\nAdmin: ${isAdmin(ctx) ? 'YES' : 'NO'}`,
-      mainMenuKeyboard(ctx)
-    );
+    await uiReply(ctx, `Your Telegram id: ${ctx.from.id}\nUsername: @${ctx.from.username || 'none'}\nAdmin: ${isAdmin(ctx) ? 'YES' : 'NO'}`, mainMenuKeyboard(ctx));
   });
 
   bot.command('status', async (ctx) => {
     try {
-      await ctx.reply(statusText(ctx), mainMenuKeyboard(ctx));
+      await uiReply(ctx, statusText(ctx), mainMenuKeyboard(ctx));
     } catch {
       await ctx.reply('Status unavailable.');
     }
   });
 
   bot.command('social', async (ctx) => {
-    await ctx.reply(LINKS, mainMenuKeyboard(ctx));
+    await uiReply(ctx, LINKS, mainMenuKeyboard(ctx));
   });
 
   bot.command('strideclub', async (ctx) => {
@@ -5904,7 +5932,7 @@ bot.command('commands', async (ctx) => {
 
     const q = (ctx.message.text || '').replace(/^\/ask(@\w+)?\s*/i, '').trim();
     if (!q) {
-      await ctx.reply('Usage: /ask your question', mainMenuKeyboard(ctx));
+      await uiReply(ctx, 'Usage: /ask your question', mainMenuKeyboard(ctx));
       return;
     }
     await ctx.sendChatAction('typing');
@@ -5973,7 +6001,7 @@ bot.command('commands', async (ctx) => {
         Markup.inlineKeyboard([
           [
             Markup.button.callback('🔽 Expand', 'ui_collapse'),
-            Markup.button.callback('❌', 'ui_dismiss'),
+            Markup.button.callback('❌ Close', 'ui_dismiss'),
           ],
           [Markup.button.callback(modeButtonLabel(ctx.from.id), 'ui_mode_cycle')],
         ])
@@ -5988,7 +6016,11 @@ bot.command('commands', async (ctx) => {
   bot.action('menu_ask', async (ctx) => {
     await ctx.answerCbQuery();
     pendingTool.delete(String(ctx.from.id));
-    await ctx.reply('AI MENU — type your question now (Sinhala or English).');
+    await uiReply(
+      ctx,
+      '🤖 AI MENU\n\nType your question now (Sinhala or English).\nPhoto = vision · Voice note = voice.',
+      mainMenuKeyboard(ctx)
+    );
   });
 
   bot.action('menu_tools', async (ctx) => {
@@ -6026,80 +6058,62 @@ bot.command('commands', async (ctx) => {
       'MOD: /warn /unwarn /mute /slow /shutup',
       'Tap buttons below or type /groupadmin',
     ];
-    await ctx.reply(lines.join('\n'), gadminKeyboard());
+    await uiReply(ctx, lines.join('\n'), gadminKeyboard());
   });
 
   bot.action('menu_edu', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply(
-      `EDUCATION LAB\n` +
+    await uiReply(ctx, `EDUCATION LAB\n` +
         `Type a topic or use:\n` +
         `/wiki <topic> · /define <word> · /tr <text>\n` +
-        `/code <question>`,
-      mainMenuKeyboard(ctx)
-    );
+        `/code <question>`, mainMenuKeyboard(ctx));
   });
 
   bot.action('menu_links', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply(
-      `RADIANT QUEEN · LINKS\n\n` +
+    await uiReply(ctx, `RADIANT QUEEN · LINKS\n\n` +
         `Bot: https://t.me/PasiyaMaxQueen_bot\n` +
         `Web: https://radiant-queen-pasiya-max-v2.vercel.app\n` +
         `Hub: https://radiant-queen-pasiya-max-v2.vercel.app/bot/\n` +
         `Stride: https://strideclub-platform-6b71a.containers.snapdeploy.app\n\n` +
-        `/invite to share`,
-      mainMenuKeyboard(ctx)
-    );
+        `/invite to share`, mainMenuKeyboard(ctx));
   });
 
   bot.action('menu_platforms', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply(
-      `CONNECTED PLATFORMS\n` +
+    await uiReply(ctx, `CONNECTED PLATFORMS\n` +
         `• Telegram main bot — live\n` +
         `• Tenant bots — /setbot /mybot\n` +
         `• StrideClub — /stride\n` +
         `• Web hub — /bot/\n` +
-        `v4 later: Discord / official WhatsApp only`,
-      mainMenuKeyboard(ctx)
-    );
+        `v4 later: Discord / official WhatsApp only`, mainMenuKeyboard(ctx));
   });
 
   bot.action('menu_invite', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply(
-      `Join RADIANT QUEEN · PASIYA MAX\n\n` +
+    await uiReply(ctx, `Join RADIANT QUEEN · PASIYA MAX\n\n` +
         `Free Telegram AI bot + group tools + Radiant Gold.\n` +
         `Start bonus 400 gold · daily +50.\n\n` +
         `Open: https://t.me/PasiyaMaxQueen_bot\n` +
         `Hub: https://radiant-queen-pasiya-max-v2.vercel.app/bot/\n\n` +
-        `Copy & share this message.`,
-      mainMenuKeyboard(ctx)
-    );
+        `Copy & share this message.`, mainMenuKeyboard(ctx));
   });
 
   bot.action('menu_freetools', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply(
-      `FREE TOOLS (work when AI quota rests)\n` +
+    await uiReply(ctx, `FREE TOOLS (work when AI quota rests)\n` +
         `/weather Colombo · /currency USD LKR · /moon\n` +
         `/calc 10*5 · /daily · /balance · /groupadmin\n` +
-        `Full list: type /tools`,
-      weatherKeyboard()
-    );
+        `Full list: type /tools`, weatherKeyboard());
   });
 
   bot.action('menu_about', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply(
-      `RADIANT QUEEN · PASIYA MAX\n` +
+    await uiReply(ctx, `RADIANT QUEEN · PASIYA MAX\n` +
         `Status: STABLE v3.1 · Touch + Type\n` +
         `Public AI + group tools + Radiant Gold\n` +
         `Bot: @PasiyaMaxQueen_bot\n` +
-        `/menu · /tools · /invite`,
-      mainMenuKeyboard(ctx)
-    );
+        `/menu · /tools · /invite`, mainMenuKeyboard(ctx));
   });
 
   bot.action('menu_si_home', async (ctx) => {
@@ -6148,16 +6162,13 @@ bot.command('commands', async (ctx) => {
     try {
       const g = await getOrCreateGold(ctx.from.id, ctx.from.username || ctx.from.first_name);
       if (!g.ok) {
-        await ctx.reply(`balance failed: ${g.error || 'db'}`, goldKeyboard());
+        await uiReply(ctx, `balance failed: ${g.error || 'db'}`, goldKeyboard());
         return;
       }
       const daily = typeof GOLD_DAILY !== 'undefined' ? GOLD_DAILY : 50;
-      await ctx.reply(
-        `RADIANT GOLD · WALLET\nBalance: ${g.gold}\nPremium: ${g.premium ? 'yes' : 'no'}\n/daily +${daily}`,
-        goldKeyboard()
-      );
+      await uiReply(ctx, `RADIANT GOLD · WALLET\nBalance: ${g.gold}\nPremium: ${g.premium ? 'yes' : 'no'}\n/daily +${daily}`, goldKeyboard());
     } catch (e) {
-      await ctx.reply('balance failed.', goldKeyboard());
+      await uiReply(ctx, 'balance failed.', goldKeyboard());
     }
   });
 
@@ -6165,17 +6176,17 @@ bot.command('commands', async (ctx) => {
     await ctx.answerCbQuery();
     try {
       if (isAdmin(ctx)) {
-        await ctx.reply('Founder — unlimited gold. No daily claim needed.', goldKeyboard());
+        await uiReply(ctx, 'Founder — unlimited gold. No daily claim needed.', goldKeyboard());
         return;
       }
       const g = await getOrCreateGold(ctx.from.id, ctx.from.username || ctx.from.first_name);
       if (!g.ok) {
-        await ctx.reply(`daily failed: ${g.error || 'db'}`, goldKeyboard());
+        await uiReply(ctx, `daily failed: ${g.error || 'db'}`, goldKeyboard());
         return;
       }
       const today = new Date().toISOString().slice(0, 10);
       if (g.last_daily === today) {
-        await ctx.reply(`Already claimed today.\nBalance: ${g.gold}`, goldKeyboard());
+        await uiReply(ctx, `Already claimed today.\nBalance: ${g.gold}`, goldKeyboard());
         return;
       }
       const add = typeof GOLD_DAILY !== 'undefined' ? GOLD_DAILY : 50;
@@ -6184,78 +6195,75 @@ bot.command('commands', async (ctx) => {
         username: ctx.from.username || ctx.from.first_name || null,
         last_daily: today,
       });
-      await ctx.reply(`DAILY CLAIM OK\n+${add}\nBalance: ${next}`, goldKeyboard());
+      await uiReply(ctx, `DAILY CLAIM OK\n+${add}\nBalance: ${next}`, goldKeyboard());
     } catch (e) {
-      await ctx.reply('daily failed.', goldKeyboard());
+      await uiReply(ctx, 'daily failed.', goldKeyboard());
     }
   });
 
   bot.action('tap_prices', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply(
-      `RADIANT GOLD · PRICES\n` +
+    await uiReply(ctx, `RADIANT GOLD · PRICES\n` +
         `Start: 400 · Daily: +50\n` +
-        `AI text: 5 · Vision: 10 · Voice: 10 · Stride: 5`,
-      goldKeyboard()
-    );
+        `AI text: 5 · Vision: 10 · Voice: 10 · Stride: 5`, goldKeyboard());
   });
 
   bot.action('tap_weather_cmb', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply('Type: /weather Colombo', weatherKeyboard());
+    await uiReply(ctx, 'Type: /weather Colombo', weatherKeyboard());
   });
 
   bot.action('tap_moon', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply('Type: /moon', weatherKeyboard());
+    await uiReply(ctx, 'Type: /moon', weatherKeyboard());
   });
 
   bot.action('tap_sun_cmb', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply('Type: /sun Colombo', weatherKeyboard());
+    await uiReply(ctx, 'Type: /sun Colombo', weatherKeyboard());
   });
 
   bot.action('tap_aqi_cmb', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply('Type: /aqi Colombo', weatherKeyboard());
+    await uiReply(ctx, 'Type: /aqi Colombo', weatherKeyboard());
   });
 
   bot.action('tap_currency', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply('Type: /currency USD LKR', weatherKeyboard());
+    await uiReply(ctx, 'Type: /currency USD LKR', weatherKeyboard());
   });
 
   bot.action('tap_modcheck', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply('Type in group: /modcheck', gadminKeyboard());
+    await uiReply(ctx, 'Type in group: /modcheck', gadminKeyboard());
   });
 
   bot.action('tap_rules', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply('Type: /rules  · set: /setrules <text>', gadminKeyboard());
+    await uiReply(ctx, 'Type: /rules  · set: /setrules <text>', gadminKeyboard());
   });
 
   bot.action('tap_antilink_status', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply('Type: /antilink status', gadminKeyboard());
+    await uiReply(ctx, 'Type: /antilink status', gadminKeyboard());
   });
 
   bot.action('tap_groupinfo', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply('Type in group: /groupinfo', gadminKeyboard());
+    await uiReply(ctx, 'Type in group: /groupinfo', gadminKeyboard());
   });
 
 
 
   bot.action('menu_social', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply(LINKS, mainMenuKeyboard(ctx));
+    await uiReply(ctx, LINKS, mainMenuKeyboard(ctx));
   });
 
   bot.action('menu_status', async (ctx) => {
     try {
       await ctx.answerCbQuery();
-      await ctx.reply(statusText(ctx), mainMenuKeyboard(ctx));
+      await uiReply(ctx, statusText(ctx), mainMenuKeyboard(ctx));
     } catch {
       try {
         await ctx.answerCbQuery('Error');
@@ -6289,76 +6297,61 @@ bot.command('commands', async (ctx) => {
 
   bot.action('menu_help', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply(
-      `GROUP HELP\n` +
+    await uiReply(ctx, `GROUP HELP\n` +
         `• In groups: mention @${ctx.botInfo?.username || 'PasiyaMaxQueen_bot'} + question\n` +
         `• Or reply to my messages\n` +
         `• Full tools work best in private chat\n` +
-        `• /menu — open this menu again`,
-      mainMenuKeyboard(ctx)
-    );
+        `• /menu — open this menu again`, mainMenuKeyboard(ctx));
   });
 
   bot.action('menu_id', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply(
-      `ID: ${ctx.from.id}\nAdmin: ${isAdmin(ctx) ? 'YES' : 'NO'}`,
-      mainMenuKeyboard(ctx)
-    );
+    await uiReply(ctx, `ID: ${ctx.from.id}\nAdmin: ${isAdmin(ctx) ? 'YES' : 'NO'}`, mainMenuKeyboard(ctx));
   });
 
   bot.action('menu_admin', async (ctx) => {
     if (!(await requireAdmin(ctx))) return;
     await ctx.answerCbQuery();
-    await ctx.reply(`Founder Admin Panel\nID: ${ctx.from.id}`, adminKeyboard());
+    await uiReply(ctx, `Founder Admin Panel\nID: ${ctx.from.id}`, adminKeyboard());
   });
 
   // admin
   bot.action('admin_health', async (ctx) => {
     if (!(await requireAdmin(ctx))) return;
     await ctx.answerCbQuery();
-    await ctx.reply(
-      `Health\nToken: ${BOT_TOKEN ? 'set' : 'MISSING'}\nGemini: ${GEMINI_KEY ? 'set' : 'MISSING'}\nGitHub: ${GITHUB_TOKEN ? 'set' : 'no'}\nSupabase: ${supabase ? 'set' : 'MISSING'}\nUptime: ${uptimeText()}\nPending modes: ${pendingTool.size}`,
-      adminKeyboard()
-    );
+    await uiReply(ctx, `Health\nToken: ${BOT_TOKEN ? 'set' : 'MISSING'}\nGemini: ${GEMINI_KEY ? 'set' : 'MISSING'}\nGitHub: ${GITHUB_TOKEN ? 'set' : 'no'}\nSupabase: ${supabase ? 'set' : 'MISSING'}\nUptime: ${uptimeText()}\nPending modes: ${pendingTool.size}`, adminKeyboard());
   });
 
   bot.action('admin_whoami', async (ctx) => {
     if (!(await requireAdmin(ctx))) return;
     await ctx.answerCbQuery();
-    await ctx.reply(
-      `Founder\nName: ${ctx.from.first_name || ''} ${ctx.from.last_name || ''}\n@${ctx.from.username || 'none'}\nID: ${ctx.from.id}\nADMIN match: YES`,
-      adminKeyboard()
-    );
+    await uiReply(ctx, `Founder\nName: ${ctx.from.first_name || ''} ${ctx.from.last_name || ''}\n@${ctx.from.username || 'none'}\nID: ${ctx.from.id}\nADMIN match: YES`, adminKeyboard());
   });
 
   bot.action('admin_clear', async (ctx) => {
     if (!(await requireAdmin(ctx))) return;
     await ctx.answerCbQuery();
     pendingTool.clear();
-    await ctx.reply('Cleared in-memory tool modes on this instance.', adminKeyboard());
+    await uiReply(ctx, 'Cleared in-memory tool modes on this instance.', adminKeyboard());
   });
 
   bot.action('admin_model', async (ctx) => {
     if (!(await requireAdmin(ctx))) return;
     await ctx.answerCbQuery();
-    await ctx.reply(
-      `Model\nLast: ${resolvedModel || 'none'}\nCandidates:\n${MODELS.map((m) => `- ${m}`).join('\n')}`,
-      adminKeyboard()
-    );
+    await uiReply(ctx, `Model\nLast: ${resolvedModel || 'none'}\nCandidates:\n${MODELS.map((m) => `- ${m}`).join('\n')}`, adminKeyboard());
   });
 
   bot.action('admin_links', async (ctx) => {
     if (!(await requireAdmin(ctx))) return;
     await ctx.answerCbQuery();
-    await ctx.reply(LINKS, adminKeyboard());
+    await uiReply(ctx, LINKS, adminKeyboard());
   });
 
   bot.action('admin_github', async (ctx) => {
     if (!(await requireAdmin(ctx))) return;
     await ctx.answerCbQuery();
     await ctx.sendChatAction('typing');
-    await ctx.reply(await fetchGitHubStatus(), adminKeyboard());
+    await uiReply(ctx, await fetchGitHubStatus(), adminKeyboard());
   });
 
   // tools
@@ -6396,7 +6389,7 @@ bot.command('commands', async (ctx) => {
       'Give one practical running tip for today (max 6 lines). Sri Lankan amateur runner context OK.',
       ctx
     );
-    await ctx.reply(tip, toolsKeyboard());
+    await uiReply(ctx, tip, toolsKeyboard());
   });
 
   bot.action(/^verify_join:(.+):(\d+)$/, async (ctx) => {
@@ -6885,7 +6878,7 @@ bot.command('commands', async (ctx) => {
         return;
       }
       if (text === '2') {
-        await ctx.reply(LINKS, mainMenuKeyboard(ctx));
+        await uiReply(ctx, LINKS, mainMenuKeyboard(ctx));
         return;
       }
       if (text === '3') {
@@ -6921,7 +6914,7 @@ bot.command('commands', async (ctx) => {
         return;
       }
       if (text === '7') {
-        await ctx.reply(LINKS, mainMenuKeyboard(ctx));
+        await uiReply(ctx, LINKS, mainMenuKeyboard(ctx));
         return;
       }
       if (text === '8') {
@@ -6930,7 +6923,7 @@ bot.command('commands', async (ctx) => {
         return;
       }
       if (text === '9') {
-        await ctx.reply(statusText(ctx), mainMenuKeyboard(ctx));
+        await uiReply(ctx, statusText(ctx), mainMenuKeyboard(ctx));
         return;
       }
       if (text === '10') {
@@ -7022,7 +7015,7 @@ bot.command('commands', async (ctx) => {
         }
         await ctx.sendChatAction('typing');
         const out = await generateReply(prompt, ctx);
-        await ctx.reply(out, mainMenuKeyboard(ctx));
+        await uiReply(ctx, out, mainMenuKeyboard(ctx));
       } catch (err) {
         console.error('edu_lab', err);
         await ctx.reply('Education Lab failed. Try again in a moment.');
