@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v3.0-stable';
+const BOT_VERSION = 'v3.1-touch';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -420,11 +420,10 @@ function numberedMainMenuText() {
   return (
     `╔══════════════════════════════╗\n` +
     `║  RADIANT QUEEN • PASIYA MAX\n` +
-    `║  VERSION 2.2 | GEMINI AI\n` +
+    `║  STABLE v3.1 · TOUCH + TYPE\n` +
     `╚══════════════════════════════╝\n\n` +
     `WEB     radiant-queen-pasiya-max-v2.vercel.app\n` +
-    `STRIDE  strideclub-platform-6b71a.containers.snapdeploy.app\n` +
-    `BOT     @PasiyaMaxQueen_bot\n\n` +
+    `HUB     /bot/  ·  BOT  @PasiyaMaxQueen_bot\n\n` +
     `┌─ MAIN (Reply Number) ────────┐\n` +
     `│  1  OWNER / FOUNDER\n` +
     `│  2  SOCIAL HUB\n` +
@@ -436,8 +435,8 @@ function numberedMainMenuText() {
     `│  8  CONNECTED PLATFORMS\n` +
     `│  9  STATUS & HELP\n` +
     `└──────────────────────────────┘\n\n` +
-    `Type 1–9 • buttons work too • or ask anything\n` +
-    `Group Admin Lab needs bot ADMIN rights.`
+    `Type 1–9 · tap buttons below · or ask anything\n` +
+    `Also: /tools /balance /groupadmin /invite`
   );
 }
 
@@ -479,21 +478,37 @@ function platformsKeyboard() {
 function mainMenuKeyboard(ctx) {
   const rows = [
     [
-      Markup.button.callback('Ask AI', 'menu_ask'),
-      Markup.button.callback('Tools', 'menu_tools'),
+      Markup.button.callback('1️⃣ AI', 'menu_ask'),
+      Markup.button.callback('2️⃣ Social', 'menu_social'),
+      Markup.button.callback('3️⃣ Tools', 'menu_tools'),
     ],
     [
-      Markup.button.callback('StrideClub', 'menu_stride_panel'),
-      Markup.button.callback('Social', 'menu_social'),
+      Markup.button.callback('4️⃣ Group', 'menu_gadmin'),
+      Markup.button.callback('5️⃣ Creator', 'menu_tools'),
+      Markup.button.callback('6️⃣ Learn', 'menu_edu'),
     ],
     [
-      Markup.button.callback('Status', 'menu_status'),
+      Markup.button.callback('7️⃣ Links', 'menu_links'),
+      Markup.button.callback('8️⃣ Platforms', 'menu_platforms'),
+      Markup.button.callback('9️⃣ Status', 'menu_status'),
+    ],
+    [
+      Markup.button.callback('💰 Gold', 'menu_gold'),
+      Markup.button.callback('🌦️ Weather', 'menu_weather'),
+      Markup.button.callback('🏃 Stride', 'menu_stride_panel'),
+    ],
+    [
+      Markup.button.callback('🎁 Invite', 'menu_invite'),
+      Markup.button.callback('📋 Free tools', 'menu_freetools'),
+      Markup.button.callback('ℹ️ About', 'menu_about'),
+    ],
+    [
       Markup.button.callback('Help', 'menu_help'),
+      Markup.button.callback('My ID', 'menu_id'),
     ],
-    [Markup.button.callback('My ID', 'menu_id')],
   ];
   if (isAdmin(ctx)) {
-    rows.push([Markup.button.callback('Admin Panel', 'menu_admin')]);
+    rows.push([Markup.button.callback('👑 Admin Panel', 'menu_admin')]);
   }
   return Markup.inlineKeyboard(rows);
 }
@@ -532,9 +547,58 @@ function toolsKeyboard() {
     [
       Markup.button.callback('Photo caption', 'tool_photo_caption'),
     ],
-    [Markup.button.callback('Back to menu', 'menu_home')],
+    [
+      Markup.button.callback('💰 Gold', 'menu_gold'),
+      Markup.button.callback('🌦️ Weather', 'menu_weather'),
+    ],
+    [Markup.button.callback('🏠 Main menu', 'menu_home')],
   ]);
 }
+
+function goldKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('💰 Balance', 'tap_balance'),
+      Markup.button.callback('🎁 Daily', 'tap_daily'),
+    ],
+    [
+      Markup.button.callback('💲 Prices', 'tap_prices'),
+      Markup.button.callback('🏠 Menu', 'menu_home'),
+    ],
+  ]);
+}
+
+function weatherKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('Colombo weather', 'tap_weather_cmb'),
+      Markup.button.callback('Moon', 'tap_moon'),
+    ],
+    [
+      Markup.button.callback('Sun Colombo', 'tap_sun_cmb'),
+      Markup.button.callback('AQI Colombo', 'tap_aqi_cmb'),
+    ],
+    [
+      Markup.button.callback('USD→LKR', 'tap_currency'),
+      Markup.button.callback('🏠 Menu', 'menu_home'),
+    ],
+  ]);
+}
+
+function gadminKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('Modcheck', 'tap_modcheck'),
+      Markup.button.callback('Rules', 'tap_rules'),
+    ],
+    [
+      Markup.button.callback('Anti-link status', 'tap_antilink_status'),
+      Markup.button.callback('Group info', 'tap_groupinfo'),
+    ],
+    [Markup.button.callback('🏠 Menu', 'menu_home')],
+  ]);
+}
+
 
 function strideKeyboard() {
   return Markup.inlineKeyboard([
@@ -1669,7 +1733,7 @@ function buildBot() {
         'Promote bot as Admin (Delete + Restrict) for full power.',
         '— Radiant Queen · Pasiya Max',
       ];
-      await ctx.reply(lines.join('\n').slice(0, 4000));
+      await ctx.reply(lines.join('\n').slice(0, 4000), gadminKeyboard());
     } catch (err) {
       console.error('groupadmin', err);
       await ctx.reply('groupadmin failed.');
@@ -5374,7 +5438,7 @@ bot.command('commands', async (ctx) => {
       `/wiki · /web · /code · /define · /tr\n\n` +
       `When AI is busy → use this list.\n` +
       `— Radiant Queen · Pasiya Max`;
-    await ctx.reply(msg.slice(0, 4000));
+    await ctx.reply(msg.slice(0, 4000), toolsKeyboard());
   });
 
 
@@ -5421,7 +5485,7 @@ bot.command('commands', async (ctx) => {
       }
       lines.push('');
       lines.push('— Radiant Queen · Pasiya Max');
-      await ctx.reply(lines.join('\n'));
+      await ctx.reply(lines.join('\n'), goldKeyboard());
     } catch (err) {
       console.error('balance', err);
       await ctx.reply('balance failed.');
@@ -5560,6 +5624,216 @@ bot.command('commands', async (ctx) => {
     await ctx.answerCbQuery();
     await ctx.reply('TOOLS MENU', toolsKeyboard());
   });
+
+  bot.action('menu_gold', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply(
+      `RADIANT GOLD\n` +
+        `Tap a button or type /balance /daily /prices`,
+      goldKeyboard()
+    );
+  });
+
+  bot.action('menu_weather', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply(
+      `WEATHER & UTILS\n` +
+        `Tap a city shortcut or type /weather <city>`,
+      weatherKeyboard()
+    );
+  });
+
+  bot.action('menu_gadmin', async (ctx) => {
+    await ctx.answerCbQuery();
+    const chat = ctx.chat;
+    const isGroup = chat && (chat.type === 'group' || chat.type === 'supergroup');
+    const lines = [
+      'RADIANT QUEEN · GROUP ADMIN PACK',
+      isGroup ? `Chat: ${chat.title || chat.id}` : '(Best used inside a group)',
+      '',
+      'SETUP: /setwelcome /setrules /rules /antilink /modcheck /groupinfo',
+      'MOD: /warn /unwarn /mute /slow /shutup',
+      'Tap buttons below or type /groupadmin',
+    ];
+    await ctx.reply(lines.join('\n'), gadminKeyboard());
+  });
+
+  bot.action('menu_edu', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply(
+      `EDUCATION LAB\n` +
+        `Type a topic or use:\n` +
+        `/wiki <topic> · /define <word> · /tr <text>\n` +
+        `/code <question>`,
+      mainMenuKeyboard(ctx)
+    );
+  });
+
+  bot.action('menu_links', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply(
+      `RADIANT QUEEN · LINKS\n\n` +
+        `Bot: https://t.me/PasiyaMaxQueen_bot\n` +
+        `Web: https://radiant-queen-pasiya-max-v2.vercel.app\n` +
+        `Hub: https://radiant-queen-pasiya-max-v2.vercel.app/bot/\n` +
+        `Stride: https://strideclub-platform-6b71a.containers.snapdeploy.app\n\n` +
+        `/invite to share`,
+      mainMenuKeyboard(ctx)
+    );
+  });
+
+  bot.action('menu_platforms', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply(
+      `CONNECTED PLATFORMS\n` +
+        `• Telegram main bot — live\n` +
+        `• Tenant bots — /setbot /mybot\n` +
+        `• StrideClub — /stride\n` +
+        `• Web hub — /bot/\n` +
+        `v4 later: Discord / official WhatsApp only`,
+      mainMenuKeyboard(ctx)
+    );
+  });
+
+  bot.action('menu_invite', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply(
+      `Join RADIANT QUEEN · PASIYA MAX\n\n` +
+        `Free Telegram AI bot + group tools + Radiant Gold.\n` +
+        `Start bonus 400 gold · daily +50.\n\n` +
+        `Open: https://t.me/PasiyaMaxQueen_bot\n` +
+        `Hub: https://radiant-queen-pasiya-max-v2.vercel.app/bot/\n\n` +
+        `Copy & share this message.`,
+      mainMenuKeyboard(ctx)
+    );
+  });
+
+  bot.action('menu_freetools', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply(
+      `FREE TOOLS (work when AI quota rests)\n` +
+        `/weather Colombo · /currency USD LKR · /moon\n` +
+        `/calc 10*5 · /daily · /balance · /groupadmin\n` +
+        `Full list: type /tools`,
+      weatherKeyboard()
+    );
+  });
+
+  bot.action('menu_about', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply(
+      `RADIANT QUEEN · PASIYA MAX\n` +
+        `Status: STABLE v3.1 · Touch + Type\n` +
+        `Public AI + group tools + Radiant Gold\n` +
+        `Bot: @PasiyaMaxQueen_bot\n` +
+        `/menu · /tools · /invite`,
+      mainMenuKeyboard(ctx)
+    );
+  });
+
+  bot.action('tap_balance', async (ctx) => {
+    await ctx.answerCbQuery();
+    try {
+      const g = await getOrCreateGold(ctx.from.id, ctx.from.username || ctx.from.first_name);
+      if (!g.ok) {
+        await ctx.reply(`balance failed: ${g.error || 'db'}`, goldKeyboard());
+        return;
+      }
+      const daily = typeof GOLD_DAILY !== 'undefined' ? GOLD_DAILY : 50;
+      await ctx.reply(
+        `RADIANT GOLD · WALLET\nBalance: ${g.gold}\nPremium: ${g.premium ? 'yes' : 'no'}\n/daily +${daily}`,
+        goldKeyboard()
+      );
+    } catch (e) {
+      await ctx.reply('balance failed.', goldKeyboard());
+    }
+  });
+
+  bot.action('tap_daily', async (ctx) => {
+    await ctx.answerCbQuery();
+    try {
+      if (isAdmin(ctx)) {
+        await ctx.reply('Founder — unlimited gold. No daily claim needed.', goldKeyboard());
+        return;
+      }
+      const g = await getOrCreateGold(ctx.from.id, ctx.from.username || ctx.from.first_name);
+      if (!g.ok) {
+        await ctx.reply(`daily failed: ${g.error || 'db'}`, goldKeyboard());
+        return;
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      if (g.last_daily === today) {
+        await ctx.reply(`Already claimed today.\nBalance: ${g.gold}`, goldKeyboard());
+        return;
+      }
+      const add = typeof GOLD_DAILY !== 'undefined' ? GOLD_DAILY : 50;
+      const next = g.gold + add;
+      await setGold(ctx.from.id, next, {
+        username: ctx.from.username || ctx.from.first_name || null,
+        last_daily: today,
+      });
+      await ctx.reply(`DAILY CLAIM OK\n+${add}\nBalance: ${next}`, goldKeyboard());
+    } catch (e) {
+      await ctx.reply('daily failed.', goldKeyboard());
+    }
+  });
+
+  bot.action('tap_prices', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply(
+      `RADIANT GOLD · PRICES\n` +
+        `Start: 400 · Daily: +50\n` +
+        `AI text: 5 · Vision: 10 · Voice: 10 · Stride: 5`,
+      goldKeyboard()
+    );
+  });
+
+  bot.action('tap_weather_cmb', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply('Type: /weather Colombo', weatherKeyboard());
+  });
+
+  bot.action('tap_moon', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply('Type: /moon', weatherKeyboard());
+  });
+
+  bot.action('tap_sun_cmb', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply('Type: /sun Colombo', weatherKeyboard());
+  });
+
+  bot.action('tap_aqi_cmb', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply('Type: /aqi Colombo', weatherKeyboard());
+  });
+
+  bot.action('tap_currency', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply('Type: /currency USD LKR', weatherKeyboard());
+  });
+
+  bot.action('tap_modcheck', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply('Type in group: /modcheck', gadminKeyboard());
+  });
+
+  bot.action('tap_rules', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply('Type: /rules  · set: /setrules <text>', gadminKeyboard());
+  });
+
+  bot.action('tap_antilink_status', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply('Type: /antilink status', gadminKeyboard());
+  });
+
+  bot.action('tap_groupinfo', async (ctx) => {
+    await ctx.answerCbQuery();
+    await ctx.reply('Type in group: /groupinfo', gadminKeyboard());
+  });
+
+
 
   bot.action('menu_social', async (ctx) => {
     await ctx.answerCbQuery();
