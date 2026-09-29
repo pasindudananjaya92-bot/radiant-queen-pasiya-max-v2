@@ -44,6 +44,10 @@ const pendingGhPath = new Map(); // admin userId -> repo path
 const groupSettings = new Map(); // groupId -> settings
 const slowLastMsg = new Map(); // `${chatId}:${userId}` -> timestamp ms
 const rateMap = new Map(); // memory fallback for rate limit
+const uiModeMap = new Map(); // userId -> normal | phone | clean
+const phoneAnchor = new Map(); // userId -> message_id
+const collapseStore = new Map(); // chatId:messageId -> snapshot
+
 const RATE_WINDOW_MS = 60 * 1000; // 1 minute
 const RATE_MAX_HITS = 8; // max AI calls per user per window
 
@@ -52,7 +56,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v3.2-sinhala-guide';
+const BOT_VERSION = 'v3.3-3mode-digital';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -416,11 +420,102 @@ function identityLine(ctx) {
   return `The user is ${name}. Be helpful. Do not call them the founder.`;
 }
 
+
+function getUiMode(uid) {
+  return uiModeMap.get(String(uid)) || 'normal';
+}
+
+function cycleUiMode(uid) {
+  const order = ['normal', 'phone', 'clean'];
+  const cur = getUiMode(uid);
+  const next = order[(order.indexOf(cur) + 1) % order.length];
+  uiModeMap.set(String(uid), next);
+  return next;
+}
+
+function modeButtonLabel(uid) {
+  const m = getUiMode(uid);
+  if (m === 'phone') return '🔘 Mode: 📱 Phone';
+  if (m === 'clean') return '🔘 Mode: 🧹 Clean';
+  return '🔘 Mode: 📜 Normal';
+}
+
+function digitalFrame(body) {
+  const core = String(body || '').trim();
+  return (
+    `╔════════════════════════════╗\n` +
+    `║ ⚡ RADIANT QUEEN DIGITAL ⚡\n` +
+    `║ SCREEN · v3.3 · 3-MODE UI\n` +
+    `╚════════════════════════════╝\n\n` +
+    core
+  );
+}
+
+function extractRows(markup) {
+  if (!markup) return [];
+  if (markup.reply_markup?.inline_keyboard) {
+    return markup.reply_markup.inline_keyboard.map((r) => r.slice());
+  }
+  if (markup.inline_keyboard) {
+    return markup.inline_keyboard.map((r) => r.slice());
+  }
+  return [];
+}
+
+function buildUiMarkup(ctx, baseMarkup) {
+  const uid = ctx.from?.id;
+  const mode = getUiMode(uid);
+  const rows = extractRows(baseMarkup);
+  rows.push([Markup.button.callback(modeButtonLabel(uid), 'ui_mode_cycle')]);
+  if (mode === 'clean') {
+    rows.push([
+      Markup.button.callback('🔼', 'ui_collapse'),
+      Markup.button.callback('❌', 'ui_dismiss'),
+    ]);
+  }
+  return Markup.inlineKeyboard(rows);
+}
+
+async function uiReply(ctx, text, baseMarkup) {
+  const uid = ctx.from?.id;
+  const mode = getUiMode(uid);
+  const framed = digitalFrame(text).slice(0, 4090);
+  const extra = buildUiMarkup(ctx, baseMarkup);
+
+  if (mode === 'phone') {
+    if (ctx.callbackQuery?.message) {
+      try {
+        await ctx.editMessageText(framed, extra);
+        phoneAnchor.set(String(uid), ctx.callbackQuery.message.message_id);
+        return;
+      } catch (_) {}
+    }
+    const anchorId = phoneAnchor.get(String(uid));
+    if (anchorId && ctx.chat?.id) {
+      try {
+        await ctx.telegram.editMessageText(
+          ctx.chat.id,
+          anchorId,
+          undefined,
+          framed,
+          extra
+        );
+        return;
+      } catch (_) {}
+    }
+    const sent = await ctx.reply(framed, extra);
+    if (sent?.message_id) phoneAnchor.set(String(uid), sent.message_id);
+    return;
+  }
+
+  await ctx.reply(framed, extra);
+}
+
 function numberedMainMenuText() {
   return (
     `╔══════════════════════════════╗\n` +
     `║  RADIANT QUEEN • PASIYA MAX\n` +
-    `║  v3.2 · TOUCH + සිංහල GUIDE\n` +
+    `║  v3.3 · 3-MODE DIGITAL\n` +
     `╚══════════════════════════════╝\n\n` +
     `WEB     radiant-queen-pasiya-max-v2.vercel.app\n` +
     `HUB     /bot/  ·  BOT  @PasiyaMaxQueen_bot\n\n` +
@@ -436,7 +531,7 @@ function numberedMainMenuText() {
     `│  9  STATUS & HELP\n` +
     `│ 10  සිංහල සම්පූර්ණ GUIDE\n` +
     `└──────────────────────────────┘\n\n` +
-    `Type 1–10 · tap buttons · or ask anything\n` +
+    `Type 1–10 · tap · Mode button: 📱 / 🧹 / 📜\n` +
     `සිංහලෙන් සියල්ල: 10 හෝ /si`
   );
 }
@@ -1871,9 +1966,9 @@ function buildBot() {
       const who = isAdmin(ctx)
         ? 'Ayubowan Nirmathru Pasiya Max'
         : `Hello ${ctx.from?.first_name || 'there'}`;
-      await ctx.reply(
-        `${who}\n\n` +
-          numberedMainMenuText(),
+      await uiReply(
+        ctx,
+        `${who}\n\n` + numberedMainMenuText(),
         mainMenuKeyboard(ctx)
       );
     } catch (err) {
@@ -1885,7 +1980,7 @@ function buildBot() {
   });
 
   bot.command('menu', async (ctx) => {
-    await ctx.reply(numberedMainMenuText(), mainMenuKeyboard(ctx));
+    await uiReply(ctx, numberedMainMenuText(), mainMenuKeyboard(ctx));
   });
 
   bot.command('help', async (ctx) => {
@@ -5819,8 +5914,76 @@ bot.command('commands', async (ctx) => {
   // menus
   bot.action('menu_home', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply(numberedMainMenuText(), mainMenuKeyboard(ctx));
+    await uiReply(ctx, numberedMainMenuText(), mainMenuKeyboard(ctx));
   });
+
+  bot.action('ui_mode_cycle', async (ctx) => {
+    try {
+      const next = cycleUiMode(ctx.from.id);
+      const labels = {
+        normal: '📜 Normal — messages go downward (classic)',
+        phone: '📱 Phone — one digital frame, edits in place',
+        clean: '🧹 Clean — ❌ delete · 🔼 fold each box',
+      };
+      await ctx.answerCbQuery('Mode: ' + next);
+      if (next !== 'phone') phoneAnchor.delete(String(ctx.from.id));
+      await uiReply(
+        ctx,
+        'Mode switched\n\n' + labels[next] + '\n\nTap Mode button again to cycle.\n/menu to continue.',
+        mainMenuKeyboard(ctx)
+      );
+    } catch (e) {
+      console.error('ui_mode_cycle', e);
+      try { await ctx.answerCbQuery('Mode error'); } catch (_) {}
+    }
+  });
+
+  bot.action('ui_dismiss', async (ctx) => {
+    try {
+      await ctx.answerCbQuery('Removed');
+      await ctx.deleteMessage();
+    } catch (e) {
+      try { await ctx.answerCbQuery('Cannot delete'); } catch (_) {}
+    }
+  });
+
+  bot.action('ui_collapse', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const msg = ctx.callbackQuery?.message;
+      if (!msg) return;
+      const key = msg.chat.id + ':' + msg.message_id;
+      const prev = collapseStore.get(key);
+      if (prev && prev.collapsed) {
+        await ctx.editMessageText(
+          String(prev.fullText).slice(0, 4090),
+          prev.markup || buildUiMarkup(ctx, mainMenuKeyboard(ctx))
+        );
+        collapseStore.set(key, Object.assign({}, prev, { collapsed: false }));
+        return;
+      }
+      const fullText = msg.text || digitalFrame('…');
+      const markup = { reply_markup: msg.reply_markup };
+      collapseStore.set(key, { fullText: fullText, markup: markup, collapsed: true });
+      const header =
+        fullText.split('\n').slice(0, 4).join('\n') +
+        '\n\n… folded · tap 🔽 to expand';
+      await ctx.editMessageText(
+        header.slice(0, 4090),
+        Markup.inlineKeyboard([
+          [
+            Markup.button.callback('🔽 Expand', 'ui_collapse'),
+            Markup.button.callback('❌', 'ui_dismiss'),
+          ],
+          [Markup.button.callback(modeButtonLabel(ctx.from.id), 'ui_mode_cycle')],
+        ])
+      );
+    } catch (e) {
+      console.error('ui_collapse', e);
+    }
+  });
+
+
 
   bot.action('menu_ask', async (ctx) => {
     await ctx.answerCbQuery();
@@ -5830,23 +5993,23 @@ bot.command('commands', async (ctx) => {
 
   bot.action('menu_tools', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply('TOOLS MENU', toolsKeyboard());
+    await uiReply(ctx, 'TOOLS MENU', toolsKeyboard());
   });
 
   bot.action('menu_gold', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply(
-      `RADIANT GOLD\n` +
-        `Tap a button or type /balance /daily /prices`,
+    await uiReply(
+      ctx,
+      `RADIANT GOLD\nTap a button or type /balance /daily /prices`,
       goldKeyboard()
     );
   });
 
   bot.action('menu_weather', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply(
-      `WEATHER & UTILS\n` +
-        `Tap a city shortcut or type /weather <city>`,
+    await uiReply(
+      ctx,
+      `WEATHER & UTILS\nTap a city shortcut or type /weather <city>`,
       weatherKeyboard()
     );
   });
@@ -5941,16 +6104,16 @@ bot.command('commands', async (ctx) => {
 
   bot.action('menu_si_home', async (ctx) => {
     await ctx.answerCbQuery();
-    await ctx.reply(siGuideIntroText(), siGuideHomeKeyboard());
+    await uiReply(ctx, siGuideIntroText(), siGuideHomeKeyboard());
   });
 
   bot.command(['si', 'sinhala', 'guide'], async (ctx) => {
-    await ctx.reply(siGuideIntroText(), siGuideHomeKeyboard());
+    await uiReply(ctx, siGuideIntroText(), siGuideHomeKeyboard());
   });
 
   bot.hears(/^(10|🔟)$/, async (ctx) => {
     try {
-      await ctx.reply(siGuideIntroText(), siGuideHomeKeyboard());
+      await uiReply(ctx, siGuideIntroText(), siGuideHomeKeyboard());
     } catch (e) {
       console.error('si10', e);
     }
@@ -5961,7 +6124,7 @@ bot.command('commands', async (ctx) => {
   async function replySiCat(ctx, key) {
     await ctx.answerCbQuery();
     const body = SI_CAT[key] || 'කාණ්ඩය හමු නොවීය.';
-    await ctx.reply(body.slice(0, 4000), siBackKeyboard());
+    await uiReply(ctx, body.slice(0, 4000), siBackKeyboard());
   }
 
   bot.action('si_cat_system', (ctx) => replySiCat(ctx, 'system'));
@@ -6746,7 +6909,7 @@ bot.command('commands', async (ctx) => {
         return;
       }
       if (text === '5') {
-        await ctx.reply('TOOLS MENU', toolsKeyboard());
+        await uiReply(ctx, 'TOOLS MENU', toolsKeyboard());
         return;
       }
       if (text === '6') {
@@ -6771,7 +6934,7 @@ bot.command('commands', async (ctx) => {
         return;
       }
       if (text === '10') {
-        await ctx.reply(siGuideIntroText(), siGuideHomeKeyboard());
+        await uiReply(ctx, siGuideIntroText(), siGuideHomeKeyboard());
         return;
       }
     }
@@ -6779,14 +6942,14 @@ bot.command('commands', async (ctx) => {
     // Handle submenu navigation back / 0
     if (text === '0' || text.toLowerCase() === 'back') {
       pendingTool.delete(uid);
-      await ctx.reply(numberedMainMenuText(), mainMenuKeyboard(ctx));
+      await uiReply(ctx, numberedMainMenuText(), mainMenuKeyboard(ctx));
       return;
     }
 
     if (mode === 'platforms_lab') {
       if (text === '0') {
         pendingTool.delete(uid);
-        await ctx.reply(numberedMainMenuText(), mainMenuKeyboard(ctx));
+        await uiReply(ctx, numberedMainMenuText(), mainMenuKeyboard(ctx));
         return;
       }
       if (text === '1') {
@@ -6824,7 +6987,7 @@ bot.command('commands', async (ctx) => {
     if (mode === 'edu_lab') {
       if (text === '0') {
         pendingTool.delete(uid);
-        await ctx.reply(numberedMainMenuText(), mainMenuKeyboard(ctx));
+        await uiReply(ctx, numberedMainMenuText(), mainMenuKeyboard(ctx));
         return;
       }
 
@@ -6870,7 +7033,7 @@ bot.command('commands', async (ctx) => {
     if (mode === 'group_lab') {
       if (text === '0') {
         pendingTool.delete(uid);
-        await ctx.reply(numberedMainMenuText(), mainMenuKeyboard(ctx));
+        await uiReply(ctx, numberedMainMenuText(), mainMenuKeyboard(ctx));
         return;
       }
 
