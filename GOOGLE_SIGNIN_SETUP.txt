@@ -1,0 +1,10 @@
+GOOGLE SIGN-IN SETUP (required once)
+
+1) Open Firebase Console → project strideclub-auth-platform
+2) Authentication → Sign-in method → Google → Enable → Save
+3) Authentication → Settings → Authorized domains → Add domain:
+   radiant-queen-pasiya-max-v2.vercel.app
+4) Redeploy / hard refresh https://radiant-queen-pasiya-max-v2.vercel.app/bot/
+5) Click "Sign in with Google" on the page
+
+If error "unauthorized-domain" → step 3 not done yet.
