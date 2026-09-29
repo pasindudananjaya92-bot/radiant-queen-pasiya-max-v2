@@ -59,7 +59,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-factory-p6'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
+const BOT_VERSION = 'v4.0-factory-p7'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -849,7 +849,7 @@ function marketKeyboard() {
 function marketText(st) {
   const lines = [
     '⚡ RADIANT QUEEN · MARKETPLACE',
-    'Phase 5 · Template packs',
+    'Phase 7 · Marketplace + share links',
     '',
     'Pick a pack → Apply. Then open your tenant bot /start.',
     '',
@@ -1029,10 +1029,11 @@ function rowsOf3(buttons) {
 }
 
 function digitalFrame(body) {
-  // v3.7 - no box-drawing chars (Telegram vertical-line artifact)
+  // Digital OS header — always follows BOT_VERSION (no stale v3.7 label)
   const core = sanitizeUiText(String(body || '').trim());
+  const ver = typeof BOT_VERSION !== 'undefined' ? BOT_VERSION : 'v4.0';
   return (
-    `⚡ RADIANT QUEEN OS v3.7
+    `⚡ RADIANT QUEEN OS ${ver}
 ` +
     `👑 FULL POWER · DIGITAL · 3-MODE
 ` +
@@ -1178,11 +1179,11 @@ async function sendMenuSmart(ctx, text, baseMarkup) {
 
 
 function numberedMainMenuText() {
-  // v3.7 clean digital menu - no |   box chars
+  const ver = typeof BOT_VERSION !== 'undefined' ? BOT_VERSION : 'v4.0';
   return (
     `⚡ RADIANT QUEEN · PASIYA MAX
 ` +
-    `OS v3.7 · DIGITAL · TOUCH + TYPE
+    `OS ${ver} · DIGITAL · TOUCH + TYPE
 
 ` +
     `WEB  radiant-queen-pasiya-max-v2.vercel.app
@@ -1213,7 +1214,7 @@ function numberedMainMenuText() {
     `10 Sinhala Full Guide
 
 ` +
-    `Tip: Mode button cycles Phone / Clean / Normal`
+    `Tip: Mode button cycles Phone / Clean / Normal · /market · /invitepack`
   );
 }
 
@@ -3211,7 +3212,7 @@ function buildBot() {
       const templates = await listFactoryTemplates();
       const st = await getOwnerFactoryState(ctx.from.id);
       const lines = [
-        'BOT FACTORY · Phase 6',
+        'BOT FACTORY · Phase 7',
         'Brand: RADIANT QUEEN · PASIYA MAX',
         '',
         'Your pack: ' + (st.template_id || 'none'),
@@ -3487,6 +3488,42 @@ function buildBot() {
       await ctx.reply('invitemarket failed: ' + (e.message || e));
     }
   });
+
+  bot.command(['sharelinks', 'publiclinks', 'deeplinks'], async (ctx) => {
+    try {
+      const lines = [
+        '⚡ RADIANT QUEEN · PUBLIC SHARE LINKS',
+        'Version: ' + (typeof BOT_VERSION !== 'undefined' ? BOT_VERSION : ''),
+        '',
+        'Marketplace:',
+        marketStartLink(),
+        '',
+        'Pack deep links:',
+        'club   ' + packStartLink('club'),
+        'shop   ' + packStartLink('shop'),
+        'school ' + packStartLink('school'),
+        'gold   ' + packStartLink('gold'),
+        '',
+        'Web hub: ' + (typeof WEB_HUB !== 'undefined' ? WEB_HUB : 'https://radiant-queen-pasiya-max-v2.vercel.app') + '/bot/',
+        'Studio:  ' + (typeof WEB_HUB !== 'undefined' ? WEB_HUB : 'https://radiant-queen-pasiya-max-v2.vercel.app') + '/bot/studio.html',
+        '',
+        'Commands: /invitepack club · /invitemarket · /market',
+      ];
+      await ctx.reply(lines.join('\n'), {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🏪 Open market', url: marketStartLink() }],
+            [{ text: '🏃 Share club pack', callback_data: 'mkt_share_club' }],
+            [{ text: '🔗 Share market', callback_data: 'mkt_share_market' }],
+          ],
+        },
+      });
+    } catch (e) {
+      await ctx.reply('sharelinks failed: ' + (e.message || e));
+    }
+  });
+
+
 
 
 
