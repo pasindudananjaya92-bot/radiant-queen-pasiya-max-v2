@@ -59,7 +59,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v3.7-digital-os'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
+const BOT_VERSION = 'v4.0-factory-p1'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -466,6 +466,83 @@ async function setBotSetting(key, value) {
     return { ok: false, error: e.message, memory: true };
   }
 }
+
+async function listFactoryTemplates() {
+  if (!supabase) {
+    return [
+      { id: 'club', name: 'Running Club', description: 'Stride + group + gold' },
+      { id: 'shop', name: 'Shop Helper', description: 'AI + links + contact' },
+      { id: 'school', name: 'School / Class', description: 'FAQ + rules + welcome' },
+      { id: 'gold', name: 'Gold Economy', description: 'Balance daily prices' },
+    ];
+  }
+  try {
+    const { data, error } = await supabase
+      .from('rq_factory_templates')
+      .select('id,name,description,pack,features')
+      .eq('is_public', true)
+      .order('id');
+    if (error || !data?.length) {
+      return [
+        { id: 'club', name: 'Running Club', description: 'Stride + group + gold' },
+        { id: 'shop', name: 'Shop Helper', description: 'AI + links + contact' },
+        { id: 'school', name: 'School / Class', description: 'FAQ + rules + welcome' },
+        { id: 'gold', name: 'Gold Economy', description: 'Balance daily prices' },
+      ];
+    }
+    return data;
+  } catch (_) {
+    return [
+      { id: 'club', name: 'Running Club', description: 'Stride + group + gold' },
+      { id: 'shop', name: 'Shop Helper', description: 'AI + links + contact' },
+      { id: 'school', name: 'School / Class', description: 'FAQ + rules + welcome' },
+      { id: 'gold', name: 'Gold Economy', description: 'Balance daily prices' },
+    ];
+  }
+}
+
+async function getTenantFlags(ownerId, botUsername) {
+  const oid = Number(ownerId);
+  const un = String(botUsername || '');
+  if (!supabase) {
+    return { version_channel: 'stable', flags: {}, template_id: null };
+  }
+  try {
+    const { data } = await supabase
+      .from('rq_tenant_flags')
+      .select('version_channel,flags,template_id')
+      .eq('owner_id', oid)
+      .eq('bot_username', un)
+      .maybeSingle();
+    if (!data) return { version_channel: 'stable', flags: {}, template_id: null };
+    return {
+      version_channel: data.version_channel || 'stable',
+      flags: data.flags || {},
+      template_id: data.template_id || null,
+    };
+  } catch (_) {
+    return { version_channel: 'stable', flags: {}, template_id: null };
+  }
+}
+
+async function setTenantTemplate(ownerId, botUsername, templateId, channel) {
+  if (!supabase) return { ok: false, error: 'no supabase' };
+  try {
+    const { error } = await supabase.from('rq_tenant_flags').upsert({
+      owner_id: Number(ownerId),
+      bot_username: String(botUsername || ''),
+      template_id: templateId || null,
+      version_channel: channel || 'stable',
+      updated_at: new Date().toISOString(),
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+
 
 function trackGroupUser(ctx) {
   try {
@@ -2675,6 +2752,51 @@ function buildBot() {
       } catch (_) {}
     }
     await ctx.reply('Purge attempted. Deleted ~' + deleted);
+  });
+
+
+  
+  // ===== v4.0 Bot Factory Phase 1 =====
+  bot.command(['factory', 'studio', 'templates'], async (ctx) => {
+    try {
+      const templates = await listFactoryTemplates();
+      const lines = [
+        '⚡ BOT FACTORY · Phase 1',
+        'Brand: RADIANT QUEEN · PASIYA MAX',
+        '',
+        'Create flow:',
+        '1) @BotFather → /newbot → token',
+        '2) /setbot <token>',
+        '3) /mybot · /settenantwelcome',
+        '',
+        'Templates:',
+      ];
+      for (const t of templates) {
+        lines.push('• ' + t.id + ' — ' + (t.name || '') + (t.description ? ' · ' + t.description : ''));
+      }
+      lines.push('');
+      lines.push('Founder: /factoryset <template_id>');
+      lines.push('Studio: https://radiant-queen-pasiya-max-v2.vercel.app/bot/studio.html');
+      lines.push('UI stays v3.7 digital · channel default stable');
+      await uiReply(ctx, lines.join('\\n'), mainMenuKeyboard(ctx));
+    } catch (e) {
+      await ctx.reply('factory failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['factoryset'], async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const id = (ctx.message?.text || '').trim().split(/\\s+/)[1];
+    if (!id) {
+      await ctx.reply('Usage: /factoryset club|shop|school|gold');
+      return;
+    }
+    const r = await setTenantTemplate(ctx.from.id, '', id, 'stable');
+    await ctx.reply(
+      r.ok
+        ? 'Factory template set for founder: ' + id + ' (channel stable)'
+        : 'factoryset failed: ' + (r.error || 'db') + '\\nRun SQL_V4_PHASE1.sql in Supabase first.'
+    );
   });
 
 
