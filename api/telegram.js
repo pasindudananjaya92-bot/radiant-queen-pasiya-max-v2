@@ -59,7 +59,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-factory-p7'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
+const BOT_VERSION = 'v4.0-stable'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -849,7 +849,7 @@ function marketKeyboard() {
 function marketText(st) {
   const lines = [
     '⚡ RADIANT QUEEN · MARKETPLACE',
-    'Phase 7 · Marketplace + share links',
+    'STABLE v4.0 · Marketplace + share links',
     '',
     'Pick a pack → Apply. Then open your tenant bot /start.',
     '',
@@ -3212,7 +3212,7 @@ function buildBot() {
       const templates = await listFactoryTemplates();
       const st = await getOwnerFactoryState(ctx.from.id);
       const lines = [
-        'BOT FACTORY · Phase 7',
+        'BOT FACTORY · STABLE v4.0',
         'Brand: RADIANT QUEEN · PASIYA MAX',
         '',
         'Your pack: ' + (st.template_id || 'none'),
@@ -6643,7 +6643,7 @@ bot.command('commands', async (ctx) => {
     await ctx.reply(
       `RADIANT QUEEN · PASIYA MAX\n` +
         `Public AI + group tools + Radiant Gold\n` +
-        `Status: STABLE v3.0 — public release\n\n` +
+        `Status: STABLE v4.0 — Bot Factory locked — Bot Factory + Marketplace locked release\n\n` +
         `Version: ${typeof BOT_VERSION !== 'undefined' ? BOT_VERSION : 'v3.0'}\n` +
         `Bot: @PasiyaMaxQueen_bot\n` +
         `Web: https://radiant-queen-pasiya-max-v2.vercel.app\n` +
