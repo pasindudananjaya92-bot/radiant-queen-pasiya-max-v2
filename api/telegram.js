@@ -59,7 +59,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-factory-p4'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
+const BOT_VERSION = 'v4.0-factory-p5'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -790,6 +790,91 @@ async function getTenantToken(ownerId) {
   const row = typeof getUserBot === 'function' ? await getUserBot(ownerId) : null;
   return row?.bot_token || null;
 }
+
+const MARKET_PACKS = [
+  {
+    id: 'club',
+    emoji: '🏃',
+    title: 'Running Club',
+    blurb: 'AI coach + group tools + Stride + gold. Best for run clubs.',
+    flags: 'ai · group · gold · stride',
+  },
+  {
+    id: 'shop',
+    emoji: '🛒',
+    title: 'Shop Helper',
+    blurb: 'Customer Q&A style AI + gold. Light group tools off by default pack.',
+    flags: 'ai · gold',
+  },
+  {
+    id: 'school',
+    emoji: '📚',
+    title: 'Class / FAQ',
+    blurb: 'Lessons & FAQ answers. Good for study groups.',
+    flags: 'ai · gold',
+  },
+  {
+    id: 'gold',
+    emoji: '💰',
+    title: 'Gold Economy',
+    blurb: 'Focus on Radiant Gold habits on main bot. Tenant AI on.',
+    flags: 'ai · gold',
+  },
+];
+
+function marketKeyboard() {
+  const rows = [];
+  for (const p of MARKET_PACKS) {
+    rows.push([
+      {
+        text: `${p.emoji} ${p.title}`,
+        callback_data: `mkt_info_${p.id}`,
+      },
+      {
+        text: '✅ Apply',
+        callback_data: `mkt_apply_${p.id}`,
+      },
+    ]);
+  }
+  rows.push([
+    { text: '📊 My status', callback_data: 'mkt_status' },
+    { text: '🏠 Menu', callback_data: 'mkt_menu' },
+  ]);
+  return { inline_keyboard: rows };
+}
+
+function marketText(st) {
+  const lines = [
+    '⚡ RADIANT QUEEN · MARKETPLACE',
+    'Phase 5 · Template packs',
+    '',
+    'Pick a pack → Apply. Then open your tenant bot /start.',
+    '',
+  ];
+  for (const p of MARKET_PACKS) {
+    const mark = st && st.template_id === p.id ? ' ← active' : '';
+    lines.push(`${p.emoji} ${p.title}${mark}`);
+    lines.push(`   ${p.blurb}`);
+    lines.push(`   Flags: ${p.flags}`);
+    lines.push('');
+  }
+  lines.push('Or type: /factoryapply club|shop|school|gold');
+  lines.push('Studio: /factory · web /bot/studio.html');
+  return lines.join('\n');
+}
+
+function packDetailText(id) {
+  const p = MARKET_PACKS.find((x) => x.id === id);
+  if (!p) return 'Unknown pack.';
+  return (
+    `${p.emoji} ${p.title}\n\n` +
+    `${p.blurb}\n\n` +
+    `Flags: ${p.flags}\n` +
+    `Apply: tap ✅ Apply or /factoryapply ${p.id}\n` +
+    `Then: /factorywelcome · tenant /start`
+  );
+}
+
 
 
 
@@ -3027,7 +3112,7 @@ function buildBot() {
       const templates = await listFactoryTemplates();
       const st = await getOwnerFactoryState(ctx.from.id);
       const lines = [
-        'BOT FACTORY · Phase 4',
+        'BOT FACTORY · Phase 5',
         'Brand: RADIANT QUEEN · PASIYA MAX',
         '',
         'Your pack: ' + (st.template_id || 'none'),
@@ -3051,6 +3136,7 @@ function buildBot() {
       lines.push('/factorychannel stable|beta — founder');
         lines.push('/factorywelcome — pack welcome → tenant');
         lines.push('/factorystatus · /factorybeta (beta)');
+        lines.push('/market — template marketplace');
       lines.push('Studio: https://radiant-queen-pasiya-max-v2.vercel.app/bot/studio.html');
       await uiReply(ctx, lines.join('\n'), mainMenuKeyboard(ctx));
     } catch (e) {
@@ -3240,6 +3326,100 @@ function buildBot() {
       await ctx.reply('factorypacks failed: ' + (e.message || e));
     }
   });
+
+  bot.command(['market', 'factorymarket', 'marketplace'], async (ctx) => {
+    try {
+      const st = await getOwnerFactoryState(ctx.from.id);
+      await uiReply(ctx, marketText(st), marketKeyboard());
+    } catch (e) {
+      await ctx.reply('market failed: ' + (e.message || e));
+    }
+  });
+
+  bot.action(/^mkt_info_(club|shop|school|gold)$/, async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const id = (ctx.match && ctx.match[1]) || '';
+      await ctx.reply(packDetailText(id), {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '✅ Apply ' + id, callback_data: 'mkt_apply_' + id }],
+            [{ text: '🏪 Marketplace', callback_data: 'mkt_home' }],
+          ],
+        },
+      });
+    } catch (e) {
+      try { await ctx.answerCbQuery('error'); } catch (_) {}
+    }
+  });
+
+  bot.action(/^mkt_apply_(club|shop|school|gold)$/, async (ctx) => {
+    try {
+      await ctx.answerCbQuery('Applying…');
+      const id = (ctx.match && ctx.match[1]) || '';
+      const r = await applyFactoryToOwner(ctx.from.id, id);
+      if (!r.ok) {
+        await ctx.reply('Apply failed: ' + (r.error || 'error'));
+        return;
+      }
+      await ctx.reply(
+        '✅ Pack applied from Marketplace\n' +
+          'Template: ' + r.template_id + (r.name ? ' (' + r.name + ')' : '') + '\n' +
+          'Tenant: ' + r.bot_username + '\n' +
+          'Channel: ' + r.version_channel + '\n' +
+          'Flags: ' + JSON.stringify(r.flags) + '\n' +
+          'Welcome: ' + (r.welcome_applied ? 'yes' : 'no') +
+          ' · commands: ' + (r.commands_set ? 'yes' : 'no') + '\n\n' +
+          'Open tenant bot → /start · /menu'
+      );
+    } catch (e) {
+      try {
+        await ctx.reply('Apply failed: ' + (e.message || e));
+      } catch (_) {}
+    }
+  });
+
+  bot.action('mkt_status', async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const st = await getOwnerFactoryState(ctx.from.id);
+      let botU = '';
+      try {
+        const row = await getUserBot(ctx.from.id);
+        botU = row?.bot_username || '';
+      } catch (_) {}
+      await ctx.reply(
+        'Marketplace · My status\n' +
+          'Tenant: ' + (botU ? '@' + botU : '(none — /setbot)') + '\n' +
+          'Pack: ' + (st.template_id || 'none') + '\n' +
+          'Channel: ' + (st.version_channel || 'stable') + '\n' +
+          'Flags: ' + JSON.stringify(st.flags || {})
+      );
+    } catch (e) {
+      try { await ctx.answerCbQuery('error'); } catch (_) {}
+    }
+  });
+
+  bot.action(['mkt_home', 'mkt_menu'], async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      if (ctx.callbackQuery?.data === 'mkt_menu') {
+        // open main menu text if possible
+        try {
+          await ctx.reply('Main menu: /menu');
+        } catch (_) {}
+        return;
+      }
+      const st = await getOwnerFactoryState(ctx.from.id);
+      await ctx.reply(marketText(st), { reply_markup: marketKeyboard() });
+    } catch (e) {
+      try { await ctx.answerCbQuery('error'); } catch (_) {}
+    }
+  });
+
+
+
+
 
   bot.command(['factorylist'], async (ctx) => {
     try {
