@@ -59,7 +59,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v3.5-full-group-power';
+const BOT_VERSION = 'v3.6-super-fix';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -546,13 +546,17 @@ function modeButtonLabel(uid) {
 function digitalFrame(body) {
   const core = String(body || '').trim();
   return (
-    `╔══ ⚡ RADIANT QUEEN OS v3.5 ⚡ ══╗\n` +
-    `║ 👑 FULL GROUP POWER · DIGITAL  ║\n` +
-    `║ 💎 3-MODE · TOUCH · සිංහල     ║\n` +
-    `╚══════════════════════════════╝\n\n` +
+    `⚡ RADIANT QUEEN OS v3.6
+` +
+    `👑 FULL POWER · DIGITAL · 3-MODE
+` +
+    `────────────────────────
+` +
     core +
-    `\n\n────────────────────────\n` +
-    `📡 Mode · 🔟 Guide · 4️⃣ Group tools`
+    `
+────────────────────────
+` +
+    `Mode button · 🔟 Guide · /contact`
   );
 }
 
@@ -649,6 +653,42 @@ async function uiReply(ctx, text, baseMarkup) {
   return sent;
 }
 
+async function sendMenuSmart(ctx, text, baseMarkup) {
+  const framed = digitalFrame(text).slice(0, 1024); // photo caption limit
+  const extra = buildUiMarkup(ctx, baseMarkup || mainMenuKeyboard(ctx));
+  const isGroup = ctx.chat && (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup');
+  const mode = getUiMode(ctx.from?.id);
+
+  // Groups (or when banner set): prefer photo + caption + buttons together
+  let bannerId = null;
+  try {
+    bannerId = await getBotSetting('banner_file_id');
+  } catch (_) {}
+
+  // Phone mode private: keep edit path via uiReply (text only)
+  if (mode === 'phone' && !isGroup) {
+    await uiReply(ctx, text, baseMarkup || mainMenuKeyboard(ctx));
+    return;
+  }
+
+  if (bannerId) {
+    try {
+      await ctx.replyWithPhoto(bannerId, {
+        caption: framed,
+        ...extra,
+      });
+      return;
+    } catch (e) {
+      console.error('sendMenuSmart photo', e?.message || e);
+    }
+  }
+
+  // Fallback text
+  await uiReply(ctx, text, baseMarkup || mainMenuKeyboard(ctx));
+}
+
+
+
 
 
 function numberedMainMenuText() {
@@ -729,25 +769,33 @@ function mainMenuKeyboard(ctx) {
       Markup.button.callback('9️⃣ Status', 'menu_status'),
     ],
     [
-      Markup.button.callback('🔟 සිංහල Guide', 'menu_si_home'),
-    ],
-    [
+      Markup.button.callback('🔟 Guide', 'menu_si_home'),
       Markup.button.callback('💰 Gold', 'menu_gold'),
       Markup.button.callback('🌦️ Weather', 'menu_weather'),
+    ],
+    [
       Markup.button.callback('🏃 Stride', 'menu_stride_panel'),
-    ],
-    [
       Markup.button.callback('🎁 Invite', 'menu_invite'),
-      Markup.button.callback('📋 Free tools', 'menu_freetools'),
-      Markup.button.callback('ℹ️ About', 'menu_about'),
+      Markup.button.callback('📋 Tools map', 'menu_freetools'),
     ],
     [
-      Markup.button.callback('Help', 'menu_help'),
-      Markup.button.callback('My ID', 'menu_id'),
+      Markup.button.callback('ℹ️ About', 'menu_about'),
+      Markup.button.callback('❓ Help', 'menu_help'),
+      Markup.button.callback('🆔 My ID', 'menu_id'),
     ],
   ];
   if (isAdmin(ctx)) {
-    rows.push([Markup.button.callback('👑 Admin Panel', 'menu_admin')]);
+    rows.push([
+      Markup.button.callback('👑 Admin', 'menu_admin'),
+      Markup.button.callback('📞 Contact', 'tap_contact'),
+      Markup.button.callback('📊 Info', 'tap_groupinfo'),
+    ]);
+  } else {
+    rows.push([
+      Markup.button.callback('📞 Contact', 'tap_contact'),
+      Markup.button.callback('📊 Info', 'tap_groupinfo'),
+      Markup.button.callback('🔗 Links', 'menu_links'),
+    ]);
   }
   return Markup.inlineKeyboard(rows);
 }
@@ -2107,18 +2155,21 @@ function buildBot() {
         ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup';
 
       if (isGroup) {
-        await uiReply(ctx, `RADIANT QUEEN is active in this group.\n\n` +
-            `• Mention @${ctx.botInfo?.username || 'PasiyaMaxQueen_bot'} + question\n` +
-            `• Or reply to my messages\n` +
-            `• Full tools: open a private chat with me\n\n` +
-            `/help for commands`, mainMenuKeyboard(ctx));
+        await sendMenuSmart(
+          ctx,
+          `RADIANT QUEEN is active in this group.
+
+` +
+            numberedMainMenuText(),
+          mainMenuKeyboard(ctx)
+        );
         return;
       }
 
       const who = isAdmin(ctx)
         ? 'Ayubowan Nirmathru Pasiya Max'
         : `Hello ${ctx.from?.first_name || 'there'}`;
-      await uiReply(
+      await sendMenuSmart(
         ctx,
         `${who}\n\n` + numberedMainMenuText(),
         mainMenuKeyboard(ctx)
@@ -2132,7 +2183,7 @@ function buildBot() {
   });
 
   bot.command('menu', async (ctx) => {
-    await uiReply(ctx, numberedMainMenuText(), mainMenuKeyboard(ctx));
+    await sendMenuSmart(ctx, numberedMainMenuText(), mainMenuKeyboard(ctx));
   });
 
   bot.command('help', async (ctx) => {
@@ -2493,14 +2544,17 @@ function buildBot() {
   bot.command(['admins', 'tagadmins'], async (ctx) => {
     try {
       const admins = await ctx.telegram.getChatAdministrators(ctx.chat.id);
-      const lines = ['👑 GROUP ADMINS', ''];
+      const title = ctx.chat?.title || 'Group';
+      const lines = ['👑 ADMINS - ' + title, ''];
       for (const a of admins) {
         const u = a.user;
         const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || 'Admin';
-        const mention = u.username ? '@' + u.username : '[' + name + '](tg://user?id=' + u.id + ')';
-        lines.push('• ' + mention + (a.status === 'creator' ? ' (owner)' : ''));
+        const uname = u.username ? ' @' + u.username : '';
+        const role = a.status === 'creator' ? ' (owner)' : '';
+        lines.push('• ' + name + uname + role);
+        lines.push('  id: ' + u.id);
       }
-      await ctx.reply(lines.join('\n'), { parse_mode: 'Markdown', disable_web_page_preview: true });
+      await ctx.reply(lines.join('\n'));
     } catch (e) {
       await ctx.reply('admins failed: ' + (e.message || e));
     }
@@ -6505,7 +6559,7 @@ bot.command('commands', async (ctx) => {
   // menus
   bot.action('menu_home', async (ctx) => {
     await ctx.answerCbQuery();
-    await uiReply(ctx, numberedMainMenuText(), mainMenuKeyboard(ctx));
+    await sendMenuSmart(ctx, numberedMainMenuText(), mainMenuKeyboard(ctx));
   });
 
   bot.action('ui_mode_cycle', async (ctx) => {
