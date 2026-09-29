@@ -59,7 +59,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-factory-p1'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
+const BOT_VERSION = 'v4.0-factory-p2'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -525,22 +525,124 @@ async function getTenantFlags(ownerId, botUsername) {
   }
 }
 
-async function setTenantTemplate(ownerId, botUsername, templateId, channel) {
+async function setTenantTemplate(ownerId, botUsername, templateId, channel, flags) {
   if (!supabase) return { ok: false, error: 'no supabase' };
   try {
-    const { error } = await supabase.from('rq_tenant_flags').upsert({
+    const row = {
       owner_id: Number(ownerId),
       bot_username: String(botUsername || ''),
       template_id: templateId || null,
       version_channel: channel || 'stable',
       updated_at: new Date().toISOString(),
-    });
+    };
+    if (flags && typeof flags === 'object') row.flags = flags;
+    const { error } = await supabase.from('rq_tenant_flags').upsert(row);
     if (error) return { ok: false, error: error.message };
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e.message };
   }
 }
+
+const DEFAULT_TEMPLATE_FLAGS = {
+  club: { group: true, gold: true, stride: true, ai: true },
+  shop: { group: false, gold: true, stride: false, ai: true },
+  school: { group: true, gold: false, stride: false, ai: true },
+  gold: { group: false, gold: true, stride: false, ai: true },
+};
+
+async function getTemplateFeatures(templateId) {
+  const id = String(templateId || '').toLowerCase();
+  if (!id) return null;
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from('rq_factory_templates')
+        .select('id,name,features')
+        .eq('id', id)
+        .maybeSingle();
+      if (data?.features) {
+        return {
+          id: data.id,
+          name: data.name,
+          flags: typeof data.features === 'object' ? data.features : DEFAULT_TEMPLATE_FLAGS[id] || {},
+        };
+      }
+    } catch (_) {}
+  }
+  if (DEFAULT_TEMPLATE_FLAGS[id]) {
+    return { id, name: id, flags: DEFAULT_TEMPLATE_FLAGS[id] };
+  }
+  return null;
+}
+
+async function applyFactoryToOwner(ownerId, templateId, channel) {
+  const tpl = await getTemplateFeatures(templateId);
+  if (!tpl) return { ok: false, error: 'unknown template (use club|shop|school|gold)' };
+  let botUsername = '';
+  try {
+    if (typeof getUserBot === 'function') {
+      const row = await getUserBot(ownerId);
+      if (row?.bot_username) botUsername = row.bot_username;
+    }
+  } catch (_) {}
+  const ch = channel || 'stable';
+  const r = await setTenantTemplate(ownerId, botUsername, tpl.id, ch, tpl.flags);
+  if (!r.ok) return r;
+  // also store under empty username key for founder main bot profile
+  if (botUsername) {
+    await setTenantTemplate(ownerId, '', tpl.id, ch, tpl.flags);
+  }
+  return {
+    ok: true,
+    template_id: tpl.id,
+    name: tpl.name,
+    flags: tpl.flags,
+    bot_username: botUsername || '(main / no tenant yet)',
+    version_channel: ch,
+  };
+}
+
+function flagOn(flags, key) {
+  if (!flags || typeof flags !== 'object') return true; // default open if no flags set
+  if (Object.keys(flags).length === 0) return true;
+  if (flags[key] === false) return false;
+  return flags[key] !== false;
+}
+
+async function getOwnerFactoryState(ownerId) {
+  let st = await getTenantFlags(ownerId, '');
+  try {
+    if (typeof getUserBot === 'function') {
+      const row = await getUserBot(ownerId);
+      if (row?.bot_username) {
+        const st2 = await getTenantFlags(ownerId, row.bot_username);
+        if (st2?.template_id) st = st2;
+      }
+    }
+  } catch (_) {}
+  return st;
+}
+
+async function requireFeature(ctx, featureKey, label) {
+  try {
+    const st = await getOwnerFactoryState(ctx.from.id);
+    // Main Radiant Queen bot (founder) always full power
+    if (typeof isAdmin === 'function' && isAdmin(ctx)) return true;
+    if (flagOn(st.flags, featureKey)) return true;
+    await ctx.reply(
+      'Feature off for your pack: ' +
+        (label || featureKey) +
+        '\nTemplate: ' +
+        (st.template_id || 'none') +
+        '\nUse /factoryapply club|shop|school|gold'
+    );
+    return false;
+  } catch (_) {
+    return true;
+  }
+}
+
 
 
 
@@ -2401,6 +2503,7 @@ function buildBot() {
   });
 
   bot.command(['kick'], async (ctx) => {
+    if (!(await requireFeature(ctx, 'group', 'Group pack'))) return;
     if (!(await requireAdmin(ctx))) return;
     if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
       await ctx.reply('Use in a group.');
@@ -2421,6 +2524,7 @@ function buildBot() {
   });
 
   bot.command(['ban'], async (ctx) => {
+    if (!(await requireFeature(ctx, 'group', 'Group pack'))) return;
     if (!(await requireAdmin(ctx))) return;
     const target = await resolveTargetUser(ctx);
     if (!target?.id) {
@@ -2756,18 +2860,25 @@ function buildBot() {
 
 
   
-  // ===== v4.0 Bot Factory Phase 1 =====
+  
+  // ===== v4.0 Bot Factory Phase 2 =====
   bot.command(['factory', 'studio', 'templates'], async (ctx) => {
     try {
       const templates = await listFactoryTemplates();
+      const st = await getOwnerFactoryState(ctx.from.id);
       const lines = [
-        '⚡ BOT FACTORY · Phase 1',
+        'BOT FACTORY · Phase 2',
         'Brand: RADIANT QUEEN · PASIYA MAX',
+        '',
+        'Your pack: ' + (st.template_id || 'none'),
+        'Channel: ' + (st.version_channel || 'stable'),
+        'Flags: ' + JSON.stringify(st.flags || {}),
         '',
         'Create flow:',
         '1) @BotFather → /newbot → token',
         '2) /setbot <token>',
-        '3) /mybot · /settenantwelcome',
+        '3) /factoryapply club|shop|school|gold',
+        '4) /mybot · /settenantwelcome',
         '',
         'Templates:',
       ];
@@ -2775,33 +2886,97 @@ function buildBot() {
         lines.push('• ' + t.id + ' — ' + (t.name || '') + (t.description ? ' · ' + t.description : ''));
       }
       lines.push('');
-      lines.push('Founder: /factoryset <template_id>');
+      lines.push('/factoryapply <id> — apply flags to your tenant');
+      lines.push('/factoryflags — show flags');
+      lines.push('/factorychannel stable|beta — founder');
       lines.push('Studio: https://radiant-queen-pasiya-max-v2.vercel.app/bot/studio.html');
-      lines.push('UI stays v3.7 digital · channel default stable');
-      await uiReply(ctx, lines.join('\\n'), mainMenuKeyboard(ctx));
+      await uiReply(ctx, lines.join('\n'), mainMenuKeyboard(ctx));
     } catch (e) {
       await ctx.reply('factory failed: ' + (e.message || e));
     }
   });
 
-  bot.command(['factoryset'], async (ctx) => {
+  bot.command(['factoryset', 'factoryapply'], async (ctx) => {
+    try {
+      const raw = (ctx.message?.text || '')
+        .replace(/^\/(factoryset|factoryapply)(@\w+)?\s*/i, '')
+        .trim()
+        .toLowerCase();
+      const id = (raw.split(/\s+/)[0] || '').trim();
+      if (!id) {
+        await ctx.reply('Usage: /factoryapply club|shop|school|gold');
+        return;
+      }
+      // Anyone can apply pack to their own tenant; founder also ok
+      const r = await applyFactoryToOwner(ctx.from.id, id, 'stable');
+      if (!r.ok) {
+        await ctx.reply('factoryapply failed: ' + (r.error || 'error'));
+        return;
+      }
+      await ctx.reply(
+        'Pack applied\n' +
+          'Template: ' + r.template_id + (r.name ? ' (' + r.name + ')' : '') + '\n' +
+          'Tenant: ' + r.bot_username + '\n' +
+          'Channel: ' + r.version_channel + '\n' +
+          'Flags: ' + JSON.stringify(r.flags) + '\n\n' +
+          'group=' + !!r.flags.group + ' gold=' + !!r.flags.gold +
+          ' stride=' + !!r.flags.stride + ' ai=' + !!r.flags.ai + '\n' +
+          '/factoryflags · /factory'
+      );
+    } catch (e) {
+      await ctx.reply('factoryapply failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['factoryflags', 'myflags'], async (ctx) => {
+    try {
+      const st = await getOwnerFactoryState(ctx.from.id);
+      let botU = '';
+      try {
+        const row = await getUserBot(ctx.from.id);
+        botU = row?.bot_username || '';
+      } catch (_) {}
+      await ctx.reply(
+        'FACTORY FLAGS\n' +
+          'Owner: ' + ctx.from.id + '\n' +
+          'Tenant bot: ' + (botU ? '@' + botU : '(none)') + '\n' +
+          'Template: ' + (st.template_id || 'none') + '\n' +
+          'Channel: ' + (st.version_channel || 'stable') + '\n' +
+          'Flags: ' + JSON.stringify(st.flags || {}) + '\n\n' +
+          'Apply: /factoryapply club'
+      );
+    } catch (e) {
+      await ctx.reply('factoryflags failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['factorychannel'], async (ctx) => {
     if (!(await requireAdmin(ctx))) return;
-    const id = (ctx.message?.text || '').trim().split(/\\s+/)[1];
-    if (!id) {
-      await ctx.reply('Usage: /factoryset club|shop|school|gold');
+    const ch = (ctx.message?.text || '')
+      .replace(/^\/factorychannel(@\w+)?\s*/i, '')
+      .trim()
+      .toLowerCase();
+    if (ch !== 'stable' && ch !== 'beta') {
+      await ctx.reply('Usage: /factorychannel stable|beta');
       return;
     }
-    const r = await setTenantTemplate(ctx.from.id, '', id, 'stable');
-    await ctx.reply(
-      r.ok
-        ? 'Factory template set for founder: ' + id + ' (channel stable)'
-        : 'factoryset failed: ' + (r.error || 'db') + '\\nRun SQL_V4_PHASE1.sql in Supabase first.'
+    const st = await getOwnerFactoryState(ctx.from.id);
+    const r = await setTenantTemplate(
+      ctx.from.id,
+      '',
+      st.template_id || null,
+      ch,
+      st.flags || {}
     );
+    await ctx.reply(r.ok ? 'Version channel set: ' + ch : 'failed: ' + (r.error || ''));
   });
+
+
 
 
   bot.command(['groupadmin', 'gadmin'], async (ctx) => {
     try {
+      if (!(await requireFeature(ctx, 'group', 'Group Admin pack'))) return;
       const chat = ctx.chat;
       const isGroup = chat && (chat.type === 'group' || chat.type === 'supergroup');
       const lines = [
@@ -6540,6 +6715,7 @@ bot.command('commands', async (ctx) => {
 
   bot.command(['balance', 'gold'], async (ctx) => {
     try {
+      if (!(await requireFeature(ctx, 'gold', 'Gold pack'))) return;
       const g = await getOrCreateGold(
         ctx.from.id,
         ctx.from.username || ctx.from.first_name
