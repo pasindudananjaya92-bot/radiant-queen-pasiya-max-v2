@@ -3,8 +3,10 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Radiant Queen — Bot Settings Panel</title>
-  <meta name="description" content="Radiant Queen · Pasiya Max Queen — free Telegram AI bot with Radiant Gold." />
+  <title>Radiant Queen — Settings & Admin</title>
+  <meta name="description" content="Radiant Queen · Pasiya Max — free Telegram AI bot, group tools, Radiant Gold. Share with friends." />
+  <meta property="og:title" content="Radiant Queen — Settings & Admin" />
+  <meta property="og:description" content="Free Telegram AI bot + group admin tools + Radiant Gold. Start bonus 400 gold." />
   <style>
 :root {
   --bg: #0a0608;
@@ -27,9 +29,7 @@ body {
 a { color: var(--gold); text-decoration: none; }
 a:hover { text-decoration: underline; }
 .wrap { max-width: 720px; margin: 0 auto; padding: 28px 18px 60px; }
-.brand {
-  display: flex; align-items: center; gap: 12px; margin-bottom: 28px;
-}
+.brand { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
 .logo {
   width: 48px; height: 48px; border-radius: 50%;
   background: linear-gradient(145deg, var(--red), #3a0a12);
@@ -37,9 +37,7 @@ a:hover { text-decoration: underline; }
   display: grid; place-items: center;
   font-weight: 800; color: var(--gold); font-size: 20px;
 }
-h1 {
-  font-size: 1.55rem; color: var(--gold2); letter-spacing: 0.02em;
-}
+h1 { font-size: 1.55rem; color: var(--gold2); letter-spacing: 0.02em; }
 .sub { color: var(--muted); font-size: 0.95rem; margin-top: 4px; }
 .card {
   background: var(--card);
@@ -77,6 +75,15 @@ h1 {
   font-size: 0.8rem;
   margin-right: 6px;
 }
+.sharebox {
+  background: #1c1216;
+  border: 1px dashed var(--gold);
+  border-radius: 12px;
+  padding: 14px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+}
 .footer { margin-top: 36px; color: var(--muted); font-size: 0.85rem; }
 ul { padding-left: 1.2rem; color: var(--muted); }
 li { margin: 6px 0; }
@@ -89,36 +96,31 @@ code { color: var(--gold2); }
       <div class="logo">R</div>
       <div>
         <h1>Radiant Queen</h1>
-        <div class="sub">Pasiya Max Queen v2 · Telegram AI</div>
+        <div class="sub">Pasiya Max Queen · Public free-tier bot</div>
       </div>
     </div>
     
     <div class="card">
-      <h2>Radiant Queen Bot Settings Panel</h2>
-      <p style="color:var(--muted);margin-bottom:12px">
-        Free users manage the bot inside Telegram. Founder tools are private-chat only.
-      </p>
+      <h2>Bot settings (inside Telegram)</h2>
       <ul>
-        <li><code>/menu</code> — main control panel</li>
-        <li><code>/balance</code> / <code>/daily</code> — Radiant Gold</li>
-        <li><code>/help</code> / <code>/commands</code> — command map</li>
-        <li><code>/links</code> — official links</li>
-        <li>Group: <code>/setwelcome</code> <code>/antilink</code> <code>/rules</code></li>
-        <li>Founder: <code>/admin</code> <code>/ghstatus</code> <code>/competitor</code></li>
+        <li><code>/menu</code> — main panel</li>
+        <li><code>/balance</code> <code>/daily</code> <code>/prices</code> — gold</li>
+        <li><code>/invite</code> — share pack</li>
+        <li><code>/groupadmin</code> — welcome, anti-link, warn, rules</li>
+        <li><code>/setbot</code> — host your own tenant bot</li>
+        <li><code>/about</code> <code>/links</code> — story & links</li>
       </ul>
       <a class="btn" href="https://t.me/PasiyaMaxQueen_bot" target="_blank" rel="noopener">Open bot</a>
       <a class="btn secondary" href="/bot/index.html">Hub</a>
-      <a class="btn secondary" href="https://radiant-queen-pasiya-max-v2.vercel.app/" target="_blank" rel="noopener">Main web app</a>
     </div>
-
     <div class="card">
       <h2>StrideClub</h2>
-      <p style="color:var(--muted);margin-bottom:10px">Running club platform connected to Radiant Queen.</p>
+      <p style="color:var(--muted);margin-bottom:10px">Running club platform linked to Radiant Queen.</p>
       <a class="btn secondary" href="https://strideclub-platform-6b71a.containers.snapdeploy.app" target="_blank" rel="noopener">Open StrideClub</a>
     </div>
   
     <div class="footer">
-      © Radiant Queen · Pasiya Max · StrideClub bridge · Free-tier friendly
+      © Radiant Queen · Pasiya Max · StrideClub · Share with /invite in Telegram
     </div>
   </div>
 </body>
