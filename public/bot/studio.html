@@ -5,64 +5,115 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Radiant Queen · Bot Factory Studio</title>
   <style>
-    :root { --bg:#0b0f14; --card:#141b24; --line:#243041; --txt:#e8eef7; --mut:#9aabbf; --acc:#e11d48; --ok:#22c55e; }
+    :root { --bg:#0b0f14; --card:#141b24; --line:#243041; --txt:#e8eef7; --mut:#9aabbf; --acc:#e11d48; }
     * { box-sizing: border-box; }
     body { margin:0; font-family: ui-sans-serif, system-ui, sans-serif; background:var(--bg); color:var(--txt); }
-    .wrap { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
-    h1 { font-size: 1.4rem; margin: 0 0 8px; }
-    .sub { color: var(--mut); font-size: 0.95rem; margin-bottom: 20px; }
-    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
-    .badge { display:inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 999px; background:#1f2937; color:#fda4af; }
-    ol { margin: 8px 0 0 18px; padding: 0; color: var(--mut); line-height: 1.55; }
-    a.btn { display:inline-block; margin-top: 12px; margin-right: 8px; padding: 10px 14px; border-radius: 10px;
-      background: var(--acc); color:#fff; text-decoration:none; font-weight:600; font-size:0.9rem; }
-    a.btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--txt); }
-    code { background:#0f172a; padding: 2px 6px; border-radius: 6px; font-size: 0.85rem; }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+    h1 { font-size: 1.35rem; margin: 0 0 8px; }
+    .sub { color: var(--mut); margin-bottom: 18px; }
+    .badge { display:inline-block; font-size: 0.72rem; padding: 3px 8px; border-radius: 999px; background:#1f2937; color:#fda4af; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
     .grid { display:grid; gap:10px; grid-template-columns: 1fr 1fr; }
     @media (max-width:560px){ .grid { grid-template-columns: 1fr; } }
-    .t { font-weight:600; margin:0 0 4px; }
-    .d { color:var(--mut); font-size:0.85rem; margin:0; }
+    .t { font-weight:700; margin:0 0 4px; }
+    .d { color:var(--mut); font-size:0.86rem; margin:0 0 10px; line-height:1.45; }
+    button.copy, a.btn {
+      display:inline-block; border:0; cursor:pointer; padding: 8px 12px; border-radius: 10px;
+      background: var(--acc); color:#fff; font-weight:600; font-size:0.85rem; text-decoration:none;
+    }
+    a.btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--txt); }
+    pre {
+      background:#0f172a; border:1px solid var(--line); border-radius: 10px; padding: 10px;
+      white-space: pre-wrap; word-break: break-word; color:#cbd5e1; font-size: 0.8rem; margin: 0 0 10px;
+    }
+    .ok { color:#4ade80; font-size:0.8rem; min-height: 1.1em; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <span class="badge">v4.0 Phase 1 · Factory Foundation</span>
-    <h1>⚡ Radiant Queen · Bot Factory Studio</h1>
-    <p class="sub">Create tenant bots from Telegram. Keep brand: Radiant Queen · Pasiya Max. Free-tier friendly.</p>
+    <span class="badge">v4.0 Phase 2 · Apply packs + flags</span>
+    <h1>⚡ Bot Factory Studio</h1>
+    <p class="sub">Radiant Queen · Pasiya Max — pick a pack, copy steps, apply in Telegram. Free tier.</p>
 
     <div class="card">
-      <div class="t">How to create a bot (lowest friction)</div>
-      <ol>
-        <li>Open <code>@BotFather</code> → <code>/newbot</code> → copy token</li>
-        <li>Open <code>@PasiyaMaxQueen_bot</code> → <code>/setbot TOKEN</code></li>
-        <li>Optional: <code>/settenantwelcome</code> your welcome text</li>
-        <li>Check <code>/mybot</code> · <code>/resyncbot</code> if needed</li>
-        <li>Pick a template later: Club / Shop / School / Gold (Phase 2)</li>
-      </ol>
-      <a class="btn" href="https://t.me/PasiyaMaxQueen_bot">Open main bot</a>
-      <a class="btn ghost" href="/bot/">Hub</a>
+      <div class="t">Quick create</div>
+      <p class="d">BotFather → token → main bot → apply pack.</p>
+      <pre id="steps-core">1) Telegram: @BotFather → /newbot → copy token
+2) Open @PasiyaMaxQueen_bot (private chat)
+3) /setbot YOUR_TOKEN_HERE
+4) /factoryapply club
+5) /factoryflags
+6) /mybot · /settenantwelcome Hello!</pre>
+      <button class="copy" data-target="steps-core">Copy steps</button>
+      <span class="ok" id="ok-core"></span>
+      <div style="margin-top:10px">
+        <a class="btn" href="https://t.me/PasiyaMaxQueen_bot">Open main bot</a>
+        <a class="btn ghost" href="/bot/">Hub</a>
+      </div>
     </div>
 
     <div class="card">
-      <div class="t">Template packs (Phase 1 registry)</div>
-      <div class="grid" style="margin-top:12px">
-        <div><p class="t">🏃 Club</p><p class="d">Stride + group admin + gold</p></div>
-        <div><p class="t">🛒 Shop</p><p class="d">AI help + links + contact</p></div>
-        <div><p class="t">📚 School</p><p class="d">FAQ + rules + welcome</p></div>
-        <div><p class="t">💰 Gold</p><p class="d">Balance / daily / prices focus</p></div>
+      <div class="t">Pick a pack (copy apply command)</div>
+      <div class="grid" style="margin-top:10px">
+        <div class="card" style="margin:0">
+          <div class="t">🏃 Club</div>
+          <p class="d">group + gold + stride + ai</p>
+          <pre id="pack-club">/factoryapply club</pre>
+          <button class="copy" data-target="pack-club">Copy</button>
+          <span class="ok" id="ok-pack-club"></span>
+        </div>
+        <div class="card" style="margin:0">
+          <div class="t">🛒 Shop</div>
+          <p class="d">ai + gold · group off</p>
+          <pre id="pack-shop">/factoryapply shop</pre>
+          <button class="copy" data-target="pack-shop">Copy</button>
+          <span class="ok" id="ok-pack-shop"></span>
+        </div>
+        <div class="card" style="margin:0">
+          <div class="t">📚 School</div>
+          <p class="d">group + ai · gold off</p>
+          <pre id="pack-school">/factoryapply school</pre>
+          <button class="copy" data-target="pack-school">Copy</button>
+          <span class="ok" id="ok-pack-school"></span>
+        </div>
+        <div class="card" style="margin:0">
+          <div class="t">💰 Gold</div>
+          <p class="d">gold + ai focus</p>
+          <pre id="pack-gold">/factoryapply gold</pre>
+          <button class="copy" data-target="pack-gold">Copy</button>
+          <span class="ok" id="ok-pack-gold"></span>
+        </div>
       </div>
     </div>
 
     <div class="card">
       <div class="t">Version channels</div>
-      <p class="d"><code>stable</code> = production UI (v3.7). <code>beta</code> = experimental factory features (Phase 2+).</p>
-      <p class="d">Founder: in Telegram type <code>/factory</code></p>
+      <p class="d"><code>stable</code> = production (default). <code>beta</code> = founder tests only.</p>
+      <pre id="ch">/factorychannel stable
+/factorychannel beta</pre>
+      <button class="copy" data-target="ch">Copy</button>
+      <span class="ok" id="ok-ch"></span>
     </div>
 
     <div class="card">
-      <div class="t">What is NOT in Phase 1</div>
-      <p class="d">No drag-drop builder yet. No auto /newbot. Feature flags apply in Phase 2. WhatsApp/Discord later (official APIs only).</p>
+      <div class="t">Feature flags (enforced Phase 2)</div>
+      <p class="d">After apply: group tools need group=true · /balance needs gold=true. Founder main bot keeps full power.</p>
     </div>
   </div>
+  <script>
+    document.querySelectorAll('button.copy').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-target');
+        const el = document.getElementById(id);
+        const ok = document.getElementById('ok-' + id) || btn.nextElementSibling;
+        try {
+          await navigator.clipboard.writeText(el.innerText);
+          if (ok) ok.textContent = 'Copied';
+        } catch {
+          if (ok) ok.textContent = 'Select text and copy manually';
+        }
+      });
+    });
+  </script>
 </body>
 </html>
