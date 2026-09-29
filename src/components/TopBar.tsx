@@ -11,7 +11,7 @@ import {
   Archive,
   Download
 } from "lucide-react";
-import { PASIYA_MAIN_SITE } from "../data/socialLinks";
+import { PASIYA_MAIN_SITE, PASIYA_BOT, PASIYA_BOT_HUB } from "../data/socialLinks";
 
 interface TopBarProps {
   isPaused: boolean;
@@ -43,8 +43,30 @@ export const TopBar: React.FC<TopBarProps> = ({
           className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#00B4D8]/15 border border-[#00B4D8]/40 hover:bg-[#00B4D8]/30 text-[#00B4D8] text-xs font-mono transition cursor-pointer"
         >
           <Send className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Telegram</span>
+          <span className="hidden sm:inline">Social</span>
         </button>
+
+        <a
+          href={PASIYA_BOT}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open @PasiyaMaxQueen_bot"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#FFD700]/15 border border-[#FFD700]/40 hover:bg-[#FFD700]/30 text-[#FFD700] text-xs font-mono transition"
+        >
+          <Send className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Bot</span>
+        </a>
+
+        <a
+          href={PASIYA_BOT_HUB}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Official Bot Hub · Google Sign-In"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-950/50 border border-emerald-500/40 hover:bg-emerald-900/40 text-emerald-300 text-xs font-mono transition"
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Hub</span>
+        </a>
 
         <div className="h-4 w-px bg-white/15 hidden sm:block" />
 
@@ -69,14 +91,14 @@ export const TopBar: React.FC<TopBarProps> = ({
           <span className="text-white/40">|</span>
           <span className="text-amber-300 flex items-center gap-1">
             <Cpu className="w-3 h-3 text-[#FFD700]" />
-            AI STUDIO BRAIN: AUTO-CONNECTED
+            STABLE v4.0
           </span>
         </div>
 
-        {/* Uptime */}
+        {/* Version */}
         <div className="hidden xl:flex items-center gap-1 text-[11px] font-mono text-gray-400">
-          <span className="text-gray-500">Uptime:</span>
-          <span className="text-amber-200">14d 03:12:27</span>
+          <span className="text-gray-500">OS:</span>
+          <span className="text-amber-200">v4.0-stable</span>
         </div>
       </div>
 
