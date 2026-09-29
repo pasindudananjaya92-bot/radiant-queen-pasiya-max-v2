@@ -1,0 +1,4 @@
+v4.0-factory-p3-fix2
+Bug: applyTemplateWelcome filtered is_active=true while /mybot used getUserBot without that filter.
+If is_active was null/non-boolean truthy, /mybot showed Active:yes but welcome lookup returned 0 rows.
+Fix: use same getUserBot lookup + update by owner_id only; ensure is_active true on welcome write.
