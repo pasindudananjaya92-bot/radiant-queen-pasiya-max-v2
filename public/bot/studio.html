@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Radiant Queen · Share & Marketplace P6</title>
+  <title>Radiant Queen · Share Links P7</title>
   <style>
     :root { --bg:#0b0f14; --card:#141b24; --line:#243041; --txt:#e8eef7; --mut:#9aabbf; --acc:#e11d48; }
     body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--txt); }
@@ -13,7 +13,6 @@
     .sub { color:var(--mut); }
     .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin:12px 0; }
     .t { font-weight:700; margin:0 0 6px; }
-    .d { color:var(--mut); font-size:.88rem; line-height:1.45; }
     pre { background:#0f172a; border:1px solid var(--line); border-radius:10px; padding:10px; white-space:pre-wrap; font-size:.8rem; color:#cbd5e1; word-break:break-all; }
     button, a.btn { display:inline-block; margin-top:8px; margin-right:8px; padding:8px 12px; border-radius:10px; border:0; background:var(--acc); color:#fff; font-weight:600; text-decoration:none; cursor:pointer; font-size:.85rem; }
     a.ghost { background:transparent; border:1px solid var(--line); color:var(--txt); }
@@ -24,32 +23,32 @@
 </head>
 <body>
   <div class="wrap">
-    <span class="badge">v4.0 Phase 6 · Public share links</span>
-    <h1>🔗 Invite-to-Pack</h1>
-    <p class="sub">Share deep links — friends open Telegram → Start → pack card → Apply</p>
+    <span class="badge">v4.0 Phase 7 · Version UI + share hub</span>
+    <h1>🔗 Public Share Hub</h1>
+    <p class="sub">Headers now follow live bot version. Copy any deep link.</p>
 
     <div class="card">
-      <div class="t">Marketplace deep link</div>
-      <pre id="ml">https://t.me/PasiyaMaxQueen_bot?start=market</pre>
-      <button data-c="ml">Copy</button> <span class="ok" id="ok-ml"></span>
-      <div><a class="btn" href="https://t.me/PasiyaMaxQueen_bot?start=market">Open</a></div>
+      <div class="t">In-bot</div>
+      <pre id="c">/sharelinks
+/invitepack club
+/invitemarket
+/market
+/version</pre>
+      <button data-c="c">Copy</button> <span class="ok" id="ok-c"></span>
+      <a class="btn" href="https://t.me/PasiyaMaxQueen_bot">Open bot</a>
+    </div>
+
+    <div class="card">
+      <div class="t">Marketplace</div>
+      <pre id="m">https://t.me/PasiyaMaxQueen_bot?start=market</pre>
+      <button data-c="m">Copy</button> <span class="ok" id="ok-m"></span>
     </div>
 
     <div class="grid">
-      <div class="card"><div class="t">🏃 Club</div><pre id="c">https://t.me/PasiyaMaxQueen_bot?start=pack_club</pre><button data-c="c">Copy</button><span class="ok" id="ok-c"></span></div>
-      <div class="card"><div class="t">🛒 Shop</div><pre id="s">https://t.me/PasiyaMaxQueen_bot?start=pack_shop</pre><button data-c="s">Copy</button><span class="ok" id="ok-s"></span></div>
+      <div class="card"><div class="t">🏃 Club</div><pre id="cl">https://t.me/PasiyaMaxQueen_bot?start=pack_club</pre><button data-c="cl">Copy</button><span class="ok" id="ok-cl"></span></div>
+      <div class="card"><div class="t">🛒 Shop</div><pre id="sh">https://t.me/PasiyaMaxQueen_bot?start=pack_shop</pre><button data-c="sh">Copy</button><span class="ok" id="ok-sh"></span></div>
       <div class="card"><div class="t">📚 School</div><pre id="sc">https://t.me/PasiyaMaxQueen_bot?start=pack_school</pre><button data-c="sc">Copy</button><span class="ok" id="ok-sc"></span></div>
       <div class="card"><div class="t">💰 Gold</div><pre id="g">https://t.me/PasiyaMaxQueen_bot?start=pack_gold</pre><button data-c="g">Copy</button><span class="ok" id="ok-g"></span></div>
-    </div>
-
-    <div class="card">
-      <div class="t">In-bot commands</div>
-      <pre id="cmd">/invitepack club
-/invitepack shop
-/invitemarket
-/market</pre>
-      <button data-c="cmd">Copy</button> <span class="ok" id="ok-cmd"></span>
-      <p class="d">Also works: /sharepack · /packlink · /sharemarket</p>
     </div>
   </div>
   <script>
