@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Radiant Queen · Factory Studio P4</title>
+  <title>Radiant Queen · Marketplace Studio P5</title>
   <style>
     :root { --bg:#0b0f14; --card:#141b24; --line:#243041; --txt:#e8eef7; --mut:#9aabbf; --acc:#e11d48; }
     body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--txt); }
-    .wrap { max-width:760px; margin:0 auto; padding:24px 16px 48px; }
+    .wrap { max-width:820px; margin:0 auto; padding:24px 16px 48px; }
     .badge { display:inline-block; font-size:.72rem; padding:3px 8px; border-radius:999px; background:#1f2937; color:#fda4af; }
-    h1 { font-size:1.35rem; margin:8px 0; }
+    h1 { font-size:1.4rem; margin:8px 0; }
     .sub { color:var(--mut); }
     .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin:12px 0; }
     .t { font-weight:700; margin:0 0 6px; }
@@ -17,50 +17,62 @@
     pre { background:#0f172a; border:1px solid var(--line); border-radius:10px; padding:10px; white-space:pre-wrap; font-size:.8rem; color:#cbd5e1; }
     button, a.btn { display:inline-block; margin-top:8px; margin-right:8px; padding:8px 12px; border-radius:10px; border:0; background:var(--acc); color:#fff; font-weight:600; text-decoration:none; cursor:pointer; font-size:.85rem; }
     a.ghost { background:transparent; border:1px solid var(--line); color:var(--txt); }
-    .grid { display:grid; gap:10px; grid-template-columns:1fr 1fr; }
+    .grid { display:grid; gap:12px; grid-template-columns:1fr 1fr; }
     @media(max-width:560px){ .grid{grid-template-columns:1fr} }
     .ok { color:#4ade80; font-size:.8rem; }
+    .pack { border-left:3px solid var(--acc); padding-left:10px; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <span class="badge">v4.0 Phase 4 · Tenant menu + commands + list</span>
-    <h1>⚡ Bot Factory Studio</h1>
-    <p class="sub">Radiant Queen · Pasiya Max — pack apply, tenant /menu buttons, founder list.</p>
+    <span class="badge">v4.0 Phase 5 · Marketplace</span>
+    <h1>🏪 Radiant Queen Marketplace</h1>
+    <p class="sub">Template packs for your tenant bot — apply inside Telegram with /market</p>
 
     <div class="card">
-      <div class="t">Full flow</div>
-      <pre id="flow">1) @BotFather → /newbot → token
-2) @PasiyaMaxQueen_bot → /setbot TOKEN
-3) /factoryapply club
-4) /factorywelcome
-5) Tenant bot → /start (welcome + buttons)
-6) Tenant → /menu · /pack · /help
-7) Founder → /factorylist · /factorypacks</pre>
-      <button data-c="flow">Copy</button> <span class="ok" id="ok-flow"></span>
-      <div><a class="btn" href="https://t.me/PasiyaMaxQueen_bot">Main bot</a>
-      <a class="btn ghost" href="/bot/">Hub</a></div>
+      <div class="t">Open in Telegram</div>
+      <pre id="m">/market</pre>
+      <button data-c="m">Copy</button> <span class="ok" id="ok-m"></span>
+      <div>
+        <a class="btn" href="https://t.me/PasiyaMaxQueen_bot?start=market">Open bot</a>
+        <a class="btn ghost" href="/bot/">Hub</a>
+      </div>
     </div>
 
-    <div class="card">
-      <div class="t">Packs</div>
-      <div class="grid">
-        <div><div class="t">🏃 club</div><pre id="c">/factoryapply club</pre><button data-c="c">Copy</button><span class="ok" id="ok-c"></span></div>
-        <div><div class="t">🛒 shop</div><pre id="s">/factoryapply shop</pre><button data-c="s">Copy</button><span class="ok" id="ok-s"></span></div>
-        <div><div class="t">📚 school</div><pre id="sc">/factoryapply school</pre><button data-c="sc">Copy</button><span class="ok" id="ok-sc"></span></div>
-        <div><div class="t">💰 gold</div><pre id="g">/factoryapply gold</pre><button data-c="g">Copy</button><span class="ok" id="ok-g"></span></div>
+    <div class="grid">
+      <div class="card pack">
+        <div class="t">🏃 Running Club</div>
+        <p class="d">AI coach + group tools + Stride + gold. Best for run clubs.</p>
+        <pre id="c">/factoryapply club</pre>
+        <button data-c="c">Copy apply</button> <span class="ok" id="ok-c"></span>
+      </div>
+      <div class="card pack">
+        <div class="t">🛒 Shop Helper</div>
+        <p class="d">Customer Q&amp;A AI + gold. Light shop assistant.</p>
+        <pre id="s">/factoryapply shop</pre>
+        <button data-c="s">Copy apply</button> <span class="ok" id="ok-s"></span>
+      </div>
+      <div class="card pack">
+        <div class="t">📚 Class / FAQ</div>
+        <p class="d">Lessons &amp; FAQ style answers for study groups.</p>
+        <pre id="sc">/factoryapply school</pre>
+        <button data-c="sc">Copy apply</button> <span class="ok" id="ok-sc"></span>
+      </div>
+      <div class="card pack">
+        <div class="t">💰 Gold Economy</div>
+        <p class="d">Radiant Gold focus. Tenant AI on. Main bot /daily /balance.</p>
+        <pre id="g">/factoryapply gold</pre>
+        <button data-c="g">Copy apply</button> <span class="ok" id="ok-g"></span>
       </div>
     </div>
 
     <div class="card">
-      <div class="t">Phase 4 commands</div>
-      <pre id="p4">/factorypacks
-/factorylist
-/factoryapply club
-/factorywelcome
+      <div class="t">After apply</div>
+      <pre id="a">/factorywelcome
+Tenant bot → /start
+Tenant → /menu · /pack
 /factorystatus</pre>
-      <button data-c="p4">Copy</button> <span class="ok" id="ok-p4"></span>
-      <p class="d">Tenant bot: /start shows Help + Pack + Open Main Bot buttons. /menu same keyboard.</p>
+      <button data-c="a">Copy</button> <span class="ok" id="ok-a"></span>
     </div>
   </div>
   <script>
