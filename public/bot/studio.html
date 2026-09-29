@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Radiant Queen · Marketplace Studio P5</title>
+  <title>Radiant Queen · Share & Marketplace P6</title>
   <style>
     :root { --bg:#0b0f14; --card:#141b24; --line:#243041; --txt:#e8eef7; --mut:#9aabbf; --acc:#e11d48; }
     body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--txt); }
@@ -14,65 +14,42 @@
     .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin:12px 0; }
     .t { font-weight:700; margin:0 0 6px; }
     .d { color:var(--mut); font-size:.88rem; line-height:1.45; }
-    pre { background:#0f172a; border:1px solid var(--line); border-radius:10px; padding:10px; white-space:pre-wrap; font-size:.8rem; color:#cbd5e1; }
+    pre { background:#0f172a; border:1px solid var(--line); border-radius:10px; padding:10px; white-space:pre-wrap; font-size:.8rem; color:#cbd5e1; word-break:break-all; }
     button, a.btn { display:inline-block; margin-top:8px; margin-right:8px; padding:8px 12px; border-radius:10px; border:0; background:var(--acc); color:#fff; font-weight:600; text-decoration:none; cursor:pointer; font-size:.85rem; }
     a.ghost { background:transparent; border:1px solid var(--line); color:var(--txt); }
     .grid { display:grid; gap:12px; grid-template-columns:1fr 1fr; }
     @media(max-width:560px){ .grid{grid-template-columns:1fr} }
     .ok { color:#4ade80; font-size:.8rem; }
-    .pack { border-left:3px solid var(--acc); padding-left:10px; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <span class="badge">v4.0 Phase 5 · Marketplace</span>
-    <h1>🏪 Radiant Queen Marketplace</h1>
-    <p class="sub">Template packs for your tenant bot — apply inside Telegram with /market</p>
+    <span class="badge">v4.0 Phase 6 · Public share links</span>
+    <h1>🔗 Invite-to-Pack</h1>
+    <p class="sub">Share deep links — friends open Telegram → Start → pack card → Apply</p>
 
     <div class="card">
-      <div class="t">Open in Telegram</div>
-      <pre id="m">/market</pre>
-      <button data-c="m">Copy</button> <span class="ok" id="ok-m"></span>
-      <div>
-        <a class="btn" href="https://t.me/PasiyaMaxQueen_bot?start=market">Open bot</a>
-        <a class="btn ghost" href="/bot/">Hub</a>
-      </div>
+      <div class="t">Marketplace deep link</div>
+      <pre id="ml">https://t.me/PasiyaMaxQueen_bot?start=market</pre>
+      <button data-c="ml">Copy</button> <span class="ok" id="ok-ml"></span>
+      <div><a class="btn" href="https://t.me/PasiyaMaxQueen_bot?start=market">Open</a></div>
     </div>
 
     <div class="grid">
-      <div class="card pack">
-        <div class="t">🏃 Running Club</div>
-        <p class="d">AI coach + group tools + Stride + gold. Best for run clubs.</p>
-        <pre id="c">/factoryapply club</pre>
-        <button data-c="c">Copy apply</button> <span class="ok" id="ok-c"></span>
-      </div>
-      <div class="card pack">
-        <div class="t">🛒 Shop Helper</div>
-        <p class="d">Customer Q&amp;A AI + gold. Light shop assistant.</p>
-        <pre id="s">/factoryapply shop</pre>
-        <button data-c="s">Copy apply</button> <span class="ok" id="ok-s"></span>
-      </div>
-      <div class="card pack">
-        <div class="t">📚 Class / FAQ</div>
-        <p class="d">Lessons &amp; FAQ style answers for study groups.</p>
-        <pre id="sc">/factoryapply school</pre>
-        <button data-c="sc">Copy apply</button> <span class="ok" id="ok-sc"></span>
-      </div>
-      <div class="card pack">
-        <div class="t">💰 Gold Economy</div>
-        <p class="d">Radiant Gold focus. Tenant AI on. Main bot /daily /balance.</p>
-        <pre id="g">/factoryapply gold</pre>
-        <button data-c="g">Copy apply</button> <span class="ok" id="ok-g"></span>
-      </div>
+      <div class="card"><div class="t">🏃 Club</div><pre id="c">https://t.me/PasiyaMaxQueen_bot?start=pack_club</pre><button data-c="c">Copy</button><span class="ok" id="ok-c"></span></div>
+      <div class="card"><div class="t">🛒 Shop</div><pre id="s">https://t.me/PasiyaMaxQueen_bot?start=pack_shop</pre><button data-c="s">Copy</button><span class="ok" id="ok-s"></span></div>
+      <div class="card"><div class="t">📚 School</div><pre id="sc">https://t.me/PasiyaMaxQueen_bot?start=pack_school</pre><button data-c="sc">Copy</button><span class="ok" id="ok-sc"></span></div>
+      <div class="card"><div class="t">💰 Gold</div><pre id="g">https://t.me/PasiyaMaxQueen_bot?start=pack_gold</pre><button data-c="g">Copy</button><span class="ok" id="ok-g"></span></div>
     </div>
 
     <div class="card">
-      <div class="t">After apply</div>
-      <pre id="a">/factorywelcome
-Tenant bot → /start
-Tenant → /menu · /pack
-/factorystatus</pre>
-      <button data-c="a">Copy</button> <span class="ok" id="ok-a"></span>
+      <div class="t">In-bot commands</div>
+      <pre id="cmd">/invitepack club
+/invitepack shop
+/invitemarket
+/market</pre>
+      <button data-c="cmd">Copy</button> <span class="ok" id="ok-cmd"></span>
+      <p class="d">Also works: /sharepack · /packlink · /sharemarket</p>
     </div>
   </div>
   <script>
