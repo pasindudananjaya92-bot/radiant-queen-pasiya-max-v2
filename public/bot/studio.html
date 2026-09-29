@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Radiant Queen · Bot Factory Studio</title>
+  <style>
+    :root { --bg:#0b0f14; --card:#141b24; --line:#243041; --txt:#e8eef7; --mut:#9aabbf; --acc:#e11d48; --ok:#22c55e; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: ui-sans-serif, system-ui, sans-serif; background:var(--bg); color:var(--txt); }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+    h1 { font-size: 1.4rem; margin: 0 0 8px; }
+    .sub { color: var(--mut); font-size: 0.95rem; margin-bottom: 20px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+    .badge { display:inline-block; font-size: 0.75rem; padding: 3px 8px; border-radius: 999px; background:#1f2937; color:#fda4af; }
+    ol { margin: 8px 0 0 18px; padding: 0; color: var(--mut); line-height: 1.55; }
+    a.btn { display:inline-block; margin-top: 12px; margin-right: 8px; padding: 10px 14px; border-radius: 10px;
+      background: var(--acc); color:#fff; text-decoration:none; font-weight:600; font-size:0.9rem; }
+    a.btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--txt); }
+    code { background:#0f172a; padding: 2px 6px; border-radius: 6px; font-size: 0.85rem; }
+    .grid { display:grid; gap:10px; grid-template-columns: 1fr 1fr; }
+    @media (max-width:560px){ .grid { grid-template-columns: 1fr; } }
+    .t { font-weight:600; margin:0 0 4px; }
+    .d { color:var(--mut); font-size:0.85rem; margin:0; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <span class="badge">v4.0 Phase 1 · Factory Foundation</span>
+    <h1>⚡ Radiant Queen · Bot Factory Studio</h1>
+    <p class="sub">Create tenant bots from Telegram. Keep brand: Radiant Queen · Pasiya Max. Free-tier friendly.</p>
+
+    <div class="card">
+      <div class="t">How to create a bot (lowest friction)</div>
+      <ol>
+        <li>Open <code>@BotFather</code> → <code>/newbot</code> → copy token</li>
+        <li>Open <code>@PasiyaMaxQueen_bot</code> → <code>/setbot TOKEN</code></li>
+        <li>Optional: <code>/settenantwelcome</code> your welcome text</li>
+        <li>Check <code>/mybot</code> · <code>/resyncbot</code> if needed</li>
+        <li>Pick a template later: Club / Shop / School / Gold (Phase 2)</li>
+      </ol>
+      <a class="btn" href="https://t.me/PasiyaMaxQueen_bot">Open main bot</a>
+      <a class="btn ghost" href="/bot/">Hub</a>
+    </div>
+
+    <div class="card">
+      <div class="t">Template packs (Phase 1 registry)</div>
+      <div class="grid" style="margin-top:12px">
+        <div><p class="t">🏃 Club</p><p class="d">Stride + group admin + gold</p></div>
+        <div><p class="t">🛒 Shop</p><p class="d">AI help + links + contact</p></div>
+        <div><p class="t">📚 School</p><p class="d">FAQ + rules + welcome</p></div>
+        <div><p class="t">💰 Gold</p><p class="d">Balance / daily / prices focus</p></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="t">Version channels</div>
+      <p class="d"><code>stable</code> = production UI (v3.7). <code>beta</code> = experimental factory features (Phase 2+).</p>
+      <p class="d">Founder: in Telegram type <code>/factory</code></p>
+    </div>
+
+    <div class="card">
+      <div class="t">What is NOT in Phase 1</div>
+      <p class="d">No drag-drop builder yet. No auto /newbot. Feature flags apply in Phase 2. WhatsApp/Discord later (official APIs only).</p>
+    </div>
+  </div>
+</body>
+</html>
