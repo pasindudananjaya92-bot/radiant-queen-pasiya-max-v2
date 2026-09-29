@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v3.0-phase7';
+const BOT_VERSION = 'v3.0-phase8';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -3855,6 +3855,7 @@ bot.command('commands', async (ctx) => {
 
 
 
+
   bot.command('links', async (ctx) => {
     try {
       const site = 'https://radiant-queen-pasiya-max-v2.vercel.app';
@@ -3863,42 +3864,34 @@ bot.command('commands', async (ctx) => {
           ? STRIDE_BASE
           : 'https://strideclub-platform-6b71a.containers.snapdeploy.app'
         ).replace(/\/$/, '');
-      const github = 'https://github.com/pasindudananjaya92-bot/radiant-queen-pasiya-max-v2';
-      const tg = 'https://t.me/PasiyaMaxQueen_bot';
-
-      const text =
-        `QUICK LINKS\n\n` +
-        `Bot web: ${site}\n` +
-        `StrideClub: ${stride}\n` +
-        `GitHub: ${github}\n` +
-        `Telegram: ${tg}\n\n` +
-        `/social · /stride · /menu`;
-
       await ctx.reply(
-        text,
-        Markup.inlineKeyboard([
-          [Markup.button.url('Website', site)],
-          [Markup.button.url('StrideClub', stride)],
-          [Markup.button.url('GitHub', github)],
-          [Markup.button.url('Bot', tg)],
-          [Markup.button.callback('Main menu', 'menu_home')],
-        ])
+        `RADIANT QUEEN · LINKS\n\n` +
+          `Bot: https://t.me/PasiyaMaxQueen_bot\n` +
+          `Web app: ${site}\n` +
+          `Create / Gold hub: ${site}/bot/\n` +
+          `Sign up info: ${site}/bot/create.html\n` +
+          `Settings guide: ${site}/bot/setting.html\n` +
+          `StrideClub: ${stride}\n\n` +
+          `Share: /invite\n` +
+          `— Radiant Queen · Pasiya Max`
       );
     } catch (err) {
-      console.error('links', err);
-      try {
-        await ctx.reply(
-          `QUICK LINKS\n\n` +
-            `Web: https://radiant-queen-pasiya-max-v2.vercel.app\n` +
-            `Stride: https://strideclub-platform-6b71a.containers.snapdeploy.app\n` +
-            `GitHub: https://github.com/pasindudananjaya92-bot/radiant-queen-pasiya-max-v2\n` +
-            `Bot: https://t.me/PasiyaMaxQueen_bot`
-        );
-      } catch (e2) {
-        await ctx.reply(`links failed: ${String(err?.message || err).slice(0, 120)}`);
-      }
+      await ctx.reply('links failed.');
     }
   });
+
+
+  bot.command(['invite', 'share'], async (ctx) => {
+    const text =
+      `Join RADIANT QUEEN · PASIYA MAX\n\n` +
+      `Free Telegram AI bot + group tools + Radiant Gold.\n` +
+      `Start bonus 400 gold · daily +50 · admin tools for groups.\n\n` +
+      `Open bot:\nhttps://t.me/PasiyaMaxQueen_bot\n\n` +
+      `Web hub:\nhttps://radiant-queen-pasiya-max-v2.vercel.app/bot/\n\n` +
+      `Copy & share this message with friends.`;
+    await ctx.reply(text);
+  });
+
 
 
 
@@ -4599,18 +4592,28 @@ bot.command('commands', async (ctx) => {
 
 
 
+
   bot.command('about', async (ctx) => {
     await ctx.reply(
       `RADIANT QUEEN · PASIYA MAX\n` +
-        `Version: ${typeof BOT_VERSION !== 'undefined' ? BOT_VERSION : 'v2.7'}\n` +
-        `Gemini AI · Supabase · StrideClub bridge\n` +
+        `Public AI + group tools + Radiant Gold\n\n` +
+        `Version: ${typeof BOT_VERSION !== 'undefined' ? BOT_VERSION : 'v3.0'}\n` +
         `Bot: @PasiyaMaxQueen_bot\n` +
         `Web: https://radiant-queen-pasiya-max-v2.vercel.app\n` +
-        `Stride: https://strideclub-platform-6b71a.containers.snapdeploy.app\n\n` +
-        `/commands · /menu · /version`
-        + `\nStatus: STABLE v2.9 — core feature freeze OK to pause`
+        `Create hub: https://radiant-queen-pasiya-max-v2.vercel.app/bot/\n` +
+        `StrideClub: https://strideclub-platform-6b71a.containers.snapdeploy.app\n\n` +
+        `What you get\n` +
+        `• AI chat (uses Radiant Gold)\n` +
+        `• Daily +50 gold · /daily\n` +
+        `• Group admin pack · /groupadmin\n` +
+        `• Weather, currency, runner tools\n` +
+        `• Tenant bots · /setbot\n\n` +
+        `Free tier = fair gold limits (no fake unlimited).\n` +
+        `Invite friends: /invite\n` +
+        `/menu · /balance · /links`
     );
   });
+
 
 
   bot.command('ghpath', async (ctx) => {
