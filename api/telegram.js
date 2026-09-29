@@ -59,7 +59,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-factory-p5'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
+const BOT_VERSION = 'v4.0-factory-p6'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -840,6 +840,9 @@ function marketKeyboard() {
     { text: '📊 My status', callback_data: 'mkt_status' },
     { text: '🏠 Menu', callback_data: 'mkt_menu' },
   ]);
+  rows.push([
+    { text: '🔗 Share market', callback_data: 'mkt_share_market' },
+  ]);
   return { inline_keyboard: rows };
 }
 
@@ -859,6 +862,7 @@ function marketText(st) {
     lines.push('');
   }
   lines.push('Or type: /factoryapply club|shop|school|gold');
+  lines.push('Share pack: /invitepack club');
   lines.push('Studio: /factory · web /bot/studio.html');
   return lines.join('\n');
 }
@@ -874,6 +878,54 @@ function packDetailText(id) {
     `Then: /factorywelcome · tenant /start`
   );
 }
+
+const MAIN_BOT_USERNAME = process.env.BOT_USERNAME || 'PasiyaMaxQueen_bot';
+const WEB_HUB = process.env.APP_URL || 'https://radiant-queen-pasiya-max-v2.vercel.app';
+
+function packStartLink(packId) {
+  const id = String(packId || 'club').toLowerCase();
+  return `https://t.me/${MAIN_BOT_USERNAME}?start=pack_${id}`;
+}
+
+function marketStartLink() {
+  return `https://t.me/${MAIN_BOT_USERNAME}?start=market`;
+}
+
+function invitePackCard(packId, fromUser) {
+  const p = (typeof MARKET_PACKS !== 'undefined' ? MARKET_PACKS : []).find(
+    (x) => x.id === String(packId || '').toLowerCase()
+  );
+  const id = p?.id || String(packId || 'club').toLowerCase();
+  const title = p ? `${p.emoji} ${p.title}` : id;
+  const blurb = p?.blurb || 'Radiant Queen template pack';
+  const link = packStartLink(id);
+  const who = fromUser?.username
+    ? '@' + fromUser.username
+    : fromUser?.first_name || 'a friend';
+  return (
+    `👑 Join RADIANT QUEEN · PASIYA MAX\n\n` +
+    `Pack invite: ${title}\n` +
+    `${blurb}\n\n` +
+    `1) Open: ${link}\n` +
+    `2) Tap Start\n` +
+    `3) Get 400 Radiant Gold · /market · /daily\n\n` +
+    `Web hub: ${WEB_HUB}/bot/\n` +
+    `Marketplace: ${WEB_HUB}/bot/studio.html\n\n` +
+    `Invited by ${who}\n` +
+    `— Radiant Queen · free on Telegram`
+  );
+}
+
+function parseStartPayload(payload) {
+  const p = String(payload || '').trim().toLowerCase();
+  if (!p) return null;
+  if (p === 'market' || p === 'marketplace') return { type: 'market' };
+  const m = /^pack[_-](club|shop|school|gold)$/.exec(p);
+  if (m) return { type: 'pack', id: m[1] };
+  if (['club', 'shop', 'school', 'gold'].includes(p)) return { type: 'pack', id: p };
+  return { type: 'raw', payload: p };
+}
+
 
 
 
@@ -2612,6 +2664,53 @@ function buildBot() {
         return;
       }
 
+      // Phase 6 deep links: /start pack_club | /start market
+      let startPayload = '';
+      try {
+        const t = ctx.message?.text || '';
+        const parts = t.trim().split(/\s+/);
+        if (parts.length > 1) startPayload = parts.slice(1).join(' ').trim();
+      } catch (_) {}
+      const deep = typeof parseStartPayload === 'function' ? parseStartPayload(startPayload) : null;
+      if (deep && deep.type === 'market') {
+        try {
+          await getOrCreateGold(ctx.from.id, ctx.from.username || ctx.from.first_name);
+        } catch (_) {}
+        const st = await getOwnerFactoryState(ctx.from.id);
+        await uiReply(ctx, marketText(st), marketKeyboard());
+        return;
+      }
+      if (deep && deep.type === 'pack' && deep.id) {
+        try {
+          await getOrCreateGold(ctx.from.id, ctx.from.username || ctx.from.first_name);
+        } catch (_) {}
+        const p = MARKET_PACKS.find((x) => x.id === deep.id);
+        const title = p ? p.emoji + ' ' + p.title : deep.id;
+        await ctx.reply(
+          'Pack link: ' +
+            title +
+            '\n\n' +
+            (p ? p.blurb + '\n' : '') +
+            'Flags: ' +
+            (p && p.flags ? p.flags : '') +
+            '\n\n' +
+            'Tap Apply to set this pack on your tenant bot.\n' +
+            'New here? /setbot first, then apply.\n\n' +
+            'Share link:\n' +
+            packStartLink(deep.id),
+          {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '✅ Apply ' + deep.id, callback_data: 'mkt_apply_' + deep.id }],
+                [{ text: '🏪 Marketplace', callback_data: 'mkt_home' }],
+                [{ text: '🎁 Share this pack', callback_data: 'mkt_share_' + deep.id }],
+              ],
+            },
+          }
+        );
+        return;
+      }
+
       const who = isAdmin(ctx)
         ? 'Ayubowan Nirmathru Pasiya Max'
         : `Hello ${ctx.from?.first_name || 'there'}`;
@@ -3112,7 +3211,7 @@ function buildBot() {
       const templates = await listFactoryTemplates();
       const st = await getOwnerFactoryState(ctx.from.id);
       const lines = [
-        'BOT FACTORY · Phase 5',
+        'BOT FACTORY · Phase 6',
         'Brand: RADIANT QUEEN · PASIYA MAX',
         '',
         'Your pack: ' + (st.template_id || 'none'),
@@ -3336,6 +3435,61 @@ function buildBot() {
     }
   });
 
+  bot.command(['invitepack', 'sharepack', 'packlink'], async (ctx) => {
+    try {
+      const arg = (ctx.message?.text || '')
+        .replace(/^\/(invitepack|sharepack|packlink)(@\w+)?\s*/i, '')
+        .trim()
+        .toLowerCase();
+      const id = ['club', 'shop', 'school', 'gold'].includes(arg)
+        ? arg
+        : (await getOwnerFactoryState(ctx.from.id)).template_id || 'club';
+      const card = invitePackCard(id, ctx.from);
+      await ctx.reply(card, {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: 'Open pack link', url: packStartLink(id) }],
+            [{ text: '🏪 Marketplace', callback_data: 'mkt_home' }],
+            [
+              {
+                text: '📤 Forward tip',
+                callback_data: 'mkt_share_' + id,
+              },
+            ],
+          ],
+        },
+      });
+    } catch (e) {
+      await ctx.reply('invitepack failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['invitemarket', 'sharemarket'], async (ctx) => {
+    try {
+      const link = marketStartLink();
+      const text =
+        `👑 RADIANT QUEEN · PASIYA MAX\n` +
+        `Template Marketplace\n\n` +
+        `Open: ${link}\n` +
+        `Web: ${WEB_HUB}/bot/studio.html\n\n` +
+        `Free packs: club · shop · school · gold\n` +
+        `400 Radiant Gold on /start · /daily +50\n` +
+        `— Share with friends`;
+      await ctx.reply(text, {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: 'Open Marketplace', url: link }],
+            [{ text: 'Web Studio', url: WEB_HUB + '/bot/studio.html' }],
+          ],
+        },
+      });
+    } catch (e) {
+      await ctx.reply('invitemarket failed: ' + (e.message || e));
+    }
+  });
+
+
+
   bot.action(/^mkt_info_(club|shop|school|gold)$/, async (ctx) => {
     try {
       await ctx.answerCbQuery();
@@ -3345,6 +3499,7 @@ function buildBot() {
           inline_keyboard: [
             [{ text: '✅ Apply ' + id, callback_data: 'mkt_apply_' + id }],
             [{ text: '🏪 Marketplace', callback_data: 'mkt_home' }],
+            [{ text: '🎁 Share pack', callback_data: 'mkt_share_' + id }],
           ],
         },
       });
@@ -3378,6 +3533,26 @@ function buildBot() {
       } catch (_) {}
     }
   });
+
+  bot.action(/^mkt_share_(club|shop|school|gold|market)$/, async (ctx) => {
+    try {
+      await ctx.answerCbQuery();
+      const id = (ctx.match && ctx.match[1]) || 'club';
+      if (id === 'market') {
+        const link = marketStartLink();
+        await ctx.reply(
+          `Share Marketplace:\n${link}\n\nWeb: ${WEB_HUB}/bot/studio.html\n\nForward this message to friends.`
+        );
+        return;
+      }
+      const card = invitePackCard(id, ctx.from);
+      await ctx.reply(card + '\n\n(Forward this message)');
+    } catch (e) {
+      try { await ctx.answerCbQuery('error'); } catch (_) {}
+    }
+  });
+
+
 
   bot.action('mkt_status', async (ctx) => {
     try {
