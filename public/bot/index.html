@@ -88,9 +88,46 @@ h1 { font-size: 1.55rem; color: var(--gold2); letter-spacing: 0.02em; }
 ul { padding-left: 1.2rem; color: var(--muted); }
 li { margin: 6px 0; }
 code { color: var(--gold2); }
+
+#rq-auth-bar {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(10,6,8,0.92);
+  border-bottom: 1px solid #2a1f24;
+  backdrop-filter: blur(8px);
+  padding: 10px 14px;
+}
+.rq-auth-inner {
+  max-width: 720px; margin: 0 auto;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+}
+.rq-auth-name { color: #f5e6b0; font-weight: 600; font-size: 0.92rem; }
+.rq-auth-hint { color: #a89890; font-size: 0.85rem; flex: 1; }
+.rq-auth-pill {
+  font-size: 0.72rem; color: #4ade80; border: 1px solid #166534;
+  padding: 2px 8px; border-radius: 999px;
+}
+.rq-auth-btn {
+  display: inline-block; cursor: pointer; border: 0;
+  background: linear-gradient(135deg, #a8842e, #e8c56a);
+  color: #1a1008; font-weight: 700; font-size: 0.85rem;
+  padding: 8px 14px; border-radius: 999px; text-decoration: none !important;
+  font-family: inherit;
+}
+.rq-auth-btn.ghost {
+  background: transparent; color: #f5e6b0 !important;
+  border: 1px solid #e8c56a;
+}
+#rq-auth-error {
+  max-width: 720px; margin: 8px auto 0; padding: 0 14px 10px;
+  color: #fca5a5; font-size: 0.82rem;
+}
+
 </style>
 </head>
 <body>
+  <div id="rq-auth-bar"></div>
+  <div id="rq-auth-error"></div>
+
   <div class="wrap">
     <div class="brand">
       <div class="logo">R</div>
@@ -152,5 +189,6 @@ Hub: https://radiant-queen-pasiya-max-v2.vercel.app/bot/</div>
       © Radiant Queen · Pasiya Max · StrideClub · Share with /invite in Telegram
     </div>
   </div>
+  <script type="module" src="./auth.js"></script>
 </body>
 </html>
