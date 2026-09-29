@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Radiant Queen · Factory Studio P3</title>
+  <title>Radiant Queen · Factory Studio P4</title>
   <style>
     :root { --bg:#0b0f14; --card:#141b24; --line:#243041; --txt:#e8eef7; --mut:#9aabbf; --acc:#e11d48; }
     body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--txt); }
@@ -24,19 +24,19 @@
 </head>
 <body>
   <div class="wrap">
-    <span class="badge">v4.0 Phase 3 · Tenant enforce + welcome + beta</span>
+    <span class="badge">v4.0 Phase 4 · Tenant menu + commands + list</span>
     <h1>⚡ Bot Factory Studio</h1>
-    <p class="sub">Radiant Queen · Pasiya Max — apply pack, push welcome to tenant, beta channel.</p>
+    <p class="sub">Radiant Queen · Pasiya Max — pack apply, tenant /menu buttons, founder list.</p>
 
     <div class="card">
-      <div class="t">Full flow (copy)</div>
+      <div class="t">Full flow</div>
       <pre id="flow">1) @BotFather → /newbot → token
 2) @PasiyaMaxQueen_bot → /setbot TOKEN
 3) /factoryapply club
 4) /factorywelcome
-5) Open tenant bot → /start (pack welcome)
-6) /factorystatus
-7) Optional beta: /factorychannel beta → /factorybeta</pre>
+5) Tenant bot → /start (welcome + buttons)
+6) Tenant → /menu · /pack · /help
+7) Founder → /factorylist · /factorypacks</pre>
       <button data-c="flow">Copy</button> <span class="ok" id="ok-flow"></span>
       <div><a class="btn" href="https://t.me/PasiyaMaxQueen_bot">Main bot</a>
       <a class="btn ghost" href="/bot/">Hub</a></div>
@@ -53,14 +53,14 @@
     </div>
 
     <div class="card">
-      <div class="t">Phase 3 commands</div>
-      <pre id="p3">/factorywelcome
-/factorystatus
-/factorychannel beta
-/factorybeta
-/factorypreview</pre>
-      <button data-c="p3">Copy</button> <span class="ok" id="ok-p3"></span>
-      <p class="d">Tenant bot: /start /help /pack — AI respects pack ai flag.</p>
+      <div class="t">Phase 4 commands</div>
+      <pre id="p4">/factorypacks
+/factorylist
+/factoryapply club
+/factorywelcome
+/factorystatus</pre>
+      <button data-c="p4">Copy</button> <span class="ok" id="ok-p4"></span>
+      <p class="d">Tenant bot: /start shows Help + Pack + Open Main Bot buttons. /menu same keyboard.</p>
     </div>
   </div>
   <script>
