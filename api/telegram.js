@@ -59,7 +59,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-factory-p3-fix2'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
+const BOT_VERSION = 'v4.0-factory-p4'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -597,6 +597,11 @@ async function applyFactoryToOwner(ownerId, templateId, channel) {
   try {
     welcomeResult = await applyTemplateWelcome(ownerId, tpl.id);
   } catch (_) {}
+  let commandsResult = null;
+  try {
+    const token = await getTenantToken(ownerId);
+    if (token) commandsResult = await setTenantBotCommands(token, tpl.id);
+  } catch (_) {}
   return {
     ok: true,
     template_id: tpl.id,
@@ -606,6 +611,7 @@ async function applyFactoryToOwner(ownerId, templateId, channel) {
     version_channel: ch,
     welcome_applied: !!(welcomeResult && welcomeResult.ok),
     welcome_error: welcomeResult && !welcomeResult.ok ? welcomeResult.error : null,
+    commands_set: !!(commandsResult && commandsResult.ok),
   };
 }
 
@@ -735,6 +741,56 @@ async function requireBeta(ctx, label) {
     return false;
   }
 }
+
+const PACK_COMMANDS = {
+  club: [
+    { command: 'start', description: 'Welcome / Running Club' },
+    { command: 'help', description: 'Tenant help' },
+    { command: 'pack', description: 'Show pack + flags' },
+    { command: 'menu', description: 'Quick menu' },
+  ],
+  shop: [
+    { command: 'start', description: 'Welcome / Shop helper' },
+    { command: 'help', description: 'Tenant help' },
+    { command: 'pack', description: 'Show pack + flags' },
+    { command: 'menu', description: 'Quick menu' },
+  ],
+  school: [
+    { command: 'start', description: 'Welcome / Class bot' },
+    { command: 'help', description: 'Tenant help' },
+    { command: 'pack', description: 'Show pack + flags' },
+    { command: 'menu', description: 'Quick menu' },
+  ],
+  gold: [
+    { command: 'start', description: 'Welcome / Gold mode' },
+    { command: 'help', description: 'Tenant help' },
+    { command: 'pack', description: 'Show pack + flags' },
+    { command: 'menu', description: 'Quick menu' },
+  ],
+};
+
+async function setTenantBotCommands(botToken, templateId) {
+  if (!botToken) return { ok: false, error: 'no token' };
+  const id = String(templateId || 'club').toLowerCase();
+  const commands = PACK_COMMANDS[id] || PACK_COMMANDS.club;
+  try {
+    const r = await fetch(`https://api.telegram.org/bot${botToken}/setMyCommands`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ commands }),
+    });
+    const j = await r.json();
+    return { ok: !!j.ok, error: j.description || null };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+async function getTenantToken(ownerId) {
+  const row = typeof getUserBot === 'function' ? await getUserBot(ownerId) : null;
+  return row?.bot_token || null;
+}
+
 
 
 
@@ -2971,7 +3027,7 @@ function buildBot() {
       const templates = await listFactoryTemplates();
       const st = await getOwnerFactoryState(ctx.from.id);
       const lines = [
-        'BOT FACTORY · Phase 3',
+        'BOT FACTORY · Phase 4',
         'Brand: RADIANT QUEEN · PASIYA MAX',
         '',
         'Your pack: ' + (st.template_id || 'none'),
@@ -3028,6 +3084,7 @@ function buildBot() {
           'group=' + !!r.flags.group + ' gold=' + !!r.flags.gold +
           ' stride=' + !!r.flags.stride + ' ai=' + !!r.flags.ai + '\n' +
           'Tenant welcome preset: ' + (r.welcome_applied ? 'yes' : 'no') +
+          ' · commands: ' + (r.commands_set ? 'yes' : 'no') +
           (r.welcome_error ? ' (' + r.welcome_error + ')' : '') + '\n' +
           '/factoryflags · /factorywelcome · /factory'
       );
@@ -3162,6 +3219,73 @@ function buildBot() {
         'Tenant /start uses pack welcome when applied.'
     );
   });
+
+  bot.command(['factorypacks', 'packs'], async (ctx) => {
+    try {
+      const lines = [
+        'FACTORY PACKS · Phase 4',
+        '',
+        '🏃 club — Running Club (AI + group + gold + stride)',
+        '🛒 shop — Shop helper (AI + gold)',
+        '📚 school — Class / FAQ (AI + gold)',
+        '💰 gold — Gold economy focus (AI + gold)',
+        '',
+        'Apply: /factoryapply club|shop|school|gold',
+        'Welcome: /factorywelcome',
+        'Status: /factorystatus',
+        'Studio: https://radiant-queen-pasiya-max-v2.vercel.app/bot/studio.html',
+      ];
+      await uiReply(ctx, lines.join('\n'), mainMenuKeyboard(ctx));
+    } catch (e) {
+      await ctx.reply('factorypacks failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['factorylist'], async (ctx) => {
+    try {
+      if (!(await requireAdmin(ctx))) return;
+      if (!supabase) {
+        await ctx.reply('Supabase offline');
+        return;
+      }
+      const { data: bots } = await supabase
+        .from('rq_user_bots')
+        .select('owner_id,bot_username,is_active,webhook_set,welcome_text')
+        .order('owner_id', { ascending: true })
+        .limit(30);
+      const { data: flags } = await supabase
+        .from('rq_tenant_flags')
+        .select('owner_id,bot_username,template_id,version_channel,flags')
+        .limit(30);
+      const flagMap = {};
+      for (const f of flags || []) {
+        flagMap[String(f.owner_id)] = f;
+      }
+      const lines = ['FACTORY LIST · Founder', 'Tenants: ' + ((bots || []).length)];
+      for (const b of bots || []) {
+        const f = flagMap[String(b.owner_id)] || {};
+        lines.push(
+          '• @' +
+            (b.bot_username || '?') +
+            ' owner=' +
+            b.owner_id +
+            ' pack=' +
+            (f.template_id || '—') +
+            ' ch=' +
+            (f.version_channel || '—') +
+            ' active=' +
+            (b.is_active ? 'y' : 'n')
+        );
+      }
+      if (!(bots || []).length) lines.push('(no tenant rows)');
+      lines.push('', '/factorystatus · /factorypacks');
+      await ctx.reply(lines.join('\n').slice(0, 3500));
+    } catch (e) {
+      await ctx.reply('factorylist failed: ' + (e.message || e));
+    }
+  });
+
+
 
 
 

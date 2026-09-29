@@ -1,6 +1,6 @@
 /**
- * Radiant Queen · Tenant webhook — Factory Phase 3
- * Pack flags + template welcome + AI gate
+ * Radiant Queen · Tenant webhook — Factory Phase 4
+ * Pack welcome + inline menu + AI gate + /menu
  */
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenAI } from '@google/genai';
@@ -8,6 +8,7 @@ import { GoogleGenAI } from '@google/genai';
 const SUPABASE_URL = process.env.SUPABASE_URL || '';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const GEMINI_KEY = process.env.GEMINI_API_KEY || '';
+const MAIN_BOT = 'PasiyaMaxQueen_bot';
 
 const supabase =
   SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
@@ -51,7 +52,7 @@ async function aiReply(userText) {
       if (text && String(text).trim()) return String(text).trim().slice(0, 3500);
     } catch (_) {}
   }
-  return 'Radiant Queen AI is busy (free tier). Try again shortly.\nFull tools: @PasiyaMaxQueen_bot';
+  return 'Radiant Queen AI is busy (free tier). Try again shortly.\nFull tools: @' + MAIN_BOT;
 }
 
 function parseBody(req) {
@@ -74,8 +75,8 @@ function defaultWelcome(row, pack) {
     p +
     `\nBot: @${row.bot_username || 'bot'}\n` +
     `Send any text for AI help.\n` +
-    `/help — commands\n\n` +
-    `Full menu & group tools: @PasiyaMaxQueen_bot`
+    `/menu · /help · /pack\n\n` +
+    `Full tools: @${MAIN_BOT}`
   );
 }
 
@@ -85,13 +86,39 @@ function helpText(row, flags, pack) {
     `RADIANT QUEEN · TENANT BOT\n` +
     `@${row.bot_username || 'bot'}\n` +
     (pack ? `Pack: ${pack}\n` : '') +
-    `Flags: ai=${ai} group=${flags?.group === true} gold=${flags?.gold === true}\n\n` +
+    `Flags: ai=${ai} group=${flags?.group === true} gold=${flags?.gold === true} stride=${flags?.stride === true}\n\n` +
     `/start — welcome\n` +
+    `/menu — quick buttons\n` +
     `/help — this message\n` +
+    `/pack — pack status\n` +
     (ai ? `Any text — AI reply\n` : `AI disabled for this pack\n`) +
     `\nOwner (main bot):\n` +
-    `@PasiyaMaxQueen_bot → /factorystatus /settenantwelcome /mybot\n\n` +
-    `— Radiant Queen engine · Phase 3`
+    `@${MAIN_BOT} → /factorystatus /factorywelcome /mybot\n\n` +
+    `— Radiant Queen · Phase 4`
+  );
+}
+
+function menuKeyboard() {
+  return {
+    inline_keyboard: [
+      [
+        { text: '📋 Help', callback_data: 't_help' },
+        { text: '📦 Pack', callback_data: 't_pack' },
+      ],
+      [
+        { text: '👑 Open Main Bot', url: `https://t.me/${MAIN_BOT}` },
+      ],
+    ],
+  };
+}
+
+function menuText(row, pack) {
+  return (
+    `⚡ RADIANT QUEEN · TENANT MENU\n` +
+    `@${row.bot_username || 'bot'}\n` +
+    (pack ? `Pack: ${pack}\n` : '') +
+    `\nTap a button or send any text for AI.\n` +
+    `Full power: @${MAIN_BOT}`
   );
 }
 
@@ -128,7 +155,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         ok: true,
         service: 'radiant-queen-tenant-webhook',
-        phase: 'factory-p3',
+        phase: 'factory-p4',
         brand: 'Radiant Queen · Pasiya Max',
         hasDb: Boolean(supabase),
         hasGemini: Boolean(GEMINI_KEY),
@@ -147,7 +174,6 @@ export default async function handler(req, res) {
       .from('rq_user_bots')
       .select('*')
       .eq('owner_id', owner)
-      .eq('is_active', true)
       .maybeSingle();
 
     if (!row?.bot_token) {
@@ -160,6 +186,30 @@ export default async function handler(req, res) {
 
     const update = parseBody(req);
     const msg = update.message || update.edited_message;
+    const cq = update.callback_query;
+
+    if (cq) {
+      const chatId = cq.message?.chat?.id;
+      const data = cq.data || '';
+      await tg(row.bot_token, 'answerCallbackQuery', { callback_query_id: cq.id });
+      if (data === 't_help' && chatId) {
+        await tg(row.bot_token, 'sendMessage', {
+          chat_id: chatId,
+          text: helpText(row, flags, pack),
+        });
+      } else if (data === 't_pack' && chatId) {
+        await tg(row.bot_token, 'sendMessage', {
+          chat_id: chatId,
+          text:
+            `Pack: ${pack || 'none'}\n` +
+            `Channel: ${state.version_channel || 'stable'}\n` +
+            `Flags: ${JSON.stringify(flags)}\n` +
+            `Main: @${MAIN_BOT} /factorystatus`,
+        });
+      }
+      return res.status(200).json({ ok: true, callback: true });
+    }
+
     if (!msg) {
       return res.status(200).json({ ok: true, ignored: true });
     }
@@ -173,8 +223,18 @@ export default async function handler(req, res) {
       const out = await tg(row.bot_token, 'sendMessage', {
         chat_id: chatId,
         text: body.slice(0, 4000),
+        reply_markup: menuKeyboard(),
       });
       return res.status(200).json({ ok: true, start: true, pack, telegram: out.ok });
+    }
+
+    if (text === '/menu' || text.startsWith('/menu')) {
+      const out = await tg(row.bot_token, 'sendMessage', {
+        chat_id: chatId,
+        text: menuText(row, pack),
+        reply_markup: menuKeyboard(),
+      });
+      return res.status(200).json({ ok: true, menu: true, telegram: out.ok });
     }
 
     if (text === '/help' || text.startsWith('/help')) {
@@ -192,7 +252,7 @@ export default async function handler(req, res) {
           `Pack: ${pack || 'none'}\n` +
           `Channel: ${state.version_channel || 'stable'}\n` +
           `Flags: ${JSON.stringify(flags)}\n` +
-          `Main: @PasiyaMaxQueen_bot /factorystatus`,
+          `Main: @${MAIN_BOT} /factorystatus`,
       });
       return res.status(200).json({ ok: true, pack: true, telegram: out.ok });
     }
@@ -200,7 +260,7 @@ export default async function handler(req, res) {
     if (!text) {
       await tg(row.bot_token, 'sendMessage', {
         chat_id: chatId,
-        text: 'Send text for Radiant Queen AI.\n/help · Full tools: @PasiyaMaxQueen_bot',
+        text: 'Send text for Radiant Queen AI.\n/menu · /help · Full tools: @' + MAIN_BOT,
       });
       return res.status(200).json({ ok: true });
     }
@@ -211,8 +271,9 @@ export default async function handler(req, res) {
         text:
           'AI is off for this pack.\n' +
           `Pack: ${pack || 'none'}\n` +
-          'Owner: apply another pack on @PasiyaMaxQueen_bot\n' +
-          '/factoryapply club',
+          'Owner: apply another pack on @' +
+          MAIN_BOT +
+          '\n/factoryapply club',
       });
       return res.status(200).json({ ok: true, ai: false });
     }
@@ -220,7 +281,7 @@ export default async function handler(req, res) {
     const answer = await aiReply(text);
     const out = await tg(row.bot_token, 'sendMessage', {
       chat_id: chatId,
-      text: `${answer}\n\n— Radiant Queen · @PasiyaMaxQueen_bot`,
+      text: `${answer}\n\n— Radiant Queen · @${MAIN_BOT}`,
     });
     return res.status(200).json({ ok: true, telegram: out.ok });
   } catch (err) {
