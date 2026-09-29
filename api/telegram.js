@@ -47,6 +47,9 @@ const rateMap = new Map(); // memory fallback for rate limit
 const uiModeMap = new Map(); // userId -> normal | phone | clean
 const phoneAnchor = new Map(); // userId -> message_id
 const collapseStore = new Map(); // chatId:messageId -> snapshot
+const botSettingsMem = new Map(); // key -> value
+const groupActiveUsers = new Map(); // chatId -> Map(userId -> {name, username, ts})
+
 
 const RATE_WINDOW_MS = 60 * 1000; // 1 minute
 const RATE_MAX_HITS = 8; // max AI calls per user per window
@@ -56,7 +59,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v3.3.1-clean-fix';
+const BOT_VERSION = 'v3.5-full-group-power';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -421,6 +424,106 @@ function identityLine(ctx) {
 }
 
 
+
+async function getBotSetting(key) {
+  const k = String(key);
+  if (botSettingsMem.has(k)) return botSettingsMem.get(k);
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('rq_bot_settings')
+      .select('value')
+      .eq('key', k)
+      .maybeSingle();
+    if (error) return null;
+    const v = data?.value ?? null;
+    if (v != null) botSettingsMem.set(k, v);
+    return v;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function setBotSetting(key, value) {
+  const k = String(key);
+  const v = value == null ? null : String(value);
+  if (v == null) botSettingsMem.delete(k);
+  else botSettingsMem.set(k, v);
+  if (!supabase) return { ok: true, memory: true };
+  try {
+    if (v == null) {
+      await supabase.from('rq_bot_settings').delete().eq('key', k);
+      return { ok: true };
+    }
+    const { error } = await supabase.from('rq_bot_settings').upsert({
+      key: k,
+      value: v,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) return { ok: false, error: error.message, memory: true };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message, memory: true };
+  }
+}
+
+function trackGroupUser(ctx) {
+  try {
+    const chat = ctx.chat;
+    if (!chat || (chat.type !== 'group' && chat.type !== 'supergroup')) return;
+    const u = ctx.from;
+    if (!u || u.is_bot) return;
+    const cid = String(chat.id);
+    if (!groupActiveUsers.has(cid)) groupActiveUsers.set(cid, new Map());
+    groupActiveUsers.get(cid).set(String(u.id), {
+      id: u.id,
+      name: [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username || 'User',
+      username: u.username || null,
+      ts: Date.now(),
+    });
+  } catch (_) {}
+}
+
+function contactOwnerKeyboard() {
+  return Markup.inlineKeyboard([
+    [Markup.button.url('📞 WhatsApp 0759570743', 'https://wa.me/94759570743')],
+    [Markup.button.url('📞 WhatsApp 0707751710', 'https://wa.me/94707751710')],
+    [Markup.button.callback('🏠 Menu', 'menu_home')],
+  ]);
+}
+
+function groupPowerKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('📊 Group info', 'tap_groupinfo'),
+      Markup.button.callback('👑 Admins', 'tap_tagadmins'),
+    ],
+    [
+      Markup.button.callback('📣 Tag active', 'tap_tagall'),
+      Markup.button.callback('🔗 Invite link', 'tap_invitelink'),
+    ],
+    [
+      Markup.button.callback('📞 Contact', 'tap_contact'),
+      Markup.button.callback('🏠 Menu', 'menu_home'),
+    ],
+  ]);
+}
+
+async function resolveTargetUser(ctx) {
+  if (ctx.message?.reply_to_message?.from) {
+    return ctx.message.reply_to_message.from;
+  }
+  const text = ctx.message?.text || '';
+  const parts = text.trim().split(/\s+/);
+  if (parts.length < 2) return null;
+  const raw = parts[1].replace(/^@/, '');
+  if (/^\d+$/.test(raw)) {
+    return { id: Number(raw), username: null, first_name: raw };
+  }
+  // username lookup not available via API without interaction
+  return { id: null, username: raw, first_name: raw };
+}
+
 function getUiMode(uid) {
   return uiModeMap.get(String(uid)) || 'normal';
 }
@@ -443,13 +546,13 @@ function modeButtonLabel(uid) {
 function digitalFrame(body) {
   const core = String(body || '').trim();
   return (
-    `┏━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n` +
-    `┃ ⚡ RADIANT QUEEN DIGITAL ┃\n` +
-    `┃ ◆ SCREEN v3.3.1 · 3-MODE ◆\n` +
-    `┗━━━━━━━━━━━━━━━━━━━━━━━━━━┛\n\n` +
+    `╔══ ⚡ RADIANT QUEEN OS v3.5 ⚡ ══╗\n` +
+    `║ 👑 FULL GROUP POWER · DIGITAL  ║\n` +
+    `║ 💎 3-MODE · TOUCH · සිංහල     ║\n` +
+    `╚══════════════════════════════╝\n\n` +
     core +
-    `\n\n────────────────────\n` +
-    `💎 Touch UI · Type 1-10 still works`
+    `\n\n────────────────────────\n` +
+    `📡 Mode · 🔟 Guide · 4️⃣ Group tools`
   );
 }
 
@@ -728,8 +831,16 @@ function gadminKeyboard() {
       Markup.button.callback('Rules', 'tap_rules'),
     ],
     [
-      Markup.button.callback('Anti-link status', 'tap_antilink_status'),
-      Markup.button.callback('Group info', 'tap_groupinfo'),
+      Markup.button.callback('Anti-link', 'tap_antilink_status'),
+      Markup.button.callback('📊 Info', 'tap_groupinfo'),
+    ],
+    [
+      Markup.button.callback('👑 Admins', 'tap_tagadmins'),
+      Markup.button.callback('📣 Tag active', 'tap_tagall'),
+    ],
+    [
+      Markup.button.callback('🔗 Invite', 'tap_invitelink'),
+      Markup.button.callback('📞 Contact', 'tap_contact'),
     ],
     [Markup.button.callback('🏠 Menu', 'menu_home')],
   ]);
@@ -866,6 +977,8 @@ const SI_CAT = {
     `👥 GROUP ADMIN — සමූහ පාලනය\n\n` +
     `බොට්ව group එකේ Admin කරන්න (Delete + Restrict).\n\n` +
     `/groupadmin හෝ /gadmin — admin මෙනුව\n` +
+    `/kick /ban /unban /pin /purge /promote /demote\n` +
+    `/tagall /admins /members /invitelink /contact\n` +
     `/setwelcome පෙළ — ආචාර පණිවිඩය\n` +
     `/setrules පෙළ — නීති\n` +
     `/rules — නීති කියවන්න\n` +
@@ -1980,6 +2093,11 @@ function buildBot() {
 
   bot = new Telegraf(BOT_TOKEN);
 
+  bot.use(async (ctx, next) => {
+    try { trackGroupUser(ctx); } catch (_) {}
+    return next();
+  });
+
   bot.start(async (ctx) => {
     try {
       await getOrCreateGold(ctx.from.id, ctx.from.username || ctx.from.first_name);
@@ -2035,6 +2153,451 @@ function buildBot() {
         (isAdmin(ctx) ? `/admin — founder panel\n` : '') +
         `\nTools: Translate, Summarize, Rewrite, Caption, Hashtags, Bio, Ideas, Photo caption, Running tip\n` +
         `Send a photo anytime for vision.`, mainMenuKeyboard(ctx));
+  });
+
+
+  
+  // ===== v3.5 GROUP POWER + BANNER =====
+  bot.command(['contact', 'owner', 'call'], async (ctx) => {
+    await uiReply(
+      ctx,
+      '📞 CONTACT OWNER\n\n' +
+        'WhatsApp / Call:\n' +
+        '• 0759570743\n' +
+        '• 0707751710\n\n' +
+        'Tap buttons below.',
+      contactOwnerKeyboard()
+    );
+  });
+
+  bot.action('tap_contact', async (ctx) => {
+    await ctx.answerCbQuery();
+    await uiReply(
+      ctx,
+      '📞 CONTACT OWNER\n\n• 0759570743\n• 0707751710',
+      contactOwnerKeyboard()
+    );
+  });
+
+  bot.command(['setbanner'], async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const photo = ctx.message?.reply_to_message?.photo;
+    if (!photo || !photo.length) {
+      await ctx.reply('Reply to a photo with /setbanner (founder only).');
+      return;
+    }
+    const fileId = photo[photo.length - 1].file_id;
+    const r = await setBotSetting('banner_file_id', fileId);
+    await ctx.reply(r.ok ? 'Banner saved. Next /menu will prefer this photo (when sendPhoto path is used).' : 'Saved in memory only: ' + (r.error || ''));
+  });
+
+  bot.command(['banner'], async (ctx) => {
+    const id = await getBotSetting('banner_file_id');
+    if (!id) {
+      await ctx.reply('No custom banner yet. Reply to a photo with /setbanner');
+      return;
+    }
+    try {
+      await ctx.replyWithPhoto(id, { caption: 'Current banner' });
+    } catch (e) {
+      await ctx.reply('Banner file_id stored but send failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['resetbanner'], async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    await setBotSetting('banner_file_id', null);
+    await ctx.reply('Banner reset (text digital frame).');
+  });
+
+  bot.command(['testwelcome'], async (ctx) => {
+    const name = ctx.from?.first_name || 'Member';
+    const w = await getBotSetting('welcome_text_global');
+    const photo = await getBotSetting('welcome_photo_id');
+    const caption =
+      (w || 'Welcome to RADIANT QUEEN · PASIYA MAX group 👑') +
+      '\n\nHi ' + name + '!';
+    try {
+      if (photo) await ctx.replyWithPhoto(photo, { caption: caption.slice(0, 1024) });
+      else await ctx.reply(caption);
+    } catch (e) {
+      await ctx.reply(caption);
+    }
+  });
+
+  bot.command(['setwelcomemedia'], async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const rep = ctx.message?.reply_to_message;
+    if (!rep) {
+      await ctx.reply('Reply to a photo with /setwelcomemedia (optional caption becomes welcome text).');
+      return;
+    }
+    if (rep.photo?.length) {
+      await setBotSetting('welcome_photo_id', rep.photo[rep.photo.length - 1].file_id);
+    }
+    if (rep.caption || (ctx.message.text || '').split(' ').slice(1).join(' ')) {
+      const t = rep.caption || (ctx.message.text || '').split(' ').slice(1).join(' ');
+      await setBotSetting('welcome_text_global', t);
+    }
+    await ctx.reply('Welcome media/text saved. Use /testwelcome');
+  });
+
+  bot.command(['nowelcome'], async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    await setBotSetting('welcome_photo_id', null);
+    await setBotSetting('welcome_text_global', null);
+    await ctx.reply('Custom global welcome media cleared (group /setwelcome still works).');
+  });
+
+  bot.command(['kick'], async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+      await ctx.reply('Use in a group.');
+      return;
+    }
+    const target = await resolveTargetUser(ctx);
+    if (!target?.id) {
+      await ctx.reply('Reply to a user message with /kick');
+      return;
+    }
+    try {
+      await ctx.telegram.banChatMember(ctx.chat.id, target.id);
+      await ctx.telegram.unbanChatMember(ctx.chat.id, target.id, { only_if_banned: true });
+      await ctx.reply('Kicked user ' + target.id);
+    } catch (e) {
+      await ctx.reply('kick failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['ban'], async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const target = await resolveTargetUser(ctx);
+    if (!target?.id) {
+      await ctx.reply('Reply to a user with /ban');
+      return;
+    }
+    try {
+      await ctx.telegram.banChatMember(ctx.chat.id, target.id);
+      await ctx.reply('Banned ' + target.id);
+    } catch (e) {
+      await ctx.reply('ban failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['unban'], async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const target = await resolveTargetUser(ctx);
+    if (!target?.id) {
+      await ctx.reply('Reply to a user with /unban (or /unban <id>)');
+      return;
+    }
+    try {
+      await ctx.telegram.unbanChatMember(ctx.chat.id, target.id, { only_if_banned: true });
+      await ctx.reply('Unbanned ' + target.id);
+    } catch (e) {
+      await ctx.reply('unban failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['pin'], async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const mid = ctx.message?.reply_to_message?.message_id;
+    if (!mid) {
+      await ctx.reply('Reply to a message with /pin');
+      return;
+    }
+    try {
+      await ctx.telegram.pinChatMessage(ctx.chat.id, mid);
+      await ctx.reply('Pinned.');
+    } catch (e) {
+      await ctx.reply('pin failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['unpin'], async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    try {
+      await ctx.telegram.unpinChatMessage(ctx.chat.id);
+      await ctx.reply('Unpinned.');
+    } catch (e) {
+      await ctx.reply('unpin failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['mute'], async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const target = await resolveTargetUser(ctx);
+    if (!target?.id) {
+      await ctx.reply('Reply to a user with /mute');
+      return;
+    }
+    try {
+      const until = Math.floor(Date.now() / 1000) + 3600;
+      await ctx.telegram.restrictChatMember(ctx.chat.id, target.id, {
+        permissions: {
+          can_send_messages: false,
+          can_send_media_messages: false,
+          can_send_other_messages: false,
+          can_add_web_page_previews: false,
+        },
+        until_date: until,
+      });
+      await ctx.reply('Muted 1 hour: ' + target.id);
+    } catch (e) {
+      await ctx.reply('mute failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['unmute'], async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const target = await resolveTargetUser(ctx);
+    if (!target?.id) {
+      await ctx.reply('Reply to a user with /unmute');
+      return;
+    }
+    try {
+      await ctx.telegram.restrictChatMember(ctx.chat.id, target.id, {
+        permissions: {
+          can_send_messages: true,
+          can_send_media_messages: true,
+          can_send_other_messages: true,
+          can_add_web_page_previews: true,
+          can_send_polls: true,
+          can_invite_users: true,
+        },
+      });
+      await ctx.reply('Unmuted: ' + target.id);
+    } catch (e) {
+      await ctx.reply('unmute failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['promote'], async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const target = await resolveTargetUser(ctx);
+    if (!target?.id) {
+      await ctx.reply('Reply to a user with /promote');
+      return;
+    }
+    try {
+      await ctx.telegram.promoteChatMember(ctx.chat.id, target.id, {
+        can_manage_chat: true,
+        can_delete_messages: true,
+        can_restrict_members: true,
+        can_invite_users: true,
+        can_pin_messages: true,
+      });
+      await ctx.reply('Promoted: ' + target.id);
+    } catch (e) {
+      await ctx.reply('promote failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['demote'], async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const target = await resolveTargetUser(ctx);
+    if (!target?.id) {
+      await ctx.reply('Reply to a user with /demote');
+      return;
+    }
+    try {
+      await ctx.telegram.promoteChatMember(ctx.chat.id, target.id, {
+        can_manage_chat: false,
+        can_delete_messages: false,
+        can_restrict_members: false,
+        can_invite_users: false,
+        can_pin_messages: false,
+        can_promote_members: false,
+        can_change_info: false,
+        can_manage_video_chats: false,
+      });
+      await ctx.reply('Demoted: ' + target.id);
+    } catch (e) {
+      await ctx.reply('demote failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['settitle'], async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const target = ctx.message?.reply_to_message?.from;
+    const title = (ctx.message?.text || '').split(/\s+/).slice(1).join(' ').trim();
+    if (!target?.id || !title) {
+      await ctx.reply('Reply to admin with /settitle Custom Title');
+      return;
+    }
+    try {
+      await ctx.telegram.setChatAdministratorCustomTitle(ctx.chat.id, target.id, title.slice(0, 16));
+      await ctx.reply('Title set.');
+    } catch (e) {
+      await ctx.reply('settitle failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['setgtitle'], async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const title = (ctx.message?.text || '').split(/\s+/).slice(1).join(' ').trim();
+    if (!title) {
+      await ctx.reply('Usage: /setgtitle New Group Name');
+      return;
+    }
+    try {
+      await ctx.telegram.setChatTitle(ctx.chat.id, title);
+      await ctx.reply('Group title updated.');
+    } catch (e) {
+      await ctx.reply('setgtitle failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['setgphoto'], async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const photo = ctx.message?.reply_to_message?.photo;
+    if (!photo?.length) {
+      await ctx.reply('Reply to a photo with /setgphoto');
+      return;
+    }
+    try {
+      await ctx.telegram.setChatPhoto(ctx.chat.id, photo[photo.length - 1].file_id);
+      await ctx.reply('Group photo updated.');
+    } catch (e) {
+      await ctx.reply('setgphoto failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['invitelink', 'link'], async (ctx) => {
+    try {
+      const link = await ctx.telegram.exportChatInviteLink(ctx.chat.id);
+      await ctx.reply('Invite link:\n' + link);
+    } catch (e) {
+      try {
+        const inv = await ctx.telegram.createChatInviteLink(ctx.chat.id, {
+          name: 'RadiantQueen',
+          creates_join_request: false,
+        });
+        await ctx.reply('Invite link:\n' + inv.invite_link);
+      } catch (e2) {
+        await ctx.reply('invitelink failed: ' + (e2.message || e.message || e));
+      }
+    }
+  });
+
+  bot.action('tap_invitelink', async (ctx) => {
+    await ctx.answerCbQuery();
+    try {
+      const link = await ctx.telegram.exportChatInviteLink(ctx.chat.id);
+      await uiReply(ctx, '🔗 Invite link\n' + link, gadminKeyboard());
+    } catch (e) {
+      await uiReply(ctx, 'Invite failed: ' + (e.message || e) + '\nType /invitelink in group as admin.', gadminKeyboard());
+    }
+  });
+
+  bot.command(['admins', 'tagadmins'], async (ctx) => {
+    try {
+      const admins = await ctx.telegram.getChatAdministrators(ctx.chat.id);
+      const lines = ['👑 GROUP ADMINS', ''];
+      for (const a of admins) {
+        const u = a.user;
+        const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || 'Admin';
+        const mention = u.username ? '@' + u.username : '[' + name + '](tg://user?id=' + u.id + ')';
+        lines.push('• ' + mention + (a.status === 'creator' ? ' (owner)' : ''));
+      }
+      await ctx.reply(lines.join('\n'), { parse_mode: 'Markdown', disable_web_page_preview: true });
+    } catch (e) {
+      await ctx.reply('admins failed: ' + (e.message || e));
+    }
+  });
+
+  bot.action('tap_tagadmins', async (ctx) => {
+    await ctx.answerCbQuery();
+    try {
+      const admins = await ctx.telegram.getChatAdministrators(ctx.chat.id);
+      const lines = ['👑 GROUP ADMINS'];
+      for (const a of admins) {
+        const u = a.user;
+        const name = u.first_name || 'Admin';
+        lines.push('• ' + (u.username ? '@' + u.username : name + ' (' + u.id + ')'));
+      }
+      await uiReply(ctx, lines.join('\n'), gadminKeyboard());
+    } catch (e) {
+      await uiReply(ctx, 'admins failed: ' + (e.message || e), gadminKeyboard());
+    }
+  });
+
+  bot.command(['tagall', 'all', 'mentionall'], async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const cid = String(ctx.chat.id);
+    const map = groupActiveUsers.get(cid);
+    const lines = ['📣 TAG ACTIVE MEMBERS', '(Users who talked recently — Bot API cannot list everyone)', ''];
+    let i = 0;
+    if (map) {
+      for (const u of map.values()) {
+        if (i >= 40) break;
+        const mention = u.username ? '@' + u.username : u.name + ' (' + u.id + ')';
+        lines.push('• ' + mention);
+        i++;
+      }
+    }
+    if (i === 0) lines.push('No active users tracked yet. Members must send a message first.');
+    lines.push('', 'Admins: /admins');
+    await ctx.reply(lines.join('\n').slice(0, 4000));
+  });
+
+  bot.action('tap_tagall', async (ctx) => {
+    await ctx.answerCbQuery();
+    const cid = String(ctx.chat.id);
+    const map = groupActiveUsers.get(cid);
+    const lines = ['📣 ACTIVE MEMBERS'];
+    let i = 0;
+    if (map) {
+      for (const u of map.values()) {
+        if (i >= 30) break;
+        lines.push('• ' + (u.username ? '@' + u.username : u.name));
+        i++;
+      }
+    }
+    if (i === 0) lines.push('No tracked users yet.');
+    await uiReply(ctx, lines.join('\n'), gadminKeyboard());
+  });
+
+  bot.command(['members', 'list'], async (ctx) => {
+    try {
+      const count = await ctx.telegram.getChatMemberCount(ctx.chat.id);
+      const cid = String(ctx.chat.id);
+      const map = groupActiveUsers.get(cid);
+      const active = map ? map.size : 0;
+      await ctx.reply(
+        '👥 MEMBERS\nCount: ' + count + '\nTracked active: ' + active + '\n/admins · /tagall · /groupinfo'
+      );
+    } catch (e) {
+      await ctx.reply('members failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['addmember'], async (ctx) => {
+    await ctx.reply(
+      'Telegram bots cannot force-add a phone number.\n\n' +
+        '1) /invitelink — get invite link\n' +
+        '2) Share link to the person\n' +
+        '3) They join themselves\n\n' +
+        'Contact owner: /contact'
+    );
+  });
+
+  bot.command(['purge'], async (ctx) => {
+    if (!(await requireAdmin(ctx))) return;
+    const startId = ctx.message?.reply_to_message?.message_id;
+    const endId = ctx.message?.message_id;
+    if (!startId) {
+      await ctx.reply('Reply to the first message to delete from, with /purge');
+      return;
+    }
+    let deleted = 0;
+    for (let id = startId; id <= endId; id++) {
+      try {
+        await ctx.telegram.deleteMessage(ctx.chat.id, id);
+        deleted++;
+      } catch (_) {}
+    }
+    await ctx.reply('Purge attempted. Deleted ~' + deleted);
   });
 
 
@@ -6054,9 +6617,10 @@ bot.command('commands', async (ctx) => {
       'RADIANT QUEEN · GROUP ADMIN PACK',
       isGroup ? `Chat: ${chat.title || chat.id}` : '(Best used inside a group)',
       '',
-      'SETUP: /setwelcome /setrules /rules /antilink /modcheck /groupinfo',
-      'MOD: /warn /unwarn /mute /slow /shutup',
-      'Tap buttons below or type /groupadmin',
+      'SETUP: /setwelcome /setrules /antilink /modcheck /groupinfo',
+      'MOD: /kick /ban /warn /mute /pin /purge /promote',
+      'TAG: /tagall /admins /members · CONTACT: /contact',
+      'Tap buttons or type /groupadmin',
     ];
     await uiReply(ctx, lines.join('\n'), gadminKeyboard());
   });
