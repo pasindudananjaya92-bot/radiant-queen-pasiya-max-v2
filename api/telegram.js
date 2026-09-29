@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v3.0-phase9';
+const BOT_VERSION = 'v3.0-stable';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -4596,7 +4596,8 @@ bot.command('commands', async (ctx) => {
   bot.command('about', async (ctx) => {
     await ctx.reply(
       `RADIANT QUEEN · PASIYA MAX\n` +
-        `Public AI + group tools + Radiant Gold\n\n` +
+        `Public AI + group tools + Radiant Gold\n` +
+        `Status: STABLE v3.0 — public release\n\n` +
         `Version: ${typeof BOT_VERSION !== 'undefined' ? BOT_VERSION : 'v3.0'}\n` +
         `Bot: @PasiyaMaxQueen_bot\n` +
         `Web: https://radiant-queen-pasiya-max-v2.vercel.app\n` +
