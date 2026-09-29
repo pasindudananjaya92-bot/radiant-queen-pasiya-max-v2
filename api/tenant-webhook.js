@@ -1,6 +1,6 @@
 /**
- * Radiant Queen · Tenant webhook — Phase 5
- * Personality + /help + custom welcome
+ * Radiant Queen · Tenant webhook — Factory Phase 3
+ * Pack flags + template welcome + AI gate
  */
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenAI } from '@google/genai';
@@ -67,27 +67,59 @@ function parseBody(req) {
   return body;
 }
 
-function defaultWelcome(row) {
+function defaultWelcome(row, pack) {
+  const p = pack ? `Pack: ${pack}\n` : '';
   return (
-    `Ayubowan — powered by RADIANT QUEEN · PASIYA MAX\n\n` +
-    `Bot: @${row.bot_username || 'bot'}\n` +
+    `Ayubowan — powered by RADIANT QUEEN · PASIYA MAX\n` +
+    p +
+    `\nBot: @${row.bot_username || 'bot'}\n` +
     `Send any text for AI help.\n` +
     `/help — commands\n\n` +
     `Full menu & group tools: @PasiyaMaxQueen_bot`
   );
 }
 
-function helpText(row) {
+function helpText(row, flags, pack) {
+  const ai = flags?.ai !== false;
   return (
     `RADIANT QUEEN · TENANT BOT\n` +
-    `@${row.bot_username || 'bot'}\n\n` +
+    `@${row.bot_username || 'bot'}\n` +
+    (pack ? `Pack: ${pack}\n` : '') +
+    `Flags: ai=${ai} group=${flags?.group === true} gold=${flags?.gold === true}\n\n` +
     `/start — welcome\n` +
     `/help — this message\n` +
-    `Any text — AI reply (Queen personality)\n\n` +
-    `Owner tools (on main bot):\n` +
-    `@PasiyaMaxQueen_bot → /settenantwelcome /mybot /resyncbot\n\n` +
-    `— Radiant Queen engine`
+    (ai ? `Any text — AI reply\n` : `AI disabled for this pack\n`) +
+    `\nOwner (main bot):\n` +
+    `@PasiyaMaxQueen_bot → /factorystatus /settenantwelcome /mybot\n\n` +
+    `— Radiant Queen engine · Phase 3`
   );
+}
+
+async function loadOwnerFlags(ownerId, botUsername) {
+  if (!supabase) return { flags: { ai: true }, template_id: null, version_channel: 'stable' };
+  try {
+    let q = await supabase
+      .from('rq_tenant_flags')
+      .select('flags,template_id,version_channel')
+      .eq('owner_id', Number(ownerId))
+      .eq('bot_username', String(botUsername || ''))
+      .maybeSingle();
+    if (!q.data) {
+      q = await supabase
+        .from('rq_tenant_flags')
+        .select('flags,template_id,version_channel')
+        .eq('owner_id', Number(ownerId))
+        .eq('bot_username', '')
+        .maybeSingle();
+    }
+    return {
+      flags: q.data?.flags || { ai: true },
+      template_id: q.data?.template_id || null,
+      version_channel: q.data?.version_channel || 'stable',
+    };
+  } catch (_) {
+    return { flags: { ai: true }, template_id: null, version_channel: 'stable' };
+  }
 }
 
 export default async function handler(req, res) {
@@ -96,7 +128,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         ok: true,
         service: 'radiant-queen-tenant-webhook',
-        phase: '5-personality',
+        phase: 'factory-p3',
         brand: 'Radiant Queen · Pasiya Max',
         hasDb: Boolean(supabase),
         hasGemini: Boolean(GEMINI_KEY),
@@ -122,6 +154,10 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: false, error: 'tenant bot not found' });
     }
 
+    const state = await loadOwnerFlags(owner, row.bot_username);
+    const flags = state.flags || {};
+    const pack = state.template_id || null;
+
     const update = parseBody(req);
     const msg = update.message || update.edited_message;
     if (!msg) {
@@ -133,20 +169,32 @@ export default async function handler(req, res) {
 
     if (text === '/start' || text.startsWith('/start')) {
       const custom = (row.welcome_text || '').trim();
-      const body = custom || defaultWelcome(row);
+      const body = custom || defaultWelcome(row, pack);
       const out = await tg(row.bot_token, 'sendMessage', {
         chat_id: chatId,
         text: body.slice(0, 4000),
       });
-      return res.status(200).json({ ok: true, start: true, telegram: out.ok });
+      return res.status(200).json({ ok: true, start: true, pack, telegram: out.ok });
     }
 
     if (text === '/help' || text.startsWith('/help')) {
       const out = await tg(row.bot_token, 'sendMessage', {
         chat_id: chatId,
-        text: helpText(row),
+        text: helpText(row, flags, pack),
       });
       return res.status(200).json({ ok: true, help: true, telegram: out.ok });
+    }
+
+    if (text === '/pack' || text.startsWith('/pack')) {
+      const out = await tg(row.bot_token, 'sendMessage', {
+        chat_id: chatId,
+        text:
+          `Pack: ${pack || 'none'}\n` +
+          `Channel: ${state.version_channel || 'stable'}\n` +
+          `Flags: ${JSON.stringify(flags)}\n` +
+          `Main: @PasiyaMaxQueen_bot /factorystatus`,
+      });
+      return res.status(200).json({ ok: true, pack: true, telegram: out.ok });
     }
 
     if (!text) {
@@ -155,6 +203,18 @@ export default async function handler(req, res) {
         text: 'Send text for Radiant Queen AI.\n/help · Full tools: @PasiyaMaxQueen_bot',
       });
       return res.status(200).json({ ok: true });
+    }
+
+    if (flags.ai === false) {
+      await tg(row.bot_token, 'sendMessage', {
+        chat_id: chatId,
+        text:
+          'AI is off for this pack.\n' +
+          `Pack: ${pack || 'none'}\n` +
+          'Owner: apply another pack on @PasiyaMaxQueen_bot\n' +
+          '/factoryapply club',
+      });
+      return res.status(200).json({ ok: true, ai: false });
     }
 
     const answer = await aiReply(text);

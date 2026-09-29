@@ -59,7 +59,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-factory-p2'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
+const BOT_VERSION = 'v4.0-factory-p3'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -593,6 +593,10 @@ async function applyFactoryToOwner(ownerId, templateId, channel) {
   if (botUsername) {
     await setTenantTemplate(ownerId, '', tpl.id, ch, tpl.flags);
   }
+  let welcomeResult = null;
+  try {
+    welcomeResult = await applyTemplateWelcome(ownerId, tpl.id);
+  } catch (_) {}
   return {
     ok: true,
     template_id: tpl.id,
@@ -600,6 +604,8 @@ async function applyFactoryToOwner(ownerId, templateId, channel) {
     flags: tpl.flags,
     bot_username: botUsername || '(main / no tenant yet)',
     version_channel: ch,
+    welcome_applied: !!(welcomeResult && welcomeResult.ok),
+    welcome_error: welcomeResult && !welcomeResult.ok ? welcomeResult.error : null,
   };
 }
 
@@ -642,6 +648,60 @@ async function requireFeature(ctx, featureKey, label) {
     return true;
   }
 }
+
+const TEMPLATE_WELCOMES = {
+  club:
+    'Ayubowan! 🏃 Running Club mode\nPowered by RADIANT QUEEN · PASIYA MAX\n\nSend text for AI coach tips.\nFull tools: @PasiyaMaxQueen_bot\n/help',
+  shop:
+    'Welcome! 🛒 Shop helper mode\nPowered by RADIANT QUEEN · PASIYA MAX\n\nAsk product or support questions.\nFull tools: @PasiyaMaxQueen_bot\n/help',
+  school:
+    'Welcome! 📚 Class bot mode\nPowered by RADIANT QUEEN · PASIYA MAX\n\nAsk lessons / FAQ style questions.\nFull tools: @PasiyaMaxQueen_bot\n/help',
+  gold:
+    'Welcome! 💰 Gold economy mode\nPowered by RADIANT QUEEN · PASIYA MAX\n\nMain bot: /balance /daily on @PasiyaMaxQueen_bot\n/help',
+};
+
+async function applyTemplateWelcome(ownerId, templateId) {
+  const id = String(templateId || '').toLowerCase();
+  const text = TEMPLATE_WELCOMES[id];
+  if (!text || !supabase) return { ok: false, error: 'no welcome preset' };
+  try {
+    const { data: row } = await supabase
+      .from('rq_user_bots')
+      .select('id,bot_username')
+      .eq('owner_id', Number(ownerId))
+      .eq('is_active', true)
+      .maybeSingle();
+    if (!row) return { ok: false, error: 'no tenant bot — /setbot first' };
+    const { error } = await supabase
+      .from('rq_user_bots')
+      .update({ welcome_text: text })
+      .eq('owner_id', Number(ownerId))
+      .eq('is_active', true);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, bot_username: row.bot_username, welcome: text };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+async function requireBeta(ctx, label) {
+  try {
+    if (typeof isAdmin === 'function' && isAdmin(ctx)) return true;
+    const st = await getOwnerFactoryState(ctx.from.id);
+    if ((st.version_channel || 'stable') === 'beta') return true;
+    await ctx.reply(
+      'Beta only: ' +
+        (label || 'feature') +
+        '\nYour channel: ' +
+        (st.version_channel || 'stable') +
+        '\nFounder: /factorychannel beta'
+    );
+    return false;
+  } catch (_) {
+    return false;
+  }
+}
+
 
 
 
@@ -2781,6 +2841,7 @@ function buildBot() {
   });
 
   bot.command(['tagall', 'all', 'mentionall'], async (ctx) => {
+    if (!(await requireFeature(ctx, 'group', 'Group pack'))) return;
     if (!(await requireAdmin(ctx))) return;
     const cid = String(ctx.chat.id);
     const map = groupActiveUsers.get(cid);
@@ -2867,7 +2928,7 @@ function buildBot() {
       const templates = await listFactoryTemplates();
       const st = await getOwnerFactoryState(ctx.from.id);
       const lines = [
-        'BOT FACTORY · Phase 2',
+        'BOT FACTORY · Phase 3',
         'Brand: RADIANT QUEEN · PASIYA MAX',
         '',
         'Your pack: ' + (st.template_id || 'none'),
@@ -2888,7 +2949,7 @@ function buildBot() {
       lines.push('');
       lines.push('/factoryapply <id> — apply flags to your tenant');
       lines.push('/factoryflags — show flags');
-      lines.push('/factorychannel stable|beta — founder');
+      lines.push('/factorychannel stable|beta — founder'\n        '/factorywelcome — pack welcome → tenant'\n        '/factorystatus · /factorybeta (beta)');
       lines.push('Studio: https://radiant-queen-pasiya-max-v2.vercel.app/bot/studio.html');
       await uiReply(ctx, lines.join('\n'), mainMenuKeyboard(ctx));
     } catch (e) {
@@ -2921,7 +2982,9 @@ function buildBot() {
           'Flags: ' + JSON.stringify(r.flags) + '\n\n' +
           'group=' + !!r.flags.group + ' gold=' + !!r.flags.gold +
           ' stride=' + !!r.flags.stride + ' ai=' + !!r.flags.ai + '\n' +
-          '/factoryflags · /factory'
+          'Tenant welcome preset: ' + (r.welcome_applied ? 'yes' : 'no') +
+          (r.welcome_error ? ' (' + r.welcome_error + ')' : '') + '\n' +
+          '/factoryflags · /factorywelcome · /factory'
       );
     } catch (e) {
       await ctx.reply('factoryapply failed: ' + (e.message || e));
@@ -2970,6 +3033,92 @@ function buildBot() {
     );
     await ctx.reply(r.ok ? 'Version channel set: ' + ch : 'failed: ' + (r.error || ''));
   });
+
+  bot.command(['factorywelcome'], async (ctx) => {
+    try {
+      const st = await getOwnerFactoryState(ctx.from.id);
+      const id = st.template_id;
+      if (!id) {
+        await ctx.reply('No pack yet. /factoryapply club first');
+        return;
+      }
+      const r = await applyTemplateWelcome(ctx.from.id, id);
+      if (!r.ok) {
+        await ctx.reply('factorywelcome failed: ' + (r.error || ''));
+        return;
+      }
+      await ctx.reply(
+        'Tenant welcome set from pack: ' + id + '\n' +
+          'Bot: @' + (r.bot_username || '') + '\n\n' +
+          'Preview:\n' + String(r.welcome || '').slice(0, 500) + '\n\n' +
+          'Test: open your tenant bot → /start'
+      );
+    } catch (e) {
+      await ctx.reply('factorywelcome failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['factorystatus', 'factoryinfo'], async (ctx) => {
+    try {
+      const st = await getOwnerFactoryState(ctx.from.id);
+      let botU = '';
+      try {
+        const row = await getUserBot(ctx.from.id);
+        botU = row?.bot_username || '';
+      } catch (_) {}
+      const lines = [
+        'FACTORY STATUS · Phase 3',
+        'Owner: ' + ctx.from.id,
+        'Tenant: ' + (botU ? '@' + botU : '(none)'),
+        'Template: ' + (st.template_id || 'none'),
+        'Channel: ' + (st.version_channel || 'stable'),
+        'Flags: ' + JSON.stringify(st.flags || {}),
+        '',
+        'group=' + flagOn(st.flags, 'group'),
+        'gold=' + flagOn(st.flags, 'gold'),
+        'stride=' + flagOn(st.flags, 'stride'),
+        'ai=' + flagOn(st.flags, 'ai'),
+        '',
+        'Beta features: ' + ((st.version_channel || '') === 'beta' || isAdmin(ctx) ? 'UNLOCKED' : 'locked'),
+        '/factoryapply · /factorywelcome · /factorychannel',
+      ];
+      await uiReply(ctx, lines.join('\n'), mainMenuKeyboard(ctx));
+    } catch (e) {
+      await ctx.reply('factorystatus failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['factorybeta'], async (ctx) => {
+    if (!(await requireBeta(ctx, 'factorybeta'))) return;
+    await ctx.reply(
+      'BETA LAB (Phase 3)\n\n' +
+        'Unlocked because channel=beta or founder.\n' +
+        '• /factorystatus — full pack pulse\n' +
+        '• /factorywelcome — re-apply pack welcome to tenant\n' +
+        '• /factorychannel stable — leave beta\n\n' +
+        'Experimental ideas (coming):\n' +
+        '• per-tenant tool menus\n' +
+        '• pack marketplace cards\n' +
+        '• auto /start keyboard on tenant bots'
+    );
+  });
+
+  bot.command(['factorypreview'], async (ctx) => {
+    if (!(await requireBeta(ctx, 'factorypreview'))) return;
+    const st = await getOwnerFactoryState(ctx.from.id);
+    await ctx.reply(
+      'BETA PREVIEW\n' +
+        'If this pack is public, users see:\n' +
+        'Template: ' + (st.template_id || 'none') + '\n' +
+        'AI: ' + flagOn(st.flags, 'ai') + '\n' +
+        'Group tools: ' + flagOn(st.flags, 'group') + '\n' +
+        'Gold: ' + flagOn(st.flags, 'gold') + '\n' +
+        'Stride: ' + flagOn(st.flags, 'stride') + '\n\n' +
+        'Tenant /start uses pack welcome when applied.'
+    );
+  });
+
+
 
 
 
@@ -3563,6 +3712,7 @@ function buildBot() {
 
 
   bot.command('stride', async (ctx) => {
+    if (!(await requireFeature(ctx, 'stride', 'Stride pack'))) return;
     try {
       const arg = (ctx.message.text || '')
         .replace(/^\/stride(@\w+)?\s*/i, '')
