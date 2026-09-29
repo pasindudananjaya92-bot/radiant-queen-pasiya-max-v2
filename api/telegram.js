@@ -52,7 +52,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v3.0-phase8';
+const BOT_VERSION = 'v3.0-phase9';
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -1423,10 +1423,10 @@ ${LINKS}`;
       if (msg.includes('429') || msg.includes('quota')) {
         return (
           'AI temporarily unavailable (Gemini free-tier limit).\n\n'
-          + 'Try non-AI commands now:\n'
-          + '/ping /version /currency USD LKR /moon /weather Colombo\n'
-          + '/sun Colombo /aqi Colombo /calc 10*5 /todos /habits\n\n'
-          + 'Wait a bit, then retry AI (/ask, voice, Tools).'
+          + 'Free tools still work — try /tools\n'
+          + '/weather Colombo · /currency USD LKR · /moon\n'
+          + '/calc 10*5 · /daily · /balance · /groupadmin\n\n'
+          + 'Wait a bit, then retry AI.'
         );
       }
       break;
@@ -4610,6 +4610,7 @@ bot.command('commands', async (ctx) => {
         `• Tenant bots · /setbot\n\n` +
         `Free tier = fair gold limits (no fake unlimited).\n` +
         `Invite friends: /invite\n` +
+        `Free tools list: /tools\n` +
         `/menu · /balance · /links`
     );
   });
@@ -5339,6 +5340,41 @@ bot.command('commands', async (ctx) => {
     }
   });
 
+
+
+
+  bot.command(['tools', 'freetools', 'utilities'], async (ctx) => {
+    const msg =
+      `RADIANT QUEEN · FREE TOOLS\n` +
+      `(Work even when AI quota is resting)\n\n` +
+      `SYSTEM\n` +
+      `/ping · /version · /about · /links · /invite\n\n` +
+      `GOLD\n` +
+      `/balance · /gold · /daily · /claim · /prices\n\n` +
+      `WEATHER & SKY\n` +
+      `/weather <city> · /forecast <city>\n` +
+      `/sun <city> · /aqi <city> · /moon\n\n` +
+      `MONEY & MATH\n` +
+      `/currency USD LKR · /calc 10*5\n` +
+      `/time · /uuid\n\n` +
+      `CRYPTO UTILS\n` +
+      `/pw · /b64 · /hash\n\n` +
+      `PERSONAL DB\n` +
+      `/todo · /todos · /done\n` +
+      `/save · /saves · /unsave\n` +
+      `/habit · /habits · /export\n\n` +
+      `RUNNER\n` +
+      `/pace · /split · /convert\n` +
+      `/stride · /runxp · /xptop\n\n` +
+      `GROUP ADMIN\n` +
+      `/groupadmin · /gadmin\n\n` +
+      `AI (uses Radiant Gold / Gemini quota)\n` +
+      `Send any text · vision · voice\n` +
+      `/wiki · /web · /code · /define · /tr\n\n` +
+      `When AI is busy → use this list.\n` +
+      `— Radiant Queen · Pasiya Max`;
+    await ctx.reply(msg.slice(0, 4000));
+  });
 
 
   bot.command(['balance', 'gold'], async (ctx) => {
