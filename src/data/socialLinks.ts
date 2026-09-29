@@ -1,11 +1,42 @@
 import { SocialLinkItem } from "../types";
 
 export const PASIYA_MAIN_SITE = "https://strideclub-platform-6b71a.containers.snapdeploy.app/";
-export const PASIYA_GITHUB = "https://github.com/pasindudananjaya92-bot/bhook-";
+export const PASIYA_BOT = "https://t.me/PasiyaMaxQueen_bot";
+export const PASIYA_BOT_HUB = "https://radiant-queen-pasiya-max-v2.vercel.app/bot/";
+export const PASIYA_WEB_OS = "https://radiant-queen-pasiya-max-v2.vercel.app/";
+export const PASIYA_GITHUB = "https://github.com/pasindudananjaya92-bot/radiant-queen-pasiya-max-v2";
 export const PASIYA_PORTAL = "https://pasiyamax.vercel.app";
 export const PASIYA_BLOG = "https://mamageblog.blogspot.com";
+export const PASIYA_YOUTUBE = "https://youtube.com/@pasyamaxofficial";
 
 export const SOCIAL_LINKS: SocialLinkItem[] = [
+  {
+    id: "telegram-bot",
+    name: "Pasiya Max Queen Bot",
+    url: PASIYA_BOT,
+    iconName: "Send",
+    category: "official",
+    badge: "@PasiyaMaxQueen_bot",
+    description: "Official Telegram bot · STABLE v4.0 · Gold · Factory · Group tools"
+  },
+  {
+    id: "bot-hub",
+    name: "Bot Official Hub",
+    url: PASIYA_BOT_HUB,
+    iconName: "Globe",
+    category: "official",
+    badge: "Google Sign-In",
+    description: "Landing · create · studio · Sign in with Google"
+  },
+  {
+    id: "web-os",
+    name: "Radiant Queen Web OS",
+    url: PASIYA_WEB_OS,
+    iconName: "Cpu",
+    category: "official",
+    badge: "MAIN SITE",
+    description: "Luxury dashboard · neural UI · tools"
+  },
   {
     id: "strideclub",
     name: "StrideClub Platform",
@@ -36,7 +67,7 @@ export const SOCIAL_LINKS: SocialLinkItem[] = [
   {
     id: "youtube",
     name: "YouTube",
-    url: "https://youtube.com/@pasya",
+    url: "https://youtube.com/@pasyamaxofficial",
     iconName: "Youtube",
     category: "social",
     badge: "@pasya",
