@@ -59,7 +59,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v3.6-super-fix';
+const BOT_VERSION = 'v3.7-digital-os'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -543,20 +543,40 @@ function modeButtonLabel(uid) {
   return '🔘 Mode: 📜 Normal';
 }
 
+
+function sanitizeUiText(s) {
+  // Strip box-drawing / heavy rules that Telegram paints as a full-height vertical bar
+  return String(s || '')
+    .replace(/[╔╗╚╝╠╣╦╩╬┌┐└┘├┤┬┴┼┃━│║═─]/g, '')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function rowsOf3(buttons) {
+  const rows = [];
+  const list = Array.isArray(buttons) ? buttons.slice() : [];
+  while (list.length) {
+    rows.push(list.splice(0, 3));
+  }
+  return rows;
+}
+
 function digitalFrame(body) {
-  const core = String(body || '').trim();
+  // v3.7 - no box-drawing chars (Telegram vertical-line artifact)
+  const core = sanitizeUiText(String(body || '').trim());
   return (
-    `⚡ RADIANT QUEEN OS v3.6
+    `⚡ RADIANT QUEEN OS v3.7
 ` +
     `👑 FULL POWER · DIGITAL · 3-MODE
 ` +
-    `────────────────────────
+    `· · · · · · · · · · · · · · · ·
 ` +
     core +
     `
-────────────────────────
+· · · · · · · · · · · · · · · ·
 ` +
-    `Mode button · 🔟 Guide · /contact`
+    `Mode · 🔟 Guide · /contact · /menu`
   );
 }
 
@@ -604,7 +624,7 @@ function getPhoneFrame(uid) {
 async function uiReply(ctx, text, baseMarkup) {
   const uid = ctx.from?.id;
   const mode = getUiMode(uid);
-  const framed = digitalFrame(text).slice(0, 4090);
+  const framed = digitalFrame(sanitizeUiText(text)).slice(0, 4090);
   const extra = buildUiMarkup(ctx, baseMarkup || Markup.inlineKeyboard([]));
 
   // --- PHONE MODE: must stay on one message ---
@@ -654,7 +674,7 @@ async function uiReply(ctx, text, baseMarkup) {
 }
 
 async function sendMenuSmart(ctx, text, baseMarkup) {
-  const framed = digitalFrame(text).slice(0, 1024); // photo caption limit
+  const framed = digitalFrame(sanitizeUiText(text)).slice(0, 1024); // photo caption limit
   const extra = buildUiMarkup(ctx, baseMarkup || mainMenuKeyboard(ctx));
   const isGroup = ctx.chat && (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup');
   const mode = getUiMode(ctx.from?.id);
@@ -692,27 +712,42 @@ async function sendMenuSmart(ctx, text, baseMarkup) {
 
 
 function numberedMainMenuText() {
+  // v3.7 clean digital menu - no |   box chars
   return (
-    `╔══════════════════════════════╗\n` +
-    `║  RADIANT QUEEN • PASIYA MAX\n` +
-    `║  v3.3 · 3-MODE DIGITAL\n` +
-    `╚══════════════════════════════╝\n\n` +
-    `WEB     radiant-queen-pasiya-max-v2.vercel.app\n` +
-    `HUB     /bot/  ·  BOT  @PasiyaMaxQueen_bot\n\n` +
-    `┌─ MAIN (Reply Number) ────────┐\n` +
-    `│  1  OWNER / FOUNDER\n` +
-    `│  2  SOCIAL HUB\n` +
-    `│  3  AI LAB\n` +
-    `│  4  GROUP ADMIN LAB\n` +
-    `│  5  CREATOR TOOLS\n` +
-    `│  6  EDUCATION LAB\n` +
-    `│  7  CHANNELS & LINKS\n` +
-    `│  8  CONNECTED PLATFORMS\n` +
-    `│  9  STATUS & HELP\n` +
-    `│ 10  සිංහල සම්පූර්ණ GUIDE\n` +
-    `└──────────────────────────────┘\n\n` +
-    `Type 1–10 · tap · Mode button: 📱 / 🧹 / 📜\n` +
-    `සිංහලෙන් සියල්ල: 10 හෝ /si`
+    `⚡ RADIANT QUEEN · PASIYA MAX
+` +
+    `OS v3.7 · DIGITAL · TOUCH + TYPE
+
+` +
+    `WEB  radiant-queen-pasiya-max-v2.vercel.app
+` +
+    `HUB  /bot/   BOT  @PasiyaMaxQueen_bot
+
+` +
+    `MAIN (type 1-10 or tap)
+` +
+    `1  Owner / Founder
+` +
+    `2  Social Hub
+` +
+    `3  AI Lab
+` +
+    `4  Group Admin Lab
+` +
+    `5  Creator Tools
+` +
+    `6  Education Lab
+` +
+    `7  Channels and Links
+` +
+    `8  Connected Platforms
+` +
+    `9  Status and Help
+` +
+    `10 Sinhala Full Guide
+
+` +
+    `Tip: Mode button cycles Phone / Clean / Normal`
   );
 }
 
@@ -752,52 +787,40 @@ function platformsKeyboard() {
 }
 
 function mainMenuKeyboard(ctx) {
-  const rows = [
-    [
-      Markup.button.callback('1️⃣ AI', 'menu_ask'),
-      Markup.button.callback('2️⃣ Social', 'menu_social'),
-      Markup.button.callback('3️⃣ Tools', 'menu_tools'),
-    ],
-    [
-      Markup.button.callback('4️⃣ Group', 'menu_gadmin'),
-      Markup.button.callback('5️⃣ Creator', 'menu_tools'),
-      Markup.button.callback('6️⃣ Learn', 'menu_edu'),
-    ],
-    [
-      Markup.button.callback('7️⃣ Links', 'menu_links'),
-      Markup.button.callback('8️⃣ Platforms', 'menu_platforms'),
-      Markup.button.callback('9️⃣ Status', 'menu_status'),
-    ],
-    [
-      Markup.button.callback('🔟 Guide', 'menu_si_home'),
-      Markup.button.callback('💰 Gold', 'menu_gold'),
-      Markup.button.callback('🌦️ Weather', 'menu_weather'),
-    ],
-    [
-      Markup.button.callback('🏃 Stride', 'menu_stride_panel'),
-      Markup.button.callback('🎁 Invite', 'menu_invite'),
-      Markup.button.callback('📋 Tools map', 'menu_freetools'),
-    ],
-    [
-      Markup.button.callback('ℹ️ About', 'menu_about'),
-      Markup.button.callback('❓ Help', 'menu_help'),
-      Markup.button.callback('🆔 My ID', 'menu_id'),
-    ],
+  const buttons = [
+    Markup.button.callback('1️⃣ AI', 'menu_ask'),
+    Markup.button.callback('2️⃣ Social', 'menu_social'),
+    Markup.button.callback('3️⃣ Tools', 'menu_tools'),
+    Markup.button.callback('4️⃣ Group', 'menu_gadmin'),
+    Markup.button.callback('5️⃣ Creator', 'menu_tools'),
+    Markup.button.callback('6️⃣ Learn', 'menu_edu'),
+    Markup.button.callback('7️⃣ Links', 'menu_links'),
+    Markup.button.callback('8️⃣ Platforms', 'menu_platforms'),
+    Markup.button.callback('9️⃣ Status', 'menu_status'),
+    Markup.button.callback('🔟 Guide', 'menu_si_home'),
+    Markup.button.callback('💰 Gold', 'menu_gold'),
+    Markup.button.callback('🌦️ Weather', 'menu_weather'),
+    Markup.button.callback('🏃 Stride', 'menu_stride_panel'),
+    Markup.button.callback('🎁 Invite', 'menu_invite'),
+    Markup.button.callback('📋 Free', 'menu_freetools'),
+    Markup.button.callback('ℹ️ About', 'menu_about'),
+    Markup.button.callback('❓ Help', 'menu_help'),
+    Markup.button.callback('🆔 My ID', 'menu_id'),
   ];
   if (isAdmin(ctx)) {
-    rows.push([
+    buttons.push(
       Markup.button.callback('👑 Admin', 'menu_admin'),
       Markup.button.callback('📞 Contact', 'tap_contact'),
-      Markup.button.callback('📊 Info', 'tap_groupinfo'),
-    ]);
+      Markup.button.callback('📊 Info', 'tap_groupinfo')
+    );
   } else {
-    rows.push([
+    buttons.push(
       Markup.button.callback('📞 Contact', 'tap_contact'),
       Markup.button.callback('📊 Info', 'tap_groupinfo'),
-      Markup.button.callback('🔗 Links', 'menu_links'),
-    ]);
+      Markup.button.callback('🔗 Hub', 'menu_links')
+    );
   }
-  return Markup.inlineKeyboard(rows);
+  return Markup.inlineKeyboard(rowsOf3(buttons));
 }
 
 function afterReplyKeyboard(ctx) {
