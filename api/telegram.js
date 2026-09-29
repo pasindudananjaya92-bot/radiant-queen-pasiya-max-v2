@@ -59,7 +59,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-factory-p3'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
+const BOT_VERSION = 'v4.0-factory-p3-fix'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -2949,7 +2949,9 @@ function buildBot() {
       lines.push('');
       lines.push('/factoryapply <id> — apply flags to your tenant');
       lines.push('/factoryflags — show flags');
-      lines.push('/factorychannel stable|beta — founder'\n        '/factorywelcome — pack welcome → tenant'\n        '/factorystatus · /factorybeta (beta)');
+      lines.push('/factorychannel stable|beta — founder');
+        lines.push('/factorywelcome — pack welcome → tenant');
+        lines.push('/factorystatus · /factorybeta (beta)');
       lines.push('Studio: https://radiant-queen-pasiya-max-v2.vercel.app/bot/studio.html');
       await uiReply(ctx, lines.join('\n'), mainMenuKeyboard(ctx));
     } catch (e) {
