@@ -1,21 +1,59 @@
-# RADIANT QUEEN · PASIYA MAX v2.9
+# RADIANT QUEEN · PASIYA MAX — STABLE v4.0
 
-**Bot:** [@PasiyaMaxQueen_bot](https://t.me/PasiyaMaxQueen_bot)  
-**Web:** https://radiant-queen-pasiya-max-v2.vercel.app  
-**StrideClub:** https://strideclub-platform-6b71a.containers.snapdeploy.app  
-**Version:** v2.9-quota-safe  
+**Brand locked.** Do not rename to RedQueen or any other brand.
 
-Gemini-powered Telegram bot + Supabase + StrideClub bridge + GitHub founder tools.  
-Hosted on **Vercel** (webhook). Free-tier oriented.
+| | |
+|--|--|
+| **Telegram bot** | [@PasiyaMaxQueen_bot](https://t.me/PasiyaMaxQueen_bot) |
+| **Web OS (main site)** | https://radiant-queen-pasiya-max-v2.vercel.app |
+| **Bot hub (official pages)** | https://radiant-queen-pasiya-max-v2.vercel.app/bot/ |
+| **Factory studio** | https://radiant-queen-pasiya-max-v2.vercel.app/bot/studio.html |
+| **StrideClub** | https://strideclub-platform-6b71a.containers.snapdeploy.app |
+| **Version** | `v4.0-stable` |
+
+Gemini-powered Telegram super-bot + web OS + Bot Factory (tenant packs) + StrideClub bridge.  
+Hosted on **Vercel** (webhook + static hub). Free-tier oriented.
+
+---
+
+## What is live (STABLE freeze)
+
+### Telegram (`api/telegram.js`)
+- Dual menu: type **1–10** + touch buttons
+- Phone / Clean / Normal UI modes
+- Radiant Gold: `/balance` `/daily` `/prices`
+- Free tools when AI quota rests: `/tools` weather currency calc todos habits…
+- Group admin pack: welcome, anti-link, warn/mute, tagall, slow, notes, reports…
+- Bot Factory: `/market` `/factoryapply` `/factorywelcome` `/factorylist`
+- Public share: `/invitepack` `/invitemarket` `/sharelinks` + deep links `?start=pack_club`
+- Tenant bots via `/setbot` + `api/tenant-webhook.js`
+- Founder GitHub tools (private): upload/list/log
+
+### Web hub (`public/bot/`)
+- Landing, create, settings, studio
+- **Sign in with Google** (Firebase `strideclub-auth-platform`)
+- Authorized domain: `radiant-queen-pasiya-max-v2.vercel.app`
+
+### Main site (`src/` React OS)
+- Luxury dashboard UI (Neural / Analytics / Tools modals)
+- Links to Telegram bot, Bot Hub, StrideClub
+
+---
 
 ## Stack
 
-- `api/telegram.js` — Telegraf webhook
-- Supabase (Postgres) — groups, XP, warns, notes, FAQ, todos, habits, saves
-- Google Gemini — chat, vision, voice, tools (**free-tier limits apply**)
-- Open-Meteo — weather / forecast / sun / AQI (no key)
-- open.er-api.com — currency rates (includes LKR)
-- GitHub API — founder upload/list/get/log from private chat
+| Layer | Tech |
+|-------|------|
+| Bot webhook | Telegraf · `api/telegram.js` |
+| Tenant webhook | `api/tenant-webhook.js` |
+| Database | Supabase Postgres |
+| AI | Google Gemini (free tier limits) |
+| Weather | Open-Meteo (no key) |
+| FX | open.er-api.com |
+| Auth (web) | Firebase Google Sign-In |
+| Host | Vercel |
+
+---
 
 ## Environment (Vercel)
 
@@ -24,77 +62,57 @@ Hosted on **Vercel** (webhook). Free-tier oriented.
 | `BOT_TOKEN` | yes | BotFather |
 | `GEMINI_API_KEY` | yes | AI features |
 | `ADMIN_ID` | yes | Founder Telegram numeric id |
-| `ADMIN_EMAIL` | optional | meta only |
 | `SUPABASE_URL` | yes | |
 | `SUPABASE_SERVICE_ROLE_KEY` | yes | |
-| `GITHUB_TOKEN` | founder tools | Contents Read **and** Write |
+| `GITHUB_TOKEN` | founder tools | Contents read+write |
 | `GITHUB_REPO` | optional | `pasindudananjaya92-bot/radiant-queen-pasiya-max-v2` |
 | `STRIDE_API_BASE` | optional | StrideClub base URL |
+| `BOT_USERNAME` | optional | default `PasiyaMaxQueen_bot` |
+| `APP_URL` | optional | `https://radiant-queen-pasiya-max-v2.vercel.app` |
 
-## Quota-safe usage
+---
 
-When Gemini free tier is exhausted, AI commands pause. **Non-AI still works:**
+## Quick start (users)
+
+1. Open [@PasiyaMaxQueen_bot](https://t.me/PasiyaMaxQueen_bot) → `/start`
+2. `/balance` → 400 Radiant Gold · `/daily` +50
+3. `/market` → pick pack · or share `/invitepack club`
+4. Web: [/bot/](https://radiant-queen-pasiya-max-v2.vercel.app/bot/) → Sign in with Google
+5. Full OS UI: [main site](https://radiant-queen-pasiya-max-v2.vercel.app/)
+
+### Deep links
+```
+https://t.me/PasiyaMaxQueen_bot?start=market
+https://t.me/PasiyaMaxQueen_bot?start=pack_club
+https://t.me/PasiyaMaxQueen_bot?start=pack_shop
+https://t.me/PasiyaMaxQueen_bot?start=pack_school
+https://t.me/PasiyaMaxQueen_bot?start=pack_gold
+```
+
+---
+
+## Quota-safe note
+
+When Gemini free tier is exhausted, AI pauses. **Non-AI still works:**  
+`/ping` `/version` `/tools` `/weather` `/currency` `/calc` `/market` `/sharelinks` group admin commands.
+
+---
+
+## Repo map
 
 ```
-/ping /version /about /commands
-/currency USD LKR /moon /calc 10*5
-/weather Colombo /forecast Colombo /sun Colombo /aqi Colombo
-/todos /habits /saves /export
-/ghstatus /ghlist /sysbackup   (founder, private)
+api/telegram.js          Main bot (STABLE)
+api/tenant-webhook.js    Tenant mini-bots
+public/bot/              Official hub + Google auth
+src/                     Main web OS (React)
+STABLE_v4.md             Freeze notes
 ```
 
-AI (needs quota): `/ask`, Tools panel, `/wiki` `/web` `/code` `/define` `/tr`, voice, photo/video OCR, `/quote` `/dailytip`.
+---
 
-## Command map
+## Brand
 
-### AI & chat
-`/menu` `/ask` `/quote` `/dailytip` `/help` `/status` `/id` `/today`
+**Radiant Queen · Pasiya Max** only.  
+Bot username: `@PasiyaMaxQueen_bot`
 
-### Knowledge (AI)
-`/wiki` `/web` `/code` `/define` `/tr` `/ocr`
-
-### Runner
-`/runxp` `/xptop` `/logrun` `/streak` `/weekly` `/badges` `/linkstride`  
-`/pace` `/split` `/convert` `/challenge` `/me` `/habit` `/habits`
-
-### Weather & time (no Gemini)
-`/weather` `/forecast` `/sun` `/aqi` `/time` `/moon`
-
-### Money & utils (no Gemini)
-`/currency` `/calc` `/uuid` `/pw` `/b64` `/hash` `/roll` `/pick`
-
-### Personal DB
-`/save` `/saves` `/unsave` `/todo` `/todos` `/done` `/export`
-
-### Group moderation
-`/setwelcome` `/setrules` `/rules` `/groupinfo` `/antilink`  
-`/warn` `/unwarn` `/warns` `/mute` `/unmute` `/slow` `/title` `/modcheck`  
-`/note` `/notes` `/clearnote` `/stats` `/report` `/shutup` `/speak`  
-`/faqset` `/faq` `/faqs`
-
-### Founder / GitHub (private chat)
-`/ghpath` `/ghstatus` `/ghlist` `/ghget` `/ghlog` `/sysbackup`  
-`/admin` `/usage` `/broadcast` `/agentpulse`
-
-### System
-`/ping` `/version` `/commands` `/about` `/links`
-
-## Founder: upload file to GitHub
-
-1. Private chat with bot  
-2. `/ghpath api/telegram.js`  
-3. Send file as **Document**  
-4. Or caption: `gh api/telegram.js`
-
-## Supabase tables (summary)
-
-`group_settings`, `rq_run_xp`, `rq_run_xp_log`, `rq_warns`, `rq_pending_joins`,  
-`rq_group_notes`, `rq_group_reports`, `rq_faq`, `rq_feedback`, `rq_club_meta`,  
-`rq_saves`, `rq_todos`, `rq_habits`, `rq_rate_limits`
-
-See project chat / SQL dumps for full `CREATE TABLE` definitions.  
-`chat_id` and `user_id` are **bigint** (Telegram ids).
-
-## License
-
-Private / educational — Pasiya Max · StrideClub.
+© Pasiya Max · STABLE v4.0

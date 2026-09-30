@@ -1,0 +1,10 @@
+Upload paths (GitHub):
+README.md                         → repo root
+src/data/socialLinks.ts           → replace
+src/components/TopBar.tsx         → replace
+
+After Vercel rebuild, main site top bar shows:
+  Bot  → t.me/PasiyaMaxQueen_bot
+  Hub  → /bot/ (Google Sign-In pages)
+  Social → existing nexus modal
+  Badge → STABLE v4.0
