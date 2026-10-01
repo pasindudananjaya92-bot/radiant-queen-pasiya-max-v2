@@ -1,0 +1,20 @@
+P1a — Multi-provider AI router
+
+1) Upload:
+   lib/aiRouter.js          (NEW)
+   api/telegram.js          (replace)
+
+2) Vercel → Settings → Environment Variables:
+   GROQ_API_KEY=...           (https://console.groq.com/keys)  RECOMMENDED
+   OPENROUTER_API_KEY=...     (https://openrouter.ai/keys)     optional
+   GEMINI_API_KEY=...         (already have)
+
+3) Redeploy → Ready
+
+4) Test in Telegram:
+   /version  → v4.0-p1a-ai-router
+   /ask hi
+   If Gemini quota exhausted, Groq/OpenRouter should still answer.
+
+Order: Groq → OpenRouter → Gemini
+Images/vision still use Gemini.
