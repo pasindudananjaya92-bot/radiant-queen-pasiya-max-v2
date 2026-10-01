@@ -20,10 +20,21 @@ const supabase =
     : null;
 
 const MODELS = [
-  'gemini-2.5-flash',
-  'gemini-2.5-pro',
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-lite',
+  'gemini-1.5-flash',
+  'gemini-1.5-flash-8b',
   'gemini-flash-latest',
 ];
+
+function geminiModelCandidates() {
+  // Never pass groq/openrouter/cache labels into Gemini SDK
+  const bad = new Set(['groq', 'openrouter', 'cache', 'gemini']);
+  const cur = resolvedModel && !bad.has(String(resolvedModel)) && String(resolvedModel).startsWith('gemini')
+    ? [String(resolvedModel)]
+    : [];
+  return [...cur, ...MODELS.filter((m) => !cur.includes(m))];
+}
 
 const LINKS = `RADIANT QUEEN • PASIYA MAX
 Web: https://radiant-queen-pasiya-max-v2.vercel.app
@@ -59,7 +70,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-p1b-cache-rate'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
+const BOT_VERSION = 'v4.0-p1b-router-fix'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -2471,7 +2482,7 @@ ${identityLine(ctx)}
 Official links when asked:
 ${LINKS}`;
 
-  // Vision / image → Gemini SDK path only (multi-provider is text-first in P1a)
+  // Vision / image → Gemini SDK only (valid model ids only)
   if (imageBase64 && mimeType) {
     const ai = getAI();
     if (!ai) {
@@ -2481,9 +2492,7 @@ ${LINKS}`;
       { text: prompt },
       { inlineData: { data: imageBase64, mimeType } },
     ];
-    const models = resolvedModel
-      ? [resolvedModel, ...MODELS.filter((m) => m !== resolvedModel)]
-      : MODELS;
+    const models = geminiModelCandidates();
     let lastErr;
     for (const model of models) {
       try {
@@ -2505,16 +2514,16 @@ ${LINKS}`;
             'Free tools: /tools · /weather Colombo · /currency USD LKR'
           );
         }
-        break;
+        continue;
       }
     }
     return `AI vision error: ${String(lastErr?.message || lastErr).slice(0, 120)}`;
   }
 
-  // Text → cache → Groq → OpenRouter → Gemini (lib/aiRouter.js)
+  // Text: cache → aiRouter (Groq → OpenRouter → Gemini REST) — no hardcoded 2.5-flash here
   const userPrompt = String(prompt || '');
   try {
-    const { getCached, setCached } = await import('../lib/aiCache.js');
+    const { getCached } = await import('../lib/aiCache.js');
     const hit = await getCached(userPrompt);
     if (hit) {
       resolvedModel = 'cache';
@@ -2539,32 +2548,45 @@ ${LINKS}`;
   } catch (err) {
     const msg = String(err?.message || err);
     const low = msg.toLowerCase();
-    if (low.includes('429') || low.includes('quota') || low.includes('rate limit')) {
-      return (
-        'AI temporarily unavailable (all free providers busy/limited).\n\n' +
-        'Free tools still work — try /tools\n' +
-        '/weather Colombo · /currency USD LKR · /moon\n' +
-        '/calc 10*5 · /daily · /balance · /groupadmin'
-      );
+    if (low.includes('429') || low.includes('quota') || low.includes('rate limit') || low.includes('high demand')) {
+      // still try Gemini SDK with safe models before giving up
+    } else {
+      // router hard fail — try safe Gemini models below
     }
-    // Fallback: direct Gemini SDK if router failed hard
+
     const ai = getAI();
     if (ai) {
-      try {
-        const response = await ai.models.generateContent({
-          model: resolvedModel || MODELS[0],
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          config: { systemInstruction, temperature: 0.7 },
-        });
-        const text = (response.text || '').trim();
-        if (text) return text.slice(0, 3500);
-      } catch (e2) {
-        return (
-          `AI error: ${String(e2?.message || e2).slice(0, 120)}\n\n` +
-          `Non-AI: /ping /currency USD LKR /weather Colombo /tools`
-        );
+      let lastErr = err;
+      for (const model of geminiModelCandidates()) {
+        try {
+          const response = await ai.models.generateContent({
+            model,
+            contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+            config: { systemInstruction, temperature: 0.7 },
+          });
+          const text = (response.text || '').trim();
+          if (text) {
+            resolvedModel = model;
+            try {
+              const { setCached } = await import('../lib/aiCache.js');
+              await setCached(userPrompt, text);
+            } catch (_) {}
+            return text.slice(0, 3500);
+          }
+        } catch (e2) {
+          lastErr = e2;
+          const m2 = String(e2?.message || e2).toLowerCase();
+          if (m2.includes('404') || m2.includes('not found') || m2.includes('no longer available')) continue;
+          if (m2.includes('429') || m2.includes('quota')) continue;
+          continue;
+        }
       }
+      return (
+        `AI error: ${String(lastErr?.message || lastErr).slice(0, 140)}\n\n` +
+        `Non-AI: /ping /currency USD LKR /weather Colombo /tools`
+      );
     }
+
     return (
       `AI error: ${msg.slice(0, 160)}\n\n` +
       `Set GROQ_API_KEY or OPENROUTER_API_KEY or GEMINI_API_KEY on Vercel.\n` +
