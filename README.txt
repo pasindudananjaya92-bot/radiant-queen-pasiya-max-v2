@@ -1,7 +1,19 @@
-v4.0-p1d-hotfix
-Fix: broken multi-line single-quoted strings in /imagine and /notify
-caused SyntaxError → whole webhook dead (buttons spin then die).
+v4.0-p1d-lib-fix
 
-Upload: api/telegram.js replace
-Caption: gh api/telegram.js
-Test: /version → v4.0-p1d-hotfix then /menu /ask hi /imagine cat
+UPLOAD ALL 4 FILES:
+1) api/telegram.js
+2) lib/imagine.js
+3) lib/ntfy.js
+4) lib/stt.js
+
+Caption uploads:
+gh api/telegram.js
+gh lib/imagine.js
+gh lib/ntfy.js
+gh lib/stt.js
+
+Test:
+/version → v4.0-p1d-lib-fix
+/imagine a cat
+/notify test
+/ask hi
