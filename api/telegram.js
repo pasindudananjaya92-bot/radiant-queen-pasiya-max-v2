@@ -71,7 +71,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-p1c-persona'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
+const BOT_VERSION = 'v4.0-p1c-ai-stable'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -2541,7 +2541,21 @@ Persona mode: ${personaId}
 Official links when asked:
 ${LINKS}`;
 
-  // Vision / image → Gemini SDK only (valid model ids only)
+  const looksLikeError = (t) => {
+    const low = String(t || '').toLowerCase();
+    return (
+      low.includes('high demand') ||
+      low.includes('experiencing high') ||
+      low.includes('rate limit') ||
+      low.includes('resource_exhausted') ||
+      low.includes('ai error:') ||
+      low.includes('temporarily unavailable') ||
+      low.includes('no ai provider') ||
+      low.startsWith('ai vision error')
+    );
+  };
+
+  // Vision / image → Gemini SDK only
   if (imageBase64 && mimeType) {
     const ai = getAI();
     if (!ai) {
@@ -2562,98 +2576,148 @@ ${LINKS}`;
         });
         resolvedModel = model;
         const text = (response.text || '').trim();
-        if (text) return text.slice(0, 3500);
+        if (text && !looksLikeError(text)) return text.slice(0, 3500);
       } catch (err) {
         lastErr = err;
         const msg = String(err?.message || err).toLowerCase();
         if (msg.includes('404') || msg.includes('not found') || msg.includes('no longer available')) continue;
-        if (msg.includes('429') || msg.includes('quota')) {
-          return (
-            'AI temporarily unavailable (vision / Gemini limit).\n\n' +
-            'Free tools: /tools · /weather Colombo · /currency USD LKR'
-          );
-        }
+        if (msg.includes('429') || msg.includes('quota') || msg.includes('high demand')) continue;
         continue;
       }
     }
     return `AI vision error: ${String(lastErr?.message || lastErr).slice(0, 120)}`;
   }
 
-  // Text: cache → aiRouter (Groq → OpenRouter → Gemini REST) — no hardcoded 2.5-flash here
+  /*
+   * TEXT FLOW (P1c stable):
+   * 1) Redis cache (skip if poisoned error text)
+   * 2) lib/aiRouter.js routeTextAI: Groq (retry) → OpenRouter → Gemini REST
+   * 3) Emergency inline OpenRouter + Gemini if router throws/empty
+   * 4) Friendly message + /tools — never raw-only 503
+   */
   const userPrompt = String(prompt || '');
+
+  // 1) cache
   try {
     const { getCached } = await import('../lib/aiCache.js');
     const hit = await getCached(userPrompt, personaId);
-    if (hit) {
+    if (hit && !looksLikeError(hit)) {
       resolvedModel = 'cache';
       return hit.slice(0, 3500);
     }
   } catch (_) {}
 
+  // 2) main router
+  let routerErr = null;
   try {
     const { routeTextAI } = await import('../lib/aiRouter.js');
     const { text, provider } = await routeTextAI({
       system: systemInstruction,
       user: userPrompt,
     });
-    if (provider) resolvedModel = provider;
-    if (text) {
+    if (text && !looksLikeError(text)) {
+      if (provider) resolvedModel = provider;
       try {
         const { setCached } = await import('../lib/aiCache.js');
         await setCached(userPrompt, text, personaId);
       } catch (_) {}
-      return text;
+      return text.slice(0, 3500);
     }
   } catch (err) {
-    const msg = String(err?.message || err);
-    const low = msg.toLowerCase();
-    if (low.includes('429') || low.includes('quota') || low.includes('rate limit') || low.includes('high demand')) {
-      // still try Gemini SDK with safe models before giving up
-    } else {
-      // router hard fail — try safe Gemini models below
-    }
-
-    const ai = getAI();
-    if (ai) {
-      let lastErr = err;
-      for (const model of geminiModelCandidates()) {
-        try {
-          const response = await ai.models.generateContent({
-            model,
-            contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-            config: { systemInstruction, temperature: 0.7 },
-          });
-          const text = (response.text || '').trim();
-          if (text) {
-            resolvedModel = model;
-            try {
-              const { setCached } = await import('../lib/aiCache.js');
-              await setCached(userPrompt, text, personaId);
-            } catch (_) {}
-            return text.slice(0, 3500);
-          }
-        } catch (e2) {
-          lastErr = e2;
-          const m2 = String(e2?.message || e2).toLowerCase();
-          if (m2.includes('404') || m2.includes('not found') || m2.includes('no longer available')) continue;
-          if (m2.includes('429') || m2.includes('quota')) continue;
-          continue;
-        }
-      }
-      return (
-        `AI error: ${String(lastErr?.message || lastErr).slice(0, 140)}\n\n` +
-        `Non-AI: /ping /currency USD LKR /weather Colombo /tools`
-      );
-    }
-
-    return (
-      `AI error: ${msg.slice(0, 160)}\n\n` +
-      `Set GROQ_API_KEY or OPENROUTER_API_KEY or GEMINI_API_KEY on Vercel.\n` +
-      `Non-AI: /tools /weather /currency /daily`
-    );
+    routerErr = err;
   }
 
-  return 'AI returned empty. Try again or use /tools.';
+  // 3a) Emergency OpenRouter (if key present)
+  const orKey = process.env.OPENROUTER_API_KEY || '';
+  if (orKey) {
+    const orModels = [
+      process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free',
+      'google/gemma-2-9b-it:free',
+      'mistralai/mistral-7b-instruct:free',
+    ];
+    for (const model of orModels) {
+      try {
+        const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${orKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': process.env.APP_URL || 'https://radiant-queen-pasiya-max-v2.vercel.app',
+            'X-Title': 'Radiant Queen Pasiya Max',
+          },
+          body: JSON.stringify({
+            model,
+            temperature: 0.7,
+            max_tokens: 1200,
+            messages: [
+              { role: 'system', content: systemInstruction },
+              { role: 'user', content: userPrompt },
+            ],
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) continue;
+        const text = String(data?.choices?.[0]?.message?.content || '').trim();
+        if (text && !looksLikeError(text)) {
+          resolvedModel = 'openrouter';
+          try {
+            const { setCached } = await import('../lib/aiCache.js');
+            await setCached(userPrompt, text, personaId);
+          } catch (_) {}
+          return text.slice(0, 3500);
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+  }
+
+  // 3b) Emergency Gemini REST
+  const gKey = process.env.GEMINI_API_KEY || GEMINI_KEY || '';
+  if (gKey) {
+    for (const model of geminiModelCandidates()) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(gKey)}`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemInstruction }] },
+            contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 1200 },
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) continue;
+        const text = (data?.candidates?.[0]?.content?.parts || [])
+          .map((p) => p.text || '')
+          .join('')
+          .trim();
+        if (text && !looksLikeError(text)) {
+          resolvedModel = model;
+          try {
+            const { setCached } = await import('../lib/aiCache.js');
+            await setCached(userPrompt, text, personaId);
+          } catch (_) {}
+          return text.slice(0, 3500);
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+  }
+
+  // 4) friendly fail — never dump raw 503 alone
+  const hint = routerErr ? String(routerErr.message || routerErr).slice(0, 100) : 'providers busy';
+  return (
+    `AI is busy right now (free-tier limits).\n` +
+    `Tried: Groq → OpenRouter → Gemini.\n` +
+    `(${hint})\n\n` +
+    `Free tools still work:\n` +
+    `/tools · /weather Colombo · /currency USD LKR\n` +
+    `/persona status · /daily · /balance\n` +
+    `Retry /ask in ~30s.`
+  );
 }
 
 function toolPrompt(mode, userText) {
@@ -2942,6 +3006,27 @@ function buildBot() {
       await ctx.reply('persona failed: ' + String(err?.message || err).slice(0, 120));
     }
   });
+
+  bot.command(['aistatus', 'ailog'], async (ctx) => {
+    if (!isAdmin(ctx)) {
+      await ctx.reply('Founder only.');
+      return;
+    }
+    try {
+      const { getAiProviderStatus } = await import('../lib/aiRouter.js');
+      const s = getAiProviderStatus();
+      await ctx.reply(
+        `AI STATUS (founder)\n` +
+          `Keys: groq=${s.groq} openrouter=${s.openrouter} gemini=${s.gemini}\n` +
+          `Last provider: ${s.lastProvider || '—'}\n` +
+          `Last error: ${s.lastError || '—'}\n` +
+          `Log:\n${(s.log || []).join('\n') || '(empty)'}`
+      );
+    } catch (e) {
+      await ctx.reply('aistatus failed: ' + String(e?.message || e).slice(0, 120));
+    }
+  });
+
 
 
 
