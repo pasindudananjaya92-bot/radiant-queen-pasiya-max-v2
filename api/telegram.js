@@ -59,7 +59,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-stable'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
+const BOT_VERSION = 'v4.0-p1a-ai-router'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -2451,55 +2451,98 @@ async function setTenantWelcome(ownerId, text) {
 }
 
 async function generateReply(prompt, ctx, imageBase64, mimeType) {
-  const ai = getAI();
-  if (!ai) return 'Gemini key missing. Set GEMINI_API_KEY on Vercel.';
-
   const systemInstruction = `You are Pasiya AI, assistant of Pasiya Max, for RADIANT QUEEN.
 Answer in the user's language (Sinhala or English). Be practical. No fake supercomputer stats.
 ${identityLine(ctx)}
 Official links when asked:
 ${LINKS}`;
 
-  const parts = [{ text: prompt }];
+  // Vision / image → Gemini SDK path only (multi-provider is text-first in P1a)
   if (imageBase64 && mimeType) {
-    parts.push({ inlineData: { data: imageBase64, mimeType } });
+    const ai = getAI();
+    if (!ai) {
+      return 'Image AI needs GEMINI_API_KEY. Text chat can use Groq/OpenRouter if configured.';
+    }
+    const parts = [
+      { text: prompt },
+      { inlineData: { data: imageBase64, mimeType } },
+    ];
+    const models = resolvedModel
+      ? [resolvedModel, ...MODELS.filter((m) => m !== resolvedModel)]
+      : MODELS;
+    let lastErr;
+    for (const model of models) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: [{ role: 'user', parts }],
+          config: { systemInstruction, temperature: 0.7 },
+        });
+        resolvedModel = model;
+        const text = (response.text || '').trim();
+        if (text) return text.slice(0, 3500);
+      } catch (err) {
+        lastErr = err;
+        const msg = String(err?.message || err).toLowerCase();
+        if (msg.includes('404') || msg.includes('not found') || msg.includes('no longer available')) continue;
+        if (msg.includes('429') || msg.includes('quota')) {
+          return (
+            'AI temporarily unavailable (vision / Gemini limit).\n\n' +
+            'Free tools: /tools · /weather Colombo · /currency USD LKR'
+          );
+        }
+        break;
+      }
+    }
+    return `AI vision error: ${String(lastErr?.message || lastErr).slice(0, 120)}`;
   }
 
-  const models = resolvedModel
-    ? [resolvedModel, ...MODELS.filter((m) => m !== resolvedModel)]
-    : MODELS;
-
-  let lastErr;
-  for (const model of models) {
-    try {
-      const response = await ai.models.generateContent({
-        model,
-        contents: [{ role: 'user', parts }],
-        config: { systemInstruction, temperature: 0.7 },
-      });
-      resolvedModel = model;
-      const text = (response.text || '').trim();
-      if (text) return text.slice(0, 3500);
-    } catch (err) {
-      lastErr = err;
-      const msg = String(err?.message || err).toLowerCase();
-      if (msg.includes('404') || msg.includes('not found') || msg.includes('no longer available')) continue;
-      if (msg.includes('429') || msg.includes('quota')) {
+  // Text → Groq → OpenRouter → Gemini (lib/aiRouter.js)
+  try {
+    const { routeTextAI } = await import('../lib/aiRouter.js');
+    const { text, provider } = await routeTextAI({
+      system: systemInstruction,
+      user: String(prompt || ''),
+    });
+    if (provider) resolvedModel = provider;
+    if (text) return text;
+  } catch (err) {
+    const msg = String(err?.message || err);
+    const low = msg.toLowerCase();
+    if (low.includes('429') || low.includes('quota') || low.includes('rate limit')) {
+      return (
+        'AI temporarily unavailable (all free providers busy/limited).\n\n' +
+        'Free tools still work — try /tools\n' +
+        '/weather Colombo · /currency USD LKR · /moon\n' +
+        '/calc 10*5 · /daily · /balance · /groupadmin'
+      );
+    }
+    // Fallback: direct Gemini SDK if router failed hard
+    const ai = getAI();
+    if (ai) {
+      try {
+        const response = await ai.models.generateContent({
+          model: resolvedModel || MODELS[0],
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          config: { systemInstruction, temperature: 0.7 },
+        });
+        const text = (response.text || '').trim();
+        if (text) return text.slice(0, 3500);
+      } catch (e2) {
         return (
-          'AI temporarily unavailable (Gemini free-tier limit).\n\n'
-          + 'Free tools still work — try /tools\n'
-          + '/weather Colombo · /currency USD LKR · /moon\n'
-          + '/calc 10*5 · /daily · /balance · /groupadmin\n\n'
-          + 'Wait a bit, then retry AI.'
+          `AI error: ${String(e2?.message || e2).slice(0, 120)}\n\n` +
+          `Non-AI: /ping /currency USD LKR /weather Colombo /tools`
         );
       }
-      break;
     }
+    return (
+      `AI error: ${msg.slice(0, 160)}\n\n` +
+      `Set GROQ_API_KEY or OPENROUTER_API_KEY or GEMINI_API_KEY on Vercel.\n` +
+      `Non-AI: /tools /weather /currency /daily`
+    );
   }
-  return (
-    `AI error: ${String(lastErr?.message || lastErr).slice(0, 120)}\n\n` +
-    `Non-AI still works: /ping /currency USD LKR /weather Colombo /moon /calc 1+1`
-  );
+
+  return 'AI returned empty. Try again or use /tools.';
 }
 
 function toolPrompt(mode, userText) {
