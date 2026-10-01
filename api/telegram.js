@@ -55,6 +55,7 @@ const pendingGhPath = new Map(); // admin userId -> repo path
 const groupSettings = new Map(); // groupId -> settings
 const slowLastMsg = new Map(); // `${chatId}:${userId}` -> timestamp ms
 const rateMap = new Map(); // memory fallback for rate limit
+const personaMem = new Map(); // userId -> persona id (P1c)
 const uiModeMap = new Map(); // userId -> normal | phone | clean
 const phoneAnchor = new Map(); // userId -> message_id
 const collapseStore = new Map(); // chatId:messageId -> snapshot
@@ -70,7 +71,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-p1b-router-fix'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
+const BOT_VERSION = 'v4.0-p1c-persona'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -447,6 +448,52 @@ function identityLine(ctx) {
   const name = ctx.from?.first_name || ctx.from?.username || 'user';
   return `The user is ${name}. Be helpful. Do not call them the founder.`;
 }
+
+async function getUserPersona(userId) {
+  const id = String(userId || '');
+  if (!id) return 'default';
+  if (personaMem.has(id)) return personaMem.get(id);
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from('rq_user_personas')
+        .select('persona')
+        .eq('user_id', id)
+        .maybeSingle();
+      if (data?.persona) {
+        const { normalizePersona } = await import('../lib/personas.js');
+        const p = normalizePersona(data.persona) || 'default';
+        personaMem.set(id, p);
+        return p;
+      }
+    } catch (_) {}
+  }
+  personaMem.set(id, 'default');
+  return 'default';
+}
+
+async function setUserPersona(userId, personaId) {
+  const id = String(userId || '');
+  const { normalizePersona } = await import('../lib/personas.js');
+  const p = normalizePersona(personaId);
+  if (!p) return { ok: false, error: 'invalid' };
+  personaMem.set(id, p);
+  if (supabase) {
+    try {
+      const { error } = await supabase.from('rq_user_personas').upsert({
+        user_id: id,
+        persona: p,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) return { ok: true, persona: p, db: false, dbError: error.message };
+      return { ok: true, persona: p, db: true };
+    } catch (e) {
+      return { ok: true, persona: p, db: false, dbError: String(e?.message || e) };
+    }
+  }
+  return { ok: true, persona: p, db: false };
+}
+
 
 
 
@@ -2476,9 +2523,21 @@ async function setTenantWelcome(ownerId, text) {
 }
 
 async function generateReply(prompt, ctx, imageBase64, mimeType) {
-  const systemInstruction = `You are Pasiya AI, assistant of Pasiya Max, for RADIANT QUEEN.
-Answer in the user's language (Sinhala or English). Be practical. No fake supercomputer stats.
+  let personaId = 'default';
+  try {
+    personaId = await getUserPersona(ctx?.from?.id);
+  } catch (_) {}
+  let personaBlock = '';
+  try {
+    const { personaSystemBlock } = await import('../lib/personas.js');
+    personaBlock = personaSystemBlock(personaId);
+  } catch (_) {
+    personaBlock = `You are Pasiya AI, assistant of Pasiya Max, for RADIANT QUEEN.
+Answer in the user's language (Sinhala or English). Be practical. No fake supercomputer stats.`;
+  }
+  const systemInstruction = `${personaBlock}
 ${identityLine(ctx)}
+Persona mode: ${personaId}
 Official links when asked:
 ${LINKS}`;
 
@@ -2524,7 +2583,7 @@ ${LINKS}`;
   const userPrompt = String(prompt || '');
   try {
     const { getCached } = await import('../lib/aiCache.js');
-    const hit = await getCached(userPrompt);
+    const hit = await getCached(userPrompt, personaId);
     if (hit) {
       resolvedModel = 'cache';
       return hit.slice(0, 3500);
@@ -2541,7 +2600,7 @@ ${LINKS}`;
     if (text) {
       try {
         const { setCached } = await import('../lib/aiCache.js');
-        await setCached(userPrompt, text);
+        await setCached(userPrompt, text, personaId);
       } catch (_) {}
       return text;
     }
@@ -2569,7 +2628,7 @@ ${LINKS}`;
             resolvedModel = model;
             try {
               const { setCached } = await import('../lib/aiCache.js');
-              await setCached(userPrompt, text);
+              await setCached(userPrompt, text, personaId);
             } catch (_) {}
             return text.slice(0, 3500);
           }
@@ -2846,6 +2905,44 @@ function buildBot() {
         `\nTools: Translate, Summarize, Rewrite, Caption, Hashtags, Bio, Ideas, Photo caption, Running tip\n` +
         `Send a photo anytime for vision.`, mainMenuKeyboard(ctx));
   });
+
+  bot.command(['persona', 'mood', 'tone'], async (ctx) => {
+    try {
+      const { normalizePersona, listPersonasText } = await import('../lib/personas.js');
+      const raw = (ctx.message?.text || '').trim();
+      const arg = raw.split(/\s+/).slice(1).join(' ').trim().toLowerCase();
+      const uid = ctx.from?.id;
+
+      if (!arg || arg === 'help' || arg === 'list') {
+        const cur = await getUserPersona(uid);
+        await ctx.reply(
+          listPersonasText() + `\n\nCurrent: ${cur}\n` +
+            `Try: /persona coach\nThen: /ask give me a 5k plan`
+        );
+        return;
+      }
+      if (arg === 'status' || arg === 'me' || arg === 'show') {
+        const cur = await getUserPersona(uid);
+        await ctx.reply(`Your AI persona: ${cur}\nChange: /persona <mode>\nList: /persona`);
+        return;
+      }
+
+      const p = normalizePersona(arg);
+      if (!p) {
+        await ctx.reply('Unknown persona.\n\n' + listPersonasText());
+        return;
+      }
+      const res = await setUserPersona(uid, p);
+      const dbNote = res.db ? 'saved to Supabase' : (supabase ? 'memory only (table?)' : 'memory only');
+      await ctx.reply(
+        `Persona set: ${res.persona}\n(${dbNote})\n\n` +
+          `Next AI replies use this style.\nTest: /ask hi`
+      );
+    } catch (err) {
+      await ctx.reply('persona failed: ' + String(err?.message || err).slice(0, 120));
+    }
+  });
+
 
 
   
