@@ -59,7 +59,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-p1a-ai-router'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
+const BOT_VERSION = 'v4.0-p1b-cache-rate'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -237,6 +237,20 @@ async function fetchStrideJson(path, timeoutMs = 8000) {
 async function checkRateLimit(userId) {
   const id = String(userId);
   const now = Date.now();
+
+  // P1b: Upstash Redis (shared across serverless instances)
+  try {
+    const { checkRedisRateLimit } = await import('../lib/rateLimiter.js');
+    const redis = await checkRedisRateLimit(id);
+    if (redis && redis.ok === false) {
+      return { ok: false, waitSec: redis.waitSec || 60 };
+    }
+    if (redis && redis.ok === true) {
+      return { ok: true };
+    }
+  } catch (_) {
+    /* fall through to memory / Supabase */
+  }
 
   if (!supabase) {
     const row = rateMap.get(id) || { windowStart: now, hits: 0 };
@@ -2497,15 +2511,31 @@ ${LINKS}`;
     return `AI vision error: ${String(lastErr?.message || lastErr).slice(0, 120)}`;
   }
 
-  // Text → Groq → OpenRouter → Gemini (lib/aiRouter.js)
+  // Text → cache → Groq → OpenRouter → Gemini (lib/aiRouter.js)
+  const userPrompt = String(prompt || '');
+  try {
+    const { getCached, setCached } = await import('../lib/aiCache.js');
+    const hit = await getCached(userPrompt);
+    if (hit) {
+      resolvedModel = 'cache';
+      return hit.slice(0, 3500);
+    }
+  } catch (_) {}
+
   try {
     const { routeTextAI } = await import('../lib/aiRouter.js');
     const { text, provider } = await routeTextAI({
       system: systemInstruction,
-      user: String(prompt || ''),
+      user: userPrompt,
     });
     if (provider) resolvedModel = provider;
-    if (text) return text;
+    if (text) {
+      try {
+        const { setCached } = await import('../lib/aiCache.js');
+        await setCached(userPrompt, text);
+      } catch (_) {}
+      return text;
+    }
   } catch (err) {
     const msg = String(err?.message || err);
     const low = msg.toLowerCase();
