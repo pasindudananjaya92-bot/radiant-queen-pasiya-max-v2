@@ -20,10 +20,11 @@ const supabase =
     : null;
 
 const MODELS = [
-  'gemini-2.0-flash',
-  'gemini-2.0-flash-lite',
-  'gemini-1.5-flash',
-  'gemini-1.5-flash-8b',
+  'gemini-3.8-flash',
+  'gemini-3.6-flash',
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-2.5-flash',
   'gemini-flash-latest',
 ];
 
@@ -51,7 +52,60 @@ Live: https://strideclub-platform-6b71a.containers.snapdeploy.app
 Open the site for: Dashboard, Logbook, Leaderboard, Events, AI Coach, Agent Logs.`;
 
 const pendingTool = new Map();
-const pendingGhPath = new Map(); // admin userId -> repo path
+const pendingGhPath = new Map(); // admin userId -> repo path (memory; also persisted)
+
+async function setPendingGhPath(userId, repoPath) {
+  const id = String(userId || '');
+  const p = String(repoPath || '')
+    .trim()
+    .replace(/^\/+/, '')
+    .replace(/\\/g, '/')
+    .replace(/\.\./g, '');
+  if (!id || !p) return { ok: false, error: 'empty' };
+  // never allow basename-only overwrite of intentional nested paths from caller
+  pendingGhPath.set(id, p);
+  if (supabase) {
+    try {
+      await supabase.from('rq_bot_settings').upsert({
+        key: 'ghpath_' + id,
+        value: p,
+        updated_at: new Date().toISOString(),
+      });
+    } catch (_) {}
+  }
+  return { ok: true, path: p };
+}
+
+async function getPendingGhPath(userId) {
+  const id = String(userId || '');
+  if (pendingGhPath.has(id)) return pendingGhPath.get(id);
+  if (supabase) {
+    try {
+      const { data } = await supabase
+        .from('rq_bot_settings')
+        .select('value')
+        .eq('key', 'ghpath_' + id)
+        .maybeSingle();
+      if (data?.value) {
+        const p = String(data.value).replace(/^\/+/, '');
+        pendingGhPath.set(id, p);
+        return p;
+      }
+    } catch (_) {}
+  }
+  return null;
+}
+
+async function clearPendingGhPath(userId) {
+  const id = String(userId || '');
+  pendingGhPath.delete(id);
+  if (supabase) {
+    try {
+      await supabase.from('rq_bot_settings').delete().eq('key', 'ghpath_' + id);
+    } catch (_) {}
+  }
+}
+
 const groupSettings = new Map(); // groupId -> settings
 const slowLastMsg = new Map(); // `${chatId}:${userId}` -> timestamp ms
 const rateMap = new Map(); // memory fallback for rate limit
@@ -71,7 +125,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-p1c-ai-stable'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
+const BOT_VERSION = 'v4.0-p1c-path-models'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -1924,12 +1978,20 @@ async function githubPutFile(path, contentBuffer, message) {
   }
   const repo = GITHUB_REPO || 'pasindudananjaya92-bot/radiant-queen-pasiya-max-v2';
   const cleanPath = String(path || '')
+    .trim()
     .replace(/^\/+/, '')
+    .replace(/\\/g, '/')
     .replace(/\.\./g, '')
-    .slice(0, 200);
+    .slice(0, 240);
   if (!cleanPath || cleanPath.includes('..')) {
     return { ok: false, error: 'Invalid path' };
   }
+  // Keep nested paths (lib/aiRouter.js) — encode each segment
+  const encodedPath = cleanPath
+    .split('/')
+    .filter(Boolean)
+    .map((seg) => encodeURIComponent(seg))
+    .join('/');
   const headers = {
     Authorization: `Bearer ${GITHUB_TOKEN}`,
     Accept: 'application/vnd.github+json',
@@ -1939,7 +2001,7 @@ async function githubPutFile(path, contentBuffer, message) {
   let sha;
   try {
     const getRes = await fetch(
-      `https://api.github.com/repos/${repo}/contents/${cleanPath}`,
+      `https://api.github.com/repos/${repo}/contents/${encodedPath}`,
       { headers }
     );
     if (getRes.ok) {
@@ -1956,7 +2018,7 @@ async function githubPutFile(path, contentBuffer, message) {
   if (sha) body.sha = sha;
 
   const putRes = await fetch(
-    `https://api.github.com/repos/${repo}/contents/${cleanPath}`,
+    `https://api.github.com/repos/${repo}/contents/${encodedPath}`,
     { method: 'PUT', headers, body: JSON.stringify(body) }
   );
   const text = await putRes.text();
@@ -6958,17 +7020,21 @@ bot.command('commands', async (ctx) => {
       if (!path) {
         await ctx.reply(
           'Founder GitHub upload\n\n' +
-            '1) /ghpath api/telegram.js\n' +
-            '2) Send the file (document) in this private chat\n\n' +
-            'Or send a document with caption:\ngh api/telegram.js\n\n' +
+            '1) /ghpath lib/aiRouter.js   ← FULL path with folder\n' +
+            '2) Send file as Document\n\n' +
+            'BEST: caption the document:\ngh lib/aiRouter.js\n' +
+            '(caption never loses folder on cold start)\n\n' +
             `Repo: ${GITHUB_REPO}\nToken: ${GITHUB_TOKEN ? 'yes' : 'NO — set GITHUB_TOKEN with Contents: Read and write'}\n` +
             `Admin email (meta): ${ADMIN_EMAIL}`
         );
         return;
       }
-      pendingGhPath.set(String(ctx.from.id), path);
+      const saved = await setPendingGhPath(ctx.from.id, path);
       await ctx.reply(
-        `Ready.\nPath: ${path}\nNow send the file as a Document (not photo) in this private chat.`
+        `Ready.\nPath: ${saved.path || path}\n` +
+          `(saved for next document — survives Vercel cold start)\n` +
+          `Now send the file as a Document (not photo).\n` +
+          `Or caption the file: gh ${saved.path || path}`
       );
     } catch (err) {
       console.error('ghpath', err);
@@ -6988,7 +7054,7 @@ bot.command('commands', async (ctx) => {
           `Token: ${GITHUB_TOKEN ? 'yes' : 'NO'}\n` +
           `Admin Telegram ID: ${ADMIN_ID || '—'}\n` +
           `Admin email: ${ADMIN_EMAIL}\n` +
-          `Pending path: ${pendingGhPath.get(String(ctx.from.id)) || 'none'}\n\n` +
+          `Pending path: ${(await getPendingGhPath(ctx.from.id)) || 'none'}\n\n` +
           `/ghpath api/telegram.js  then send file`
       );
     } catch (err) {
@@ -8376,7 +8442,7 @@ bot.command('commands', async (ctx) => {
       }
 
       const caption = (ctx.message.caption || '').trim();
-      let path = pendingGhPath.get(String(ctx.from.id));
+      let path = await getPendingGhPath(ctx.from.id);
 
       // caption: "gh api/telegram.js" or "upload:README.md"
       const cap = caption.match(/^(?:gh|upload)\s*:?\s*(\S+)/i);
@@ -8384,13 +8450,18 @@ bot.command('commands', async (ctx) => {
 
       const doc = ctx.message.document;
       if (!path && doc?.file_name) {
-        // default: upload to repo root with same filename
         path = doc.file_name;
+        await ctx.reply(
+          `⚠ No /ghpath set — would upload to ROOT as ${path}.\n` +
+            `Cancel mentally & use:\n/ghpath lib/${doc.file_name}\nthen resend.\n` +
+            `Or caption this file: gh lib/${doc.file_name}`
+        );
       }
       if (!path) {
-        await ctx.reply('Set path first:\n/ghpath api/telegram.js\nor caption: gh api/telegram.js');
+        await ctx.reply('Set path first:\n/ghpath lib/aiRouter.js\nor caption: gh lib/aiRouter.js');
         return;
       }
+      path = String(path).replace(/^\/+/, '').replace(/\\/g, '/');
 
       // size limit ~4.5MB for GitHub API practicality on serverless
       if (doc.file_size && doc.file_size > 4_500_000) {
@@ -8409,7 +8480,7 @@ bot.command('commands', async (ctx) => {
         buf,
         `bot-upload: ${path} by founder`
       );
-      pendingGhPath.delete(String(ctx.from.id));
+      await clearPendingGhPath(ctx.from.id);
 
       if (!result.ok) {
         await ctx.reply(`Upload failed:\n${result.error}`);
