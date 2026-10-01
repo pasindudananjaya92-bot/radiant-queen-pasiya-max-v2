@@ -125,7 +125,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-p1c-path-models'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
+const BOT_VERSION = 'v4.0-p1d-imagine-voice'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -2584,6 +2584,100 @@ async function setTenantWelcome(ownerId, text) {
   return { ok: !error, error: error?.message };
 }
 
+
+/** Groq Whisper STT (same GROQ_API_KEY) */
+async function transcribeVoiceGroq(audioBuffer, filename = 'voice.ogg') {
+  const key = process.env.GROQ_API_KEY || '';
+  if (!key) return { ok: false, error: 'GROQ_API_KEY missing' };
+  const models = [
+    process.env.GROQ_WHISPER_MODEL || 'whisper-large-v3-turbo',
+    'whisper-large-v3',
+  ];
+  let lastErr = 'no model';
+  for (const model of models) {
+    try {
+      const form = new FormData();
+      const blob = new Blob([audioBuffer], { type: 'audio/ogg' });
+      form.append('file', blob, filename);
+      form.append('model', model);
+      form.append('response_format', 'text');
+      const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + key },
+        body: form,
+      });
+      const text = await res.text();
+      if (!res.ok) {
+        lastErr = 'HTTP ' + res.status + ': ' + text.slice(0, 160);
+        continue;
+      }
+      const cleaned = String(text || '').trim();
+      if (cleaned) return { ok: true, text: cleaned, model };
+      lastErr = 'empty transcript';
+    } catch (e) {
+      lastErr = String(e && e.message ? e.message : e);
+    }
+  }
+  return { ok: false, error: lastErr };
+}
+
+/** Pollinations image (no API key) */
+async function generateImagineImage(prompt) {
+  const q = String(prompt || '').trim().slice(0, 400);
+  if (!q) return { ok: false, error: 'empty prompt' };
+  const params = new URLSearchParams({
+    width: '1024',
+    height: '1024',
+    model: process.env.POLLINATIONS_MODEL || 'flux',
+    nologo: 'true',
+    enhance: 'true',
+  });
+  const url =
+    'https://image.pollinations.ai/prompt/' +
+    encodeURIComponent(q) +
+    '?' +
+    params.toString();
+  const res = await fetch(url, {
+    headers: { Accept: 'image/*' },
+    redirect: 'follow',
+  });
+  if (!res.ok) {
+    return { ok: false, error: 'HTTP ' + res.status, url };
+  }
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (!buf.length || buf.length < 500) {
+    return { ok: false, error: 'empty image', url };
+  }
+  return { ok: true, buffer: buf, url, prompt: q };
+}
+
+/** ntfy.sh free push */
+function ntfyTopic() {
+  return (
+    process.env.NTFY_TOPIC ||
+    ('radiant-queen-' + String(ADMIN_ID || 'public')).replace(/[^a-zA-Z0-9_-]/g, '')
+  );
+}
+
+async function sendNtfy(title, body, priority) {
+  const topic = ntfyTopic();
+  const res = await fetch('https://ntfy.sh/' + encodeURIComponent(topic), {
+    method: 'POST',
+    headers: {
+      Title: String(title || 'Radiant Queen').slice(0, 120),
+      Priority: String(priority || 'default'),
+      Tags: 'robot,speech_balloon',
+    },
+    body: String(body || '').slice(0, 3500),
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(function () { return ''; });
+    return { ok: false, error: 'HTTP ' + res.status + ' ' + t.slice(0, 120), topic };
+  }
+  return { ok: true, topic };
+}
+
+
 async function generateReply(prompt, ctx, imageBase64, mimeType) {
   let personaId = 'default';
   try {
@@ -3029,7 +3123,7 @@ function buildBot() {
         `/usage — founder usage snapshot\n` +
         (isAdmin(ctx) ? `/admin — founder panel\n` : '') +
         `\nTools: Translate, Summarize, Rewrite, Caption, Hashtags, Bio, Ideas, Photo caption, Running tip\n` +
-        `Send a photo anytime for vision.`, mainMenuKeyboard(ctx));
+        `Photo=vision · Voice note=STT+AI · /imagine=image · /notify=phone push.`, mainMenuKeyboard(ctx));
   });
 
   bot.command(['persona', 'mood', 'tone'], async (ctx) => {
@@ -7931,6 +8025,92 @@ bot.command('commands', async (ctx) => {
     await ctx.reply(await generateReply(q, ctx), afterReplyKeyboard(ctx));
   });
 
+  bot.command(['imagine', 'draw', 'img'], async (ctx) => {
+    try {
+      const uid = String(ctx.from.id);
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      try {
+        const pay = await spendGold(ctx, 'vision');
+        if (!pay.ok) {
+          await ctx.reply(pay.message || 'Not enough gold. /balance');
+          return;
+        }
+      } catch (_) {}
+
+      const prompt = (ctx.message.text || '')
+        .replace(/^\/(imagine|draw|img)(@\w+)?\s*/i, '')
+        .trim();
+      if (!prompt) {
+        await ctx.reply(
+          'Usage: /imagine a runner at sunrise in Colombo
+' +
+            'Free image gen (Pollinations · no API key).'
+        );
+        return;
+      }
+      await ctx.sendChatAction('upload_photo');
+      const img = await generateImagineImage(prompt);
+      if (!img.ok) {
+        await ctx.reply('Imagine failed: ' + String(img.error || 'unknown').slice(0, 160));
+        return;
+      }
+      await ctx.replyWithPhoto(
+        { source: img.buffer },
+        { caption: ('🎨 ' + img.prompt).slice(0, 900) }
+      );
+    } catch (err) {
+      console.error('imagine', err);
+      await ctx.reply('Imagine failed: ' + String(err && err.message ? err.message : err).slice(0, 160));
+    }
+  });
+
+  bot.command(['notify', 'remind', 'ntfy'], async (ctx) => {
+    try {
+      const msg = (ctx.message.text || '')
+        .replace(/^\/(notify|remind|ntfy)(@\w+)?\s*/i, '')
+        .trim();
+      if (!msg) {
+        const topic = ntfyTopic();
+        await ctx.reply(
+          'Phone push via ntfy.sh (free)
+
+' +
+            '1) Install ntfy app
+' +
+            '2) Subscribe to topic:
+' + topic + '
+' +
+            '3) Send: /notify Hello from Radiant Queen
+
+' +
+            'Env override: NTFY_TOPIC on Vercel'
+        );
+        return;
+      }
+      const who = ctx.from && ctx.from.username
+        ? '@' + ctx.from.username
+        : ((ctx.from && ctx.from.first_name) || 'user');
+      const r = await sendNtfy(
+        'Radiant Queen',
+        who + ': ' + msg,
+        isAdmin(ctx) ? 'high' : 'default'
+      );
+      if (!r.ok) {
+        await ctx.reply('ntfy failed: ' + (r.error || ''));
+        return;
+      }
+      await ctx.reply('✅ Sent to ntfy topic: ' + r.topic);
+    } catch (err) {
+      await ctx.reply('notify failed: ' + String(err && err.message ? err.message : err).slice(0, 120));
+    }
+  });
+
   // menus
   bot.action('menu_home', async (ctx) => {
     await ctx.answerCbQuery();
@@ -8666,20 +8846,36 @@ bot.command('commands', async (ctx) => {
       const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
       const res = await fetch(fileUrl);
       const buf = Buffer.from(await res.arrayBuffer());
-      const b64 = buf.toString('base64');
-      const mime = 'audio/ogg';
 
+      // 1) Groq Whisper STT
+      const stt = await transcribeVoiceGroq(buf, 'voice.ogg');
+      if (!stt.ok) {
+        await ctx.reply(
+          'Voice STT failed: ' + String(stt.error || '').slice(0, 140) +
+            '
+Send as text, or check GROQ_API_KEY.'
+        );
+        return;
+      }
+      const transcript = stt.text.slice(0, 2000);
+      // 2) AI reply on transcript
       const out = await generateReply(
-        'This is a voice message. Transcribe it briefly, then answer helpfully in the user language (Sinhala or English). Keep under 12 lines.',
-        ctx,
-        b64,
-        mime
+        'User spoke (voice transcript):
+' + transcript +
+          '
+
+Reply helpfully in the same language (Sinhala or English). Keep under 12 lines.',
+        ctx
       );
-      await ctx.reply(out.slice(0, 3500), isPrivate ? undefined : undefined);
+      await ctx.reply(
+        '🎙 ' + transcript.slice(0, 500) + '
+
+' + String(out || '').slice(0, 3000)
+      );
     } catch (err) {
       console.error('voice', err);
       try {
-        await ctx.reply('Voice AI failed (model may not accept audio on free tier). Try text.');
+        await ctx.reply('Voice AI failed. Try text /ask.');
       } catch (_) {}
     }
   });
