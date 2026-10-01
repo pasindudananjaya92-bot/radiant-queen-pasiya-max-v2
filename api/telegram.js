@@ -125,7 +125,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-p1d-hotfix'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
+const BOT_VERSION = 'v4.0-p1d-lib-fix'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -1222,7 +1222,1380 @@ async function uiReply(ctx, text, baseMarkup) {
 
   // --- PHONE MODE: must stay on one message ---
   if (mode === 'phone') {
-    // 1) Prefer editing the callback's own message (same box user tapped)\n    if (ctx.callbackQuery?.message?.message_id) {\n      try {\n        await ctx.telegram.editMessageText(\n          ctx.chat.id,\n          ctx.callbackQuery.message.message_id,\n          undefined,\n          framed,\n          extra\n        );\n        setPhoneFrame(uid, ctx.callbackQuery.message.message_id);\n        return;\n      } catch (err) {\n        // message is not modified / parse issues — try anchor\n        console.error('phone edit callback msg', err?.message || err);\n      }\n    }\n    // 2) Edit stored phone frame\n    const anchorId = getPhoneFrame(uid);\n    if (anchorId && ctx.chat?.id) {\n      try {\n        await ctx.telegram.editMessageText(\n          ctx.chat.id,\n          anchorId,\n          undefined,\n          framed,\n          extra\n        );\n        return;\n      } catch (err) {\n        console.error('phone edit anchor', err?.message || err);\n      }\n    }\n    // 3) First paint — create frame and remember id\n    const sent = await ctx.reply(framed, extra);\n    if (sent?.message_id) setPhoneFrame(uid, sent.message_id);\n    return;\n  }\n\n  // --- CLEAN + NORMAL: new message (clean markup has ❌ 🔼) ---\n  const sent = await ctx.reply(framed, extra);\n  return sent;\n}\n\nasync function sendMenuSmart(ctx, text, baseMarkup) {\n  const framed = digitalFrame(sanitizeUiText(text)).slice(0, 1024); // photo caption limit\n  const extra = buildUiMarkup(ctx, baseMarkup || mainMenuKeyboard(ctx));\n  const isGroup = ctx.chat && (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup');\n  const mode = getUiMode(ctx.from?.id);\n\n  // Groups (or when banner set): prefer photo + caption + buttons together\n  let bannerId = null;\n  try {\n    bannerId = await getBotSetting('banner_file_id');\n  } catch (_) {}\n\n  // Phone mode private: keep edit path via uiReply (text only)\n  if (mode === 'phone' && !isGroup) {\n    await uiReply(ctx, text, baseMarkup || mainMenuKeyboard(ctx));\n    return;\n  }\n\n  if (bannerId) {\n    try {\n      await ctx.replyWithPhoto(bannerId, {\n        caption: framed,\n        ...extra,\n      });\n      return;\n    } catch (e) {\n      console.error('sendMenuSmart photo', e?.message || e);\n    }\n  }\n\n  // Fallback text\n  await uiReply(ctx, text, baseMarkup || mainMenuKeyboard(ctx));\n}\n\n\n\n\n\nfunction numberedMainMenuText() {\n  const ver = typeof BOT_VERSION !== 'undefined' ? BOT_VERSION : 'v4.0';\n  return (\n    `⚡ RADIANT QUEEN · PASIYA MAX\n` +\n    `OS ${ver} · DIGITAL · TOUCH + TYPE\n\n` +\n    `WEB  radiant-queen-pasiya-max-v2.vercel.app\n` +\n    `HUB  /bot/   BOT  @PasiyaMaxQueen_bot\n\n` +\n    `MAIN (type 1-10 or tap)\n` +\n    `1  Owner / Founder\n` +\n    `2  Social Hub\n` +\n    `3  AI Lab\n` +\n    `4  Group Admin Lab\n` +\n    `5  Creator Tools\n` +\n    `6  Education Lab\n` +\n    `7  Channels and Links\n` +\n    `8  Connected Platforms\n` +\n    `9  Status and Help\n` +\n    `10 Sinhala Full Guide\n\n` +\n    `Tip: Mode button cycles Phone / Clean / Normal · /market · /invitepack`\n  );\n}\n\nfunction ownerMenuText() {\n  return (\n    `OWNER / FOUNDER MENU\n\n` +\n    `1 Health / Status\n` +\n    `2 Who am I\n` +\n    `3 Model info\n` +\n    `4 GitHub status\n` +\n    `5 Clear tool mode\n` +\n    `6 Links vault\n` +\n    `0 Back`\n  );\n}\n\nfunction platformsPanelText() {\n  return (\n    `CONNECTED PLATFORMS\n\n` +\n    `1  Open Website\n` +\n    `2  Open StrideClub\n` +\n    `3  Social / Channel links\n` +\n    `4  Bot status\n` +\n    `5  GitHub status (founder only)\n` +\n    `0  Back to main\n\n` +\n    `Reply with a number.`\n  );\n}\n\nfunction platformsKeyboard() {\n  return Markup.inlineKeyboard([\n    [Markup.button.url('Website', 'https://radiant-queen-pasiya-max-v2.vercel.app')],\n    [Markup.button.url('StrideClub', 'https://strideclub-platform-6b71a.containers.snapdeploy.app')],\n    [Markup.button.url('GitHub', 'https://github.com/pasindudananjaya92-bot/radiant-queen-pasiya-max-v2')],\n    [Markup.button.callback('Main menu', 'menu_home')],\n  ]);\n}\n\nfunction mainMenuKeyboard(ctx) {\n  const buttons = [\n    Markup.button.callback('1️⃣ AI', 'menu_ask'),\n    Markup.button.callback('2️⃣ Social', 'menu_social'),\n    Markup.button.callback('3️⃣ Tools', 'menu_tools'),\n    Markup.button.callback('4️⃣ Group', 'menu_gadmin'),\n    Markup.button.callback('5️⃣ Creator', 'menu_tools'),\n    Markup.button.callback('6️⃣ Learn', 'menu_edu'),\n    Markup.button.callback('7️⃣ Links', 'menu_links'),\n    Markup.button.callback('8️⃣ Platforms', 'menu_platforms'),\n    Markup.button.callback('9️⃣ Status', 'menu_status'),\n    Markup.button.callback('🔟 Guide', 'menu_si_home'),\n    Markup.button.callback('💰 Gold', 'menu_gold'),\n    Markup.button.callback('🌦️ Weather', 'menu_weather'),\n    Markup.button.callback('🏃 Stride', 'menu_stride_panel'),\n    Markup.button.callback('🎁 Invite', 'menu_invite'),\n    Markup.button.callback('📋 Free', 'menu_freetools'),\n    Markup.button.callback('ℹ️ About', 'menu_about'),\n    Markup.button.callback('❓ Help', 'menu_help'),\n    Markup.button.callback('🆔 My ID', 'menu_id'),\n  ];\n  if (isAdmin(ctx)) {\n    buttons.push(\n      Markup.button.callback('👑 Admin', 'menu_admin'),\n      Markup.button.callback('📞 Contact', 'tap_contact'),\n      Markup.button.callback('📊 Info', 'tap_groupinfo')\n    );\n  } else {\n    buttons.push(\n      Markup.button.callback('📞 Contact', 'tap_contact'),\n      Markup.button.callback('📊 Info', 'tap_groupinfo'),\n      Markup.button.callback('🔗 Hub', 'menu_links')\n    );\n  }\n  return Markup.inlineKeyboard(rowsOf3(buttons));\n}\n\nfunction afterReplyKeyboard(ctx) {\n  const rows = [\n    [\n      Markup.button.callback('Tools', 'menu_tools'),\n      Markup.button.callback('Menu', 'menu_home'),\n    ],\n  ];\n  if (isAdmin(ctx)) {\n    rows.push([Markup.button.callback('Admin', 'menu_admin')]);\n  }\n  return Markup.inlineKeyboard(rows);\n}\n\nfunction toolsKeyboard() {\n  return Markup.inlineKeyboard([\n    [\n      Markup.button.callback('Translate', 'tool_translate'),\n      Markup.button.callback('Summarize', 'tool_summarize'),\n    ],\n    [\n      Markup.button.callback('Rewrite pro', 'tool_rewrite'),\n      Markup.button.callback('Caption gen', 'tool_caption'),\n    ],\n    [\n      Markup.button.callback('Hashtags', 'tool_hashtags'),\n      Markup.button.callback('Bio writer', 'tool_bio'),\n    ],\n    [\n      Markup.button.callback('Running tip', 'tool_run_tip'),\n      Markup.button.callback('Ideas', 'tool_ideas'),\n    ],\n    [\n      Markup.button.callback('Photo caption', 'tool_photo_caption'),\n    ],\n    [\n      Markup.button.callback('💰 Gold', 'menu_gold'),\n      Markup.button.callback('🌦️ Weather', 'menu_weather'),\n    ],\n    [Markup.button.callback('🏠 Main menu', 'menu_home')],\n  ]);\n}\n\nfunction goldKeyboard() {\n  return Markup.inlineKeyboard([\n    [\n      Markup.button.callback('💰 Balance', 'tap_balance'),\n      Markup.button.callback('🎁 Daily', 'tap_daily'),\n    ],\n    [\n      Markup.button.callback('💲 Prices', 'tap_prices'),\n      Markup.button.callback('🏠 Menu', 'menu_home'),\n    ],\n  ]);\n}\n\nfunction weatherKeyboard() {\n  return Markup.inlineKeyboard([\n    [\n      Markup.button.callback('Colombo weather', 'tap_weather_cmb'),\n      Markup.button.callback('Moon', 'tap_moon'),\n    ],\n    [\n      Markup.button.callback('Sun Colombo', 'tap_sun_cmb'),\n      Markup.button.callback('AQI Colombo', 'tap_aqi_cmb'),\n    ],\n    [\n      Markup.button.callback('USD→LKR', 'tap_currency'),\n      Markup.button.callback('🏠 Menu', 'menu_home'),\n    ],\n  ]);\n}\n\nfunction gadminKeyboard() {\n  return Markup.inlineKeyboard([\n    [\n      Markup.button.callback('Modcheck', 'tap_modcheck'),\n      Markup.button.callback('Rules', 'tap_rules'),\n    ],\n    [\n      Markup.button.callback('Anti-link', 'tap_antilink_status'),\n      Markup.button.callback('📊 Info', 'tap_groupinfo'),\n    ],\n    [\n      Markup.button.callback('👑 Admins', 'tap_tagadmins'),\n      Markup.button.callback('📣 Tag active', 'tap_tagall'),\n    ],\n    [\n      Markup.button.callback('🔗 Invite', 'tap_invitelink'),\n      Markup.button.callback('📞 Contact', 'tap_contact'),\n    ],\n    [Markup.button.callback('🏠 Menu', 'menu_home')],\n  ]);\n}\n\nfunction siGuideHomeKeyboard() {\n  return Markup.inlineKeyboard([\n    [\n      Markup.button.callback('🤖 AI කතා', 'si_cat_ai'),\n      Markup.button.callback('💰 Gold', 'si_cat_gold'),\n    ],\n    [\n      Markup.button.callback('⛅ කාලගුණය', 'si_cat_weather'),\n      Markup.button.callback('🧮 ගණන්/මුදල්', 'si_cat_math'),\n    ],\n    [\n      Markup.button.callback('👥 Group Admin', 'si_cat_group'),\n      Markup.button.callback('🏃 දිවීම Stride', 'si_cat_run'),\n    ],\n    [\n      Markup.button.callback('🧰 Tools', 'si_cat_tools'),\n      Markup.button.callback('📚 ඉගෙනීම', 'si_cat_learn'),\n    ],\n    [\n      Markup.button.callback('📝 මගේ ලැයිස්තු', 'si_cat_personal'),\n      Markup.button.callback('🔐 රහස් මෙවලම්', 'si_cat_crypto'),\n    ],\n    [\n      Markup.button.callback('⚙️ System', 'si_cat_system'),\n      Markup.button.callback('🤖 මගේ Bot', 'si_cat_tenant'),\n    ],\n    [\n      Markup.button.callback('🔗 Links / Invite', 'si_cat_links'),\n      Markup.button.callback('🏠 ප්‍රධාන මෙනුව', 'menu_home'),\n    ],\n  ]);\n}\n\nfunction siBackKeyboard() {\n  return Markup.inlineKeyboard([\n    [\n      Markup.button.callback('🔙 කාණ්ඩ ලැයිස්තුව', 'menu_si_home'),\n      Markup.button.callback('🏠 ප්‍රධාන මෙනුව', 'menu_home'),\n    ],\n  ]);\n}\n\nfunction siGuideIntroText() {\n  return (\n    `🔟 සිංහල සම්පූර්ණ GUIDE\n\n` +\n    `මෙය බොට් එකේ හැම කොටසක්ම සරල සිංහලෙන්.\n` +\n    `පහත බොත්තම් වලින් කාණ්ඩයක් තෝරන්න.\n` +\n    `කාණ්ඩයක් තුළ විධානය කුමක්ද කියලා පැහැදිලිව තියෙනවා.\n\n` +\n    `ඉංග්‍රීසි නොදන්නත් කමක් නැහැ.\n` +\n    `බොත්තම් ඔබන්න හෝ /si ටයිප් කරන්න.`\n  );\n}\n\nconst SI_CAT = {\n  system: (\n    `⚙️ SYSTEM — පද්ධතිය\n\n` +\n    `/start — බොට් එක පටන් ගන්න / මෙනුව\n` +\n    `/menu — ප්‍රධාන මෙනුව + බොත්තම්\n` +\n    `/si — මේ සිංහල GUIDE එක\n` +\n    `/help — උදව් ලැයිස්තුව\n` +\n    `/ping — බොට් ජීවමානද බලන්න\n` +\n    `/version — බොට් version එක\n` +\n    `/about — බොට් ගැන කෙටි කතාව\n` +\n    `/id — ඔබේ Telegram ID එක\n` +\n    `/status — තත්ත්වය\n` +\n    `/commands — විධාන ලැයිස්තුව`\n  ),\n  gold: (\n    `💰 GOLD — රන් ලකුණු\n\n` +\n    `මෙය AI භාවිතයට තියෙන නොමිලේ ලකුණු පද්ධතියයි.\n\n` +\n    `/balance හෝ /gold — මගේ gold කීයද\n` +\n    `/daily හෝ /claim — දවසට +50 ගන්න (දවසකට වරක්)\n` +\n    `/prices හෝ /costs — මිල ලැයිස්තුව\n\n` +\n    `මිල (සාමාන්‍ය):\n` +\n    `• AI පෙළ පිළිතුර — 5\n` +\n    `• රූප/vision — 10\n` +\n    `• හඬ/voice — 10\n` +\n    `• Stride — 5\n\n` +\n    `පටන් ගන්නාම ආසන්න වශයෙන් 400 ලැබේ.`\n  ),\n  weather: (\n    `⛅ කාලගුණය හා අහස\n\n` +\n    `/weather Colombo — නගරයේ කාලගුණය\n` +\n    `/forecast Colombo — ඉදිරි දින කාලගුණය\n` +\n    `/sun Colombo — ඉර උදාව / බැසීම\n` +\n    `/aqi Colombo — වායු තත්ත්වය (AQI)\n` +\n    `/moon — සඳ ගැන\n\n` +\n    `Colombo වෙනුවට ඔබේ නගරය දාන්න.`\n  ),\n  math: (\n    `🧮 ගණන් හා මුදල්\n\n` +\n    `/currency USD LKR — ඩොලර් → රුපියල්\n` +\n    `/calc 10*5 — ගණන් කරන්න\n` +\n    `/time — වේලාව\n` +\n    `/uuid — අහඹු ID එකක්`\n  ),\n  crypto: (\n    `🔐 රහස් / කේත මෙවලම්\n\n` +\n    `/pw — ශක්තිමත් මුරපදයක් හදන්න\n` +\n    `/b64 — Base64 කේතනය\n` +\n    `/hash — hash අගයක් හදන්න\n\n` +\n    `මේවා AI නැතිවත් වැඩ කරයි.`\n  ),\n  personal: (\n    `📝 මගේ ලැයිස්තු (පුද්ගලික)\n\n` +\n    `/todo ටෙක්ස්ට් — කළ යුතු දෙයක් දාන්න\n` +\n    `/todos — ලැයිස්තුව බලන්න\n` +\n    `/done අංකය — ඉවරයි කියලා මකන්න\n\n` +\n    `/save ටෙක්ස්ට් — සටහනක් සේව්\n` +\n    `/saves — සේව් ලැයිස්තුව\n` +\n    `/unsave අංකය — මකන්න\n\n` +\n    `/habit නම — පුරුද්දක් එකතු\n` +\n    `/habits — පුරුදු බලන්න\n` +\n    `/export — දත්ත export`\n  ),\n  run: (\n    `🏃 දිවීම / StrideClub\n\n` +\n    `/pace 5 25:00 — වේගය ගණන්\n` +\n    `/split 5:30 10 — කොටස් වේලා\n` +\n    `/convert 21.1 km — km ↔ miles\n` +\n    `/stride — StrideClub bridge\n` +\n    `/runxp — දිවීම් XP\n` +\n    `/xptop — XP ලීඩර්බෝඩ්\n` +\n    `/logrun සටහන — රන් ලොග්\n` +\n    `/streak — දින දිගටි පුරුද්ද\n` +\n    `/me — මගේ පැතිකඩ`\n  ),\n  group: (\n    `👥 GROUP ADMIN — සමූහ පාලනය\n\n` +\n    `බොට්ව group එකේ Admin කරන්න (Delete + Restrict).\n\n` +\n    `/groupadmin හෝ /gadmin — admin මෙනුව\n` +\n    `/kick /ban /unban /pin /purge /promote /demote\n` +\n    `/tagall /admins /members /invitelink /contact\n` +\n    `/setwelcome පෙළ — ආචාර පණිවිඩය\n` +\n    `/setrules පෙළ — නීති\n` +\n    `/rules — නීති කියවන්න\n` +\n    `/antilink on|off|status — ලින්ක් අවහිර\n` +\n    `/modcheck — බොට්ට බලතල තියෙනවද\n` +\n    `/groupinfo — සමූහ තොරතුරු\n` +\n    `/warn (reply) — අනතුරු ඇඟවීම\n` +\n    `/unwarn (reply) — warn අඩු\n` +\n    `/warns — warn ලැයිස්තුව\n` +\n    `/mute /unmute — නිහඬ / නිදහස්\n` +\n    `/slow තත් — slow mode\n` +\n    `/note /notes — සටහන්\n` +\n    `/faqset /faq — නිති ප්‍රශ්න`\n  ),\n  tools: (\n    `🧰 CREATOR TOOLS\n\n` +\n    `මෙනුවෙන් Tools බොත්තම ඔබන්න.\n` +\n    `හෝ /tools\n\n` +\n    `තියෙනවා:\n` +\n    `• Translate — පරිවර්තනය\n` +\n    `• Summarize — කෙටි කරන්න\n` +\n    `• Rewrite — නැවත ලියන්න\n` +\n    `• Caption — caption හදන්න\n` +\n    `• Hashtags — හෑෂ්ටැග්\n` +\n    `• Bio — bio ලියන්න\n` +\n    `• Ideas — අදහස්\n` +\n    `• Running tip — දිවීම් උපදෙස්\n` +\n    `• Photo caption — රූපයට caption`\n  ),\n  learn: (\n    `📚 ඉගෙනීම / AI උපකාර\n\n` +\n    `/wiki මාතෘකාව — විස්තර\n` +\n    `/web ප්‍රශ්නය — වෙබ් උපකාර\n` +\n    `/code ප්‍රශ්නය — කේත උපකාර\n` +\n    `/define වචනය — අර්ථය\n` +\n    `/tr පෙළ — පරිවර්තනය\n\n` +\n    `සාමාන්‍ය පෙළ යැවුවත් AI උත්තර දෙයි.\n` +\n    `(Gold / quota අනුව)`\n  ),\n  ai: (\n    `🤖 AI කතා කිරීම\n\n` +\n    `1) ප්‍රශ්නය සෘජුව ටයිප් කරන්න\n` +\n    `2) හෝ මෙනුවෙන් 1️⃣ AI ඔබන්න\n` +\n    `3) රූපයක් යවන්න — vision විශ්ලේෂණය\n` +\n    `4) හඬ පණිවිඩයක් — voice\n\n` +\n    `AI නැවතී නම්:\n` +\n    `/tools බලන්න — නොමිලේ මෙවලම් තවමත් වැඩ කරයි.\n\n` +\n    `Gold වියදම් වේ — /balance /prices`\n  ),\n  tenant: (\n    `🤖 මගේ Bot (Tenant)\n\n` +\n    `ඔබේම Telegram bot එකක් Radiant Queen engine එකට සම්බන්ධ කරන්න.\n\n` +\n    `/setbot ටෝකන් — bot එක සම්බන්ධ කරන්න\n` +\n    `/mybot — මගේ bot තොරතුරු\n` +\n    `/resyncbot — webhook නැවත සකසන්න\n` +\n    `/settenantwelcome පෙළ — ආචාර පණිවිඩය\n` +\n    `/tenantwelcome — දැන් තියෙන welcome\n\n` +\n    `ටෝකන් BotFather ගෙන් ගන්න.\n` +\n    `ටෝකන් public group එකක දාන්න එපා.`\n  ),\n  links: (\n    `🔗 Links හා Invite\n\n` +\n    `/links — නිල ලින්ක් ඔක්කොම\n` +\n    `/invite හෝ /share — යාළුවන්ට යවන පෙළ\n\n` +\n    `Bot: https://t.me/PasiyaMaxQueen_bot\n` +\n    `Web: https://radiant-queen-pasiya-max-v2.vercel.app\n` +\n    `Hub: https://radiant-queen-pasiya-max-v2.vercel.app/bot/\n\n` +\n    `Landing එකේත් share පෙළ තියෙනවා.`\n  ),\n};\n\n\n\n\nfunction strideKeyboard() {\n  return Markup.inlineKeyboard([\n    [Markup.button.url('Open StrideClub', 'https://strideclub-platform-6b71a.containers.snapdeploy.app')],\n    [Markup.button.callback('Stride summary', 'stride_summary')],\n    [Markup.button.callback('Back to menu', 'menu_home')],\n  ]);\n}\n\nfunction adminKeyboard() {\n  return Markup.inlineKeyboard([\n    [\n      Markup.button.callback('Health', 'admin_health'),\n      Markup.button.callback('Who am I', 'admin_whoami'),\n    ],\n    [\n      Markup.button.callback('Model info', 'admin_model'),\n      Markup.button.callback('GitHub status', 'admin_github'),\n    ],\n    [\n      Markup.button.callback('Clear tool mode', 'admin_clear'),\n      Markup.button.callback('Links vault', 'admin_links'),\n    ],\n    [Markup.button.callback('Back', 'menu_home')],\n  ]);\n}\n\nfunction statusText(ctx) {\n  return (\n    `RADIANT QUEEN • PASIYA MAX v2.2\n` +\n    `Token: ${BOT_TOKEN ? 'yes' : 'NO'}\n` +\n    `Gemini: ${GEMINI_KEY ? 'yes' : 'NO'}\n` +\n    `ADMIN_ID: ${ADMIN_ID ? 'yes' : 'NO'}\n` +\n    `GitHub token: ${GITHUB_TOKEN ? 'yes' : 'no'}\n` +\n    `Admin email: ${ADMIN_EMAIL}\n` +\n    `Supabase: ${supabase ? 'yes' : 'NO'}\n` +\n    `You are founder: ${isAdmin(ctx) ? 'yes' : 'no'}\n` +\n    `Model: ${resolvedModel || 'not used yet'}`\n  );\n}\n\nfunction uptimeText() {\n  const sec = Math.floor((Date.now() - bootTime) / 1000);\n  return `${Math.floor(sec / 60)}m ${sec % 60}s (this warm instance)`;\n}\n\nasync function ensureGroupAdmin(ctx) {\n  if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {\n    await ctx.reply('This command works only inside a group. Add the bot to a group, make it ADMIN, then try again.');\n    return false;\n  }\n  try {\n    const me = await ctx.telegram.getChatMember(ctx.chat.id, ctx.botInfo.id);\n    if (me.status !== 'administrator' && me.status !== 'creator') {\n      await ctx.reply('I need ADMIN rights in this group (restrict members + delete messages recommended).');\n      return false;\n    }\n    return true;\n  } catch (err) {\n    await ctx.reply('Could not check admin rights. Make me admin and retry.');\n    return false;\n  }\n}\n\nasync function isUserGroupAdmin(ctx) {\n  try {\n    const m = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);\n    return m.status === 'administrator' || m.status === 'creator';\n  } catch {\n    return false;\n  }\n}\n\nfunction hasLink(text = '') {\n  return /https?:\/\/|t\.me\/|www\.|telegram\.me\//i.test(text);\n}\n\n\nfunction isSafePublicHttpUrl(raw) {\n  try {\n    const u = new URL(String(raw).trim());\n    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;\n    const host = (u.hostname || '').toLowerCase();\n    if (!host || host === 'localhost' || host.endsWith('.local')) return false;\n    if (\n      host === '127.0.0.1' ||\n      host === '0.0.0.0' ||\n      host === '::1' ||\n      host.startsWith('10.') ||\n      host.startsWith('192.168.') ||\n      host.startsWith('169.254.') ||\n      /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)\n    ) {\n      return false;\n    }\n    return true;\n  } catch {\n    return false;\n  }\n}\n\nfunction stripHtml(html) {\n  return String(html || '')\n    .replace(/<script[\s\S]*?<\/script>/gi, ' ')\n    .replace(/<style[\s\S]*?<\/style>/gi, ' ')\n    .replace(/<[^>]+>/g, ' ')\n    .replace(/&nbsp;/g, ' ')\n    .replace(/&amp;/g, '&')\n    .replace(/&lt;/g, '<')\n    .replace(/&gt;/g, '>')\n    .replace(/\s+/g, ' ')\n    .trim();\n}\n\nasync function fetchWikipediaSummary(topic) {\n  const title = encodeURIComponent(String(topic).trim().replace(/\s+/g, '_'));\n  for (const lang of ['en', 'si']) {\n    const api = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${title}`;\n    try {\n      const r = await fetch(api, {\n        headers: { Accept: 'application/json', 'User-Agent': 'PasiyaMaxQueenBot/2.6 (Telegram; educational)' },\n        signal: AbortSignal.timeout(12000),\n      });\n      if (!r.ok) continue;\n      const j = await r.json();\n      if (j.type === 'disambiguation') {\n        return {\n          ok: true,\n          text:\n            `Wikipedia (${lang}) disambiguation for "${topic}".\n` +\n            `Try a more specific title.\n${j.content_urls?.desktop?.page || ''}`,\n        };\n      }\n      const extract = j.extract || j.description || '';\n      if (!extract) continue;\n      const url = j.content_urls?.desktop?.page || `https://${lang}.wikipedia.org/wiki/${title}`;\n      return {\n        ok: true,\n        text: `WIKI (${lang.toUpperCase()})\n${j.title || topic}\n\n${extract.slice(0, 1200)}\n\n${url}`,\n      };\n    } catch (_) {}\n  }\n  return { ok: false, error: 'No Wikipedia summary found. Try another spelling.' };\n}\n\nasync function fetchPublicPageText(url) {\n  if (!isSafePublicHttpUrl(url)) {\n    return { ok: false, error: 'Only public http(s) URLs allowed.' };\n  }\n  try {\n    const r = await fetch(url, {\n      headers: {\n        Accept: 'text/html,application/xhtml+xml',\n        'User-Agent': 'PasiyaMaxQueenBot/2.6 (Telegram; summary-only)',\n      },\n      redirect: 'follow',\n      signal: AbortSignal.timeout(12000),\n    });\n    if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };\n    const ct = (r.headers.get('content-type') || '').toLowerCase();\n    if (!ct.includes('text') && !ct.includes('html') && !ct.includes('json')) {\n      return { ok: false, error: 'Unsupported content type' };\n    }\n    const body = await r.text();\n    const text = stripHtml(body).slice(0, 8000);\n    if (text.length < 40) return { ok: false, error: 'Page text too short or blocked' };\n    return { ok: true, text, finalUrl: r.url || url };\n  } catch (e) {\n    return { ok: false, error: String(e?.message || e).slice(0, 120) };\n  }\n}\n\n\n\nasync function githubGetFile(path) {\n  if (!GITHUB_TOKEN) return { ok: false, error: 'GITHUB_TOKEN missing' };\n  const repo = GITHUB_REPO || 'pasindudananjaya92-bot/radiant-queen-pasiya-max-v2';\n  const cleanPath = String(path || '').replace(/^\/+/, '').replace(/\.\./g, '');\n  if (!cleanPath) return { ok: false, error: 'Invalid path' };\n  const headers = {\n    Authorization: `Bearer ${GITHUB_TOKEN}`,\n    Accept: 'application/vnd.github+json',\n    'X-GitHub-Api-Version': '2022-11-28',\n  };\n  const res = await fetch(\n    `https://api.github.com/repos/${repo}/contents/${cleanPath}`,\n    { headers }\n  );\n  const text = await res.text();\n  if (!res.ok) {\n    return { ok: false, error: `HTTP ${res.status}: ${text.slice(0, 180)}` };\n  }\n  let j;\n  try {\n    j = JSON.parse(text);\n  } catch {\n    return { ok: false, error: 'Bad JSON from GitHub' };\n  }\n  if (Array.isArray(j)) {\n    return { ok: false, error: 'Path is a directory. Use /ghlist ' + cleanPath };\n  }\n  if (j.encoding === 'base64' && j.content) {\n    const buf = Buffer.from(j.content.replace(/\n/g, ''), 'base64');\n    const isText = !/\.(png|jpg|jpeg|gif|webp|zip|pdf|exe|bin)$/i.test(cleanPath);\n    return {\n      ok: true,\n      path: cleanPath,\n      size: j.size,\n      url: j.html_url,\n      text: isText ? buf.toString('utf8') : null,\n      binary: !isText,\n      sha: j.sha,\n    };\n  }\n  return { ok: false, error: 'Unsupported content' };\n}\n\nasync function githubListPath(path) {\n  if (!GITHUB_TOKEN) return { ok: false, error: 'GITHUB_TOKEN missing' };\n  const repo = GITHUB_REPO || 'pasindudananjaya92-bot/radiant-queen-pasiya-max-v2';\n  const cleanPath = String(path || '').replace(/^\/+/, '').replace(/\.\./g, '');\n  const headers = {\n    Authorization: `Bearer ${GITHUB_TOKEN}`,\n    Accept: 'application/vnd.github+json',\n    'X-GitHub-Api-Version': '2022-11-28',\n  };\n  const url = cleanPath\n    ? `https://api.github.com/repos/${repo}/contents/${cleanPath}`\n    : `https://api.github.com/repos/${repo}/contents`;\n  const res = await fetch(url, { headers });\n  const text = await res.text();\n  if (!res.ok) {\n    return { ok: false, error: `HTTP ${res.status}: ${text.slice(0, 180)}` };\n  }\n  let j;\n  try {\n    j = JSON.parse(text);\n  } catch {\n    return { ok: false, error: 'Bad JSON' };\n  }\n  if (!Array.isArray(j)) {\n    return {\n      ok: true,\n      lines: [`FILE ${j.name} (${j.size || 0} bytes)`],\n      path: cleanPath || '/',\n    };\n  }\n  const lines = j\n    .slice(0, 40)\n    .map((item) => {\n      const tag = item.type === 'dir' ? 'DIR ' : 'FILE';\n      return `${tag} ${item.name}${item.type === 'file' && item.size != null ? ` (${item.size})` : ''}`;\n    });\n  return { ok: true, lines, path: cleanPath || '/' };\n}\n\nasync function githubPutFile(path, contentBuffer, message) {\n  if (!GITHUB_TOKEN) {\n    return { ok: false, error: 'GITHUB_TOKEN missing on Vercel' };\n  }\n  const repo = GITHUB_REPO || 'pasindudananjaya92-bot/radiant-queen-pasiya-max-v2';\n  const cleanPath = String(path || '')\n    .trim()\n    .replace(/^\/+/, '')\n    .replace(/\\/g, '/')\n    .replace(/\.\./g, '')\n    .slice(0, 240);\n  if (!cleanPath || cleanPath.includes('..')) {\n    return { ok: false, error: 'Invalid path' };\n  }\n  // Keep nested paths (lib/aiRouter.js) — encode each segment\n  const encodedPath = cleanPath\n    .split('/')\n    .filter(Boolean)\n    .map((seg) => encodeURIComponent(seg))\n    .join('/');\n  const headers = {\n    Authorization: `Bearer ${GITHUB_TOKEN}`,\n    Accept: 'application/vnd.github+json',\n    'X-GitHub-Api-Version': '2022-11-28',\n    'Content-Type': 'application/json',\n  };\n  let sha;\n  try {\n    const getRes = await fetch(\n      `https://api.github.com/repos/${repo}/contents/${encodedPath}`,\n      { headers }\n    );\n    if (getRes.ok) {\n      const j = await getRes.json();\n      sha = j.sha;\n    }\n  } catch (_) {}\n\n  const body = {\n    message: message || `bot: update ${cleanPath}`,\n    content: contentBuffer.toString('base64'),\n    branch: 'main',\n  };\n  if (sha) body.sha = sha;\n\n  const putRes = await fetch(\n    `https://api.github.com/repos/${repo}/contents/${encodedPath}`,\n    { method: 'PUT', headers, body: JSON.stringify(body) }\n  );\n  const text = await putRes.text();\n  if (!putRes.ok) {\n    return {\n      ok: false,\n      error: `GitHub HTTP ${putRes.status}: ${text.slice(0, 200)}`,\n    };\n  }\n  let html = '';\n  try {\n    html = JSON.parse(text)?.content?.html_url || '';\n  } catch (_) {}\n  return { ok: true, path: cleanPath, url: html, repo };\n}\n\n\nasync function githubRecentCommits(limit = 5) {\n  if (!GITHUB_TOKEN) return { ok: false, error: 'GITHUB_TOKEN missing' };\n  const repo = GITHUB_REPO || 'pasindudananjaya92-bot/radiant-queen-pasiya-max-v2';\n  const n = Math.max(1, Math.min(15, Number(limit) || 5));\n  const headers = {\n    Authorization: `Bearer ${GITHUB_TOKEN}`,\n    Accept: 'application/vnd.github+json',\n    'X-GitHub-Api-Version': '2022-11-28',\n  };\n  const res = await fetch(\n    `https://api.github.com/repos/${repo}/commits?per_page=${n}`,\n    { headers }\n  );\n  const text = await res.text();\n  if (!res.ok) {\n    return { ok: false, error: `HTTP ${res.status}: ${text.slice(0, 180)}` };\n  }\n  let arr;\n  try {\n    arr = JSON.parse(text);\n  } catch {\n    return { ok: false, error: 'Bad JSON' };\n  }\n  const lines = (arr || []).map((c, i) => {\n    const msg = (c.commit?.message || '').split('\n')[0].slice(0, 80);\n    const who = c.commit?.author?.name || c.author?.login || '?';\n    const sha = (c.sha || '').slice(0, 7);\n    const when = c.commit?.author?.date || '';\n    return `${i + 1}. ${sha} — ${msg}\n   ${who} · ${when.slice(0, 16)}`;\n  });\n  return { ok: true, lines, repo };\n}\n\n\nasync function geocodePlace(name) {\n  const q = encodeURIComponent(String(name).trim());\n  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${q}&count=1&language=en&format=json`;\n  const r = await fetch(url, { signal: AbortSignal.timeout(12000) });\n  if (!r.ok) return null;\n  const j = await r.json();\n  const hit = j?.results?.[0];\n  if (!hit) return null;\n  return {\n    name: hit.name,\n    country: hit.country || '',\n    admin1: hit.admin1 || '',\n    lat: hit.latitude,\n    lon: hit.longitude,\n  };\n}\n\n\nasync function fetchForecast(lat, lon, days = 3) {\n  const d = Math.max(1, Math.min(7, Number(days) || 3));\n  const url =\n    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +\n    `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max` +\n    `&timezone=auto&forecast_days=${d}`;\n  const r = await fetch(url, { signal: AbortSignal.timeout(12000) });\n  if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };\n  const j = await r.json();\n  const daily = j.daily || {};\n  const dates = daily.time || [];\n  const lines = dates.map((date, i) => {\n    const code = daily.weather_code?.[i];\n    const tmax = daily.temperature_2m_max?.[i];\n    const tmin = daily.temperature_2m_min?.[i];\n    const rain = daily.precipitation_sum?.[i];\n    const wind = daily.wind_speed_10m_max?.[i];\n    return `${date}: ${weatherCodeText(code)} · ${tmin}–${tmax}°C · rain ${rain}mm · wind ${wind}km/h`;\n  });\n  return { ok: true, timezone: j.timezone || '', lines };\n}\n\n\nasync function fetchSun(lat, lon) {\n  const url =\n    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +\n    `&daily=sunrise,sunset,daylight_duration` +\n    `&timezone=auto&forecast_days=1`;\n  const r = await fetch(url, { signal: AbortSignal.timeout(12000) });\n  if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };\n  const j = await r.json();\n  const d = j.daily || {};\n  return {\n    ok: true,\n    timezone: j.timezone || '',\n    sunrise: d.sunrise?.[0] || '—',\n    sunset: d.sunset?.[0] || '—',\n    daylight: d.daylight_duration?.[0],\n  };\n}\n\nasync function fetchAqi(lat, lon) {\n  const url =\n    `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}` +\n    `&current=european_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,ozone` +\n    `&timezone=auto`;\n  const r = await fetch(url, { signal: AbortSignal.timeout(12000) });\n  if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };\n  const j = await r.json();\n  const c = j.current || {};\n  return {\n    ok: true,\n    timezone: j.timezone || '',\n    eaqi: c.european_aqi,\n    pm10: c.pm10,\n    pm25: c.pm2_5,\n    co: c.carbon_monoxide,\n    no2: c.nitrogen_dioxide,\n    o3: c.ozone,\n  };\n}\n\nfunction aqiLabel(eaqi) {\n  const n = Number(eaqi);\n  if (!Number.isFinite(n)) return 'Unknown';\n  if (n <= 20) return 'Good';\n  if (n <= 40) return 'Fair';\n  if (n <= 60) return 'Moderate';\n  if (n <= 80) return 'Poor';\n  if (n <= 100) return 'Very poor';\n  return 'Extremely poor';\n}\n\n\nfunction moonPhaseInfo(date = new Date()) {\n  // Simple illuminated fraction / phase name (approx)\n  const yp = date.getFullYear();\n  const mp = date.getMonth();\n  const dp = date.getDate();\n  let r = yp % 100;\n  r %= 19;\n  if (r > 9) r -= 19;\n  r = ((r * 11) % 30) + mp + dp;\n  if (mp < 2) r += 2;\n  const t = date.getHours() / 24;\n  let age = (r + t) % 30;\n  if (age < 0) age += 30;\n  const names = [\n    'New Moon',\n    'Waxing Crescent',\n    'First Quarter',\n    'Waxing Gibbous',\n    'Full Moon',\n    'Waning Gibbous',\n    'Last Quarter',\n    'Waning Crescent',\n  ];\n  const idx = Math.min(7, Math.floor((age / 30) * 8));\n  const illum = Math.round((1 - Math.cos((age / 30) * 2 * Math.PI)) * 50);\n  return { age: age.toFixed(1), name: names[idx], illum };\n}\n\nasync function fetchFxRate(base, symbols) {\n  const b = String(base || 'USD').toUpperCase();\n  const s = String(symbols || 'LKR').toUpperCase();\n  // open.er-api.com free tier — includes LKR (Frankfurter/ECB does not)\n  const url = `https://open.er-api.com/v6/latest/${encodeURIComponent(b)}`;\n  const r = await fetch(url, { signal: AbortSignal.timeout(12000) });\n  if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };\n  const j = await r.json();\n  if (j.result && j.result !== 'success') {\n    return { ok: false, error: j['error-type'] || 'API error' };\n  }\n  const rate = j?.rates?.[s];\n  if (rate == null) {\n    return { ok: false, error: `Symbol ${s} not found for base ${b}` };\n  }\n  const date =\n    j.time_last_update_utc ||\n    (j.time_last_update_unix\n      ? new Date(j.time_last_update_unix * 1000).toISOString().slice(0, 10)\n      : '');\n  return {\n    ok: true,\n    base: j.base_code || b,\n    symbol: s,\n    rate,\n    date,\n  };\n}\n\nasync function fetchWeather(lat, lon) {\n  const url =\n    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +\n    `&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m` +\n    `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum` +\n    `&timezone=auto&forecast_days=1`;\n  const r = await fetch(url, { signal: AbortSignal.timeout(12000) });\n  if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };\n  const j = await r.json();\n  const c = j.current || {};\n  const d = j.daily || {};\n  return {\n    ok: true,\n    timezone: j.timezone || '',\n    temp: c.temperature_2m,\n    feels: c.apparent_temperature,\n    humidity: c.relative_humidity_2m,\n    precip: c.precipitation,\n    wind: c.wind_speed_10m,\n    code: c.weather_code,\n    tmax: d.temperature_2m_max?.[0],\n    tmin: d.temperature_2m_min?.[0],\n    precipDay: d.precipitation_sum?.[0],\n  };\n}\n\nfunction weatherCodeText(code) {\n  const map = {\n    0: 'Clear',\n    1: 'Mainly clear',\n    2: 'Partly cloudy',\n    3: 'Overcast',\n    45: 'Fog',\n    48: 'Depositing rime fog',\n    51: 'Light drizzle',\n    61: 'Light rain',\n    63: 'Rain',\n    65: 'Heavy rain',\n    71: 'Snow',\n    80: 'Rain showers',\n    95: 'Thunderstorm',\n  };\n  return map[code] || `Code ${code}`;\n}\n\n\nasync function handleCurrencyCommand(ctx) {\n  const raw = (ctx.message.text || '')\n    .replace(/^\/currency(@\w+)?\s*/i, '')\n    .trim()\n    .toUpperCase();\n  const parts = raw.split(/\s+/).filter(Boolean);\n  if (parts.length < 2) {\n    await ctx.reply(\n      'Usage:\n/currency USD LKR\n/currency 100 USD LKR\n/currency EUR LKR'\n    );\n    return;\n  }\n  let amount = 1;\n  let base;\n  let sym;\n  if (parts.length >= 3 && !Number.isNaN(parseFloat(parts[0]))) {\n    amount = parseFloat(parts[0]);\n    base = parts[1];\n    sym = parts[2];\n  } else {\n    base = parts[0];\n    sym = parts[1];\n  }\n  await ctx.sendChatAction('typing');\n  const fx = await fetchFxRate(base, sym);\n  if (!fx.ok) {\n    await ctx.reply(`currency failed: ${fx.error}`);\n    return;\n  }\n  const total = (amount * fx.rate).toFixed(4);\n  await ctx.reply(\n    `CURRENCY\n` +\n      `${amount} ${fx.base} = ${total} ${fx.symbol}\n` +\n      `Rate: 1 ${fx.base} = ${fx.rate} ${fx.symbol}\n` +\n      `Date: ${fx.date}\n` +\n      `(open.er-api.com free rates)`\n  );\n}\n\nasync function handleMoonCommand(ctx) {\n  const info = moonPhaseInfo(new Date());\n  await ctx.reply(\n    `MOON\n` +\n      `Phase: ${info.name}\n` +\n      `Approx age: ${info.age} days\n` +\n      `Illumination: ~${info.illum}%\n\n` +\n      `Tip: Full moon nights can be brighter for evening easy runs.`\n  );\n}\n\nasync function handleSunCommand(ctx) {\n  const place = (ctx.message.text || '')\n    .replace(/^\/sun(@\w+)?\s*/i, '')\n    .trim();\n  if (!place) {\n    await ctx.reply('Usage:\n/sun Colombo\n/sun Kotte');\n    return;\n  }\n  await ctx.sendChatAction('typing');\n  const geo = await geocodePlace(place);\n  if (!geo) {\n    await ctx.reply('Place not found.');\n    return;\n  }\n  const s = await fetchSun(geo.lat, geo.lon);\n  if (!s.ok) {\n    await ctx.reply(`sun failed: ${s.error}`);\n    return;\n  }\n  const label = [geo.name, geo.admin1, geo.country].filter(Boolean).join(', ');\n  const dayH = s.daylight != null ? (Number(s.daylight) / 3600).toFixed(1) : '—';\n  await ctx.reply(\n    `SUN · ${label}\n` +\n      `Sunrise: ${s.sunrise}\n` +\n      `Sunset: ${s.sunset}\n` +\n      `Daylight: ~${dayH} h\n` +\n      `TZ: ${s.timezone}`\n  );\n}\n\nasync function handleAqiCommand(ctx) {\n  const place = (ctx.message.text || '')\n    .replace(/^\/aqi(@\w+)?\s*/i, '')\n    .trim();\n  if (!place) {\n    await ctx.reply('Usage:\n/aqi Colombo\n/aqi Kotte');\n    return;\n  }\n  await ctx.sendChatAction('typing');\n  const geo = await geocodePlace(place);\n  if (!geo) {\n    await ctx.reply('Place not found.');\n    return;\n  }\n  const a = await fetchAqi(geo.lat, geo.lon);\n  if (!a.ok) {\n    await ctx.reply(`aqi failed: ${a.error}`);\n    return;\n  }\n  const label = [geo.name, geo.admin1, geo.country].filter(Boolean).join(', ');\n  await ctx.reply(\n    `AQI · ${label}\n` +\n      `European AQI: ${a.eaqi} (${aqiLabel(a.eaqi)})\n` +\n      `PM2.5: ${a.pm25} · PM10: ${a.pm10}\n` +\n      `NO2: ${a.no2} · O3: ${a.o3} · CO: ${a.co}\n` +\n      `TZ: ${a.timezone}`\n  );\n}\n\n\nconst GOLD_START = 400;\nconst GOLD_DAILY = 50;\nconst GOLD_COST = {\n  ask: 5,\n  vision: 10,\n  voice: 10,\n  stride: 5,\n};\n\nasync function getOrCreateGold(userId, username) {\n  const uid = Number(userId);\n  if (!supabase || !Number.isFinite(uid)) {\n    return { ok: false, gold: 0, premium: false, error: 'no_db' };\n  }\n  const { data, error } = await supabase\n    .from('rq_gold')\n    .select('user_id, username, gold, premium, last_daily')\n    .eq('user_id', uid)\n    .maybeSingle();\n  if (error) {\n    return { ok: false, gold: 0, premium: false, error: error.message };\n  }\n  if (data) {\n    return {\n      ok: true,\n      gold: Number(data.gold) || 0,\n      premium: !!data.premium,\n      last_daily: data.last_daily || null,\n      username: data.username || username || null,\n    };\n  }\n  const row = {\n    user_id: uid,\n    username: username || null,\n    gold: GOLD_START,\n    premium: false,\n    last_daily: null,\n    updated_at: new Date().toISOString(),\n  };\n  const { error: insErr } = await supabase.from('rq_gold').upsert(row, {\n    onConflict: 'user_id',\n  });\n  if (insErr) {\n    return { ok: false, gold: 0, premium: false, error: insErr.message };\n  }\n  return {\n    ok: true,\n    gold: GOLD_START,\n    premium: false,\n    last_daily: null,\n    username: username || null,\n    newUser: true,\n  };\n}\n\nasync function setGold(userId, gold, extra = {}) {\n  const uid = Number(userId);\n  if (!supabase || !Number.isFinite(uid)) return { ok: false };\n  const payload = {\n    user_id: uid,\n    gold: Math.max(0, Math.floor(Number(gold) || 0)),\n    updated_at: new Date().toISOString(),\n    ...extra,\n  };\n  const { error } = await supabase.from('rq_gold').upsert(payload, {\n    onConflict: 'user_id',\n  });\n  return { ok: !error, error: error?.message };\n}\n\n/** Founder = free. Returns { ok, gold, need } */\nasync function spendGold(ctx, costKey) {\n  if (isAdmin(ctx)) {\n    return { ok: true, gold: null, free: true };\n  }\n  const cost = GOLD_COST[costKey] || 0;\n  if (cost <= 0) return { ok: true, gold: null, free: true };\n  const uid = ctx.from?.id;\n  const g = await getOrCreateGold(uid, ctx.from?.username || ctx.from?.first_name);\n  if (!g.ok) {\n    // fail open if DB missing so bot still works\n    return { ok: true, gold: null, free: true, dbError: g.error };\n  }\n  if (g.premium) return { ok: true, gold: g.gold, free: true };\n  if (g.gold < cost) {\n    return {\n      ok: false,\n      gold: g.gold,\n      need: cost,\n      message:\n        `Not enough Radiant Gold.\n` +\n        `Balance: ${g.gold} · Need: ${cost}\n` +\n        `/daily for +${GOLD_DAILY} · /balance`,\n    };\n  }\n  const next = g.gold - cost;\n  await setGold(uid, next, {\n    username: ctx.from?.username || ctx.from?.first_name || null,\n  });\n  return { ok: true, gold: next, spent: cost };\n}\n\n\n/** Multi-tenant: user-owned Telegram bots powered by Radiant Queen engine */\nasync function saveUserBot(ownerId, token, meta = {}) {\n  if (!supabase) return { ok: false, error: 'Supabase missing' };\n  const uid = Number(ownerId);\n  const { error } = await supabase.from('rq_user_bots').upsert(\n    {\n      owner_id: uid,\n      bot_token: token,\n      bot_id: meta.bot_id || null,\n      bot_username: meta.bot_username || null,\n      bot_name: meta.bot_name || null,\n      is_active: true,\n      webhook_set: !!meta.webhook_set,\n      updated_at: new Date().toISOString(),\n    },\n    { onConflict: 'owner_id' }\n  );\n  return { ok: !error, error: error?.message };\n}\n\nasync function getUserBot(ownerId) {\n  if (!supabase) return null;\n  const uid = Number(ownerId);\n  let { data, error } = await supabase\n    .from('rq_user_bots')\n    .select('*')\n    .eq('owner_id', uid)\n    .maybeSingle();\n  if (!data && !error) {\n    const q2 = await supabase\n      .from('rq_user_bots')\n      .select('*')\n      .eq('owner_id', String(ownerId))\n      .maybeSingle();\n    data = q2.data || null;\n  }\n  return data || null;\n}\n\nasync function getUserBotByOwnerKey(ownerKey) {\n  if (!supabase) return null;\n  const { data } = await supabase\n    .from('rq_user_bots')\n    .select('*')\n    .eq('owner_id', Number(ownerKey))\n    .eq('is_active', true)\n    .maybeSingle();\n  return data || null;\n}\n\nasync function deleteUserBot(ownerId) {\n  if (!supabase) return { ok: false };\n  const row = await getUserBot(ownerId);\n  if (row?.bot_token) {\n    try {\n      await fetch(\n        `https://api.telegram.org/bot${row.bot_token}/deleteWebhook?drop_pending_updates=true`\n      );\n    } catch (_) {}\n  }\n  const { error } = await supabase\n    .from('rq_user_bots')\n    .delete()\n    .eq('owner_id', Number(ownerId));\n  return { ok: !error, error: error?.message };\n}\n\nasync function telegramGetMe(token) {\n  const r = await fetch(`https://api.telegram.org/bot${token}/getMe`);\n  const j = await r.json();\n  if (!j.ok) return { ok: false, error: j.description || 'getMe failed' };\n  return {\n    ok: true,\n    bot_id: j.result.id,\n    bot_username: j.result.username,\n    bot_name: j.result.first_name,\n  };\n}\n\nasync function telegramSetWebhook(token, url) {\n  const r = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify({\n      url,\n      drop_pending_updates: true,\n      allowed_updates: ['message', 'callback_query'],\n    }),\n  });\n  const j = await r.json();\n  return { ok: !!j.ok, error: j.description, result: j };\n}\n\n\nasync function setTenantWelcome(ownerId, text) {\n  if (!supabase) return { ok: false, error: 'no db' };\n  const { error } = await supabase\n    .from('rq_user_bots')\n    .update({\n      welcome_text: String(text || '').slice(0, 1500),\n      updated_at: new Date().toISOString(),\n    })\n    .eq('owner_id', Number(ownerId));\n  return { ok: !error, error: error?.message };\n}\n\n\n/** Groq Whisper STT (same GROQ_API_KEY) */\nasync function transcribeVoiceGroq(audioBuffer, filename = 'voice.ogg') {\n  const key = process.env.GROQ_API_KEY || '';\n  if (!key) return { ok: false, error: 'GROQ_API_KEY missing' };\n  const models = [\n    process.env.GROQ_WHISPER_MODEL || 'whisper-large-v3-turbo',\n    'whisper-large-v3',\n  ];\n  let lastErr = 'no model';\n  for (const model of models) {\n    try {\n      const form = new FormData();\n      const blob = new Blob([audioBuffer], { type: 'audio/ogg' });\n      form.append('file', blob, filename);\n      form.append('model', model);\n      form.append('response_format', 'text');\n      const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {\n        method: 'POST',\n        headers: { Authorization: 'Bearer ' + key },\n        body: form,\n      });\n      const text = await res.text();\n      if (!res.ok) {\n        lastErr = 'HTTP ' + res.status + ': ' + text.slice(0, 160);\n        continue;\n      }\n      const cleaned = String(text || '').trim();\n      if (cleaned) return { ok: true, text: cleaned, model };\n      lastErr = 'empty transcript';\n    } catch (e) {\n      lastErr = String(e && e.message ? e.message : e);\n    }\n  }\n  return { ok: false, error: lastErr };\n}\n\n/** Pollinations image (no API key) */\nasync function generateImagineImage(prompt) {\n  const q = String(prompt || '').trim().slice(0, 400);\n  if (!q) return { ok: false, error: 'empty prompt' };\n  const params = new URLSearchParams({\n    width: '1024',\n    height: '1024',\n    model: process.env.POLLINATIONS_MODEL || 'flux',\n    nologo: 'true',\n    enhance: 'true',\n  });\n  const url =\n    'https://image.pollinations.ai/prompt/' +\n    encodeURIComponent(q) +\n    '?' +\n    params.toString();\n  const res = await fetch(url, {\n    headers: { Accept: 'image/*' },\n    redirect: 'follow',\n  });\n  if (!res.ok) {\n    return { ok: false, error: 'HTTP ' + res.status, url };\n  }\n  const buf = Buffer.from(await res.arrayBuffer());\n  if (!buf.length || buf.length < 500) {\n    return { ok: false, error: 'empty image', url };\n  }\n  return { ok: true, buffer: buf, url, prompt: q };\n}\n\n/** ntfy.sh free push */\nfunction ntfyTopic() {\n  return (\n    process.env.NTFY_TOPIC ||\n    ('radiant-queen-' + String(ADMIN_ID || 'public')).replace(/[^a-zA-Z0-9_-]/g, '')\n  );\n}\n\nasync function sendNtfy(title, body, priority) {\n  const topic = ntfyTopic();\n  const res = await fetch('https://ntfy.sh/' + encodeURIComponent(topic), {\n    method: 'POST',\n    headers: {\n      Title: String(title || 'Radiant Queen').slice(0, 120),\n      Priority: String(priority || 'default'),\n      Tags: 'robot,speech_balloon',\n    },\n    body: String(body || '').slice(0, 3500),\n  });\n  if (!res.ok) {\n    const t = await res.text().catch(function () { return ''; });\n    return { ok: false, error: 'HTTP ' + res.status + ' ' + t.slice(0, 120), topic };\n  }\n  return { ok: true, topic };\n}\n\n\nasync function generateReply(prompt, ctx, imageBase64, mimeType) {\n  let personaId = 'default';\n  try {\n    personaId = await getUserPersona(ctx?.from?.id);\n  } catch (_) {}\n  let personaBlock = '';\n  try {\n    const { personaSystemBlock } = await import('../lib/personas.js');\n    personaBlock = personaSystemBlock(personaId);\n  } catch (_) {\n    personaBlock = `You are Pasiya AI, assistant of Pasiya Max, for RADIANT QUEEN.\nAnswer in the user's language (Sinhala or English). Be practical. No fake supercomputer stats.`;
+    // 1) Prefer editing the callback's own message (same box user tapped)
+    if (ctx.callbackQuery?.message?.message_id) {
+      try {
+        await ctx.telegram.editMessageText(
+          ctx.chat.id,
+          ctx.callbackQuery.message.message_id,
+          undefined,
+          framed,
+          extra
+        );
+        setPhoneFrame(uid, ctx.callbackQuery.message.message_id);
+        return;
+      } catch (err) {
+        // message is not modified / parse issues — try anchor
+        console.error('phone edit callback msg', err?.message || err);
+      }
+    }
+    // 2) Edit stored phone frame
+    const anchorId = getPhoneFrame(uid);
+    if (anchorId && ctx.chat?.id) {
+      try {
+        await ctx.telegram.editMessageText(
+          ctx.chat.id,
+          anchorId,
+          undefined,
+          framed,
+          extra
+        );
+        return;
+      } catch (err) {
+        console.error('phone edit anchor', err?.message || err);
+      }
+    }
+    // 3) First paint — create frame and remember id
+    const sent = await ctx.reply(framed, extra);
+    if (sent?.message_id) setPhoneFrame(uid, sent.message_id);
+    return;
+  }
+
+  // --- CLEAN + NORMAL: new message (clean markup has ❌ 🔼) ---
+  const sent = await ctx.reply(framed, extra);
+  return sent;
+}
+
+async function sendMenuSmart(ctx, text, baseMarkup) {
+  const framed = digitalFrame(sanitizeUiText(text)).slice(0, 1024); // photo caption limit
+  const extra = buildUiMarkup(ctx, baseMarkup || mainMenuKeyboard(ctx));
+  const isGroup = ctx.chat && (ctx.chat.type === 'group' || ctx.chat.type === 'supergroup');
+  const mode = getUiMode(ctx.from?.id);
+
+  // Groups (or when banner set): prefer photo + caption + buttons together
+  let bannerId = null;
+  try {
+    bannerId = await getBotSetting('banner_file_id');
+  } catch (_) {}
+
+  // Phone mode private: keep edit path via uiReply (text only)
+  if (mode === 'phone' && !isGroup) {
+    await uiReply(ctx, text, baseMarkup || mainMenuKeyboard(ctx));
+    return;
+  }
+
+  if (bannerId) {
+    try {
+      await ctx.replyWithPhoto(bannerId, {
+        caption: framed,
+        ...extra,
+      });
+      return;
+    } catch (e) {
+      console.error('sendMenuSmart photo', e?.message || e);
+    }
+  }
+
+  // Fallback text
+  await uiReply(ctx, text, baseMarkup || mainMenuKeyboard(ctx));
+}
+
+
+
+
+
+function numberedMainMenuText() {
+  const ver = typeof BOT_VERSION !== 'undefined' ? BOT_VERSION : 'v4.0';
+  return (
+    `⚡ RADIANT QUEEN · PASIYA MAX
+` +
+    `OS ${ver} · DIGITAL · TOUCH + TYPE
+
+` +
+    `WEB  radiant-queen-pasiya-max-v2.vercel.app
+` +
+    `HUB  /bot/   BOT  @PasiyaMaxQueen_bot
+
+` +
+    `MAIN (type 1-10 or tap)
+` +
+    `1  Owner / Founder
+` +
+    `2  Social Hub
+` +
+    `3  AI Lab
+` +
+    `4  Group Admin Lab
+` +
+    `5  Creator Tools
+` +
+    `6  Education Lab
+` +
+    `7  Channels and Links
+` +
+    `8  Connected Platforms
+` +
+    `9  Status and Help
+` +
+    `10 Sinhala Full Guide
+
+` +
+    `Tip: Mode button cycles Phone / Clean / Normal · /market · /invitepack`
+  );
+}
+
+function ownerMenuText() {
+  return (
+    `OWNER / FOUNDER MENU\n\n` +
+    `1 Health / Status\n` +
+    `2 Who am I\n` +
+    `3 Model info\n` +
+    `4 GitHub status\n` +
+    `5 Clear tool mode\n` +
+    `6 Links vault\n` +
+    `0 Back`
+  );
+}
+
+function platformsPanelText() {
+  return (
+    `CONNECTED PLATFORMS\n\n` +
+    `1  Open Website\n` +
+    `2  Open StrideClub\n` +
+    `3  Social / Channel links\n` +
+    `4  Bot status\n` +
+    `5  GitHub status (founder only)\n` +
+    `0  Back to main\n\n` +
+    `Reply with a number.`
+  );
+}
+
+function platformsKeyboard() {
+  return Markup.inlineKeyboard([
+    [Markup.button.url('Website', 'https://radiant-queen-pasiya-max-v2.vercel.app')],
+    [Markup.button.url('StrideClub', 'https://strideclub-platform-6b71a.containers.snapdeploy.app')],
+    [Markup.button.url('GitHub', 'https://github.com/pasindudananjaya92-bot/radiant-queen-pasiya-max-v2')],
+    [Markup.button.callback('Main menu', 'menu_home')],
+  ]);
+}
+
+function mainMenuKeyboard(ctx) {
+  const buttons = [
+    Markup.button.callback('1️⃣ AI', 'menu_ask'),
+    Markup.button.callback('2️⃣ Social', 'menu_social'),
+    Markup.button.callback('3️⃣ Tools', 'menu_tools'),
+    Markup.button.callback('4️⃣ Group', 'menu_gadmin'),
+    Markup.button.callback('5️⃣ Creator', 'menu_tools'),
+    Markup.button.callback('6️⃣ Learn', 'menu_edu'),
+    Markup.button.callback('7️⃣ Links', 'menu_links'),
+    Markup.button.callback('8️⃣ Platforms', 'menu_platforms'),
+    Markup.button.callback('9️⃣ Status', 'menu_status'),
+    Markup.button.callback('🔟 Guide', 'menu_si_home'),
+    Markup.button.callback('💰 Gold', 'menu_gold'),
+    Markup.button.callback('🌦️ Weather', 'menu_weather'),
+    Markup.button.callback('🏃 Stride', 'menu_stride_panel'),
+    Markup.button.callback('🎁 Invite', 'menu_invite'),
+    Markup.button.callback('📋 Free', 'menu_freetools'),
+    Markup.button.callback('ℹ️ About', 'menu_about'),
+    Markup.button.callback('❓ Help', 'menu_help'),
+    Markup.button.callback('🆔 My ID', 'menu_id'),
+  ];
+  if (isAdmin(ctx)) {
+    buttons.push(
+      Markup.button.callback('👑 Admin', 'menu_admin'),
+      Markup.button.callback('📞 Contact', 'tap_contact'),
+      Markup.button.callback('📊 Info', 'tap_groupinfo')
+    );
+  } else {
+    buttons.push(
+      Markup.button.callback('📞 Contact', 'tap_contact'),
+      Markup.button.callback('📊 Info', 'tap_groupinfo'),
+      Markup.button.callback('🔗 Hub', 'menu_links')
+    );
+  }
+  return Markup.inlineKeyboard(rowsOf3(buttons));
+}
+
+function afterReplyKeyboard(ctx) {
+  const rows = [
+    [
+      Markup.button.callback('Tools', 'menu_tools'),
+      Markup.button.callback('Menu', 'menu_home'),
+    ],
+  ];
+  if (isAdmin(ctx)) {
+    rows.push([Markup.button.callback('Admin', 'menu_admin')]);
+  }
+  return Markup.inlineKeyboard(rows);
+}
+
+function toolsKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('Translate', 'tool_translate'),
+      Markup.button.callback('Summarize', 'tool_summarize'),
+    ],
+    [
+      Markup.button.callback('Rewrite pro', 'tool_rewrite'),
+      Markup.button.callback('Caption gen', 'tool_caption'),
+    ],
+    [
+      Markup.button.callback('Hashtags', 'tool_hashtags'),
+      Markup.button.callback('Bio writer', 'tool_bio'),
+    ],
+    [
+      Markup.button.callback('Running tip', 'tool_run_tip'),
+      Markup.button.callback('Ideas', 'tool_ideas'),
+    ],
+    [
+      Markup.button.callback('Photo caption', 'tool_photo_caption'),
+    ],
+    [
+      Markup.button.callback('💰 Gold', 'menu_gold'),
+      Markup.button.callback('🌦️ Weather', 'menu_weather'),
+    ],
+    [Markup.button.callback('🏠 Main menu', 'menu_home')],
+  ]);
+}
+
+function goldKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('💰 Balance', 'tap_balance'),
+      Markup.button.callback('🎁 Daily', 'tap_daily'),
+    ],
+    [
+      Markup.button.callback('💲 Prices', 'tap_prices'),
+      Markup.button.callback('🏠 Menu', 'menu_home'),
+    ],
+  ]);
+}
+
+function weatherKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('Colombo weather', 'tap_weather_cmb'),
+      Markup.button.callback('Moon', 'tap_moon'),
+    ],
+    [
+      Markup.button.callback('Sun Colombo', 'tap_sun_cmb'),
+      Markup.button.callback('AQI Colombo', 'tap_aqi_cmb'),
+    ],
+    [
+      Markup.button.callback('USD→LKR', 'tap_currency'),
+      Markup.button.callback('🏠 Menu', 'menu_home'),
+    ],
+  ]);
+}
+
+function gadminKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('Modcheck', 'tap_modcheck'),
+      Markup.button.callback('Rules', 'tap_rules'),
+    ],
+    [
+      Markup.button.callback('Anti-link', 'tap_antilink_status'),
+      Markup.button.callback('📊 Info', 'tap_groupinfo'),
+    ],
+    [
+      Markup.button.callback('👑 Admins', 'tap_tagadmins'),
+      Markup.button.callback('📣 Tag active', 'tap_tagall'),
+    ],
+    [
+      Markup.button.callback('🔗 Invite', 'tap_invitelink'),
+      Markup.button.callback('📞 Contact', 'tap_contact'),
+    ],
+    [Markup.button.callback('🏠 Menu', 'menu_home')],
+  ]);
+}
+
+function siGuideHomeKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('🤖 AI කතා', 'si_cat_ai'),
+      Markup.button.callback('💰 Gold', 'si_cat_gold'),
+    ],
+    [
+      Markup.button.callback('⛅ කාලගුණය', 'si_cat_weather'),
+      Markup.button.callback('🧮 ගණන්/මුදල්', 'si_cat_math'),
+    ],
+    [
+      Markup.button.callback('👥 Group Admin', 'si_cat_group'),
+      Markup.button.callback('🏃 දිවීම Stride', 'si_cat_run'),
+    ],
+    [
+      Markup.button.callback('🧰 Tools', 'si_cat_tools'),
+      Markup.button.callback('📚 ඉගෙනීම', 'si_cat_learn'),
+    ],
+    [
+      Markup.button.callback('📝 මගේ ලැයිස්තු', 'si_cat_personal'),
+      Markup.button.callback('🔐 රහස් මෙවලම්', 'si_cat_crypto'),
+    ],
+    [
+      Markup.button.callback('⚙️ System', 'si_cat_system'),
+      Markup.button.callback('🤖 මගේ Bot', 'si_cat_tenant'),
+    ],
+    [
+      Markup.button.callback('🔗 Links / Invite', 'si_cat_links'),
+      Markup.button.callback('🏠 ප්‍රධාන මෙනුව', 'menu_home'),
+    ],
+  ]);
+}
+
+function siBackKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('🔙 කාණ්ඩ ලැයිස්තුව', 'menu_si_home'),
+      Markup.button.callback('🏠 ප්‍රධාන මෙනුව', 'menu_home'),
+    ],
+  ]);
+}
+
+function siGuideIntroText() {
+  return (
+    `🔟 සිංහල සම්පූර්ණ GUIDE\n\n` +
+    `මෙය බොට් එකේ හැම කොටසක්ම සරල සිංහලෙන්.\n` +
+    `පහත බොත්තම් වලින් කාණ්ඩයක් තෝරන්න.\n` +
+    `කාණ්ඩයක් තුළ විධානය කුමක්ද කියලා පැහැදිලිව තියෙනවා.\n\n` +
+    `ඉංග්‍රීසි නොදන්නත් කමක් නැහැ.\n` +
+    `බොත්තම් ඔබන්න හෝ /si ටයිප් කරන්න.`
+  );
+}
+
+const SI_CAT = {
+  system: (
+    `⚙️ SYSTEM — පද්ධතිය\n\n` +
+    `/start — බොට් එක පටන් ගන්න / මෙනුව\n` +
+    `/menu — ප්‍රධාන මෙනුව + බොත්තම්\n` +
+    `/si — මේ සිංහල GUIDE එක\n` +
+    `/help — උදව් ලැයිස්තුව\n` +
+    `/ping — බොට් ජීවමානද බලන්න\n` +
+    `/version — බොට් version එක\n` +
+    `/about — බොට් ගැන කෙටි කතාව\n` +
+    `/id — ඔබේ Telegram ID එක\n` +
+    `/status — තත්ත්වය\n` +
+    `/commands — විධාන ලැයිස්තුව`
+  ),
+  gold: (
+    `💰 GOLD — රන් ලකුණු\n\n` +
+    `මෙය AI භාවිතයට තියෙන නොමිලේ ලකුණු පද්ධතියයි.\n\n` +
+    `/balance හෝ /gold — මගේ gold කීයද\n` +
+    `/daily හෝ /claim — දවසට +50 ගන්න (දවසකට වරක්)\n` +
+    `/prices හෝ /costs — මිල ලැයිස්තුව\n\n` +
+    `මිල (සාමාන්‍ය):\n` +
+    `• AI පෙළ පිළිතුර — 5\n` +
+    `• රූප/vision — 10\n` +
+    `• හඬ/voice — 10\n` +
+    `• Stride — 5\n\n` +
+    `පටන් ගන්නාම ආසන්න වශයෙන් 400 ලැබේ.`
+  ),
+  weather: (
+    `⛅ කාලගුණය හා අහස\n\n` +
+    `/weather Colombo — නගරයේ කාලගුණය\n` +
+    `/forecast Colombo — ඉදිරි දින කාලගුණය\n` +
+    `/sun Colombo — ඉර උදාව / බැසීම\n` +
+    `/aqi Colombo — වායු තත්ත්වය (AQI)\n` +
+    `/moon — සඳ ගැන\n\n` +
+    `Colombo වෙනුවට ඔබේ නගරය දාන්න.`
+  ),
+  math: (
+    `🧮 ගණන් හා මුදල්\n\n` +
+    `/currency USD LKR — ඩොලර් → රුපියල්\n` +
+    `/calc 10*5 — ගණන් කරන්න\n` +
+    `/time — වේලාව\n` +
+    `/uuid — අහඹු ID එකක්`
+  ),
+  crypto: (
+    `🔐 රහස් / කේත මෙවලම්\n\n` +
+    `/pw — ශක්තිමත් මුරපදයක් හදන්න\n` +
+    `/b64 — Base64 කේතනය\n` +
+    `/hash — hash අගයක් හදන්න\n\n` +
+    `මේවා AI නැතිවත් වැඩ කරයි.`
+  ),
+  personal: (
+    `📝 මගේ ලැයිස්තු (පුද්ගලික)\n\n` +
+    `/todo ටෙක්ස්ට් — කළ යුතු දෙයක් දාන්න\n` +
+    `/todos — ලැයිස්තුව බලන්න\n` +
+    `/done අංකය — ඉවරයි කියලා මකන්න\n\n` +
+    `/save ටෙක්ස්ට් — සටහනක් සේව්\n` +
+    `/saves — සේව් ලැයිස්තුව\n` +
+    `/unsave අංකය — මකන්න\n\n` +
+    `/habit නම — පුරුද්දක් එකතු\n` +
+    `/habits — පුරුදු බලන්න\n` +
+    `/export — දත්ත export`
+  ),
+  run: (
+    `🏃 දිවීම / StrideClub\n\n` +
+    `/pace 5 25:00 — වේගය ගණන්\n` +
+    `/split 5:30 10 — කොටස් වේලා\n` +
+    `/convert 21.1 km — km ↔ miles\n` +
+    `/stride — StrideClub bridge\n` +
+    `/runxp — දිවීම් XP\n` +
+    `/xptop — XP ලීඩර්බෝඩ්\n` +
+    `/logrun සටහන — රන් ලොග්\n` +
+    `/streak — දින දිගටි පුරුද්ද\n` +
+    `/me — මගේ පැතිකඩ`
+  ),
+  group: (
+    `👥 GROUP ADMIN — සමූහ පාලනය\n\n` +
+    `බොට්ව group එකේ Admin කරන්න (Delete + Restrict).\n\n` +
+    `/groupadmin හෝ /gadmin — admin මෙනුව\n` +
+    `/kick /ban /unban /pin /purge /promote /demote\n` +
+    `/tagall /admins /members /invitelink /contact\n` +
+    `/setwelcome පෙළ — ආචාර පණිවිඩය\n` +
+    `/setrules පෙළ — නීති\n` +
+    `/rules — නීති කියවන්න\n` +
+    `/antilink on|off|status — ලින්ක් අවහිර\n` +
+    `/modcheck — බොට්ට බලතල තියෙනවද\n` +
+    `/groupinfo — සමූහ තොරතුරු\n` +
+    `/warn (reply) — අනතුරු ඇඟවීම\n` +
+    `/unwarn (reply) — warn අඩු\n` +
+    `/warns — warn ලැයිස්තුව\n` +
+    `/mute /unmute — නිහඬ / නිදහස්\n` +
+    `/slow තත් — slow mode\n` +
+    `/note /notes — සටහන්\n` +
+    `/faqset /faq — නිති ප්‍රශ්න`
+  ),
+  tools: (
+    `🧰 CREATOR TOOLS\n\n` +
+    `මෙනුවෙන් Tools බොත්තම ඔබන්න.\n` +
+    `හෝ /tools\n\n` +
+    `තියෙනවා:\n` +
+    `• Translate — පරිවර්තනය\n` +
+    `• Summarize — කෙටි කරන්න\n` +
+    `• Rewrite — නැවත ලියන්න\n` +
+    `• Caption — caption හදන්න\n` +
+    `• Hashtags — හෑෂ්ටැග්\n` +
+    `• Bio — bio ලියන්න\n` +
+    `• Ideas — අදහස්\n` +
+    `• Running tip — දිවීම් උපදෙස්\n` +
+    `• Photo caption — රූපයට caption`
+  ),
+  learn: (
+    `📚 ඉගෙනීම / AI උපකාර\n\n` +
+    `/wiki මාතෘකාව — විස්තර\n` +
+    `/web ප්‍රශ්නය — වෙබ් උපකාර\n` +
+    `/code ප්‍රශ්නය — කේත උපකාර\n` +
+    `/define වචනය — අර්ථය\n` +
+    `/tr පෙළ — පරිවර්තනය\n\n` +
+    `සාමාන්‍ය පෙළ යැවුවත් AI උත්තර දෙයි.\n` +
+    `(Gold / quota අනුව)`
+  ),
+  ai: (
+    `🤖 AI කතා කිරීම\n\n` +
+    `1) ප්‍රශ්නය සෘජුව ටයිප් කරන්න\n` +
+    `2) හෝ මෙනුවෙන් 1️⃣ AI ඔබන්න\n` +
+    `3) රූපයක් යවන්න — vision විශ්ලේෂණය\n` +
+    `4) හඬ පණිවිඩයක් — voice\n\n` +
+    `AI නැවතී නම්:\n` +
+    `/tools බලන්න — නොමිලේ මෙවලම් තවමත් වැඩ කරයි.\n\n` +
+    `Gold වියදම් වේ — /balance /prices`
+  ),
+  tenant: (
+    `🤖 මගේ Bot (Tenant)\n\n` +
+    `ඔබේම Telegram bot එකක් Radiant Queen engine එකට සම්බන්ධ කරන්න.\n\n` +
+    `/setbot ටෝකන් — bot එක සම්බන්ධ කරන්න\n` +
+    `/mybot — මගේ bot තොරතුරු\n` +
+    `/resyncbot — webhook නැවත සකසන්න\n` +
+    `/settenantwelcome පෙළ — ආචාර පණිවිඩය\n` +
+    `/tenantwelcome — දැන් තියෙන welcome\n\n` +
+    `ටෝකන් BotFather ගෙන් ගන්න.\n` +
+    `ටෝකන් public group එකක දාන්න එපා.`
+  ),
+  links: (
+    `🔗 Links හා Invite\n\n` +
+    `/links — නිල ලින්ක් ඔක්කොම\n` +
+    `/invite හෝ /share — යාළුවන්ට යවන පෙළ\n\n` +
+    `Bot: https://t.me/PasiyaMaxQueen_bot\n` +
+    `Web: https://radiant-queen-pasiya-max-v2.vercel.app\n` +
+    `Hub: https://radiant-queen-pasiya-max-v2.vercel.app/bot/\n\n` +
+    `Landing එකේත් share පෙළ තියෙනවා.`
+  ),
+};
+
+
+
+
+function strideKeyboard() {
+  return Markup.inlineKeyboard([
+    [Markup.button.url('Open StrideClub', 'https://strideclub-platform-6b71a.containers.snapdeploy.app')],
+    [Markup.button.callback('Stride summary', 'stride_summary')],
+    [Markup.button.callback('Back to menu', 'menu_home')],
+  ]);
+}
+
+function adminKeyboard() {
+  return Markup.inlineKeyboard([
+    [
+      Markup.button.callback('Health', 'admin_health'),
+      Markup.button.callback('Who am I', 'admin_whoami'),
+    ],
+    [
+      Markup.button.callback('Model info', 'admin_model'),
+      Markup.button.callback('GitHub status', 'admin_github'),
+    ],
+    [
+      Markup.button.callback('Clear tool mode', 'admin_clear'),
+      Markup.button.callback('Links vault', 'admin_links'),
+    ],
+    [Markup.button.callback('Back', 'menu_home')],
+  ]);
+}
+
+function statusText(ctx) {
+  return (
+    `RADIANT QUEEN • PASIYA MAX v2.2\n` +
+    `Token: ${BOT_TOKEN ? 'yes' : 'NO'}\n` +
+    `Gemini: ${GEMINI_KEY ? 'yes' : 'NO'}\n` +
+    `ADMIN_ID: ${ADMIN_ID ? 'yes' : 'NO'}\n` +
+    `GitHub token: ${GITHUB_TOKEN ? 'yes' : 'no'}\n` +
+    `Admin email: ${ADMIN_EMAIL}\n` +
+    `Supabase: ${supabase ? 'yes' : 'NO'}\n` +
+    `You are founder: ${isAdmin(ctx) ? 'yes' : 'no'}\n` +
+    `Model: ${resolvedModel || 'not used yet'}`
+  );
+}
+
+function uptimeText() {
+  const sec = Math.floor((Date.now() - bootTime) / 1000);
+  return `${Math.floor(sec / 60)}m ${sec % 60}s (this warm instance)`;
+}
+
+async function ensureGroupAdmin(ctx) {
+  if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+    await ctx.reply('This command works only inside a group. Add the bot to a group, make it ADMIN, then try again.');
+    return false;
+  }
+  try {
+    const me = await ctx.telegram.getChatMember(ctx.chat.id, ctx.botInfo.id);
+    if (me.status !== 'administrator' && me.status !== 'creator') {
+      await ctx.reply('I need ADMIN rights in this group (restrict members + delete messages recommended).');
+      return false;
+    }
+    return true;
+  } catch (err) {
+    await ctx.reply('Could not check admin rights. Make me admin and retry.');
+    return false;
+  }
+}
+
+async function isUserGroupAdmin(ctx) {
+  try {
+    const m = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
+    return m.status === 'administrator' || m.status === 'creator';
+  } catch {
+    return false;
+  }
+}
+
+function hasLink(text = '') {
+  return /https?:\/\/|t\.me\/|www\.|telegram\.me\//i.test(text);
+}
+
+
+function isSafePublicHttpUrl(raw) {
+  try {
+    const u = new URL(String(raw).trim());
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+    const host = (u.hostname || '').toLowerCase();
+    if (!host || host === 'localhost' || host.endsWith('.local')) return false;
+    if (
+      host === '127.0.0.1' ||
+      host === '0.0.0.0' ||
+      host === '::1' ||
+      host.startsWith('10.') ||
+      host.startsWith('192.168.') ||
+      host.startsWith('169.254.') ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(host)
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function stripHtml(html) {
+  return String(html || '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function fetchWikipediaSummary(topic) {
+  const title = encodeURIComponent(String(topic).trim().replace(/\s+/g, '_'));
+  for (const lang of ['en', 'si']) {
+    const api = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${title}`;
+    try {
+      const r = await fetch(api, {
+        headers: { Accept: 'application/json', 'User-Agent': 'PasiyaMaxQueenBot/2.6 (Telegram; educational)' },
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!r.ok) continue;
+      const j = await r.json();
+      if (j.type === 'disambiguation') {
+        return {
+          ok: true,
+          text:
+            `Wikipedia (${lang}) disambiguation for "${topic}".\n` +
+            `Try a more specific title.\n${j.content_urls?.desktop?.page || ''}`,
+        };
+      }
+      const extract = j.extract || j.description || '';
+      if (!extract) continue;
+      const url = j.content_urls?.desktop?.page || `https://${lang}.wikipedia.org/wiki/${title}`;
+      return {
+        ok: true,
+        text: `WIKI (${lang.toUpperCase()})\n${j.title || topic}\n\n${extract.slice(0, 1200)}\n\n${url}`,
+      };
+    } catch (_) {}
+  }
+  return { ok: false, error: 'No Wikipedia summary found. Try another spelling.' };
+}
+
+async function fetchPublicPageText(url) {
+  if (!isSafePublicHttpUrl(url)) {
+    return { ok: false, error: 'Only public http(s) URLs allowed.' };
+  }
+  try {
+    const r = await fetch(url, {
+      headers: {
+        Accept: 'text/html,application/xhtml+xml',
+        'User-Agent': 'PasiyaMaxQueenBot/2.6 (Telegram; summary-only)',
+      },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+    const ct = (r.headers.get('content-type') || '').toLowerCase();
+    if (!ct.includes('text') && !ct.includes('html') && !ct.includes('json')) {
+      return { ok: false, error: 'Unsupported content type' };
+    }
+    const body = await r.text();
+    const text = stripHtml(body).slice(0, 8000);
+    if (text.length < 40) return { ok: false, error: 'Page text too short or blocked' };
+    return { ok: true, text, finalUrl: r.url || url };
+  } catch (e) {
+    return { ok: false, error: String(e?.message || e).slice(0, 120) };
+  }
+}
+
+
+
+async function githubGetFile(path) {
+  if (!GITHUB_TOKEN) return { ok: false, error: 'GITHUB_TOKEN missing' };
+  const repo = GITHUB_REPO || 'pasindudananjaya92-bot/radiant-queen-pasiya-max-v2';
+  const cleanPath = String(path || '').replace(/^\/+/, '').replace(/\.\./g, '');
+  if (!cleanPath) return { ok: false, error: 'Invalid path' };
+  const headers = {
+    Authorization: `Bearer ${GITHUB_TOKEN}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+  const res = await fetch(
+    `https://api.github.com/repos/${repo}/contents/${cleanPath}`,
+    { headers }
+  );
+  const text = await res.text();
+  if (!res.ok) {
+    return { ok: false, error: `HTTP ${res.status}: ${text.slice(0, 180)}` };
+  }
+  let j;
+  try {
+    j = JSON.parse(text);
+  } catch {
+    return { ok: false, error: 'Bad JSON from GitHub' };
+  }
+  if (Array.isArray(j)) {
+    return { ok: false, error: 'Path is a directory. Use /ghlist ' + cleanPath };
+  }
+  if (j.encoding === 'base64' && j.content) {
+    const buf = Buffer.from(j.content.replace(/\n/g, ''), 'base64');
+    const isText = !/\.(png|jpg|jpeg|gif|webp|zip|pdf|exe|bin)$/i.test(cleanPath);
+    return {
+      ok: true,
+      path: cleanPath,
+      size: j.size,
+      url: j.html_url,
+      text: isText ? buf.toString('utf8') : null,
+      binary: !isText,
+      sha: j.sha,
+    };
+  }
+  return { ok: false, error: 'Unsupported content' };
+}
+
+async function githubListPath(path) {
+  if (!GITHUB_TOKEN) return { ok: false, error: 'GITHUB_TOKEN missing' };
+  const repo = GITHUB_REPO || 'pasindudananjaya92-bot/radiant-queen-pasiya-max-v2';
+  const cleanPath = String(path || '').replace(/^\/+/, '').replace(/\.\./g, '');
+  const headers = {
+    Authorization: `Bearer ${GITHUB_TOKEN}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+  const url = cleanPath
+    ? `https://api.github.com/repos/${repo}/contents/${cleanPath}`
+    : `https://api.github.com/repos/${repo}/contents`;
+  const res = await fetch(url, { headers });
+  const text = await res.text();
+  if (!res.ok) {
+    return { ok: false, error: `HTTP ${res.status}: ${text.slice(0, 180)}` };
+  }
+  let j;
+  try {
+    j = JSON.parse(text);
+  } catch {
+    return { ok: false, error: 'Bad JSON' };
+  }
+  if (!Array.isArray(j)) {
+    return {
+      ok: true,
+      lines: [`FILE ${j.name} (${j.size || 0} bytes)`],
+      path: cleanPath || '/',
+    };
+  }
+  const lines = j
+    .slice(0, 40)
+    .map((item) => {
+      const tag = item.type === 'dir' ? 'DIR ' : 'FILE';
+      return `${tag} ${item.name}${item.type === 'file' && item.size != null ? ` (${item.size})` : ''}`;
+    });
+  return { ok: true, lines, path: cleanPath || '/' };
+}
+
+async function githubPutFile(path, contentBuffer, message) {
+  if (!GITHUB_TOKEN) {
+    return { ok: false, error: 'GITHUB_TOKEN missing on Vercel' };
+  }
+  const repo = GITHUB_REPO || 'pasindudananjaya92-bot/radiant-queen-pasiya-max-v2';
+  const cleanPath = String(path || '')
+    .trim()
+    .replace(/^\/+/, '')
+    .replace(/\\/g, '/')
+    .replace(/\.\./g, '')
+    .slice(0, 240);
+  if (!cleanPath || cleanPath.includes('..')) {
+    return { ok: false, error: 'Invalid path' };
+  }
+  // Keep nested paths (lib/aiRouter.js) — encode each segment
+  const encodedPath = cleanPath
+    .split('/')
+    .filter(Boolean)
+    .map((seg) => encodeURIComponent(seg))
+    .join('/');
+  const headers = {
+    Authorization: `Bearer ${GITHUB_TOKEN}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+    'Content-Type': 'application/json',
+  };
+  let sha;
+  try {
+    const getRes = await fetch(
+      `https://api.github.com/repos/${repo}/contents/${encodedPath}`,
+      { headers }
+    );
+    if (getRes.ok) {
+      const j = await getRes.json();
+      sha = j.sha;
+    }
+  } catch (_) {}
+
+  const body = {
+    message: message || `bot: update ${cleanPath}`,
+    content: contentBuffer.toString('base64'),
+    branch: 'main',
+  };
+  if (sha) body.sha = sha;
+
+  const putRes = await fetch(
+    `https://api.github.com/repos/${repo}/contents/${encodedPath}`,
+    { method: 'PUT', headers, body: JSON.stringify(body) }
+  );
+  const text = await putRes.text();
+  if (!putRes.ok) {
+    return {
+      ok: false,
+      error: `GitHub HTTP ${putRes.status}: ${text.slice(0, 200)}`,
+    };
+  }
+  let html = '';
+  try {
+    html = JSON.parse(text)?.content?.html_url || '';
+  } catch (_) {}
+  return { ok: true, path: cleanPath, url: html, repo };
+}
+
+
+async function githubRecentCommits(limit = 5) {
+  if (!GITHUB_TOKEN) return { ok: false, error: 'GITHUB_TOKEN missing' };
+  const repo = GITHUB_REPO || 'pasindudananjaya92-bot/radiant-queen-pasiya-max-v2';
+  const n = Math.max(1, Math.min(15, Number(limit) || 5));
+  const headers = {
+    Authorization: `Bearer ${GITHUB_TOKEN}`,
+    Accept: 'application/vnd.github+json',
+    'X-GitHub-Api-Version': '2022-11-28',
+  };
+  const res = await fetch(
+    `https://api.github.com/repos/${repo}/commits?per_page=${n}`,
+    { headers }
+  );
+  const text = await res.text();
+  if (!res.ok) {
+    return { ok: false, error: `HTTP ${res.status}: ${text.slice(0, 180)}` };
+  }
+  let arr;
+  try {
+    arr = JSON.parse(text);
+  } catch {
+    return { ok: false, error: 'Bad JSON' };
+  }
+  const lines = (arr || []).map((c, i) => {
+    const msg = (c.commit?.message || '').split('\n')[0].slice(0, 80);
+    const who = c.commit?.author?.name || c.author?.login || '?';
+    const sha = (c.sha || '').slice(0, 7);
+    const when = c.commit?.author?.date || '';
+    return `${i + 1}. ${sha} — ${msg}\n   ${who} · ${when.slice(0, 16)}`;
+  });
+  return { ok: true, lines, repo };
+}
+
+
+async function geocodePlace(name) {
+  const q = encodeURIComponent(String(name).trim());
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${q}&count=1&language=en&format=json`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!r.ok) return null;
+  const j = await r.json();
+  const hit = j?.results?.[0];
+  if (!hit) return null;
+  return {
+    name: hit.name,
+    country: hit.country || '',
+    admin1: hit.admin1 || '',
+    lat: hit.latitude,
+    lon: hit.longitude,
+  };
+}
+
+
+async function fetchForecast(lat, lon, days = 3) {
+  const d = Math.max(1, Math.min(7, Number(days) || 3));
+  const url =
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max` +
+    `&timezone=auto&forecast_days=${d}`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+  const j = await r.json();
+  const daily = j.daily || {};
+  const dates = daily.time || [];
+  const lines = dates.map((date, i) => {
+    const code = daily.weather_code?.[i];
+    const tmax = daily.temperature_2m_max?.[i];
+    const tmin = daily.temperature_2m_min?.[i];
+    const rain = daily.precipitation_sum?.[i];
+    const wind = daily.wind_speed_10m_max?.[i];
+    return `${date}: ${weatherCodeText(code)} · ${tmin}–${tmax}°C · rain ${rain}mm · wind ${wind}km/h`;
+  });
+  return { ok: true, timezone: j.timezone || '', lines };
+}
+
+
+async function fetchSun(lat, lon) {
+  const url =
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&daily=sunrise,sunset,daylight_duration` +
+    `&timezone=auto&forecast_days=1`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+  const j = await r.json();
+  const d = j.daily || {};
+  return {
+    ok: true,
+    timezone: j.timezone || '',
+    sunrise: d.sunrise?.[0] || '—',
+    sunset: d.sunset?.[0] || '—',
+    daylight: d.daylight_duration?.[0],
+  };
+}
+
+async function fetchAqi(lat, lon) {
+  const url =
+    `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}` +
+    `&current=european_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,ozone` +
+    `&timezone=auto`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+  const j = await r.json();
+  const c = j.current || {};
+  return {
+    ok: true,
+    timezone: j.timezone || '',
+    eaqi: c.european_aqi,
+    pm10: c.pm10,
+    pm25: c.pm2_5,
+    co: c.carbon_monoxide,
+    no2: c.nitrogen_dioxide,
+    o3: c.ozone,
+  };
+}
+
+function aqiLabel(eaqi) {
+  const n = Number(eaqi);
+  if (!Number.isFinite(n)) return 'Unknown';
+  if (n <= 20) return 'Good';
+  if (n <= 40) return 'Fair';
+  if (n <= 60) return 'Moderate';
+  if (n <= 80) return 'Poor';
+  if (n <= 100) return 'Very poor';
+  return 'Extremely poor';
+}
+
+
+function moonPhaseInfo(date = new Date()) {
+  // Simple illuminated fraction / phase name (approx)
+  const yp = date.getFullYear();
+  const mp = date.getMonth();
+  const dp = date.getDate();
+  let r = yp % 100;
+  r %= 19;
+  if (r > 9) r -= 19;
+  r = ((r * 11) % 30) + mp + dp;
+  if (mp < 2) r += 2;
+  const t = date.getHours() / 24;
+  let age = (r + t) % 30;
+  if (age < 0) age += 30;
+  const names = [
+    'New Moon',
+    'Waxing Crescent',
+    'First Quarter',
+    'Waxing Gibbous',
+    'Full Moon',
+    'Waning Gibbous',
+    'Last Quarter',
+    'Waning Crescent',
+  ];
+  const idx = Math.min(7, Math.floor((age / 30) * 8));
+  const illum = Math.round((1 - Math.cos((age / 30) * 2 * Math.PI)) * 50);
+  return { age: age.toFixed(1), name: names[idx], illum };
+}
+
+async function fetchFxRate(base, symbols) {
+  const b = String(base || 'USD').toUpperCase();
+  const s = String(symbols || 'LKR').toUpperCase();
+  // open.er-api.com free tier — includes LKR (Frankfurter/ECB does not)
+  const url = `https://open.er-api.com/v6/latest/${encodeURIComponent(b)}`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+  const j = await r.json();
+  if (j.result && j.result !== 'success') {
+    return { ok: false, error: j['error-type'] || 'API error' };
+  }
+  const rate = j?.rates?.[s];
+  if (rate == null) {
+    return { ok: false, error: `Symbol ${s} not found for base ${b}` };
+  }
+  const date =
+    j.time_last_update_utc ||
+    (j.time_last_update_unix
+      ? new Date(j.time_last_update_unix * 1000).toISOString().slice(0, 10)
+      : '');
+  return {
+    ok: true,
+    base: j.base_code || b,
+    symbol: s,
+    rate,
+    date,
+  };
+}
+
+async function fetchWeather(lat, lon) {
+  const url =
+    `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+    `&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m` +
+    `&daily=temperature_2m_max,temperature_2m_min,precipitation_sum` +
+    `&timezone=auto&forecast_days=1`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+  const j = await r.json();
+  const c = j.current || {};
+  const d = j.daily || {};
+  return {
+    ok: true,
+    timezone: j.timezone || '',
+    temp: c.temperature_2m,
+    feels: c.apparent_temperature,
+    humidity: c.relative_humidity_2m,
+    precip: c.precipitation,
+    wind: c.wind_speed_10m,
+    code: c.weather_code,
+    tmax: d.temperature_2m_max?.[0],
+    tmin: d.temperature_2m_min?.[0],
+    precipDay: d.precipitation_sum?.[0],
+  };
+}
+
+function weatherCodeText(code) {
+  const map = {
+    0: 'Clear',
+    1: 'Mainly clear',
+    2: 'Partly cloudy',
+    3: 'Overcast',
+    45: 'Fog',
+    48: 'Depositing rime fog',
+    51: 'Light drizzle',
+    61: 'Light rain',
+    63: 'Rain',
+    65: 'Heavy rain',
+    71: 'Snow',
+    80: 'Rain showers',
+    95: 'Thunderstorm',
+  };
+  return map[code] || `Code ${code}`;
+}
+
+
+async function handleCurrencyCommand(ctx) {
+  const raw = (ctx.message.text || '')
+    .replace(/^\/currency(@\w+)?\s*/i, '')
+    .trim()
+    .toUpperCase();
+  const parts = raw.split(/\s+/).filter(Boolean);
+  if (parts.length < 2) {
+    await ctx.reply(
+      'Usage:\n/currency USD LKR\n/currency 100 USD LKR\n/currency EUR LKR'
+    );
+    return;
+  }
+  let amount = 1;
+  let base;
+  let sym;
+  if (parts.length >= 3 && !Number.isNaN(parseFloat(parts[0]))) {
+    amount = parseFloat(parts[0]);
+    base = parts[1];
+    sym = parts[2];
+  } else {
+    base = parts[0];
+    sym = parts[1];
+  }
+  await ctx.sendChatAction('typing');
+  const fx = await fetchFxRate(base, sym);
+  if (!fx.ok) {
+    await ctx.reply(`currency failed: ${fx.error}`);
+    return;
+  }
+  const total = (amount * fx.rate).toFixed(4);
+  await ctx.reply(
+    `CURRENCY\n` +
+      `${amount} ${fx.base} = ${total} ${fx.symbol}\n` +
+      `Rate: 1 ${fx.base} = ${fx.rate} ${fx.symbol}\n` +
+      `Date: ${fx.date}\n` +
+      `(open.er-api.com free rates)`
+  );
+}
+
+async function handleMoonCommand(ctx) {
+  const info = moonPhaseInfo(new Date());
+  await ctx.reply(
+    `MOON\n` +
+      `Phase: ${info.name}\n` +
+      `Approx age: ${info.age} days\n` +
+      `Illumination: ~${info.illum}%\n\n` +
+      `Tip: Full moon nights can be brighter for evening easy runs.`
+  );
+}
+
+async function handleSunCommand(ctx) {
+  const place = (ctx.message.text || '')
+    .replace(/^\/sun(@\w+)?\s*/i, '')
+    .trim();
+  if (!place) {
+    await ctx.reply('Usage:\n/sun Colombo\n/sun Kotte');
+    return;
+  }
+  await ctx.sendChatAction('typing');
+  const geo = await geocodePlace(place);
+  if (!geo) {
+    await ctx.reply('Place not found.');
+    return;
+  }
+  const s = await fetchSun(geo.lat, geo.lon);
+  if (!s.ok) {
+    await ctx.reply(`sun failed: ${s.error}`);
+    return;
+  }
+  const label = [geo.name, geo.admin1, geo.country].filter(Boolean).join(', ');
+  const dayH = s.daylight != null ? (Number(s.daylight) / 3600).toFixed(1) : '—';
+  await ctx.reply(
+    `SUN · ${label}\n` +
+      `Sunrise: ${s.sunrise}\n` +
+      `Sunset: ${s.sunset}\n` +
+      `Daylight: ~${dayH} h\n` +
+      `TZ: ${s.timezone}`
+  );
+}
+
+async function handleAqiCommand(ctx) {
+  const place = (ctx.message.text || '')
+    .replace(/^\/aqi(@\w+)?\s*/i, '')
+    .trim();
+  if (!place) {
+    await ctx.reply('Usage:\n/aqi Colombo\n/aqi Kotte');
+    return;
+  }
+  await ctx.sendChatAction('typing');
+  const geo = await geocodePlace(place);
+  if (!geo) {
+    await ctx.reply('Place not found.');
+    return;
+  }
+  const a = await fetchAqi(geo.lat, geo.lon);
+  if (!a.ok) {
+    await ctx.reply(`aqi failed: ${a.error}`);
+    return;
+  }
+  const label = [geo.name, geo.admin1, geo.country].filter(Boolean).join(', ');
+  await ctx.reply(
+    `AQI · ${label}\n` +
+      `European AQI: ${a.eaqi} (${aqiLabel(a.eaqi)})\n` +
+      `PM2.5: ${a.pm25} · PM10: ${a.pm10}\n` +
+      `NO2: ${a.no2} · O3: ${a.o3} · CO: ${a.co}\n` +
+      `TZ: ${a.timezone}`
+  );
+}
+
+
+const GOLD_START = 400;
+const GOLD_DAILY = 50;
+const GOLD_COST = {
+  ask: 5,
+  vision: 10,
+  voice: 10,
+  stride: 5,
+};
+
+async function getOrCreateGold(userId, username) {
+  const uid = Number(userId);
+  if (!supabase || !Number.isFinite(uid)) {
+    return { ok: false, gold: 0, premium: false, error: 'no_db' };
+  }
+  const { data, error } = await supabase
+    .from('rq_gold')
+    .select('user_id, username, gold, premium, last_daily')
+    .eq('user_id', uid)
+    .maybeSingle();
+  if (error) {
+    return { ok: false, gold: 0, premium: false, error: error.message };
+  }
+  if (data) {
+    return {
+      ok: true,
+      gold: Number(data.gold) || 0,
+      premium: !!data.premium,
+      last_daily: data.last_daily || null,
+      username: data.username || username || null,
+    };
+  }
+  const row = {
+    user_id: uid,
+    username: username || null,
+    gold: GOLD_START,
+    premium: false,
+    last_daily: null,
+    updated_at: new Date().toISOString(),
+  };
+  const { error: insErr } = await supabase.from('rq_gold').upsert(row, {
+    onConflict: 'user_id',
+  });
+  if (insErr) {
+    return { ok: false, gold: 0, premium: false, error: insErr.message };
+  }
+  return {
+    ok: true,
+    gold: GOLD_START,
+    premium: false,
+    last_daily: null,
+    username: username || null,
+    newUser: true,
+  };
+}
+
+async function setGold(userId, gold, extra = {}) {
+  const uid = Number(userId);
+  if (!supabase || !Number.isFinite(uid)) return { ok: false };
+  const payload = {
+    user_id: uid,
+    gold: Math.max(0, Math.floor(Number(gold) || 0)),
+    updated_at: new Date().toISOString(),
+    ...extra,
+  };
+  const { error } = await supabase.from('rq_gold').upsert(payload, {
+    onConflict: 'user_id',
+  });
+  return { ok: !error, error: error?.message };
+}
+
+/** Founder = free. Returns { ok, gold, need } */
+async function spendGold(ctx, costKey) {
+  if (isAdmin(ctx)) {
+    return { ok: true, gold: null, free: true };
+  }
+  const cost = GOLD_COST[costKey] || 0;
+  if (cost <= 0) return { ok: true, gold: null, free: true };
+  const uid = ctx.from?.id;
+  const g = await getOrCreateGold(uid, ctx.from?.username || ctx.from?.first_name);
+  if (!g.ok) {
+    // fail open if DB missing so bot still works
+    return { ok: true, gold: null, free: true, dbError: g.error };
+  }
+  if (g.premium) return { ok: true, gold: g.gold, free: true };
+  if (g.gold < cost) {
+    return {
+      ok: false,
+      gold: g.gold,
+      need: cost,
+      message:
+        `Not enough Radiant Gold.\n` +
+        `Balance: ${g.gold} · Need: ${cost}\n` +
+        `/daily for +${GOLD_DAILY} · /balance`,
+    };
+  }
+  const next = g.gold - cost;
+  await setGold(uid, next, {
+    username: ctx.from?.username || ctx.from?.first_name || null,
+  });
+  return { ok: true, gold: next, spent: cost };
+}
+
+
+/** Multi-tenant: user-owned Telegram bots powered by Radiant Queen engine */
+async function saveUserBot(ownerId, token, meta = {}) {
+  if (!supabase) return { ok: false, error: 'Supabase missing' };
+  const uid = Number(ownerId);
+  const { error } = await supabase.from('rq_user_bots').upsert(
+    {
+      owner_id: uid,
+      bot_token: token,
+      bot_id: meta.bot_id || null,
+      bot_username: meta.bot_username || null,
+      bot_name: meta.bot_name || null,
+      is_active: true,
+      webhook_set: !!meta.webhook_set,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'owner_id' }
+  );
+  return { ok: !error, error: error?.message };
+}
+
+async function getUserBot(ownerId) {
+  if (!supabase) return null;
+  const uid = Number(ownerId);
+  let { data, error } = await supabase
+    .from('rq_user_bots')
+    .select('*')
+    .eq('owner_id', uid)
+    .maybeSingle();
+  if (!data && !error) {
+    const q2 = await supabase
+      .from('rq_user_bots')
+      .select('*')
+      .eq('owner_id', String(ownerId))
+      .maybeSingle();
+    data = q2.data || null;
+  }
+  return data || null;
+}
+
+async function getUserBotByOwnerKey(ownerKey) {
+  if (!supabase) return null;
+  const { data } = await supabase
+    .from('rq_user_bots')
+    .select('*')
+    .eq('owner_id', Number(ownerKey))
+    .eq('is_active', true)
+    .maybeSingle();
+  return data || null;
+}
+
+async function deleteUserBot(ownerId) {
+  if (!supabase) return { ok: false };
+  const row = await getUserBot(ownerId);
+  if (row?.bot_token) {
+    try {
+      await fetch(
+        `https://api.telegram.org/bot${row.bot_token}/deleteWebhook?drop_pending_updates=true`
+      );
+    } catch (_) {}
+  }
+  const { error } = await supabase
+    .from('rq_user_bots')
+    .delete()
+    .eq('owner_id', Number(ownerId));
+  return { ok: !error, error: error?.message };
+}
+
+async function telegramGetMe(token) {
+  const r = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+  const j = await r.json();
+  if (!j.ok) return { ok: false, error: j.description || 'getMe failed' };
+  return {
+    ok: true,
+    bot_id: j.result.id,
+    bot_username: j.result.username,
+    bot_name: j.result.first_name,
+  };
+}
+
+async function telegramSetWebhook(token, url) {
+  const r = await fetch(`https://api.telegram.org/bot${token}/setWebhook`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      url,
+      drop_pending_updates: true,
+      allowed_updates: ['message', 'callback_query'],
+    }),
+  });
+  const j = await r.json();
+  return { ok: !!j.ok, error: j.description, result: j };
+}
+
+
+async function setTenantWelcome(ownerId, text) {
+  if (!supabase) return { ok: false, error: 'no db' };
+  const { error } = await supabase
+    .from('rq_user_bots')
+    .update({
+      welcome_text: String(text || '').slice(0, 1500),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('owner_id', Number(ownerId));
+  return { ok: !error, error: error?.message };
+}
+
+async function generateReply(prompt, ctx, imageBase64, mimeType) {
+  let personaId = 'default';
+  try {
+    personaId = await getUserPersona(ctx?.from?.id);
+  } catch (_) {}
+  let personaBlock = '';
+  try {
+    const { personaSystemBlock } = await import('../lib/personas.js');
+    personaBlock = personaSystemBlock(personaId);
+  } catch (_) {
+    personaBlock = `You are Pasiya AI, assistant of Pasiya Max, for RADIANT QUEEN.
+Answer in the user's language (Sinhala or English). Be practical. No fake supercomputer stats.`;
   }
   const systemInstruction = `${personaBlock}
 ${identityLine(ctx)}
@@ -1656,7 +3029,7 @@ function buildBot() {
         `/usage — founder usage snapshot\n` +
         (isAdmin(ctx) ? `/admin — founder panel\n` : '') +
         `\nTools: Translate, Summarize, Rewrite, Caption, Hashtags, Bio, Ideas, Photo caption, Running tip\n` +
-        `Photo=vision · Voice note=STT+AI · /imagine=image · /notify=phone push.`, mainMenuKeyboard(ctx));
+        `Send a photo anytime for vision.`, mainMenuKeyboard(ctx));
   });
 
   bot.command(['persona', 'mood', 'tone'], async (ctx) => {
@@ -6558,7 +7931,6 @@ bot.command('commands', async (ctx) => {
     await ctx.reply(await generateReply(q, ctx), afterReplyKeyboard(ctx));
   });
 
-
   bot.command(['imagine', 'draw', 'img'], async (ctx) => {
     try {
       const uid = String(ctx.from.id);
@@ -6581,13 +7953,11 @@ bot.command('commands', async (ctx) => {
         .replace(/^\/(imagine|draw|img)(@\w+)?\s*/i, '')
         .trim();
       if (!prompt) {
-        await ctx.reply(
-          'Usage: /imagine a runner at sunrise in Colombo\n' +
-            'Free image gen (Pollinations · no API key).'
-        );
+        await ctx.reply('Usage: /imagine a runner at sunrise in Colombo');
         return;
       }
       await ctx.sendChatAction('upload_photo');
+      const { generateImagineImage } = await import('../lib/imagine.js');
       const img = await generateImagineImage(prompt);
       if (!img.ok) {
         await ctx.reply('Imagine failed: ' + String(img.error || 'unknown').slice(0, 160));
@@ -6608,24 +7978,28 @@ bot.command('commands', async (ctx) => {
       const msg = (ctx.message.text || '')
         .replace(/^\/(notify|remind|ntfy)(@\w+)?\s*/i, '')
         .trim();
+      const { ntfyTopic, sendNtfy } = await import('../lib/ntfy.js');
       if (!msg) {
-        const topic = ntfyTopic();
+        const topic = ntfyTopic(ADMIN_ID);
         await ctx.reply(
           'Phone push via ntfy.sh (free)\n\n' +
             '1) Install ntfy app\n' +
-            '2) Subscribe to topic:\n' + topic + '\n' +
-            '3) Send: /notify Hello from Radiant Queen\n\n' +
-            'Env override: NTFY_TOPIC on Vercel'
+            '2) Subscribe to topic:\n' +
+            topic +
+            '\n3) Send: /notify Hello from Radiant Queen\n\n' +
+            'Env: NTFY_TOPIC on Vercel'
         );
         return;
       }
-      const who = ctx.from && ctx.from.username
-        ? '@' + ctx.from.username
-        : ((ctx.from && ctx.from.first_name) || 'user');
+      const who =
+        ctx.from && ctx.from.username
+          ? '@' + ctx.from.username
+          : (ctx.from && ctx.from.first_name) || 'user';
       const r = await sendNtfy(
         'Radiant Queen',
         who + ': ' + msg,
-        isAdmin(ctx) ? 'high' : 'default'
+        isAdmin(ctx) ? 'high' : 'default',
+        ADMIN_ID
       );
       if (!r.ok) {
         await ctx.reply('ntfy failed: ' + (r.error || ''));
@@ -6633,11 +8007,14 @@ bot.command('commands', async (ctx) => {
       }
       await ctx.reply('✅ Sent to ntfy topic: ' + r.topic);
     } catch (err) {
-      await ctx.reply('notify failed: ' + String(err && err.message ? err.message : err).slice(0, 120));
+      await ctx.reply(
+        'notify failed: ' + String(err && err.message ? err.message : err).slice(0, 120)
+      );
     }
   });
 
 
+  // menus
   bot.action('menu_home', async (ctx) => {
     await ctx.answerCbQuery();
     await sendMenuSmart(ctx, numberedMainMenuText(), mainMenuKeyboard(ctx));
@@ -7333,6 +8710,7 @@ bot.command('commands', async (ctx) => {
   });
 
 
+  
   bot.on('voice', async (ctx) => {
     try {
       const payV = await spendGold(ctx, 'voice');
@@ -7341,12 +8719,11 @@ bot.command('commands', async (ctx) => {
         return;
       }
 
-      // private: always; groups: only for admin or when not quiet (keep simple: private + admin anywhere)
       const isPrivate = ctx.chat?.type === 'private';
       if (!isPrivate && !isAdmin(ctx)) {
         return;
       }
-      if (!isPrivate && ctx.chat?.type !== 'private') {
+      if (!isPrivate) {
         const q = await loadGroupSettings(ctx.chat.id);
         if (q?.botQuiet && !isAdmin(ctx)) return;
       }
@@ -7355,7 +8732,7 @@ bot.command('commands', async (ctx) => {
       if (!isAdmin(ctx)) {
         const rate = await checkRateLimit(uid);
         if (!rate.ok) {
-          await ctx.reply(`Slow down. Retry in ~${rate.waitSec}s.`);
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
           return;
         }
       }
@@ -7369,29 +8746,28 @@ bot.command('commands', async (ctx) => {
 
       await ctx.sendChatAction('typing');
       const file = await ctx.telegram.getFile(voice.file_id);
-      const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+      const fileUrl = 'https://api.telegram.org/file/bot' + BOT_TOKEN + '/' + file.file_path;
       const res = await fetch(fileUrl);
       const buf = Buffer.from(await res.arrayBuffer());
 
-      // 1) Groq Whisper STT
+      const { transcribeVoiceGroq } = await import('../lib/stt.js');
       const stt = await transcribeVoiceGroq(buf, 'voice.ogg');
       if (!stt.ok) {
         await ctx.reply(
-          'Voice STT failed: ' + String(stt.error || '').slice(0, 140) +
-            '\nSend as text, or check GROQ_API_KEY.'
+          'Voice STT failed: ' +
+            String(stt.error || '').slice(0, 140) +
+            '. Send as text, or check GROQ_API_KEY.'
         );
         return;
       }
       const transcript = stt.text.slice(0, 2000);
-      // 2) AI reply on transcript
       const out = await generateReply(
-        'User spoke (voice transcript):\n' + transcript +
+        'User spoke (voice transcript):\n' +
+          transcript +
           '\n\nReply helpfully in the same language (Sinhala or English). Keep under 12 lines.',
         ctx
       );
-      await ctx.reply(
-        '🎙 ' + transcript.slice(0, 500) + '\n\n' + String(out || '').slice(0, 3000)
-      );
+      await ctx.reply('🎙 ' + transcript.slice(0, 500) + '\n\n' + String(out || '').slice(0, 3000));
     } catch (err) {
       console.error('voice', err);
       try {
@@ -7399,7 +8775,6 @@ bot.command('commands', async (ctx) => {
       } catch (_) {}
     }
   });
-
 
   bot.on('photo', async (ctx) => {
     try {
