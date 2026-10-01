@@ -125,7 +125,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-p1d-lib-fix'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
+const BOT_VERSION = 'v4.0-p2-memory-remind'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -2597,11 +2597,32 @@ async function generateReply(prompt, ctx, imageBase64, mimeType) {
     personaBlock = `You are Pasiya AI, assistant of Pasiya Max, for RADIANT QUEEN.
 Answer in the user's language (Sinhala or English). Be practical. No fake supercomputer stats.`;
   }
-  const systemInstruction = `${personaBlock}
+  const systemInstructionBase = `${personaBlock}
 ${identityLine(ctx)}
 Persona mode: ${personaId}
 Official links when asked:
 ${LINKS}`;
+
+  // P2: short conversation memory
+  let memoryBlock = '';
+  const memUserId = ctx?.from?.id;
+  try {
+    if (memUserId && !imageBase64) {
+      const { loadMemoryBlock } = await import('../lib/memory.js');
+      memoryBlock = await loadMemoryBlock(supabase, memUserId, 8);
+    }
+  } catch (_) {}
+  const systemInstruction = memoryBlock
+    ? systemInstructionBase + '\n\nRecent chat memory:\n' + memoryBlock
+    : systemInstructionBase;
+
+  async function rememberTurn(userText, assistantText) {
+    try {
+      if (!memUserId || imageBase64) return;
+      const { saveMemoryTurn } = await import('../lib/memory.js');
+      await saveMemoryTurn(supabase, memUserId, userText, assistantText);
+    } catch (_) {}
+  }
 
   const looksLikeError = (t) => {
     const low = String(t || '').toLowerCase();
@@ -2683,6 +2704,7 @@ ${LINKS}`;
         const { setCached } = await import('../lib/aiCache.js');
         await setCached(userPrompt, text, personaId);
       } catch (_) {}
+      await rememberTurn(userPrompt, text);
       return text.slice(0, 3500);
     }
   } catch (err) {
@@ -2726,6 +2748,7 @@ ${LINKS}`;
             const { setCached } = await import('../lib/aiCache.js');
             await setCached(userPrompt, text, personaId);
           } catch (_) {}
+          await rememberTurn(userPrompt, text);
           return text.slice(0, 3500);
         }
       } catch (_) {
@@ -7973,10 +7996,10 @@ bot.command('commands', async (ctx) => {
     }
   });
 
-  bot.command(['notify', 'remind', 'ntfy'], async (ctx) => {
+  bot.command(['notify', 'ntfy'], async (ctx) => {
     try {
       const msg = (ctx.message.text || '')
-        .replace(/^\/(notify|remind|ntfy)(@\w+)?\s*/i, '')
+        .replace(/^\/(notify|ntfy)(@\w+)?\s*/i, '')
         .trim();
       const { ntfyTopic, sendNtfy } = await import('../lib/ntfy.js');
       if (!msg) {
@@ -8013,6 +8036,126 @@ bot.command('commands', async (ctx) => {
     }
   });
 
+
+
+  bot.command(['forget', 'clearmemory', 'memoryclear'], async (ctx) => {
+    try {
+      const { clearMemory } = await import('../lib/memory.js');
+      const r = await clearMemory(supabase, ctx.from.id);
+      await ctx.reply(
+        r.ok
+          ? '🧠 Memory cleared. Next replies start fresh.'
+          : 'Memory clear failed: ' + (r.error || 'unknown')
+      );
+    } catch (err) {
+      await ctx.reply('forget failed: ' + String(err && err.message ? err.message : err).slice(0, 120));
+    }
+  });
+
+  bot.command(['memory', 'mem'], async (ctx) => {
+    try {
+      const { loadMemoryBlock } = await import('../lib/memory.js');
+      const block = await loadMemoryBlock(supabase, ctx.from.id, 8);
+      if (!block) {
+        await ctx.reply('No saved chat memory yet. Chat with /ask first.');
+        return;
+      }
+      await ctx.reply('🧠 Your recent memory:\\n\\n' + block.slice(0, 3200));
+    } catch (err) {
+      await ctx.reply('memory failed: ' + String(err && err.message ? err.message : err).slice(0, 120));
+    }
+  });
+
+  bot.command(['remind'], async (ctx) => {
+    try {
+      const raw = (ctx.message.text || '')
+        .replace(/^\/remind(@\w+)?\s*/i, '')
+        .trim();
+      const { parseReminder, addReminder, listReminders } = await import('../lib/reminders.js');
+      if (!raw || raw === 'help') {
+        await ctx.reply(
+          'Reminders\\n\\n' +
+            '/remind 10m drink water\\n' +
+            '/remind 1h call Amma\\n' +
+            '/remind 5pm stretch\\n' +
+            '/remind daily 7am morning run\\n' +
+            '/remindlist\\n' +
+            '/remindcancel <id>\\n\\n' +
+            'Uses ntfy + Telegram when due (cron).'
+        );
+        return;
+      }
+      const parsed = parseReminder(raw);
+      if (!parsed.ok) {
+        await ctx.reply(parsed.error || 'Could not parse. Try: /remind 10m message');
+        return;
+      }
+      const r = await addReminder(supabase, {
+        userId: ctx.from.id,
+        chatId: ctx.chat.id,
+        message: parsed.message,
+        dueAt: parsed.dueAt,
+        recurring: parsed.recurring,
+      });
+      if (!r.ok) {
+        await ctx.reply('Save failed: ' + (r.error || ''));
+        return;
+      }
+      await ctx.reply(
+        '⏰ Reminder #' +
+          r.id +
+          '\\nWhen: ' +
+          parsed.dueAt.toISOString() +
+          (parsed.recurring ? '\\nRepeat: ' + parsed.recurring : '') +
+          '\\nText: ' +
+          parsed.message
+      );
+    } catch (err) {
+      await ctx.reply('remind failed: ' + String(err && err.message ? err.message : err).slice(0, 140));
+    }
+  });
+
+  bot.command(['remindlist', 'reminders'], async (ctx) => {
+    try {
+      const { listReminders } = await import('../lib/reminders.js');
+      const rows = await listReminders(supabase, ctx.from.id);
+      if (!rows.length) {
+        await ctx.reply('No active reminders. /remind 10m test');
+        return;
+      }
+      const lines = rows.map(function (r) {
+        return (
+          '#' +
+          r.id +
+          ' · ' +
+          (r.due_at || '') +
+          (r.recurring ? ' · ' + r.recurring : '') +
+          '\\n  ' +
+          String(r.message || '').slice(0, 80)
+        );
+      });
+      await ctx.reply('⏰ Active reminders\\n\\n' + lines.join('\\n\\n'));
+    } catch (err) {
+      await ctx.reply('remindlist failed: ' + String(err && err.message ? err.message : err).slice(0, 120));
+    }
+  });
+
+  bot.command(['remindcancel', 'reminddel', 'undoremind'], async (ctx) => {
+    try {
+      const id = (ctx.message.text || '')
+        .replace(/^\/(remindcancel|reminddel|undoremind)(@\w+)?\s*/i, '')
+        .trim();
+      if (!id) {
+        await ctx.reply('Usage: /remindcancel <id>  (see /remindlist)');
+        return;
+      }
+      const { cancelReminder } = await import('../lib/reminders.js');
+      const r = await cancelReminder(supabase, ctx.from.id, id);
+      await ctx.reply(r.ok ? 'Cancelled reminder #' + id : 'Cancel failed: ' + (r.error || ''));
+    } catch (err) {
+      await ctx.reply('remindcancel failed: ' + String(err && err.message ? err.message : err).slice(0, 120));
+    }
+  });
 
   // menus
   bot.action('menu_home', async (ctx) => {
