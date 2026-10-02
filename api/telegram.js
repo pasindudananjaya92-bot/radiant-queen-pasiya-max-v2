@@ -125,7 +125,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-packD-live'; // Pack D: Live board + /live + web live.html
+const BOT_VERSION = 'v4.0-packE-web'; // Pack E: web search boost /search /web /askweb
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -6474,13 +6474,12 @@ bot.command('commands', async (ctx) => {
 
   bot.command('web', async (ctx) => {
     try {
-      const url = (ctx.message.text || '')
+      const arg = (ctx.message.text || '')
         .replace(/^\/web(@\w+)?\s*/i, '')
-        .trim()
-        .split(/\s+/)[0];
-      if (!url) {
+        .trim();
+      if (!arg) {
         await ctx.reply(
-          'Usage:\n/web https://example.com\n\nPublic pages only. No logins/paywalls.'
+          'Usage:\n/web https://example.com\n\nBoosted fetch: Firecrawl → Jina → plain\nAlso: /search <query> · /askweb <question>'
         );
         return;
       }
@@ -6493,24 +6492,118 @@ bot.command('commands', async (ctx) => {
         }
       }
       await ctx.sendChatAction('typing');
-      const page = await fetchPublicPageText(url);
+      const { fetchPageBoosted } = await import('../lib/webBoost.js');
+      let page = await fetchPageBoosted(arg.split(/\s+/)[0]);
+      if (!page.ok) {
+        // legacy fallback if present
+        try {
+          page = await fetchPublicPageText(arg.split(/\s+/)[0]);
+        } catch (_) {}
+      }
       if (!page.ok) {
         await ctx.reply(`web failed: ${page.error}`);
         return;
       }
       const summary = await generateReply(
         `Summarize this public webpage for a user in clear short bullets (max 12 lines). ` +
-          `Include main topic and 3 key points. If not useful, say so.\n\nURL: ${page.finalUrl}\n\nCONTENT:\n${page.text.slice(0, 6000)}`,
+          `Include main topic and 3 key points. If not useful, say so.\n\nURL: ${page.finalUrl}\nProvider: ${page.provider || 'n/a'}\n\nCONTENT:\n${page.text.slice(0, 6000)}`,
         ctx
       );
-      await ctx.reply(`WEB SUMMARY\n${page.finalUrl}\n\n${summary}`.slice(0, 3500));
+      await ctx.reply(
+        `WEB SUMMARY · ${page.provider || 'web'}\n${page.finalUrl}\n\n${summary}`.slice(0, 3500)
+      );
     } catch (err) {
       console.error('web', err);
       await ctx.reply('web failed.');
     }
   });
 
-  bot.command('code', async (ctx) => {
+  bot.command(['search', 'websearch', 'find'], async (ctx) => {
+    try {
+      const q = (ctx.message.text || '')
+        .replace(/^\/(search|websearch|find)(@\w+)?\s*/i, '')
+        .trim();
+      if (!q) {
+        await ctx.reply('Usage:\n/search best 5K training plan\n/search Sri Lanka time zone');
+        return;
+      }
+      const uid = String(ctx.from.id);
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply(`Slow down. Retry in ~${rate.waitSec}s.`);
+          return;
+        }
+      }
+      try {
+        const pay = await spendGold(ctx, 'ask');
+        if (!pay.ok) {
+          await ctx.reply(pay.message || 'Not enough gold.');
+          return;
+        }
+      } catch (_) {}
+      await ctx.sendChatAction('typing');
+      const { webSearch, formatSearchResults } = await import('../lib/webBoost.js');
+      const found = await webSearch(q);
+      if (!found.ok || !found.results?.length) {
+        await ctx.reply('Search failed: ' + (found.error || 'no results'));
+        return;
+      }
+      await ctx.reply(formatSearchResults(found).slice(0, 3500));
+    } catch (err) {
+      console.error('search', err);
+      await ctx.reply('search failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['askweb', 'webask', 'research'], async (ctx) => {
+    try {
+      const q = (ctx.message.text || '')
+        .replace(/^\/(askweb|webask|research)(@\w+)?\s*/i, '')
+        .trim();
+      if (!q) {
+        await ctx.reply(
+          'AI + live web search\n\nUsage:\n/askweb Who won the latest Olympics marathon?\n/research current gold price trends'
+        );
+        return;
+      }
+      const uid = String(ctx.from.id);
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply(`Slow down. Retry in ~${rate.waitSec}s.`);
+          return;
+        }
+      }
+      try {
+        const pay = await spendGold(ctx, 'ask');
+        if (!pay.ok) {
+          await ctx.reply(pay.message || 'Not enough gold.');
+          return;
+        }
+      } catch (_) {}
+      await ctx.sendChatAction('typing');
+      const { webSearch, formatSearchResults } = await import('../lib/webBoost.js');
+      const found = await webSearch(q);
+      const bundle = found.ok
+        ? formatSearchResults(found)
+        : 'No web hits. Answer from general knowledge and say if unsure.';
+      const answer = await generateReply(
+        `You are a research assistant. Use the WEB SEARCH RESULTS below. ` +
+          `Cite links when relevant. If results are weak, say so. Be concise.\n\n` +
+          `USER QUESTION:\n${q}\n\nWEB SEARCH RESULTS:\n${bundle.slice(0, 5000)}`,
+        ctx
+      );
+      await ctx.reply(
+        (`🧠 ASKWEB · ${found.provider || 'ai'}\n\n${answer}`).slice(0, 3500)
+      );
+    } catch (err) {
+      console.error('askweb', err);
+      await ctx.reply('askweb failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command('code, async (ctx) => {
     try {
       const q = (ctx.message.text || '')
         .replace(/^\/code(@\w+)?\s*/i, '')
