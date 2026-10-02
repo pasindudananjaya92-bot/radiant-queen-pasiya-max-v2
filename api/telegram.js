@@ -125,7 +125,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-p4-inline-pulse'; // P4: inline mode + founder /pulse
+const BOT_VERSION = 'v4.0-p5-inline-ai'; // P5: inline ask + help cards + /digest
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -7943,6 +7943,81 @@ bot.command('commands', async (ctx) => {
     }
   });
 
+
+  // P5 Founder daily-style digest
+  bot.command(['digest', 'dailydigest'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only.');
+        return;
+      }
+      const now = new Date();
+      const lines = [
+        '📬 FOUNDER DIGEST',
+        'Time: ' + now.toISOString(),
+        'Version: ' + (typeof BOT_VERSION !== 'undefined' ? BOT_VERSION : ''),
+        '',
+      ];
+      if (!supabase) {
+        lines.push('Supabase offline.');
+        await ctx.reply(lines.join('\n'));
+        return;
+      }
+      let activeRem = 0;
+      let dueSoon = [];
+      try {
+        const { data } = await supabase
+          .from('rq_reminders')
+          .select('id, message, due_at, user_id')
+          .eq('active', true)
+          .order('due_at', { ascending: true })
+          .limit(8);
+        if (data) {
+          activeRem = data.length;
+          dueSoon = data;
+        }
+      } catch (_) {}
+      let refCount = 0;
+      try {
+        const { count } = await supabase
+          .from('rq_referrals')
+          .select('*', { count: 'exact', head: true });
+        refCount = count ?? 0;
+      } catch (_) {}
+      let goldSum = 0;
+      let wallets = 0;
+      try {
+        const { data } = await supabase.from('rq_gold').select('gold');
+        if (data) {
+          wallets = data.length;
+          goldSum = data.reduce((s, r) => s + (Number(r.gold) || 0), 0);
+        }
+      } catch (_) {}
+      lines.push('Wallets: ' + wallets + ' · Gold total: ' + goldSum);
+      lines.push('Referrals: ' + refCount);
+      lines.push('Active reminders listed: ' + activeRem);
+      if (dueSoon.length) {
+        lines.push('');
+        lines.push('Next reminders:');
+        for (const r of dueSoon.slice(0, 5)) {
+          lines.push(
+            '#' +
+              r.id +
+              ' @' +
+              r.due_at +
+              ' — ' +
+              String(r.message || '').slice(0, 40)
+          );
+        }
+      }
+      lines.push('');
+      lines.push('Tips: /pulse · /remindlist · /refstats · cron-job.org every 5m');
+      await ctx.reply(lines.join('\n').slice(0, 3500));
+    } catch (e) {
+      await ctx.reply('digest failed: ' + (e.message || e));
+    }
+  });
+
   bot.command(['balance', 'gold'], async (ctx) => {
     try {
       if (!(await requireFeature(ctx, 'gold', 'Gold pack'))) return;
@@ -9574,12 +9649,13 @@ bot.command('commands', async (ctx) => {
   });
 
 
-  // P4 Inline mode — @Bot query in any chat
+  // P5 Inline mode — tools + ask (AI) + rich help
   bot.on('inline_query', async (ctx) => {
     try {
       const q = String(ctx.inlineQuery?.query || '').trim();
       const ql = q.toLowerCase();
       const results = [];
+      const botU = ctx.botInfo?.username || 'PasiyaMaxQueen_bot';
       const mk = (id, title, description, message) => ({
         type: 'article',
         id: String(id).slice(0, 64),
@@ -9590,57 +9666,237 @@ bot.command('commands', async (ctx) => {
         },
       });
 
+      // --- empty: help hub ---
       if (!q) {
         results.push(
-          mk('help', 'Radiant Queen · Help', 'Commands & links', 
-            'RADIANT QUEEN · PASIYA MAX\n/menu · /tools · /balance · /ref · /weather Colombo\nWeb: https://radiant-queen-pasiya-max-v2.vercel.app')
+          mk(
+            'help',
+            '📖 Help · Commands',
+            'Menu, tools, gold, weather…',
+            'RADIANT QUEEN · PASIYA MAX\n\n' +
+              'Main: /menu /tools /balance /daily /ref\n' +
+              'Weather: /weather Colombo\n' +
+              'Remind: /remind 10m message\n' +
+              'AI: send text in bot (5 gold) · /imagine\n' +
+              'Inline: weather · calc · ask · gold · help\n\n' +
+              'Web: https://radiant-queen-pasiya-max-v2.vercel.app\n' +
+              'Bot: @' +
+              botU
+          )
         );
-        results.push(mk('gold', 'Gold wallet', 'Open /balance', 'Type /balance in chat with @PasiyaMaxQueen_bot'));
-        results.push(mk('weather', 'Weather', 'Try: weather Colombo', 'Inline: @PasiyaMaxQueen_bot weather Colombo'));
-        results.push(mk('calc', 'Calculator', 'Try: calc 10*5', 'Inline: @PasiyaMaxQueen_bot calc 10*5'));
-      } else if (ql.startsWith('weather') || ql.startsWith('wx ')) {
+        results.push(
+          mk(
+            'askhow',
+            '🤖 Ask AI (inline)',
+            'Type: ask your question',
+            'Inline AI:\n@' +
+              botU +
+              ' ask How do I start a 5K plan?\n\nUses Radiant Gold (same as chat). Founder unlimited.'
+          )
+        );
+        results.push(
+          mk(
+            'wxhow',
+            '🌦️ Weather',
+            'weather Colombo',
+            'Type: @' + botU + ' weather Colombo'
+          )
+        );
+        results.push(
+          mk(
+            'calchow',
+            '🧮 Calculator',
+            'calc 10*5',
+            'Type: @' + botU + ' calc (10+2)*3'
+          )
+        );
+        results.push(
+          mk(
+            'goldhow',
+            '💰 Gold wallet',
+            '/balance in bot',
+            'Open @' + botU + ' and type /balance\n/daily → +50 gold'
+          )
+        );
+        await ctx.answerInlineQuery(results.slice(0, 20), {
+          cache_time: 15,
+          is_personal: true,
+        });
+        return;
+      }
+
+      // --- ask / ai / q  → AI (rate limit + gold) ---
+      const askM = /^(ask|ai|q)\s+(.{3,})$/i.exec(q);
+      if (askM) {
+        const question = askM[2].trim();
+        const uid = ctx.from?.id;
+        if (!isAdmin(ctx)) {
+          const rate = await checkRateLimit(uid);
+          if (!rate.ok) {
+            results.push(
+              mk(
+                'rate',
+                'Slow down',
+                'Retry in ~' + (rate.waitSec || 60) + 's',
+                'Rate limit. Wait ~' + (rate.waitSec || 60) + 's then try again.'
+              )
+            );
+            await ctx.answerInlineQuery(results, { cache_time: 1, is_personal: true });
+            return;
+          }
+        }
+        const pay = await spendGold(ctx, 'ask');
+        if (!pay.ok) {
+          results.push(
+            mk(
+              'nogold',
+              'Not enough gold',
+              pay.message || 'Need gold',
+              (pay.message || 'Not enough Radiant Gold.') + '\nOpen @' + botU + ' → /daily /balance'
+            )
+          );
+          await ctx.answerInlineQuery(results, { cache_time: 1, is_personal: true });
+          return;
+        }
+        try {
+          const aiPromise = generateReply(question, ctx);
+          const out = await Promise.race([
+            aiPromise,
+            new Promise((_, rej) =>
+              setTimeout(() => rej(new Error('AI timeout')), 12000)
+            ),
+          ]);
+          const suffix =
+            pay.free || pay.gold == null
+              ? ''
+              : '\n\n— ' + (pay.spent || 5) + ' gold · bal ' + pay.gold;
+          const text = (String(out || '').trim() + suffix).slice(0, 4000);
+          results.push(
+            mk(
+              'ai1',
+              'AI: ' + question.slice(0, 40),
+              'Tap to send answer',
+              text || 'No answer. Try in bot chat.'
+            )
+          );
+        } catch (e) {
+          results.push(
+            mk(
+              'aifail',
+              'AI busy / slow',
+              'Open bot instead',
+              'Inline AI timed out or failed.\nOpen @' +
+                botU +
+                ' and send:\n' +
+                question +
+                '\n\n(' +
+                String(e.message || e).slice(0, 80) +
+                ')'
+            )
+          );
+        }
+        await ctx.answerInlineQuery(results.slice(0, 5), {
+          cache_time: 5,
+          is_personal: true,
+        });
+        return;
+      }
+
+      // --- weather ---
+      if (ql.startsWith('weather') || ql.startsWith('wx ')) {
         const place = q.replace(/^(weather|wx)\s*/i, '').trim() || 'Colombo';
         try {
           const geo = await geocodePlace(place);
-          if (geo && typeof fetchWeather === 'function') {
+          if (geo) {
             const w = await fetchWeather(geo.lat, geo.lon);
             const label = [geo.name, geo.admin1, geo.country].filter(Boolean).join(', ');
-            const body = w && w.ok
-              ? ('Weather · ' + label + '\n' + weatherCodeText(w.code) + '\n'
-                  + 'Temp: ' + w.temp + '°C (feels ' + w.feels + ')\n'
-                  + 'Humidity: ' + w.humidity + '% · Wind: ' + w.wind + '\n'
-                  + 'High/Low: ' + w.tmax + ' / ' + w.tmin)
-              : ('Weather lookup: ' + label + '\nOpen bot: /weather ' + place);
-            results.push(mk('wx1', `Weather: ${place}`, label, body));
-          } else if (geo) {
-            results.push(mk('wx1', `Weather: ${place}`, 'Open bot for full weather', `/weather ${place}\nPlace: ${geo.name || place}`));
+            const body =
+              w && w.ok
+                ? 'Weather · ' +
+                  label +
+                  '\n' +
+                  weatherCodeText(w.code) +
+                  '\nTemp: ' +
+                  w.temp +
+                  '°C (feels ' +
+                  w.feels +
+                  ')\nHumidity: ' +
+                  w.humidity +
+                  '% · Wind: ' +
+                  w.wind +
+                  '\nHigh/Low: ' +
+                  w.tmax +
+                  ' / ' +
+                  w.tmin
+                : 'Weather lookup: ' + label + '\nOpen bot: /weather ' + place;
+            results.push(mk('wx1', 'Weather: ' + place, label, body));
           } else {
-            results.push(mk('wx0', 'Place not found', place, `Try /weather ${place} in the bot chat.`));
+            results.push(
+              mk('wx0', 'Place not found', place, 'Try /weather ' + place + ' in the bot chat.')
+            );
           }
         } catch (e) {
-          results.push(mk('wxe', 'Weather error', String(e.message || e), `Try /weather ${place} in bot.`));
+          results.push(
+            mk('wxe', 'Weather error', String(e.message || e), 'Try /weather ' + place + ' in bot.')
+          );
         }
       } else if (ql.startsWith('calc') || ql.startsWith('=')) {
         let expr = q.replace(/^(calc|=)\s*/i, '').trim();
         try {
           const safe = expr.replace(/[^0-9+\-*/().%\s]/g, '');
           if (!safe) throw new Error('bad expr');
-          // eslint-disable-next-line no-new-func
           const val = Function('"use strict"; return (' + safe + ')')();
-          results.push(mk('c1', `${expr} = ${val}`, 'Calculator', `🧮 ${expr} = ${val}`));
+          results.push(mk('c1', expr + ' = ' + val, 'Calculator', '🧮 ' + expr + ' = ' + val));
         } catch (_) {
           results.push(mk('c0', 'Calc help', 'calc 10*5', 'Example: calc (10+2)*3'));
         }
       } else if (ql.startsWith('gold') || ql === 'balance') {
-        results.push(mk('g1', 'Radiant Gold', 'Open wallet in bot', 'Open @PasiyaMaxQueen_bot and type /balance'));
+        results.push(
+          mk(
+            'g1',
+            'Radiant Gold',
+            'Open wallet in bot',
+            'Open @' + botU + ' and type /balance\n/daily for +50 gold'
+          )
+        );
       } else if (ql.startsWith('time') || ql === 'now') {
         const now = new Date().toISOString();
-        results.push(mk('t1', 'UTC time', now, `🕒 UTC: ${now}`));
+        results.push(mk('t1', 'UTC time', now, '🕒 UTC: ' + now));
       } else if (ql.startsWith('help') || ql.startsWith('menu')) {
-        results.push(mk('h1', 'Help', 'Main commands', 'RADIANT QUEEN\n/menu /tools /balance /ref /weather /remind /imagine'));
+        results.push(
+          mk(
+            'h1',
+            'Help · Radiant Queen',
+            'Full command map',
+            'RADIANT QUEEN · PASIYA MAX\n\n' +
+              '/menu /tools /balance /daily /ref /refstats\n' +
+              '/weather /forecast /remind /imagine\n' +
+              '/persona /memory /forget\n' +
+              'Inline: weather X · calc X · ask X · gold · help\n\n' +
+              'Web: https://radiant-queen-pasiya-max-v2.vercel.app'
+          )
+        );
       } else {
-        results.push(mk('q1', 'Ask in bot', q.slice(0, 40), `Ask the bot:\n${q}\n\nOpen @PasiyaMaxQueen_bot and send your message (uses Radiant Gold).`));
-        results.push(mk('q2', 'Help', 'Inline tips', 'Try: weather Colombo · calc 10*5 · gold · time · help'));
+        results.push(
+          mk(
+            'q1',
+            'Ask AI: ' + q.slice(0, 36),
+            'Prefix with ask ',
+            'For inline AI type:\n@' +
+              botU +
+              ' ask ' +
+              q +
+              '\n\nOr open the bot and send your message (uses gold).'
+          )
+        );
+        results.push(
+          mk(
+            'q2',
+            'Help',
+            'Inline tips',
+            'Try: ask … · weather Colombo · calc 10*5 · gold · help'
+          )
+        );
       }
 
       await ctx.answerInlineQuery(results.slice(0, 20), {
