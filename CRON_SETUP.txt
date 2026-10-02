@@ -1,0 +1,54 @@
+RADIANT QUEEN — CRON SETUP (P3 pack)
+====================================
+
+WHY auto reminders failed
+-------------------------
+Vercel HOBBY plan = cron once per DAY only.
+Schedule "*/5 * * * *" is NOT allowed / does not run every 5 minutes.
+Manual browser URL worked because YOU triggered it.
+
+Path must NOT include ?secret= in vercel.json
+Correct:  "path": "/api/cron-reminders"
+Wrong:    "path": "/api/cron-reminders?secret=..."
+
+Vercel auto-sends: Authorization: Bearer <CRON_SECRET>
+Our handler also accepts: ?secret=<CRON_SECRET> (for external cron + browser)
+
+
+SOLUTION A — FREE external cron every 5 minutes (RECOMMENDED for 1m/2m reminders)
+---------------------------------------------------------------------------------
+1. Open https://cron-job.org → free signup
+2. Create cron job:
+   Title: Radiant Queen Reminders
+   URL: https://radiant-queen-pasiya-max-v2.vercel.app/api/cron-reminders?secret=rq-remind-2026-pasiya
+   Schedule: every 5 minutes
+   Request method: GET
+   Enable job: ON
+3. Save. Wait 5–6 minutes after /remind 2m test
+4. Telegram should receive ⏰ Reminder without opening browser
+
+Alternative free: https://www.easycron.com or GitHub Actions schedule
+
+
+SOLUTION B — Vercel native (Hobby) once per day only
+----------------------------------------------------
+1. Upload vercel.json from this zip (schedule 0 2 * * * = ~02:00 UTC daily)
+2. Env CRON_SECRET already set
+3. Redeploy
+4. Vercel → Settings → Cron Jobs → should list /api/cron-reminders
+5. Good for daily digest, NOT for 1-minute reminders
+
+
+TEST
+----
+Browser:
+https://radiant-queen-pasiya-max-v2.vercel.app/api/cron-reminders?secret=rq-remind-2026-pasiya
+
+Expect: {"ok":true,"processed":N}
+
+
+FILES TO UPLOAD
+---------------
+/ghpath api/cron-reminders.js
+/ghpath vercel.json
+(then P3 referral files — see README_P3.txt)

@@ -1,12 +1,9 @@
 {
-  "version": 2,
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "framework": "vite",
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
     {
       "path": "/api/cron-reminders",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 2 * * *"
     }
   ]
-} 
+}
