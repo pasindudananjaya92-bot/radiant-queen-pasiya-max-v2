@@ -125,7 +125,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-p2-memory-remind'; // v3.7 - Bot Factory Ready - Digital OS - No Box Artifact
+const BOT_VERSION = 'v4.0-p3-cron-referral'; // P3: cron auth fix + referral gold
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -1049,6 +1049,8 @@ function parseStartPayload(payload) {
   const m = /^pack[_-](club|shop|school|gold)$/.exec(p);
   if (m) return { type: 'pack', id: m[1] };
   if (['club', 'shop', 'school', 'gold'].includes(p)) return { type: 'pack', id: p };
+  const ref = /^ref[_-]?(\d+)$/.exec(p);
+  if (ref) return { type: 'ref', id: ref[1] };
   return { type: 'raw', payload: p };
 }
 
@@ -3013,6 +3015,38 @@ function buildBot() {
           }
         );
         return;
+      }
+
+      // P3 referral deep link: /start ref_USERID
+      if (deep && deep.type === 'ref' && deep.id) {
+        try {
+          await getOrCreateGold(ctx.from.id, ctx.from.username || ctx.from.first_name);
+          const { applyReferral } = await import('../lib/referral.js');
+          const r = await applyReferral(supabase, {
+            referrerId: deep.id,
+            referredId: ctx.from.id,
+            setGold,
+            getOrCreateGold,
+          });
+          if (r.ok) {
+            await ctx.reply(
+              '🎁 Referral bonus!\n' +
+                '+' +
+                r.referredBonus +
+                ' gold for you\n' +
+                '+' +
+                r.referrerBonus +
+                ' gold for your friend\n' +
+                '/balance · /ref'
+            );
+          } else if (r.error === 'already') {
+            await ctx.reply('Referral already claimed for this account. /balance');
+          } else if (r.error === 'self') {
+            await ctx.reply('You cannot refer yourself. Share /ref with friends.');
+          }
+        } catch (e) {
+          console.error('referral', e);
+        }
       }
 
       const who = isAdmin(ctx)
@@ -7789,6 +7823,57 @@ bot.command('commands', async (ctx) => {
     await uiReply(ctx, msg.slice(0, 4000), toolsKeyboard());
   });
 
+
+  // P3 Referral
+  bot.command(['ref', 'myref', 'invitegold'], async (ctx) => {
+    try {
+      const { refStartLink, referralStats, REF_BONUS_REFERRER, REF_BONUS_REFERRED } = await import(
+        '../lib/referral.js'
+      );
+      const me = ctx.botInfo?.username || process.env.BOT_USERNAME || 'PasiyaMaxQueen_bot';
+      const link = refStartLink(me, ctx.from.id);
+      const st = await referralStats(supabase, ctx.from.id);
+      await ctx.reply(
+        '🎁 RADIANT REFERRAL\n\n' +
+          'Your link:\n' +
+          link +
+          '\n\n' +
+          'Friend gets +' +
+          REF_BONUS_REFERRED +
+          ' gold\n' +
+          'You get +' +
+          REF_BONUS_REFERRER +
+          ' gold per friend\n\n' +
+          'Invites: ' +
+          st.count +
+          ' · Earned: ' +
+          st.earned +
+          ' gold\n' +
+          '/refstats · /balance'
+      );
+    } catch (e) {
+      await ctx.reply('ref failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['refstats', 'referrals'], async (ctx) => {
+    try {
+      const { referralStats } = await import('../lib/referral.js');
+      const st = await referralStats(supabase, ctx.from.id);
+      await ctx.reply(
+        '📊 Referral stats\n' +
+          'Friends invited: ' +
+          st.count +
+          '\n' +
+          'Gold earned: ' +
+          st.earned +
+          '\n' +
+          '/ref — get invite link'
+      );
+    } catch (e) {
+      await ctx.reply('refstats failed: ' + (e.message || e));
+    }
+  });
 
   bot.command(['balance', 'gold'], async (ctx) => {
     try {

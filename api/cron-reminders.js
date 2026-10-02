@@ -1,8 +1,12 @@
 /**
  * api/cron-reminders.js
- * Vercel Cron or external ping:
- *   GET /api/cron-reminders?secret=CRON_SECRET
- * Sends due reminders via Telegram + ntfy
+ * Auth (any one is enough):
+ *   1) Authorization: Bearer <CRON_SECRET>   ← Vercel Cron auto-sends this
+ *   2) ?secret=<CRON_SECRET>                 ← browser / cron-job.org
+ *   3) x-cron-secret header
+ *
+ * Hobby plan: Vercel Cron = once/day only.
+ * For 1m/5m reminders use free external cron → see CRON_SETUP.txt
  */
 import { createClient } from '@supabase/supabase-js';
 
@@ -15,6 +19,18 @@ const SUPABASE_KEY =
 function supabaseAdmin() {
   if (!SUPABASE_URL || !SUPABASE_KEY) return null;
   return createClient(SUPABASE_URL, SUPABASE_KEY);
+}
+
+function authorized(req) {
+  if (!CRON_SECRET) return true; // open if secret not configured
+  const q = String(req.query?.secret || '').trim();
+  if (q && q === CRON_SECRET) return true;
+  const h = String(req.headers['x-cron-secret'] || '').trim();
+  if (h && h === CRON_SECRET) return true;
+  const auth = String(req.headers['authorization'] || req.headers['Authorization'] || '');
+  if (auth === 'Bearer ' + CRON_SECRET) return true;
+  if (auth.startsWith('Bearer ') && auth.slice(7).trim() === CRON_SECRET) return true;
+  return false;
 }
 
 async function tgSend(chatId, text) {
@@ -44,8 +60,7 @@ async function ntfy(userId, text) {
 
 export default async function handler(req, res) {
   try {
-    const secret = req.query?.secret || req.headers['x-cron-secret'] || '';
-    if (CRON_SECRET && secret !== CRON_SECRET) {
+    if (!authorized(req)) {
       return res.status(401).json({ ok: false, error: 'unauthorized' });
     }
     const sb = supabaseAdmin();
@@ -65,7 +80,12 @@ export default async function handler(req, res) {
         results.push({ id: row.id, ok: false, error: String(e.message || e) });
       }
     }
-    return res.status(200).json({ ok: true, processed: results.length, results });
+    return res.status(200).json({
+      ok: true,
+      processed: results.length,
+      results,
+      tip: 'Hobby Vercel cron = once/day. Use cron-job.org every 5 min for short reminders.',
+    });
   } catch (err) {
     return res.status(500).json({ ok: false, error: String(err.message || err) });
   }
