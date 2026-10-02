@@ -125,7 +125,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-p3-cron-referral'; // P3: cron auth fix + referral gold
+const BOT_VERSION = 'v4.0-p4-inline-pulse'; // P4: inline mode + founder /pulse
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -7875,6 +7875,74 @@ bot.command('commands', async (ctx) => {
     }
   });
 
+
+  // P4 Founder pulse
+  bot.command(['pulse', 'founderpulse', 'syspulse'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only. /version');
+        return;
+      }
+      const lines = [
+        '⚡ FOUNDER PULSE',
+        'Version: ' + (typeof BOT_VERSION !== 'undefined' ? BOT_VERSION : ''),
+        '',
+      ];
+      if (!supabase) {
+        lines.push('Supabase: NO');
+        await ctx.reply(lines.join('\n'));
+        return;
+      }
+      async function countTable(table) {
+        try {
+          const { count, error } = await supabase
+            .from(table)
+            .select('*', { count: 'exact', head: true });
+          if (error) return '?';
+          return count ?? 0;
+        } catch (_) {
+          return '?';
+        }
+      }
+      const goldUsers = await countTable('rq_gold');
+      const reminders = await countTable('rq_reminders');
+      const refs = await countTable('rq_referrals');
+      const memory = await countTable('rq_ai_memory');
+      let activeReminders = '?';
+      try {
+        const { count } = await supabase
+          .from('rq_reminders')
+          .select('*', { count: 'exact', head: true })
+          .eq('active', true);
+        activeReminders = count ?? 0;
+      } catch (_) {}
+      let totalGold = '?';
+      try {
+        const { data } = await supabase.from('rq_gold').select('gold');
+        if (data) totalGold = data.reduce((s, r) => s + (Number(r.gold) || 0), 0);
+      } catch (_) {}
+      lines.push('Supabase: yes');
+      lines.push('Gold wallets: ' + goldUsers);
+      lines.push('Gold in circulation: ' + totalGold);
+      lines.push('Referrals rows: ' + refs);
+      lines.push('Reminders total: ' + reminders + ' · active: ' + activeReminders);
+      lines.push('AI memory rows: ' + memory);
+      lines.push('');
+      lines.push('Keys');
+      lines.push('BOT_TOKEN: ' + (BOT_TOKEN ? 'yes' : 'NO'));
+      lines.push('GEMINI: ' + (GEMINI_KEY ? 'yes' : 'no'));
+      lines.push('GROQ: ' + (process.env.GROQ_API_KEY ? 'yes' : 'no'));
+      lines.push('OPENROUTER: ' + (process.env.OPENROUTER_API_KEY ? 'yes' : 'no'));
+      lines.push('CRON_SECRET: ' + (process.env.CRON_SECRET ? 'yes' : 'no'));
+      lines.push('');
+      lines.push('Inline: type @' + (ctx.botInfo?.username || 'PasiyaMaxQueen_bot') + ' in any chat');
+      lines.push('/ref · /remindlist · /aistatus · /agentpulse');
+      await ctx.reply(lines.join('\n').slice(0, 3500));
+    } catch (e) {
+      await ctx.reply('pulse failed: ' + (e.message || e));
+    }
+  });
+
   bot.command(['balance', 'gold'], async (ctx) => {
     try {
       if (!(await requireFeature(ctx, 'gold', 'Gold pack'))) return;
@@ -9505,6 +9573,88 @@ bot.command('commands', async (ctx) => {
     }
   });
 
+
+  // P4 Inline mode — @Bot query in any chat
+  bot.on('inline_query', async (ctx) => {
+    try {
+      const q = String(ctx.inlineQuery?.query || '').trim();
+      const ql = q.toLowerCase();
+      const results = [];
+      const mk = (id, title, description, message) => ({
+        type: 'article',
+        id: String(id).slice(0, 64),
+        title: String(title).slice(0, 64),
+        description: String(description || '').slice(0, 120),
+        input_message_content: {
+          message_text: String(message).slice(0, 4000),
+        },
+      });
+
+      if (!q) {
+        results.push(
+          mk('help', 'Radiant Queen · Help', 'Commands & links', 
+            'RADIANT QUEEN · PASIYA MAX\n/menu · /tools · /balance · /ref · /weather Colombo\nWeb: https://radiant-queen-pasiya-max-v2.vercel.app')
+        );
+        results.push(mk('gold', 'Gold wallet', 'Open /balance', 'Type /balance in chat with @PasiyaMaxQueen_bot'));
+        results.push(mk('weather', 'Weather', 'Try: weather Colombo', 'Inline: @PasiyaMaxQueen_bot weather Colombo'));
+        results.push(mk('calc', 'Calculator', 'Try: calc 10*5', 'Inline: @PasiyaMaxQueen_bot calc 10*5'));
+      } else if (ql.startsWith('weather') || ql.startsWith('wx ')) {
+        const place = q.replace(/^(weather|wx)\s*/i, '').trim() || 'Colombo';
+        try {
+          const geo = await geocodePlace(place);
+          if (geo && typeof fetchWeather === 'function') {
+            const w = await fetchWeather(geo.lat, geo.lon);
+            const label = [geo.name, geo.admin1, geo.country].filter(Boolean).join(', ');
+            const body = w && w.ok
+              ? ('Weather · ' + label + '\n' + weatherCodeText(w.code) + '\n'
+                  + 'Temp: ' + w.temp + '°C (feels ' + w.feels + ')\n'
+                  + 'Humidity: ' + w.humidity + '% · Wind: ' + w.wind + '\n'
+                  + 'High/Low: ' + w.tmax + ' / ' + w.tmin)
+              : ('Weather lookup: ' + label + '\nOpen bot: /weather ' + place);
+            results.push(mk('wx1', `Weather: ${place}`, label, body));
+          } else if (geo) {
+            results.push(mk('wx1', `Weather: ${place}`, 'Open bot for full weather', `/weather ${place}\nPlace: ${geo.name || place}`));
+          } else {
+            results.push(mk('wx0', 'Place not found', place, `Try /weather ${place} in the bot chat.`));
+          }
+        } catch (e) {
+          results.push(mk('wxe', 'Weather error', String(e.message || e), `Try /weather ${place} in bot.`));
+        }
+      } else if (ql.startsWith('calc') || ql.startsWith('=')) {
+        let expr = q.replace(/^(calc|=)\s*/i, '').trim();
+        try {
+          const safe = expr.replace(/[^0-9+\-*/().%\s]/g, '');
+          if (!safe) throw new Error('bad expr');
+          // eslint-disable-next-line no-new-func
+          const val = Function('"use strict"; return (' + safe + ')')();
+          results.push(mk('c1', `${expr} = ${val}`, 'Calculator', `🧮 ${expr} = ${val}`));
+        } catch (_) {
+          results.push(mk('c0', 'Calc help', 'calc 10*5', 'Example: calc (10+2)*3'));
+        }
+      } else if (ql.startsWith('gold') || ql === 'balance') {
+        results.push(mk('g1', 'Radiant Gold', 'Open wallet in bot', 'Open @PasiyaMaxQueen_bot and type /balance'));
+      } else if (ql.startsWith('time') || ql === 'now') {
+        const now = new Date().toISOString();
+        results.push(mk('t1', 'UTC time', now, `🕒 UTC: ${now}`));
+      } else if (ql.startsWith('help') || ql.startsWith('menu')) {
+        results.push(mk('h1', 'Help', 'Main commands', 'RADIANT QUEEN\n/menu /tools /balance /ref /weather /remind /imagine'));
+      } else {
+        results.push(mk('q1', 'Ask in bot', q.slice(0, 40), `Ask the bot:\n${q}\n\nOpen @PasiyaMaxQueen_bot and send your message (uses Radiant Gold).`));
+        results.push(mk('q2', 'Help', 'Inline tips', 'Try: weather Colombo · calc 10*5 · gold · time · help'));
+      }
+
+      await ctx.answerInlineQuery(results.slice(0, 20), {
+        cache_time: 8,
+        is_personal: true,
+      });
+    } catch (err) {
+      console.error('inline_query', err);
+      try {
+        await ctx.answerInlineQuery([], { cache_time: 1 });
+      } catch (_) {}
+    }
+  });
+
   bot.catch((err) => console.error('telegram bot error', err));
   return bot;
 }
@@ -9523,7 +9673,7 @@ export default async function handler(req, res) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             url,
-            allowed_updates: ['message', 'callback_query', 'chat_member', 'my_chat_member', 'chat_join_request'],
+            allowed_updates: ['message', 'callback_query', 'inline_query', 'chosen_inline_result', 'chat_member', 'my_chat_member', 'chat_join_request'],
             drop_pending_updates: true,
           }),
         });
