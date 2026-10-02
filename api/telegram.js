@@ -125,7 +125,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-p11-fix'; // P11-fix: photoedit cache bust + no enhance + vision debug
+const BOT_VERSION = 'v4.0-p11-fix2'; // P11-fix2: Gemini REST vision (inline_data) for photoedit
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -8860,9 +8860,9 @@ bot.command('commands', async (ctx) => {
       const photos = reply?.photo;
       if (!photos || !photos.length) {
         await ctx.reply(
-          'Reply to a photo with /photoedit <instruction>\n\n' +
+          'Reply to a photo with /photoedit <instruction>\n' +
             'Examples: enhance | cartoon | anime | add neon background\n' +
-            'P11-fix: random seed, no enhance, vision describe, cache-bust.'
+            'P11-fix2: Gemini REST vision (real image bytes).'
         );
         return;
       }
@@ -8876,37 +8876,46 @@ bot.command('commands', async (ctx) => {
       const { editPhotoWithPrompt, expandPhotoEditAlias } = await import('../lib/photoEdit.js');
       const instruction = expandPhotoEditAlias(raw);
       await ctx.sendChatAction('typing');
-      const best = photos[photos.length - 1];
 
-      let imageUrl = null;
+      const best = photos[photos.length - 1];
+      const token = BOT_TOKEN || process.env.BOT_TOKEN || '';
+      if (!token) {
+        await ctx.reply('BOT_TOKEN missing');
+        return;
+      }
+
       let sceneDescription = '';
-      let visionErr = '';
+      let visionMeta = '';
+      let imageUrl = null;
       try {
         const f = await ctx.telegram.getFile(best.file_id);
-        if (!f?.file_path) throw new Error('no file_path');
-        imageUrl =
-          'https://api.telegram.org/file/bot' +
-          process.env.BOT_TOKEN +
-          '/' +
-          f.file_path;
-        const fr = await fetch(imageUrl, { signal: AbortSignal.timeout(25000) });
+        console.log('[photoedit] file_path=', f?.file_path, 'file_size=', f?.file_size);
+        if (!f?.file_path) throw new Error('Telegram getFile: no file_path');
+        imageUrl = 'https://api.telegram.org/file/bot' + token + '/' + f.file_path;
+        const fr = await fetch(imageUrl, { signal: AbortSignal.timeout(30000) });
+        console.log('[photoedit] download status', fr.status, fr.headers.get('content-type'));
         if (!fr.ok) throw new Error('download HTTP ' + fr.status);
         const ab = await fr.arrayBuffer();
-        const b64 = Buffer.from(ab).toString('base64');
-        const mime = fr.headers.get('content-type') || 'image/jpeg';
-        console.log('photoedit download bytes', ab.byteLength, 'mime', mime);
-        const descPrompt =
-          'Look at the image. Describe ONLY what is visible in under 35 words: ' +
-          'main subject, colors, background. Do NOT invent people or objects. Plain text.';
-        const rawDesc = await generateReply(descPrompt, ctx, b64, mime);
-        sceneDescription = String(rawDesc || '')
-          .replace(/^["'\s]+|["'\s]+$/g, '')
-          .replace(/\n+/g, ' ')
-          .slice(0, 400);
-        console.log('photoedit vision:', sceneDescription.slice(0, 160));
+        const buf = Buffer.from(ab);
+        console.log('[photoedit] bytes', buf.length, 'head', buf.slice(0, 4).toString('hex'));
+        // JPEG FF D8, PNG 89 50
+        let mime = 'image/jpeg';
+        if (buf[0] === 0x89 && buf[1] === 0x50) mime = 'image/png';
+        else if (buf[0] === 0xff && buf[1] === 0xd8) mime = 'image/jpeg';
+        else if ((f.file_path || '').endsWith('.png')) mime = 'image/png';
+
+        const { describeImageBuffer } = await import('../lib/visionDescribe.js');
+        const vis = await describeImageBuffer(buf, mime);
+        if (vis.ok) {
+          sceneDescription = vis.text;
+          visionMeta = 'model=' + (vis.model || '?') + ' bytes=' + (vis.bytes || buf.length);
+        } else {
+          visionMeta = 'vision fail: ' + String(vis.error || '').slice(0, 120);
+          console.error('[photoedit]', visionMeta);
+        }
       } catch (ve) {
-        visionErr = String(ve?.message || ve).slice(0, 120);
-        console.error('photoedit vision fail', visionErr);
+        visionMeta = 'prep fail: ' + String(ve?.message || ve).slice(0, 120);
+        console.error('[photoedit]', visionMeta);
       }
 
       await ctx.sendChatAction('upload_photo');
@@ -8916,20 +8925,22 @@ bot.command('commands', async (ctx) => {
       if (!out.ok) {
         await ctx.reply(
           'Photo edit failed: ' +
-            String(out.error || 'unknown').slice(0, 280) +
-            (visionErr ? '\nVision: ' + visionErr : '')
+            String(out.error || 'unknown').slice(0, 250) +
+            '\n' +
+            visionMeta
         );
         return;
       }
       const cap = (
-        (out.mode === 'vision-guided-free' ? '👁️🆓 ' : out.mode === 'paid-img2img' ? '🖼️ ' : '🆓 ') +
+        (sceneDescription ? '👁️🆓 ' : '🆓 ') +
         instruction +
         '\n' +
         (out.note || '') +
         '\nSeen: ' +
-        (sceneDescription ? sceneDescription.slice(0, 140) : '(vision miss — text only)') +
-        (out.seed ? '\nseed=' + out.seed : '')
-      ).slice(0, 1000);
+        (sceneDescription ? sceneDescription.slice(0, 160) : '(no vision — text only)') +
+        (out.seed ? '\nseed=' + out.seed : '') +
+        (visionMeta ? '\n[' + visionMeta + ']' : '')
+      ).slice(0, 1024);
       await ctx.replyWithPhoto({ source: out.buffer }, { caption: cap });
       try {
         await logEvent(ctx.from.id, 'photoedit', {
