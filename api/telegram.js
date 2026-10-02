@@ -125,7 +125,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-p9-goldtop-report'; // P9: goldtop + myreport + premium daily boost
+const BOT_VERSION = 'v4.0-p10a-video-photo'; // P10a: founder video + photoedit + keep /imagine
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -8709,6 +8709,156 @@ bot.command('commands', async (ctx) => {
     } catch (err) {
       console.error('imagine', err);
       await ctx.reply('Imagine failed: ' + String(err && err.message ? err.message : err).slice(0, 160));
+    }
+  });
+
+
+  // ——— P10a: founder-only video + all-user photoedit ———
+  async function tgFileUrl(ctx, fileId) {
+    const f = await ctx.telegram.getFile(fileId);
+    if (!f?.file_path) throw new Error('no file_path');
+    return 'https://api.telegram.org/file/bot' + process.env.BOT_TOKEN + '/' + f.file_path;
+  }
+
+  function founderOnlyVideoMsg() {
+    return (
+      '🎬 Video generation is founder-only right now.\\n' +
+      'Coming soon for premium tiers.\\n\\n' +
+      'You can still use /imagine and /photoedit.'
+    );
+  }
+
+  bot.command(['video', 'vid'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply(founderOnlyVideoMsg());
+        return;
+      }
+      const prompt = (ctx.message?.text || '')
+        .replace(/^\/(video|vid)(@\\w+)?\\s*/i, '')
+        .trim();
+      if (!prompt) {
+        await ctx.reply(
+          'Usage (founder): /video a cat running on the beach at sunrise\\n' +
+            'Needs POLLINATIONS_API_KEY in Vercel env.\\n' +
+            'Models: seedance (default) · set POLLINATIONS_VIDEO_MODEL=veo optional'
+        );
+        return;
+      }
+      await ctx.reply('🎬 Generating video… may take 30–90s');
+      await ctx.sendChatAction('upload_video');
+      const { generateVideoFromPrompt } = await import('../lib/videoGen.js');
+      const out = await generateVideoFromPrompt(prompt, { model: process.env.POLLINATIONS_VIDEO_MODEL || 'seedance' });
+      if (!out.ok) {
+        await ctx.reply('Video failed: ' + String(out.error || 'unknown').slice(0, 400));
+        return;
+      }
+      await ctx.replyWithVideo(
+        { source: out.buffer },
+        { caption: ('🎬 ' + prompt).slice(0, 900) }
+      );
+      try { await logEvent(ctx.from.id, 'video_gen', { prompt: prompt.slice(0, 80) }); } catch (_) {}
+    } catch (err) {
+      console.error('video', err);
+      await ctx.reply('Video failed: ' + String(err?.message || err).slice(0, 200));
+    }
+  });
+
+  bot.command(['animate', 'img2vid'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply(founderOnlyVideoMsg());
+        return;
+      }
+      const reply = ctx.message?.reply_to_message;
+      const photos = reply?.photo;
+      if (!photos || !photos.length) {
+        await ctx.reply('Reply to a photo with /animate\\nOptional: /animate gentle camera zoom');
+        return;
+      }
+      const best = photos[photos.length - 1];
+      const prompt = (ctx.message?.text || '')
+        .replace(/^\/(animate|img2vid)(@\\w+)?\\s*/i, '')
+        .trim() || 'animate this image smoothly, natural motion';
+      await ctx.reply('🎬 Animating photo… 30–90s');
+      await ctx.sendChatAction('upload_video');
+      const imageUrl = await tgFileUrl(ctx, best.file_id);
+      const { generateVideoFromImage } = await import('../lib/videoGen.js');
+      const out = await generateVideoFromImage(imageUrl, prompt, {
+        model: process.env.POLLINATIONS_VIDEO_MODEL || 'seedance',
+      });
+      if (!out.ok) {
+        await ctx.reply('Animate failed: ' + String(out.error || 'unknown').slice(0, 400));
+        return;
+      }
+      await ctx.replyWithVideo(
+        { source: out.buffer },
+        { caption: ('🎬 Animated: ' + prompt).slice(0, 900) }
+      );
+      try { await logEvent(ctx.from.id, 'animate', {}); } catch (_) {}
+    } catch (err) {
+      console.error('animate', err);
+      await ctx.reply('Animate failed: ' + String(err?.message || err).slice(0, 200));
+    }
+  });
+
+  bot.command(['photoedit', 'editphoto', 'img2img'], async (ctx) => {
+    try {
+      const uid = String(ctx.from?.id || '');
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      try {
+        const pay = await spendGold(ctx, 'vision');
+        if (!pay.ok) {
+          await ctx.reply(pay.message || 'Not enough gold. /balance');
+          return;
+        }
+      } catch (_) {}
+
+      const reply = ctx.message?.reply_to_message;
+      const photos = reply?.photo;
+      if (!photos || !photos.length) {
+        await ctx.reply(
+          'Reply to a photo with /photoedit <instruction>\\n\\n' +
+            'Examples:\\n' +
+            '/photoedit enhance\\n' +
+            '/photoedit cartoon\\n' +
+            '/photoedit anime\\n' +
+            '/photoedit add sunset background\\n' +
+            '/photoedit make it blur'
+        );
+        return;
+      }
+      const raw = (ctx.message?.text || '')
+        .replace(/^\/(photoedit|editphoto|img2img)(@\\w+)?\\s*/i, '')
+        .trim();
+      if (!raw) {
+        await ctx.reply('Add instruction. Example: /photoedit enhance');
+        return;
+      }
+      const { editPhotoWithPrompt, expandPhotoEditAlias } = await import('../lib/photoEdit.js');
+      const instruction = expandPhotoEditAlias(raw);
+      await ctx.sendChatAction('upload_photo');
+      const best = photos[photos.length - 1];
+      const imageUrl = await tgFileUrl(ctx, best.file_id);
+      const out = await editPhotoWithPrompt(imageUrl, instruction);
+      if (!out.ok) {
+        await ctx.reply('Photo edit failed: ' + String(out.error || 'unknown').slice(0, 300));
+        return;
+      }
+      await ctx.replyWithPhoto(
+        { source: out.buffer },
+        { caption: ('🖼️ ' + instruction).slice(0, 900) }
+      );
+      try { await logEvent(ctx.from.id, 'photoedit', { instruction: instruction.slice(0, 60) }); } catch (_) {}
+    } catch (err) {
+      console.error('photoedit', err);
+      await ctx.reply('Photo edit failed: ' + String(err?.message || err).slice(0, 200));
     }
   });
 
