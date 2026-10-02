@@ -125,7 +125,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-p5-inline-ai'; // P5: inline ask + help cards + /digest
+const BOT_VERSION = 'v4.0-p6-analytics-premium'; // P6: web analytics + premium flags
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -2448,6 +2448,18 @@ async function setGold(userId, gold, extra = {}) {
 }
 
 /** Founder = free. Returns { ok, gold, need } */
+
+async function logEvent(userId, event, meta) {
+  if (!supabase) return;
+  try {
+    await supabase.from('rq_events').insert({
+      user_id: userId ? Number(userId) : null,
+      event: String(event || 'unknown').slice(0, 80),
+      meta: meta || null,
+    });
+  } catch (_) {}
+}
+
 async function spendGold(ctx, costKey) {
   if (isAdmin(ctx)) {
     return { ok: true, gold: null, free: true };
@@ -8015,6 +8027,108 @@ bot.command('commands', async (ctx) => {
       await ctx.reply(lines.join('\n').slice(0, 3500));
     } catch (e) {
       await ctx.reply('digest failed: ' + (e.message || e));
+    }
+  });
+
+
+  // P6 Premium + Analytics
+  bot.command(['premium'], async (ctx) => {
+    try {
+      const raw = (ctx.message?.text || '')
+        .replace(/^\/premium(@\w+)?\s*/i, '')
+        .trim();
+      const parts = raw.split(/\s+/).filter(Boolean);
+
+      // /premium status  OR empty
+      if (!parts.length || parts[0].toLowerCase() === 'status' || parts[0].toLowerCase() === 'me') {
+        const g = await getOrCreateGold(ctx.from.id, ctx.from.username || ctx.from.first_name);
+        await ctx.reply(
+          '💎 PREMIUM STATUS\n' +
+            'User: ' +
+            ctx.from.id +
+            '\n' +
+            'Premium: ' +
+            (g.premium ? 'YES' : 'no') +
+            '\n' +
+            'Gold: ' +
+            (g.gold ?? '?') +
+            '\n\n' +
+            (isAdmin(ctx)
+              ? 'Founder: /premium <user_id> on|off'
+              : 'Ask founder for premium.')
+        );
+        await logEvent(ctx.from.id, 'premium_status', null);
+        return;
+      }
+
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Only founder can change premium flags.');
+        return;
+      }
+
+      // /premium <user_id> on|off
+      const target = Number(parts[0]);
+      const flag = String(parts[1] || '').toLowerCase();
+      if (!Number.isFinite(target) || !['on', 'off', 'true', 'false', '1', '0'].includes(flag)) {
+        await ctx.reply('Usage:\n/premium status\n/premium <user_id> on\n/premium <user_id> off');
+        return;
+      }
+      const on = flag === 'on' || flag === 'true' || flag === '1';
+      await getOrCreateGold(target, null);
+      if (!supabase) {
+        await ctx.reply('Supabase missing');
+        return;
+      }
+      const { error } = await supabase
+        .from('rq_gold')
+        .update({ premium: on, updated_at: new Date().toISOString() })
+        .eq('user_id', target);
+      if (error) {
+        await ctx.reply('premium failed: ' + error.message);
+        return;
+      }
+      await logEvent(ctx.from.id, 'premium_set', { target, on });
+      await ctx.reply(
+        'Premium ' + (on ? 'ON' : 'OFF') + ' for user ' + target + '\nThey get unlimited AI spend.'
+      );
+    } catch (e) {
+      await ctx.reply('premium failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['analytics', 'statsweb'], async (ctx) => {
+    try {
+      const url =
+        'https://radiant-queen-pasiya-max-v2.vercel.app/bot/analytics.html';
+      let extra = '';
+      if (isAdmin(ctx) && supabase) {
+        try {
+          const { count: wallets } = await supabase
+            .from('rq_gold')
+            .select('*', { count: 'exact', head: true });
+          const { count: premium } = await supabase
+            .from('rq_gold')
+            .select('*', { count: 'exact', head: true })
+            .eq('premium', true);
+          extra =
+            '\n\nSnapshot\nWallets: ' +
+            (wallets ?? '?') +
+            '\nPremium: ' +
+            (premium ?? '?');
+        } catch (_) {}
+      }
+      await ctx.reply(
+        '📊 ANALYTICS\n' +
+          'Web: ' +
+          url +
+          '\n' +
+          'API: /api/stats?secret=YOUR_CRON_SECRET\n' +
+          extra +
+          '\n\n/pulse · /digest · /premium status'
+      );
+      await logEvent(ctx.from?.id, 'analytics_open', null);
+    } catch (e) {
+      await ctx.reply('analytics failed: ' + (e.message || e));
     }
   });
 
