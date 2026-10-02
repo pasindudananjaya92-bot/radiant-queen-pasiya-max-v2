@@ -1,10 +1,11 @@
 /**
- * api/cron-digest.js
- * Daily founder digest → Telegram ADMIN_ID
+ * api/cron-digest.js — Pack C enhanced
+ * Daily:
+ *  1) Telegram → ADMIN_ID (existing)
+ *  2) Email → all rq_email_prefs where digest_enabled=true (Resend)
+ *
  * Auth: Bearer CRON_SECRET | ?secret= | x-cron-secret
- * Vercel Hobby: once per day (see vercel.json)
- * Manual test:
- *   /api/cron-digest?secret=YOUR_CRON_SECRET
+ * Manual: /api/cron-digest?secret=YOUR_CRON_SECRET
  */
 import { createClient } from '@supabase/supabase-js';
 
@@ -51,66 +52,70 @@ export default async function handler(req, res) {
     if (!authorized(req)) {
       return res.status(401).json({ ok: false, error: 'unauthorized' });
     }
-    if (!ADMIN_ID) {
-      return res.status(500).json({ ok: false, error: 'ADMIN_ID missing' });
-    }
     const client = sb();
+    const {
+      collectDigestStats,
+      buildDigestHtml,
+      listDigestEmails,
+      sendResendEmail,
+      resendConfigured,
+    } = await import('../lib/resendMail.js');
+
+    const stats = await collectDigestStats(client);
     const lines = [
       '📬 DAILY DIGEST · Radiant Queen',
       'Time: ' + new Date().toISOString(),
       '',
+      'Wallets: ' + stats.wallets + ' · Premium: ' + stats.premium,
+      'Gold total: ' + stats.goldSum,
+      'Active reminders: ' + stats.activeRem,
+      'Referrals: ' + stats.refs,
+      'AI memory rows: ' + stats.mem,
+      'Events (24h): ' + stats.ev24,
+      '',
+      'Open: /pulse · /digest · /emailstatus',
+      'Web: https://radiant-queen-pasiya-max-v2.vercel.app/bot/analytics.html',
     ];
-    if (!client) {
-      lines.push('Supabase offline.');
-    } else {
-      let wallets = 0,
-        premium = 0,
-        goldSum = 0;
-      try {
-        const { data } = await client.from('rq_gold').select('gold, premium');
-        if (data) {
-          wallets = data.length;
-          premium = data.filter((r) => r.premium).length;
-          goldSum = data.reduce((s, r) => s + (Number(r.gold) || 0), 0);
-        }
-      } catch (_) {}
-      let activeRem = 0,
-        refs = 0,
-        mem = 0,
-        ev24 = 0;
-      try {
-        const since24 = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-        const a = await client
-          .from('rq_reminders')
-          .select('*', { count: 'exact', head: true })
-          .eq('active', true);
-        activeRem = a.count ?? 0;
-        const b = await client.from('rq_referrals').select('*', { count: 'exact', head: true });
-        refs = b.count ?? 0;
-        const c = await client.from('rq_ai_memory').select('*', { count: 'exact', head: true });
-        mem = c.count ?? 0;
-        const d = await client
-          .from('rq_events')
-          .select('*', { count: 'exact', head: true })
-          .gte('created_at', since24);
-        ev24 = d.count ?? 0;
-      } catch (_) {}
-      lines.push('Wallets: ' + wallets + ' · Premium: ' + premium);
-      lines.push('Gold total: ' + goldSum);
-      lines.push('Active reminders: ' + activeRem);
-      lines.push('Referrals: ' + refs);
-      lines.push('AI memory rows: ' + mem);
-      lines.push('Events (24h): ' + ev24);
-      lines.push('');
-      lines.push('Open: /pulse · /digest · /exportstats · /exportcsv');
-      lines.push('Web: https://radiant-queen-pasiya-max-v2.vercel.app/bot/analytics.html');
+
+    let tgOk = false;
+    if (ADMIN_ID) {
+      const sent = await tgSend(ADMIN_ID, lines.join('\n'));
+      tgOk = !!sent.ok;
     }
-    const sent = await tgSend(ADMIN_ID, lines.join('\n'));
+
+    const emailResults = [];
+    if (resendConfigured() && client) {
+      const recipients = await listDigestEmails(client);
+      const html = buildDigestHtml(stats);
+      const text = lines.join('\n');
+      for (const r of recipients.slice(0, 50)) {
+        try {
+          const out = await sendResendEmail({
+            to: r.email,
+            subject: 'Radiant Queen · Daily Digest',
+            text,
+            html,
+          });
+          emailResults.push({ user_id: r.user_id, email: r.email, ok: out.ok, error: out.error || null });
+        } catch (e) {
+          emailResults.push({
+            user_id: r.user_id,
+            email: r.email,
+            ok: false,
+            error: String(e.message || e),
+          });
+        }
+      }
+    }
+
     return res.status(200).json({
       ok: true,
-      sent: sent.ok,
-      admin: ADMIN_ID,
-      telegram: sent.raw || null,
+      telegram: tgOk,
+      admin: ADMIN_ID || null,
+      emailConfigured: resendConfigured(),
+      emailsSent: emailResults.filter((x) => x.ok).length,
+      emailResults,
+      stats,
     });
   } catch (err) {
     return res.status(500).json({ ok: false, error: String(err.message || err) });

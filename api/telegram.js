@@ -125,7 +125,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-packB-vault'; // Pack B: Supabase Storage /vault /files
+const BOT_VERSION = 'v4.0-packC-resend'; // Pack C: Resend email digests
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -9242,6 +9242,172 @@ bot.command('commands', async (ctx) => {
     } catch (err) {
       console.error('vault', err);
       await ctx.reply('Vault error: ' + String(err?.message || err).slice(0, 200));
+    }
+  });
+
+    // ——— Pack C: Resend email ———
+  bot.command(['setemail', 'emailset'], async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Needs Supabase.');
+        return;
+      }
+      const email = (ctx.message?.text || '')
+        .replace(/^\/(setemail|emailset)(@\w+)?\s*/i, '')
+        .trim()
+        .toLowerCase();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        await ctx.reply('Usage:\n/setemail you@gmail.com\nThen: /emailtest');
+        return;
+      }
+      const { upsertEmailPref } = await import('../lib/resendMail.js');
+      const out = await upsertEmailPref(supabase, ctx.from.id, {
+        email,
+        digest_enabled: true,
+      });
+      if (!out.ok) {
+        await ctx.reply('Save failed: ' + out.error);
+        return;
+      }
+      await ctx.reply(
+        'Email saved: ' +
+          email +
+          '\nDaily digest: ON\n\n/emailtest — send test\n/emailoff — disable digest\n/emailon — enable\n/emailstatus'
+      );
+      try {
+        await logEvent(ctx.from.id, 'email_set', { email });
+      } catch (_) {}
+    } catch (err) {
+      await ctx.reply('setemail failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['emailoff', 'unsubemail'], async (ctx) => {
+    try {
+      if (!supabase) return ctx.reply('Needs Supabase.');
+      const { getEmailPref, upsertEmailPref } = await import('../lib/resendMail.js');
+      const prev = await getEmailPref(supabase, ctx.from.id);
+      if (!prev?.email) {
+        await ctx.reply('No email set. /setemail you@gmail.com');
+        return;
+      }
+      await upsertEmailPref(supabase, ctx.from.id, {
+        email: prev.email,
+        digest_enabled: false,
+      });
+      await ctx.reply('Email digest OFF for ' + prev.email);
+    } catch (err) {
+      await ctx.reply('emailoff failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['emailon'], async (ctx) => {
+    try {
+      if (!supabase) return ctx.reply('Needs Supabase.');
+      const { getEmailPref, upsertEmailPref } = await import('../lib/resendMail.js');
+      const prev = await getEmailPref(supabase, ctx.from.id);
+      if (!prev?.email) {
+        await ctx.reply('No email set. /setemail you@gmail.com');
+        return;
+      }
+      await upsertEmailPref(supabase, ctx.from.id, {
+        email: prev.email,
+        digest_enabled: true,
+      });
+      await ctx.reply('Email digest ON for ' + prev.email);
+    } catch (err) {
+      await ctx.reply('emailon failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['emailstatus', 'myemail'], async (ctx) => {
+    try {
+      const { getEmailPref, resendConfigured } = await import('../lib/resendMail.js');
+      const prev = supabase ? await getEmailPref(supabase, ctx.from.id) : null;
+      await ctx.reply(
+        'EMAIL STATUS\n' +
+          'Resend API: ' +
+          (resendConfigured() ? 'yes' : 'NO key') +
+          '\nYour email: ' +
+          (prev?.email || '(not set)') +
+          '\nDigest: ' +
+          (prev?.digest_enabled ? 'ON' : 'OFF') +
+          '\n\n/setemail · /emailtest · /emailon · /emailoff'
+      );
+    } catch (err) {
+      await ctx.reply('emailstatus failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['emailtest', 'testemail'], async (ctx) => {
+    try {
+      const { getEmailPref, sendResendEmail, resendConfigured, collectDigestStats, buildDigestHtml } =
+        await import('../lib/resendMail.js');
+      if (!resendConfigured()) {
+        await ctx.reply(
+          'RESEND_API_KEY not set on Vercel.\n1) resend.com → API Keys\n2) Vercel env RESEND_API_KEY\n3) Redeploy'
+        );
+        return;
+      }
+      const prev = supabase ? await getEmailPref(supabase, ctx.from.id) : null;
+      if (!prev?.email) {
+        await ctx.reply('Set email first:\n/setemail you@gmail.com');
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const stats = await collectDigestStats(supabase);
+      const html = buildDigestHtml(stats);
+      const out = await sendResendEmail({
+        to: prev.email,
+        subject: 'Radiant Queen · Test email',
+        text:
+          'Test from Radiant Queen bot.\nIf you see this, Resend works.\nTime: ' +
+          new Date().toISOString(),
+        html:
+          '<p><b>Test email</b> from Radiant Queen · Pasiya Max</p>' +
+          html +
+          '<p>You can ignore this test.</p>',
+      });
+      if (!out.ok) {
+        await ctx.reply('Email failed: ' + out.error);
+        return;
+      }
+      await ctx.reply('Test email sent to ' + prev.email + '\nResend id: ' + (out.id || 'ok'));
+      try {
+        await logEvent(ctx.from.id, 'email_test', { email: prev.email });
+      } catch (_) {}
+    } catch (err) {
+      await ctx.reply('emailtest failed: ' + String(err?.message || err).slice(0, 180));
+    }
+  });
+
+  bot.command(['emaildigest', 'senddigestmail'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only.');
+        return;
+      }
+      const base =
+        process.env.APP_URL ||
+        process.env.VERCEL_URL ||
+        'https://radiant-queen-pasiya-max-v2.vercel.app';
+      const host = String(base).startsWith('http') ? base : 'https://' + base;
+      const secret = process.env.CRON_SECRET || '';
+      const url =
+        host.replace(/\/$/, '') +
+        '/api/cron-digest' +
+        (secret ? '?secret=' + encodeURIComponent(secret) : '');
+      await ctx.sendChatAction('typing');
+      const r = await fetch(url, { signal: AbortSignal.timeout(25000) });
+      const j = await r.json().catch(() => ({}));
+      await ctx.reply(
+        ('Manual digest trigger\nHTTP ' +
+          r.status +
+          '\n' +
+          JSON.stringify(j).slice(0, 800)).slice(0, 3500)
+      );
+    } catch (err) {
+      await ctx.reply('emaildigest failed: ' + String(err?.message || err).slice(0, 180));
     }
   });
 
