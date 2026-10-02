@@ -125,7 +125,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-p8-group-csv-digest'; // P8: groupstats + CSV export + daily digest cron
+const BOT_VERSION = 'v4.0-p9-goldtop-report'; // P9: goldtop + myreport + premium daily boost
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -2399,6 +2399,7 @@ async function handleAqiCommand(ctx) {
 
 const GOLD_START = 400;
 const GOLD_DAILY = 50;
+const GOLD_DAILY_PREMIUM = 100; // P9 premium daily claim
 const GOLD_COST = {
   ask: 5,
   vision: 10,
@@ -8237,6 +8238,7 @@ bot.command('commands', async (ctx) => {
           'Premium users\n' +
           '· Unlimited AI gold spend\n' +
           '· No AI rate limit\n' +
+          '· Daily claim +' + GOLD_DAILY_PREMIUM + ' (vs +' + GOLD_DAILY + ')\n' +
           '· Priority inline ask\n' +
           '· Premium badge on /premium status\n\n' +
           'Your status: ' +
@@ -8396,7 +8398,7 @@ bot.command('commands', async (ctx) => {
       }
       lines.push('');
       lines.push('Earn');
-      lines.push(`/daily → +${GOLD_DAILY} once per day`);
+      lines.push(`/daily → +${GOLD_DAILY}` + (g.premium ? ` / premium +${GOLD_DAILY_PREMIUM}` : '') + ' once per day');
       lines.push('');
       lines.push('Spend');
       lines.push(`AI text / ask → ${GOLD_COST.ask}`);
@@ -8436,26 +8438,31 @@ bot.command('commands', async (ctx) => {
         return;
       }
       const today = new Date().toISOString().slice(0, 10);
+      const claimAmt = g.premium ? GOLD_DAILY_PREMIUM : GOLD_DAILY;
       if (g.last_daily === today) {
         await ctx.reply(
           `Already claimed today.\n` +
             `Balance: ${g.gold} gold\n` +
-            `Come back tomorrow for +${GOLD_DAILY}.\n\n` +
-            `/balance · /gold`
+            `Come back tomorrow for +${claimAmt}` +
+            (g.premium ? ' (premium boost).\n\n' : '.\n\n') +
+            `/balance · /gold · /perks`
         );
         return;
       }
-      const next = g.gold + GOLD_DAILY;
+      const next = g.gold + claimAmt;
       await setGold(ctx.from.id, next, {
         username: ctx.from.username || ctx.from.first_name || null,
         last_daily: today,
       });
+      await logEvent(ctx.from.id, 'daily_claim', { amount: claimAmt, premium: !!g.premium });
       await ctx.reply(
         `DAILY CLAIM OK\n` +
-          `+${GOLD_DAILY} Radiant Gold\n` +
+          `+${claimAmt} Radiant Gold` +
+          (g.premium ? ' 👑 premium boost' : '') +
+          `\n` +
           `New balance: ${next}\n\n` +
           `Use it for AI help, vision, voice.\n` +
-          `/balance · /gold · /menu\n` +
+          `/balance · /goldtop · /myreport\n` +
           `— Radiant Queen`
       );
     } catch (err) {
@@ -8465,11 +8472,145 @@ bot.command('commands', async (ctx) => {
   });
 
 
+
+  // P9: Gold leaderboard
+  bot.command(['goldtop', 'topgold', 'richlist'], async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Supabase missing');
+        return;
+      }
+      const { data, error } = await supabase
+        .from('rq_gold')
+        .select('user_id, username, gold, premium')
+        .order('gold', { ascending: false })
+        .limit(15);
+      if (error) {
+        await ctx.reply('goldtop failed: ' + error.message);
+        return;
+      }
+      if (!data || !data.length) {
+        await ctx.reply('No wallets yet. /balance to start.');
+        return;
+      }
+      const lines = ['🏆 RADIANT GOLD · TOP'];
+      data.forEach((r, i) => {
+        const name = r.username ? '@' + String(r.username).replace(/^@/, '') : 'User ' + r.user_id;
+        const badge = r.premium ? ' 👑' : '';
+        lines.push((i + 1) + '. ' + name + badge + ' — ' + (r.gold ?? 0) + ' gold');
+      });
+      lines.push('');
+      lines.push('/balance · /myreport · /perks');
+      await ctx.reply(lines.join('\n'));
+      await logEvent(ctx.from?.id, 'goldtop', { n: data.length });
+    } catch (e) {
+      await ctx.reply('goldtop failed: ' + String(e.message || e).slice(0, 160));
+    }
+  });
+
+  // P9: Personal report
+  bot.command(['myreport', 'report', 'mystats'], async (ctx) => {
+    try {
+      const uid = ctx.from?.id;
+      if (!uid) return;
+      const name = ctx.from.first_name || ctx.from.username || 'You';
+      const lines = ['📋 MY REPORT', 'User: ' + name, 'ID: ' + uid, ''];
+      if (supabase) {
+        try {
+          const g = await getOrCreateGold(uid, ctx.from.username || ctx.from.first_name);
+          lines.push('Gold: ' + (g.gold ?? '?'));
+          lines.push('Premium: ' + (g.premium ? 'YES 👑' : 'no'));
+          if (g.last_daily) lines.push('Last daily: ' + g.last_daily);
+        } catch (_) {}
+        try {
+          const { count: mem } = await supabase
+            .from('rq_ai_memory')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', Number(uid));
+          lines.push('AI memory rows: ' + (mem ?? 0));
+        } catch (_) {}
+        try {
+          const { count: rem } = await supabase
+            .from('rq_reminders')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', Number(uid))
+            .eq('active', true);
+          lines.push('Active reminders: ' + (rem ?? 0));
+        } catch (_) {}
+        try {
+          const since7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+          const { count: ev } = await supabase
+            .from('rq_events')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', Number(uid))
+            .gte('created_at', since7);
+          lines.push('Your events (7d): ' + (ev ?? 0));
+        } catch (_) {}
+        try {
+          const { data: persona } = await supabase
+            .from('rq_user_personas')
+            .select('persona')
+            .eq('user_id', Number(uid))
+            .maybeSingle();
+          if (persona?.persona) lines.push('Persona: ' + persona.persona);
+        } catch (_) {}
+      } else {
+        lines.push('Supabase offline — limited report.');
+      }
+      lines.push('');
+      lines.push('/balance · /goldtop · /persona · /remindlist');
+      await ctx.reply(lines.join('\n'));
+      await logEvent(uid, 'myreport', {});
+    } catch (e) {
+      await ctx.reply('myreport failed: ' + String(e.message || e).slice(0, 160));
+    }
+  });
+
+  // P9: Group admin announce (text only, no spam tools)
+  bot.command(['announce', 'gannounce'], async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use /announce inside a group.\nExample: /announce Training at 6am tomorrow');
+        return;
+      }
+      const text = (ctx.message?.text || '').replace(/^\/announce(?:@\w+)?\s*/i, '').replace(/^\/gannounce(?:@\w+)?\s*/i, '').trim();
+      if (!text) {
+        await ctx.reply('Usage: /announce <message>\nAdmin only.');
+        return;
+      }
+      // founder always; else check admin in group
+      let allowed = isAdmin(ctx);
+      if (!allowed) {
+        try {
+          const m = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
+          allowed = m.status === 'creator' || m.status === 'administrator';
+        } catch (_) {}
+      }
+      if (!allowed) {
+        await ctx.reply('Group admin or founder only.');
+        return;
+      }
+      const body =
+        '📢 ANNOUNCEMENT\n' +
+        'From: ' +
+        (ctx.from.first_name || ctx.from.username || 'Admin') +
+        '\n\n' +
+        text.slice(0, 3000);
+      await ctx.reply(body);
+      try {
+        await ctx.deleteMessage(ctx.message.message_id);
+      } catch (_) {}
+      await logEvent(ctx.from.id, 'announce', { chat_id: ctx.chat.id });
+    } catch (e) {
+      await ctx.reply('announce failed: ' + String(e.message || e).slice(0, 160));
+    }
+  });
+
   bot.command(['prices', 'costs'], async (ctx) => {
     await ctx.reply(
       `RADIANT GOLD · PRICES\n\n` +
         `Start bonus: ${GOLD_START}\n` +
-        `Daily claim: +${GOLD_DAILY}\n\n` +
+        `Daily claim: +${GOLD_DAILY} (premium +${GOLD_DAILY_PREMIUM})\n\n` +
         `AI text / ask: ${GOLD_COST.ask}\n` +
         `Vision / photo: ${GOLD_COST.vision}\n` +
         `Voice: ${GOLD_COST.voice}\n` +
