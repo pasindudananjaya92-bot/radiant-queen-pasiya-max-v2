@@ -125,7 +125,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-p7-premium-export'; // P7: premium perks + export + rate bypass
+const BOT_VERSION = 'v4.0-p8-group-csv-digest'; // P8: groupstats + CSV export + daily digest cron
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -4301,6 +4301,77 @@ function buildBot() {
     }
   });
 
+
+  // P8 Group analytics
+  bot.command(['groupstats', 'gstats'], async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use /groupstats inside a group.');
+        return;
+      }
+      const chatId = ctx.chat.id;
+      const chat = await ctx.telegram.getChat(chatId);
+      let count = '?';
+      try {
+        count = await ctx.telegram.callApi('getChatMemberCount', { chat_id: chatId });
+      } catch (_) {
+        try {
+          count = await ctx.telegram.callApi('getChatMembersCount', { chat_id: chatId });
+        } catch (_) {
+          count = 'n/a';
+        }
+      }
+      const settings = await loadGroupSettings(chatId);
+      let botAdmin = 'unknown';
+      try {
+        const me = await ctx.telegram.getChatMember(chatId, ctx.botInfo.id);
+        botAdmin = me.status;
+      } catch (_) {}
+      const map = groupActiveUsers.get(String(chatId));
+      const tracked = map ? map.size : 0;
+      let top = [];
+      if (map) {
+        top = [...map.values()]
+          .sort((a, b) => (b.ts || 0) - (a.ts || 0))
+          .slice(0, 8)
+          .map((u) => (u.username ? '@' + u.username : u.name || u.id));
+      }
+      let warnRows = 0;
+      if (supabase) {
+        try {
+          const { count: wc } = await supabase
+            .from('rq_warns')
+            .select('*', { count: 'exact', head: true })
+            .eq('chat_id', chatId);
+          warnRows = wc ?? 0;
+        } catch (_) {}
+      }
+      const lines = [
+        '📊 GROUP STATS',
+        'Title: ' + (chat.title || '-'),
+        'Chat ID: ' + chatId,
+        'Members: ' + count,
+        'Bot: ' + botAdmin,
+        'Anti-link: ' + (settings.antiLink ? 'ON' : 'OFF'),
+        'Slow: ' + (settings.slow_seconds || settings.slowSeconds || 0) + 's',
+        'Welcome: ' + (settings.welcome ? 'set' : 'not set'),
+        'Warn records: ' + warnRows,
+        'Tracked active (this instance): ' + tracked,
+      ];
+      if (top.length) {
+        lines.push('');
+        lines.push('Recent active:');
+        lines.push(top.join(', '));
+      }
+      lines.push('');
+      lines.push('/groupinfo · /modcheck · /admins');
+      await ctx.reply(lines.join('\n').slice(0, 3500));
+      await logEvent(ctx.from?.id, 'groupstats', { chat_id: chatId });
+    } catch (e) {
+      await ctx.reply('groupstats failed: ' + String(e.message || e).slice(0, 160));
+    }
+  });
+
   bot.command('modcheck', async (ctx) => {
     try {
       if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
@@ -8241,6 +8312,56 @@ bot.command('commands', async (ctx) => {
       await logEvent(ctx.from.id, 'export_stats', null);
     } catch (e) {
       await ctx.reply('exportstats failed: ' + (e.message || e));
+    }
+  });
+
+
+  bot.command(['exportcsv', 'csv'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only.');
+        return;
+      }
+      if (!supabase) {
+        await ctx.reply('Supabase missing');
+        return;
+      }
+      await ctx.sendChatAction('upload_document');
+      const { data: goldRows, error } = await supabase
+        .from('rq_gold')
+        .select('user_id, username, gold, premium, last_daily, updated_at')
+        .order('gold', { ascending: false });
+      if (error) {
+        await ctx.reply('exportcsv failed: ' + error.message);
+        return;
+      }
+      const esc = (v) => {
+        const s = String(v == null ? '' : v);
+        if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+        return s;
+      };
+      const header = 'user_id,username,gold,premium,last_daily,updated_at';
+      const lines = [header];
+      for (const r of goldRows || []) {
+        lines.push(
+          [
+            esc(r.user_id),
+            esc(r.username),
+            esc(r.gold),
+            esc(r.premium ? 'yes' : 'no'),
+            esc(r.last_daily),
+            esc(r.updated_at),
+          ].join(',')
+        );
+      }
+      const buf = Buffer.from(lines.join('\n'), 'utf8');
+      await ctx.replyWithDocument({
+        source: buf,
+        filename: 'radiant-gold-' + Date.now() + '.csv',
+      });
+      await logEvent(ctx.from.id, 'export_csv', { rows: (goldRows || []).length });
+    } catch (e) {
+      await ctx.reply('exportcsv failed: ' + (e.message || e));
     }
   });
 
