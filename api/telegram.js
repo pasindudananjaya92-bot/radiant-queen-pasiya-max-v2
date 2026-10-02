@@ -125,7 +125,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-p10a-video-photo'; // P10a: founder video + photoedit + keep /imagine
+const BOT_VERSION = 'v4.0-p10a-free'; // P10a-free: video storyboard + photoedit free path (no paid pollen)
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -8713,7 +8713,7 @@ bot.command('commands', async (ctx) => {
   });
 
 
-  // ——— P10a: founder-only video + all-user photoedit ———
+  // ——— P10a-free: founder video (paid MP4 or free storyboard) + free photoedit ———
   async function tgFileUrl(ctx, fileId) {
     const f = await ctx.telegram.getFile(fileId);
     if (!f?.file_path) throw new Error('no file_path');
@@ -8722,9 +8722,9 @@ bot.command('commands', async (ctx) => {
 
   function founderOnlyVideoMsg() {
     return (
-      '🎬 Video generation is founder-only right now.\\n' +
-      'Coming soon for premium tiers.\\n\\n' +
-      'You can still use /imagine and /photoedit.'
+      '🎬 Video tools are founder-only right now.\n' +
+      'Coming soon for premium tiers.\n\n' +
+      'You can still use /imagine and /photoedit (free).'
     );
   }
 
@@ -8735,29 +8735,49 @@ bot.command('commands', async (ctx) => {
         return;
       }
       const prompt = (ctx.message?.text || '')
-        .replace(/^\/(video|vid)(@\\w+)?\\s*/i, '')
+        .replace(/^\/(video|vid)(@\w+)?\s*/i, '')
         .trim();
       if (!prompt) {
         await ctx.reply(
-          'Usage (founder): /video a cat running on the beach at sunrise\\n' +
-            'Needs POLLINATIONS_API_KEY in Vercel env.\\n' +
-            'Models: seedance (default) · set POLLINATIONS_VIDEO_MODEL=veo optional'
+          'Usage (founder): /video a cat running on the beach\n\n' +
+            'Free mode: 3-frame storyboard (no pollen)\n' +
+            'Paid MP4: needs Paid Pollen on enter.pollinations.ai\n' +
+            'Optional: POLLINATIONS_VIDEO_MODEL=seedance-2.0-fast'
         );
         return;
       }
-      await ctx.reply('🎬 Generating video… may take 30–90s');
-      await ctx.sendChatAction('upload_video');
+      await ctx.reply('🎬 Working… (free storyboard if no Paid Pollen)');
+      await ctx.sendChatAction('upload_photo');
       const { generateVideoFromPrompt } = await import('../lib/videoGen.js');
-      const out = await generateVideoFromPrompt(prompt, { model: process.env.POLLINATIONS_VIDEO_MODEL || 'seedance' });
+      const out = await generateVideoFromPrompt(prompt, {
+        model: process.env.POLLINATIONS_VIDEO_MODEL || 'seedance-2.0-fast',
+      });
       if (!out.ok) {
         await ctx.reply('Video failed: ' + String(out.error || 'unknown').slice(0, 400));
         return;
       }
-      await ctx.replyWithVideo(
-        { source: out.buffer },
-        { caption: ('🎬 ' + prompt).slice(0, 900) }
-      );
-      try { await logEvent(ctx.from.id, 'video_gen', { prompt: prompt.slice(0, 80) }); } catch (_) {}
+      if (out.mode === 'free-storyboard' && out.frames?.length) {
+        await ctx.reply(
+          '🆓 FREE STORYBOARD (3 frames)\n' +
+            'Real MP4 needs Paid Pollen on Pollinations.\n' +
+            'Prompt: ' +
+            prompt.slice(0, 200)
+        );
+        for (let i = 0; i < out.frames.length; i++) {
+          await ctx.replyWithPhoto(
+            { source: out.frames[i].buffer },
+            { caption: ('🎬 Frame ' + (i + 1) + '/3 · ' + prompt).slice(0, 900) }
+          );
+        }
+      } else if (out.buffer) {
+        await ctx.replyWithVideo(
+          { source: out.buffer },
+          { caption: ('🎬 ' + prompt).slice(0, 900) }
+        );
+      }
+      try {
+        await logEvent(ctx.from.id, 'video_gen', { mode: out.mode || 'paid', prompt: prompt.slice(0, 80) });
+      } catch (_) {}
     } catch (err) {
       console.error('video', err);
       await ctx.reply('Video failed: ' + String(err?.message || err).slice(0, 200));
@@ -8773,29 +8793,45 @@ bot.command('commands', async (ctx) => {
       const reply = ctx.message?.reply_to_message;
       const photos = reply?.photo;
       if (!photos || !photos.length) {
-        await ctx.reply('Reply to a photo with /animate\\nOptional: /animate gentle camera zoom');
+        await ctx.reply('Reply to a photo with /animate\nOptional: /animate gentle camera zoom');
         return;
       }
       const best = photos[photos.length - 1];
-      const prompt = (ctx.message?.text || '')
-        .replace(/^\/(animate|img2vid)(@\\w+)?\\s*/i, '')
-        .trim() || 'animate this image smoothly, natural motion';
-      await ctx.reply('🎬 Animating photo… 30–90s');
-      await ctx.sendChatAction('upload_video');
-      const imageUrl = await tgFileUrl(ctx, best.file_id);
+      const prompt =
+        (ctx.message?.text || '')
+          .replace(/^\/(animate|img2vid)(@\w+)?\s*/i, '')
+          .trim() || 'animate this image smoothly, natural motion';
+      await ctx.reply('🎬 Animating… (free storyboard if no Paid Pollen)');
+      await ctx.sendChatAction('upload_photo');
+      let imageUrl = null;
+      try {
+        imageUrl = await tgFileUrl(ctx, best.file_id);
+      } catch (_) {}
       const { generateVideoFromImage } = await import('../lib/videoGen.js');
       const out = await generateVideoFromImage(imageUrl, prompt, {
-        model: process.env.POLLINATIONS_VIDEO_MODEL || 'seedance',
+        model: process.env.POLLINATIONS_VIDEO_MODEL || 'seedance-2.0-fast',
       });
       if (!out.ok) {
         await ctx.reply('Animate failed: ' + String(out.error || 'unknown').slice(0, 400));
         return;
       }
-      await ctx.replyWithVideo(
-        { source: out.buffer },
-        { caption: ('🎬 Animated: ' + prompt).slice(0, 900) }
-      );
-      try { await logEvent(ctx.from.id, 'animate', {}); } catch (_) {}
+      if (out.mode === 'free-storyboard' && out.frames?.length) {
+        await ctx.reply('🆓 FREE animate storyboard (3 frames)');
+        for (let i = 0; i < out.frames.length; i++) {
+          await ctx.replyWithPhoto(
+            { source: out.frames[i].buffer },
+            { caption: ('🎬 Animate ' + (i + 1) + '/3 · ' + prompt).slice(0, 900) }
+          );
+        }
+      } else if (out.buffer) {
+        await ctx.replyWithVideo(
+          { source: out.buffer },
+          { caption: ('🎬 Animated: ' + prompt).slice(0, 900) }
+        );
+      }
+      try {
+        await logEvent(ctx.from.id, 'animate', { mode: out.mode || 'paid' });
+      } catch (_) {}
     } catch (err) {
       console.error('animate', err);
       await ctx.reply('Animate failed: ' + String(err?.message || err).slice(0, 200));
@@ -8824,18 +8860,18 @@ bot.command('commands', async (ctx) => {
       const photos = reply?.photo;
       if (!photos || !photos.length) {
         await ctx.reply(
-          'Reply to a photo with /photoedit <instruction>\\n\\n' +
-            'Examples:\\n' +
-            '/photoedit enhance\\n' +
-            '/photoedit cartoon\\n' +
-            '/photoedit anime\\n' +
-            '/photoedit add sunset background\\n' +
-            '/photoedit make it blur'
+          'Reply to a photo with /photoedit <instruction>\n\n' +
+            'Examples:\n' +
+            '/photoedit enhance\n' +
+            '/photoedit cartoon\n' +
+            '/photoedit anime\n' +
+            '/photoedit add sunset background\n\n' +
+            'Free mode: works without Paid Pollen (same engine as /imagine).'
         );
         return;
       }
       const raw = (ctx.message?.text || '')
-        .replace(/^\/(photoedit|editphoto|img2img)(@\\w+)?\\s*/i, '')
+        .replace(/^\/(photoedit|editphoto|img2img)(@\w+)?\s*/i, '')
         .trim();
       if (!raw) {
         await ctx.reply('Add instruction. Example: /photoedit enhance');
@@ -8845,17 +8881,26 @@ bot.command('commands', async (ctx) => {
       const instruction = expandPhotoEditAlias(raw);
       await ctx.sendChatAction('upload_photo');
       const best = photos[photos.length - 1];
-      const imageUrl = await tgFileUrl(ctx, best.file_id);
+      let imageUrl = null;
+      try {
+        imageUrl = await tgFileUrl(ctx, best.file_id);
+      } catch (_) {}
       const out = await editPhotoWithPrompt(imageUrl, instruction);
       if (!out.ok) {
         await ctx.reply('Photo edit failed: ' + String(out.error || 'unknown').slice(0, 300));
         return;
       }
-      await ctx.replyWithPhoto(
-        { source: out.buffer },
-        { caption: ('🖼️ ' + instruction).slice(0, 900) }
-      );
-      try { await logEvent(ctx.from.id, 'photoedit', { instruction: instruction.slice(0, 60) }); } catch (_) {}
+      const cap =
+        (out.mode === 'free-style' ? '🆓 ' : '🖼️ ') +
+        instruction +
+        (out.note ? '\n' + out.note : '');
+      await ctx.replyWithPhoto({ source: out.buffer }, { caption: cap.slice(0, 900) });
+      try {
+        await logEvent(ctx.from.id, 'photoedit', {
+          mode: out.mode || 'free',
+          instruction: instruction.slice(0, 60),
+        });
+      } catch (_) {}
     } catch (err) {
       console.error('photoedit', err);
       await ctx.reply('Photo edit failed: ' + String(err?.message || err).slice(0, 200));
