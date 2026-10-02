@@ -125,7 +125,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-p11-fix2'; // P11-fix2: Gemini REST vision (inline_data) for photoedit
+const BOT_VERSION = 'v4.0-p11-packA'; // P11 Groq vision + Pack A TTS/OCR
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -8862,7 +8862,7 @@ bot.command('commands', async (ctx) => {
         await ctx.reply(
           'Reply to a photo with /photoedit <instruction>\n' +
             'Examples: enhance | cartoon | anime | add neon background\n' +
-            'P11-fix2: Gemini REST vision (real image bytes).'
+            'P11-fix3: Groq vision (primary) + Gemini fallback.'
         );
         return;
       }
@@ -8952,6 +8952,97 @@ bot.command('commands', async (ctx) => {
     } catch (err) {
       console.error('photoedit', err);
       await ctx.reply('Photo edit failed: ' + String(err?.message || err).slice(0, 200));
+    }
+  });
+
+    // ——— Pack A Step2: TTS ———
+  bot.command(['tts', 'say', 'speaktext'], async (ctx) => {
+    try {
+      const uid = String(ctx.from?.id || '');
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      let text = (ctx.message?.text || '')
+        .replace(/^\/(tts|say|speaktext)(@\w+)?\s*/i, '')
+        .trim();
+      let langHint = '';
+      const langMatch = text.match(/^(\w{2})\s+(.+)$/s);
+      if (langMatch && ['si', 'en', 'ta', 'hi'].includes(langMatch[1].toLowerCase())) {
+        langHint = langMatch[1].toLowerCase();
+        text = langMatch[2].trim();
+      }
+      if (!text && ctx.message?.reply_to_message?.text) {
+        text = String(ctx.message.reply_to_message.text).slice(0, 180);
+      }
+      if (!text) {
+        await ctx.reply(
+          'Usage:\n/tts <text>\n/tts si ආයුබෝවන්\n/tts en Hello founder\nReply to a message + /tts'
+        );
+        return;
+      }
+      await ctx.sendChatAction('record_voice');
+      const { synthesizeSpeech } = await import('../lib/tts.js');
+      const out = await synthesizeSpeech(text, langHint);
+      if (!out.ok) {
+        await ctx.reply('TTS failed: ' + String(out.error || 'unknown').slice(0, 180));
+        return;
+      }
+      await ctx.replyWithVoice(
+        { source: out.buffer, filename: 'rq-tts.mp3' },
+        { caption: ('🔊 ' + (out.lang || '') + ' · ' + (out.provider || 'tts')).slice(0, 200) }
+      );
+      try {
+        await logEvent(ctx.from.id, 'tts', { lang: out.lang, provider: out.provider });
+      } catch (_) {}
+    } catch (err) {
+      console.error('tts', err);
+      await ctx.reply('TTS failed: ' + String(err?.message || err).slice(0, 180));
+    }
+  });
+
+  // ——— Pack A Step3: OCR.space ———
+  bot.command(['ocrspace', 'ocr'], async (ctx) => {
+    try {
+      const uid = String(ctx.from?.id || '');
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      const reply = ctx.message?.reply_to_message;
+      const photos = reply?.photo;
+      if (!photos || !photos.length) {
+        await ctx.reply('Reply to a photo with /ocr or /ocrspace');
+        return;
+      }
+      const best = photos[photos.length - 1];
+      const token = BOT_TOKEN || process.env.BOT_TOKEN || '';
+      const f = await ctx.telegram.getFile(best.file_id);
+      const imageUrl = 'https://api.telegram.org/file/bot' + token + '/' + f.file_path;
+      await ctx.sendChatAction('typing');
+      const fr = await fetch(imageUrl, { signal: AbortSignal.timeout(30000) });
+      const buf = Buffer.from(await fr.arrayBuffer());
+      let mime = 'image/jpeg';
+      if (buf[0] === 0x89 && buf[1] === 0x50) mime = 'image/png';
+      const { ocrImageBuffer } = await import('../lib/ocrSpace.js');
+      const out = await ocrImageBuffer(buf, mime, 'eng');
+      if (!out.ok) {
+        await ctx.reply('OCR failed: ' + String(out.error || 'unknown').slice(0, 200));
+        return;
+      }
+      await ctx.reply(('OCR · ocr.space\n\n' + out.text).slice(0, 3500));
+      try {
+        await logEvent(ctx.from.id, 'ocr', { engine: 'ocr.space' });
+      } catch (_) {}
+    } catch (err) {
+      console.error('ocr', err);
+      await ctx.reply('OCR failed: ' + String(err?.message || err).slice(0, 180));
     }
   });
 
