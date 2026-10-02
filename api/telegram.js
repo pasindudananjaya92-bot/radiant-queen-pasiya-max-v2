@@ -125,7 +125,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-p11-packA'; // P11 Groq vision + Pack A TTS/OCR
+const BOT_VERSION = 'v4.0-packB-vault'; // Pack B: Supabase Storage /vault /files
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -9043,6 +9043,205 @@ bot.command('commands', async (ctx) => {
     } catch (err) {
       console.error('ocr', err);
       await ctx.reply('OCR failed: ' + String(err?.message || err).slice(0, 180));
+    }
+  });
+
+    // ——— Pack B: Supabase Storage vault ———
+  bot.command(['vault', 'files', 'filevault'], async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Vault needs Supabase. Set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY.');
+        return;
+      }
+      const uid = String(ctx.from?.id || '');
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+
+      const raw = (ctx.message?.text || '')
+        .replace(/^\/(vault|files|filevault)(@\w+)?\s*/i, '')
+        .trim();
+      const parts = raw ? raw.split(/\s+/) : [];
+      const sub = (parts[0] || '').toLowerCase();
+      const arg = parts.slice(1).join(' ').trim();
+
+      const {
+        listVaultFiles,
+        saveVaultFile,
+        getVaultFile,
+        deleteVaultFile,
+        ensureVaultBucket,
+      } = await import('../lib/vault.js');
+
+      // HELP
+      if (!sub || sub === 'help') {
+        await ctx.reply(
+          'RADIANT VAULT · Supabase Storage\n\n' +
+            'Save (reply to photo / document):\n' +
+            '  /vault save\n' +
+            '  /vault save my-note.pdf\n\n' +
+            'List:\n  /vault list\n  /files\n\n' +
+            'Get file:\n  /vault get <id>\n\n' +
+            'Delete:\n  /vault del <id>\n\n' +
+            'Limits: 40 files / user · 8MB each · private bucket rq_vault'
+        );
+        return;
+      }
+
+      // LIST
+      if (sub === 'list' || sub === 'ls' || sub === 'all') {
+        await ensureVaultBucket(supabase);
+        const out = await listVaultFiles(supabase, ctx.from.id, 25);
+        if (!out.ok) {
+          await ctx.reply('Vault list failed: ' + out.error);
+          return;
+        }
+        if (!out.files.length) {
+          await ctx.reply('Vault empty. Reply to a photo/document with:\n/vault save');
+          return;
+        }
+        const lines = out.files.map((f) => {
+          const kb = f.size_bytes ? Math.round(f.size_bytes / 1024) + 'KB' : '?';
+          return '#' + f.id + ' · ' + f.name + ' · ' + kb;
+        });
+        await ctx.reply(('Your vault\n\n' + lines.join('\n')).slice(0, 3500));
+        return;
+      }
+
+      // GET
+      if (sub === 'get' || sub === 'open' || sub === 'dl' || sub === 'download') {
+        const id = parseInt(arg || parts[1] || '0', 10);
+        if (!id) {
+          await ctx.reply('Usage: /vault get <id>\nExample: /vault get 3');
+          return;
+        }
+        await ctx.sendChatAction('upload_document');
+        const out = await getVaultFile(supabase, ctx.from.id, id);
+        if (!out.ok) {
+          await ctx.reply('Vault get failed: ' + out.error);
+          return;
+        }
+        const f = out.file;
+        const cap = ('Vault #' + f.id + ' · ' + f.name).slice(0, 200);
+        if (out.buffer && out.buffer.length) {
+          const isImg = String(f.mime || '').startsWith('image/');
+          if (isImg) {
+            await ctx.replyWithPhoto({ source: out.buffer }, { caption: cap });
+          } else {
+            await ctx.replyWithDocument(
+              { source: out.buffer, filename: f.name || 'file.bin' },
+              { caption: cap }
+            );
+          }
+        } else if (out.signedUrl) {
+          await ctx.reply(cap + '\nLink (30 min):\n' + out.signedUrl);
+        } else {
+          await ctx.reply('File meta found but download failed.');
+        }
+        return;
+      }
+
+      // DELETE
+      if (sub === 'del' || sub === 'delete' || sub === 'rm' || sub === 'remove') {
+        const id = parseInt(arg || parts[1] || '0', 10);
+        if (!id) {
+          await ctx.reply('Usage: /vault del <id>');
+          return;
+        }
+        const out = await deleteVaultFile(supabase, ctx.from.id, id);
+        if (!out.ok) {
+          await ctx.reply('Delete failed: ' + out.error);
+          return;
+        }
+        await ctx.reply('Deleted vault #' + id + ' · ' + (out.deleted?.name || ''));
+        return;
+      }
+
+      // SAVE (reply to media)
+      if (sub === 'save' || sub === 'add' || sub === 'upload' || sub === 'put') {
+        const reply = ctx.message?.reply_to_message;
+        if (!reply) {
+          await ctx.reply('Reply to a photo or document, then:\n/vault save\n/vault save my-name.jpg');
+          return;
+        }
+        await ctx.sendChatAction('upload_document');
+        let fileId = null;
+        let mime = 'application/octet-stream';
+        let defaultName = 'file.bin';
+
+        if (reply.photo && reply.photo.length) {
+          const best = reply.photo[reply.photo.length - 1];
+          fileId = best.file_id;
+          mime = 'image/jpeg';
+          defaultName = 'photo.jpg';
+        } else if (reply.document) {
+          fileId = reply.document.file_id;
+          mime = reply.document.mime_type || mime;
+          defaultName = reply.document.file_name || defaultName;
+        } else if (reply.audio) {
+          fileId = reply.audio.file_id;
+          mime = reply.audio.mime_type || 'audio/mpeg';
+          defaultName = reply.audio.file_name || 'audio.mp3';
+        } else if (reply.voice) {
+          fileId = reply.voice.file_id;
+          mime = 'audio/ogg';
+          defaultName = 'voice.ogg';
+        } else if (reply.video) {
+          fileId = reply.video.file_id;
+          mime = reply.video.mime_type || 'video/mp4';
+          defaultName = 'video.mp4';
+        } else {
+          await ctx.reply('Reply to photo, document, audio, voice, or video.');
+          return;
+        }
+
+        const tgFile = await ctx.telegram.getFile(fileId);
+        const token = BOT_TOKEN || process.env.BOT_TOKEN || '';
+        const url = 'https://api.telegram.org/file/bot' + token + '/' + tgFile.file_path;
+        const fr = await fetch(url, { signal: AbortSignal.timeout(60000) });
+        if (!fr.ok) {
+          await ctx.reply('Telegram download failed: HTTP ' + fr.status);
+          return;
+        }
+        const buffer = Buffer.from(await fr.arrayBuffer());
+        if (buffer[0] === 0x89 && buffer[1] === 0x50) mime = 'image/png';
+        else if (buffer[0] === 0xff && buffer[1] === 0xd8) mime = 'image/jpeg';
+
+        const name = arg || defaultName;
+        const out = await saveVaultFile(supabase, ctx.from.id, {
+          buffer,
+          name,
+          mime,
+          telegram_file_id: fileId,
+        });
+        if (!out.ok) {
+          await ctx.reply('Vault save failed: ' + out.error);
+          return;
+        }
+        await ctx.reply(
+          'Saved to vault\n#' +
+            out.file.id +
+            ' · ' +
+            out.file.name +
+            '\n' +
+            Math.round((out.file.size_bytes || 0) / 1024) +
+            ' KB\n\n/vault list · /vault get ' +
+            out.file.id
+        );
+        try {
+          await logEvent(ctx.from.id, 'vault_save', { id: out.file.id, name: out.file.name });
+        } catch (_) {}
+        return;
+      }
+
+      await ctx.reply('Unknown vault command. Try /vault help');
+    } catch (err) {
+      console.error('vault', err);
+      await ctx.reply('Vault error: ' + String(err?.message || err).slice(0, 200));
     }
   });
 
