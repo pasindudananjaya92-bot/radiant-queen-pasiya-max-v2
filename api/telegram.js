@@ -125,7 +125,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-p6-analytics-premium'; // P6: web analytics + premium flags
+const BOT_VERSION = 'v4.0-p7-premium-export'; // P7: premium perks + export + rate bypass
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -303,6 +303,26 @@ async function fetchStrideJson(path, timeoutMs = 8000) {
 async function checkRateLimit(userId) {
   const id = String(userId);
   const now = Date.now();
+
+  // P7: founder + premium users bypass AI rate limit
+  if (ADMIN_ID && id === String(ADMIN_ID)) {
+    return { ok: true, bypass: 'founder' };
+  }
+  if (supabase) {
+    try {
+      const uid = Number(id);
+      if (Number.isFinite(uid)) {
+        const { data } = await supabase
+          .from('rq_gold')
+          .select('premium')
+          .eq('user_id', uid)
+          .maybeSingle();
+        if (data && data.premium) {
+          return { ok: true, bypass: 'premium' };
+        }
+      }
+    } catch (_) {}
+  }
 
   // P1b: Upstash Redis (shared across serverless instances)
   try {
@@ -8132,6 +8152,98 @@ bot.command('commands', async (ctx) => {
     }
   });
 
+
+  // P7 Perks + founder export
+  bot.command(['perks', 'premiumperks'], async (ctx) => {
+    try {
+      const g = await getOrCreateGold(ctx.from.id, ctx.from.username || ctx.from.first_name);
+      await ctx.reply(
+        '💎 RADIANT PREMIUM PERKS\n\n' +
+          'Free users\n' +
+          '· Start gold: 400 · Daily +50\n' +
+          '· AI ask 5 · Vision 10 · Voice 10\n' +
+          '· Rate limit on AI (fair use)\n\n' +
+          'Premium users\n' +
+          '· Unlimited AI gold spend\n' +
+          '· No AI rate limit\n' +
+          '· Priority inline ask\n' +
+          '· Premium badge on /premium status\n\n' +
+          'Your status: ' +
+          (g.premium ? 'PREMIUM ✅' : 'Standard') +
+          '\nGold: ' +
+          (g.gold ?? '?') +
+          '\n\nFounder sets: /premium <user_id> on'
+      );
+      await logEvent(ctx.from?.id, 'perks_view', { premium: !!g.premium });
+    } catch (e) {
+      await ctx.reply('perks failed: ' + (e.message || e));
+    }
+  });
+
+  bot.command(['exportstats', 'exportjson'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only.');
+        return;
+      }
+      if (!supabase) {
+        await ctx.reply('Supabase missing');
+        return;
+      }
+      await ctx.sendChatAction('upload_document');
+      const payload = {
+        exported_at: new Date().toISOString(),
+        version: typeof BOT_VERSION !== 'undefined' ? BOT_VERSION : '',
+        economy: {},
+        activity: {},
+      };
+      try {
+        const { data: goldRows } = await supabase.from('rq_gold').select('user_id, username, gold, premium, last_daily, updated_at');
+        payload.economy.wallets = goldRows || [];
+        payload.economy.goldSum = (goldRows || []).reduce((s, r) => s + (Number(r.gold) || 0), 0);
+        payload.economy.premiumCount = (goldRows || []).filter((r) => r.premium).length;
+      } catch (e) {
+        payload.economy.error = String(e.message || e);
+      }
+      try {
+        const { count: rem } = await supabase.from('rq_reminders').select('*', { count: 'exact', head: true }).eq('active', true);
+        const { count: refs } = await supabase.from('rq_referrals').select('*', { count: 'exact', head: true });
+        const { count: mem } = await supabase.from('rq_ai_memory').select('*', { count: 'exact', head: true });
+        const { count: ev } = await supabase.from('rq_events').select('*', { count: 'exact', head: true });
+        payload.activity = {
+          activeReminders: rem ?? 0,
+          referrals: refs ?? 0,
+          memoryRows: mem ?? 0,
+          events: ev ?? 0,
+        };
+      } catch (e) {
+        payload.activity.error = String(e.message || e);
+      }
+      try {
+        const since7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const { data: evs } = await supabase.from('rq_events').select('event').gte('created_at', since7).limit(500);
+        const map = {};
+        for (const row of evs || []) {
+          map[row.event] = (map[row.event] || 0) + 1;
+        }
+        payload.topEvents = Object.entries(map)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 20)
+          .map(([event, count]) => ({ event, count }));
+      } catch (_) {
+        payload.topEvents = [];
+      }
+      const buf = Buffer.from(JSON.stringify(payload, null, 2), 'utf8');
+      await ctx.replyWithDocument({
+        source: buf,
+        filename: 'radiant-queen-stats-' + Date.now() + '.json',
+      });
+      await logEvent(ctx.from.id, 'export_stats', null);
+    } catch (e) {
+      await ctx.reply('exportstats failed: ' + (e.message || e));
+    }
+  });
+
   bot.command(['balance', 'gold'], async (ctx) => {
     try {
       if (!(await requireFeature(ctx, 'gold', 'Gold pack'))) return;
@@ -8153,7 +8265,7 @@ bot.command('commands', async (ctx) => {
         `Hi ${name}`,
         '',
         `Balance: ${g.gold} gold`,
-        `Premium: ${g.premium ? 'YES' : 'no'}`,
+        `Premium: ${g.premium ? 'YES ✅ · unlimited AI + no rate limit' : 'no · /perks'}`,
       ];
       if (g.newUser) {
         lines.push(`Welcome bonus applied: ${GOLD_START}`);
