@@ -125,7 +125,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-packC-resend'; // Pack C: Resend email digests
+const BOT_VERSION = 'v4.0-packD-live'; // Pack D: Live board + /live + web live.html
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -9408,6 +9408,89 @@ bot.command('commands', async (ctx) => {
       );
     } catch (err) {
       await ctx.reply('emaildigest failed: ' + String(err?.message || err).slice(0, 180));
+    }
+  });
+
+    // ——— Pack D: Live board ———
+  bot.command(['live', 'liveboard', 'board'], async (ctx) => {
+    try {
+      if (!supabase) {
+        await ctx.reply('Needs Supabase.');
+        return;
+      }
+      const { getLiveBoard, refreshLiveBoard, formatLiveBoardText } = await import('../lib/liveBoard.js');
+      let out = await getLiveBoard(supabase);
+      const age = out.board?.updated_at ? Date.now() - new Date(out.board.updated_at).getTime() : 999999;
+      if (!out.ok || age > 30000) {
+        out = await refreshLiveBoard(supabase);
+      }
+      if (!out.ok) {
+        await ctx.reply('Live board failed: ' + out.error);
+        return;
+      }
+      await ctx.reply(
+        formatLiveBoardText(out.stats || out.board?.payload, out.board?.updated_at)
+      );
+    } catch (err) {
+      await ctx.reply('live failed: ' + String(err?.message || err).slice(0, 180));
+    }
+  });
+
+  bot.command(['liverefresh', 'livereload'], async (ctx) => {
+    try {
+      if (!supabase) return ctx.reply('Needs Supabase.');
+      const { refreshLiveBoard, formatLiveBoardText, listLiveWatchers } = await import(
+        '../lib/liveBoard.js'
+      );
+      const out = await refreshLiveBoard(supabase);
+      if (!out.ok) {
+        await ctx.reply('Refresh failed: ' + out.error);
+        return;
+      }
+      const text = formatLiveBoardText(out.stats, out.board?.updated_at);
+      await ctx.reply(text);
+
+      // Notify active watchers (except current user)
+      if (isAdmin(ctx)) {
+        const watchers = await listLiveWatchers(supabase);
+        let n = 0;
+        for (const w of watchers) {
+          if (String(w.user_id) === String(ctx.from.id)) continue;
+          try {
+            await ctx.telegram.sendMessage(w.user_id, '🔄 Live board updated\n\n' + text);
+            n++;
+          } catch (_) {}
+        }
+        if (n) await ctx.reply('Pushed to ' + n + ' watcher(s).');
+      }
+    } catch (err) {
+      await ctx.reply('liverefresh failed: ' + String(err?.message || err).slice(0, 180));
+    }
+  });
+
+  bot.command(['livewatch', 'liveon'], async (ctx) => {
+    try {
+      if (!supabase) return ctx.reply('Needs Supabase.');
+      const { setLiveWatch } = await import('../lib/liveBoard.js');
+      const out = await setLiveWatch(supabase, ctx.from.id, true);
+      if (!out.ok) return ctx.reply('Failed: ' + out.error);
+      await ctx.reply(
+        'Live watch ON.\nYou get a Telegram ping when founder runs /liverefresh.\nWeb auto-board: https://radiant-queen-pasiya-max-v2.vercel.app/bot/live.html\nOff: /liveoff'
+      );
+    } catch (err) {
+      await ctx.reply('livewatch failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['liveoff'], async (ctx) => {
+    try {
+      if (!supabase) return ctx.reply('Needs Supabase.');
+      const { setLiveWatch } = await import('../lib/liveBoard.js');
+      const out = await setLiveWatch(supabase, ctx.from.id, false);
+      if (!out.ok) return ctx.reply('Failed: ' + out.error);
+      await ctx.reply('Live watch OFF.');
+    } catch (err) {
+      await ctx.reply('liveoff failed: ' + String(err?.message || err).slice(0, 160));
     }
   });
 
