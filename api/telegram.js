@@ -125,7 +125,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-packE-web'; // Pack E: web search boost /search /web /askweb
+const BOT_VERSION = 'v4.0-packE-fix-F'; // Fix code syntax + Pack F QR/sticker/meta
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -6603,7 +6603,7 @@ bot.command('commands', async (ctx) => {
     }
   });
 
-  bot.command('code, async (ctx) => {
+  bot.command('code', async (ctx) => {
     try {
       const q = (ctx.message.text || '')
         .replace(/^\/code(@\w+)?\s*/i, '')
@@ -9584,6 +9584,168 @@ bot.command('commands', async (ctx) => {
       await ctx.reply('Live watch OFF.');
     } catch (err) {
       await ctx.reply('liveoff failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+    // ——— Pack F: QR + stickerify + link meta ———
+  bot.command(['qr', 'qrcode'], async (ctx) => {
+    try {
+      let text = (ctx.message?.text || '')
+        .replace(/^\/(qr|qrcode)(@\w+)?\s*/i, '')
+        .trim();
+      if (!text && ctx.message?.reply_to_message?.text) {
+        text = String(ctx.message.reply_to_message.text).slice(0, 1200);
+      }
+      if (!text) {
+        await ctx.reply('Usage:\n/qr https://t.me/PasiyaMaxQueen_bot\n/qr WiFi instructions\nReply to text + /qr');
+        return;
+      }
+      const uid = String(ctx.from?.id || '');
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('upload_photo');
+      const { makeQrPng } = await import('../lib/packFUtils.js');
+      const out = await makeQrPng(text, 400);
+      if (!out.ok) {
+        await ctx.reply('QR failed: ' + out.error);
+        return;
+      }
+      await ctx.replyWithPhoto(
+        { source: out.buffer },
+        { caption: ('QR · ' + text).slice(0, 200) }
+      );
+    } catch (err) {
+      await ctx.reply('QR failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['stickerify', 'makesticker'], async (ctx) => {
+    try {
+      const reply = ctx.message?.reply_to_message;
+      const photos = reply?.photo;
+      const raw = (ctx.message?.text || '')
+        .replace(/^\/(stickerify|makesticker)(@\w+)?\s*/i, '')
+        .trim();
+      const uid = String(ctx.from?.id || '');
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('upload_photo');
+      let prompt =
+        raw ||
+        'cute sticker style character, bold outline, simple colors, telegram sticker, white background';
+      let scene = '';
+      if (photos && photos.length) {
+        try {
+          const best = photos[photos.length - 1];
+          const token = BOT_TOKEN || process.env.BOT_TOKEN || '';
+          const f = await ctx.telegram.getFile(best.file_id);
+          const url = 'https://api.telegram.org/file/bot' + token + '/' + f.file_path;
+          const fr = await fetch(url, { signal: AbortSignal.timeout(30000) });
+          const buf = Buffer.from(await fr.arrayBuffer());
+          let mime = 'image/jpeg';
+          if (buf[0] === 0x89 && buf[1] === 0x50) mime = 'image/png';
+          const { describeImageBuffer } = await import('../lib/visionDescribe.js');
+          const vis = await describeImageBuffer(buf, mime);
+          if (vis.ok) scene = vis.text;
+        } catch (_) {}
+      }
+      const full =
+        (scene ? 'Sticker of: ' + scene + '. ' : '') +
+        prompt +
+        ', sticker sheet style, centered, high contrast';
+      const { generateImagineImage } = await import('../lib/imagine.js');
+      let out;
+      try {
+        out = await generateImagineImage(full);
+      } catch (_) {
+        // fallback direct pollinations
+        const seed = Math.floor(Math.random() * 1e9);
+        const u =
+          'https://image.pollinations.ai/prompt/' +
+          encodeURIComponent(full) +
+          '?width=512&height=512&nologo=true&seed=' +
+          seed;
+        const r = await fetch(u, { signal: AbortSignal.timeout(60000) });
+        if (!r.ok) {
+          await ctx.reply('Stickerify failed: HTTP ' + r.status);
+          return;
+        }
+        out = { ok: true, buffer: Buffer.from(await r.arrayBuffer()) };
+      }
+      if (!out?.ok && !out?.buffer) {
+        await ctx.reply('Stickerify failed: ' + (out?.error || 'unknown'));
+        return;
+      }
+      const buffer = out.buffer || out;
+      await ctx.replyWithPhoto(
+        { source: buffer },
+        {
+          caption: (
+            '🎨 Stickerify\n' +
+            (scene ? 'Seen: ' + scene.slice(0, 120) + '\n' : '') +
+            (raw ? 'Style: ' + raw : 'default sticker style')
+          ).slice(0, 500),
+        }
+      );
+    } catch (err) {
+      console.error('stickerify', err);
+      await ctx.reply('Stickerify failed: ' + String(err?.message || err).slice(0, 180));
+    }
+  });
+
+  bot.command(['linkmeta', 'meta', 'unfurl'], async (ctx) => {
+    try {
+      let url = (ctx.message?.text || '')
+        .replace(/^\/(linkmeta|meta|unfurl)(@\w+)?\s*/i, '')
+        .trim()
+        .split(/\s+/)[0];
+      if (!url && ctx.message?.reply_to_message?.text) {
+        const m = String(ctx.message.reply_to_message.text).match(/https?:\/\/\S+/i);
+        if (m) url = m[0];
+      }
+      if (!url) {
+        await ctx.reply('Usage:\n/linkmeta https://example.com\nReply to a message with a link + /linkmeta');
+        return;
+      }
+      const uid = String(ctx.from?.id || '');
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const { fetchLinkMeta } = await import('../lib/packFUtils.js');
+      const out = await fetchLinkMeta(url);
+      if (!out.ok) {
+        await ctx.reply('linkmeta failed: ' + out.error);
+        return;
+      }
+      await ctx.reply(
+        (
+          '🔗 LINK META · ' +
+          (out.provider || '') +
+          '\n' +
+          out.finalUrl +
+          '\n\n' +
+          out.title +
+          '\n' +
+          out.snippet
+        ).slice(0, 3500)
+      );
+    } catch (err) {
+      await ctx.reply('linkmeta failed: ' + String(err?.message || err).slice(0, 160));
     }
   });
 
