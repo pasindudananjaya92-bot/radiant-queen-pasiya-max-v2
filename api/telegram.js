@@ -125,7 +125,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-p10a-free'; // P10a-free: video storyboard + photoedit free path (no paid pollen)
+const BOT_VERSION = 'v4.0-p11-vision-edit'; // P11: vision-guided free photoedit (Gemini describe → free image)
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -8866,7 +8866,7 @@ bot.command('commands', async (ctx) => {
             '/photoedit cartoon\n' +
             '/photoedit anime\n' +
             '/photoedit add sunset background\n\n' +
-            'Free mode: works without Paid Pollen (same engine as /imagine).'
+            'P11: Gemini looks at YOUR photo first, then free restyle (no Paid Pollen).'
         );
         return;
       }
@@ -8882,22 +8882,50 @@ bot.command('commands', async (ctx) => {
       await ctx.sendChatAction('upload_photo');
       const best = photos[photos.length - 1];
       let imageUrl = null;
+      let sceneDescription = '';
       try {
         imageUrl = await tgFileUrl(ctx, best.file_id);
       } catch (_) {}
-      const out = await editPhotoWithPrompt(imageUrl, instruction);
+
+      // Vision pass: describe the actual photo (uses existing Gemini/router free path)
+      try {
+        const fileLink = imageUrl;
+        if (fileLink) {
+          const fr = await fetch(fileLink, { signal: AbortSignal.timeout(20000) });
+          if (fr.ok) {
+            const ab = await fr.arrayBuffer();
+            const b64 = Buffer.from(ab).toString('base64');
+            const mime = fr.headers.get('content-type') || 'image/jpeg';
+            const descPrompt =
+              'Describe this photo in 2-4 short sentences for an image editor: ' +
+              'main subject, pose, clothing, background, lighting, colors. No intro. Plain text only.';
+            sceneDescription = String(
+              await generateReply(descPrompt, ctx, b64, mime)
+            )
+              .replace(/^["']|["']$/g, '')
+              .slice(0, 500);
+          }
+        }
+      } catch (ve) {
+        console.error('photoedit vision', ve?.message || ve);
+      }
+
+      const out = await editPhotoWithPrompt(imageUrl, instruction, {
+        sceneDescription,
+      });
       if (!out.ok) {
         await ctx.reply('Photo edit failed: ' + String(out.error || 'unknown').slice(0, 300));
         return;
       }
       const cap =
-        (out.mode === 'free-style' ? '🆓 ' : '🖼️ ') +
+        (out.mode === 'vision-guided-free' ? '👁️🆓 ' : out.mode === 'paid-img2img' ? '🖼️ ' : '🆓 ') +
         instruction +
         (out.note ? '\n' + out.note : '');
       await ctx.replyWithPhoto({ source: out.buffer }, { caption: cap.slice(0, 900) });
       try {
         await logEvent(ctx.from.id, 'photoedit', {
           mode: out.mode || 'free',
+          vision: !!sceneDescription,
           instruction: instruction.slice(0, 60),
         });
       } catch (_) {}
@@ -8907,7 +8935,7 @@ bot.command('commands', async (ctx) => {
     }
   });
 
-  bot.command(['notify', 'ntfy'], async (ctx) => {
+    bot.command(['notify', 'ntfy'], async (ctx) => {
     try {
       const msg = (ctx.message.text || '')
         .replace(/^\/(notify|ntfy)(@\w+)?\s*/i, '')
