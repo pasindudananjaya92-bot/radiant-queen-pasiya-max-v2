@@ -128,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-packK'; // Pack K: statsuser fix + birthday/fx/aisummary/channelpost
+const BOT_VERSION = 'v4.0-packL'; // Pack L: blocklist + tutor + quotemaker + selfreport + weather7
 /** Pack I: pending trivia answers chatId:userId -> trivia obj */
 const pendingTrivia = new Map();
 
@@ -10747,6 +10747,267 @@ bot.command('commands', async (ctx) => {
     }
   });
 
+
+
+  // ——— Pack L: blocklist / aitutor / quotemaker / selfreport / weather7 ———
+  bot.command(['userblock', 'blockuser'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only.');
+        return;
+      }
+      let id = null;
+      const body = (ctx.message.text || '')
+        .replace(/^\/(userblock|blockuser)(@\w+)?\s*/i, '')
+        .trim();
+      const { parseUserIdArg } = await import('../lib/packL.js');
+      id = parseUserIdArg(body);
+      if (!id && ctx.message.reply_to_message?.from?.id) {
+        id = String(ctx.message.reply_to_message.from.id);
+      }
+      if (!id) {
+        await ctx.reply('Usage: /userblock <telegram_id>\nOr reply to user: /userblock');
+        return;
+      }
+      if (ADMIN_ID && id === String(ADMIN_ID)) {
+        await ctx.reply('Cannot block founder.');
+        return;
+      }
+      let list = [];
+      try {
+        const raw = await getBotSetting('blocked_users');
+        list = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(list)) list = [];
+      } catch (_) {
+        list = [];
+      }
+      if (!list.includes(id)) list.push(id);
+      await setBotSetting('blocked_users', JSON.stringify(list));
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('userblock', true);
+      } catch (_) {}
+      await ctx.reply('🚫 Blocked user ' + id + '\nTotal blocked: ' + list.length);
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('userblock', false, err?.message);
+        await reportError(err, 'userblock');
+      } catch (_) {}
+      await ctx.reply('userblock failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['userunblock', 'unblockuser'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only.');
+        return;
+      }
+      const body = (ctx.message.text || '')
+        .replace(/^\/(userunblock|unblockuser)(@\w+)?\s*/i, '')
+        .trim();
+      const { parseUserIdArg } = await import('../lib/packL.js');
+      let id = parseUserIdArg(body);
+      if (!id && ctx.message.reply_to_message?.from?.id) {
+        id = String(ctx.message.reply_to_message.from.id);
+      }
+      if (!id) {
+        await ctx.reply('Usage: /userunblock <telegram_id>');
+        return;
+      }
+      let list = [];
+      try {
+        const raw = await getBotSetting('blocked_users');
+        list = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(list)) list = [];
+      } catch (_) {
+        list = [];
+      }
+      list = list.filter((x) => String(x) !== id);
+      await setBotSetting('blocked_users', JSON.stringify(list));
+      await ctx.reply('✅ Unblocked ' + id + '\nRemaining: ' + list.length);
+    } catch (err) {
+      await ctx.reply('userunblock failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['blocklist', 'blocked'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only.');
+        return;
+      }
+      let list = [];
+      try {
+        const raw = await getBotSetting('blocked_users');
+        list = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(list)) list = [];
+      } catch (_) {
+        list = [];
+      }
+      await ctx.reply(
+        list.length
+          ? '🚫 BLOCKLIST (' + list.length + ')\n' + list.join('\n')
+          : 'Blocklist empty.'
+      );
+    } catch (err) {
+      await ctx.reply('blocklist failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['aitutor', 'tutor', 'lesson'], async (ctx) => {
+    try {
+      const topic = (ctx.message.text || '')
+        .replace(/^\/(aitutor|tutor|lesson)(@\w+)?\s*/i, '')
+        .trim();
+      if (!topic) {
+        await ctx.reply(
+          '🎓 AI TUTOR\n' +
+            '/aitutor JavaScript promises\n' +
+            '/aitutor 5K pacing for beginners\n' +
+            '/tutor සිංහල ව්‍යාකරණ'
+        );
+        return;
+      }
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(String(ctx.from.id));
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const out = await generateReply(
+        'You are a patient tutor for Radiant Queen users. Teach the topic in simple steps. ' +
+          'Use short lessons, 1 example, 1 practice question. Match user language (Sinhala/English).\n\nTopic: ' +
+          topic.slice(0, 400),
+        ctx
+      );
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('aitutor', true);
+      } catch (_) {}
+      await ctx.reply(('🎓 TUTOR\n\n' + out).slice(0, 3500));
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('aitutor', false, err?.message);
+        await reportError(err, 'aitutor');
+      } catch (_) {}
+      await ctx.reply('aitutor failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['quotemaker', 'qimage', 'quoteimg'], async (ctx) => {
+    try {
+      let text = (ctx.message.text || '')
+        .replace(/^\/(quotemaker|qimage|quoteimg)(@\w+)?\s*/i, '')
+        .trim();
+      if (!text && ctx.message.reply_to_message?.text) {
+        text = ctx.message.reply_to_message.text;
+      }
+      if (!text) {
+        await ctx.reply('Usage: /quotemaker Your quote here\nOr reply to a message with /quotemaker');
+        return;
+      }
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(String(ctx.from.id));
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.reply('🖼️ Making quote image…');
+      const { quoteImagePrompt } = await import('../lib/packL.js');
+      const prompt = quoteImagePrompt(text);
+      const url =
+        'https://image.pollinations.ai/prompt/' +
+        encodeURIComponent(prompt) +
+        '?width=1024&height=1024&nologo=true&seed=' +
+        String(Date.now() % 1e9);
+      const res = await fetch(url, { signal: AbortSignal.timeout(60000) });
+      if (!res.ok) throw new Error('Image HTTP ' + res.status);
+      const buffer = Buffer.from(await res.arrayBuffer());
+      await ctx.replyWithPhoto(
+        { source: buffer },
+        { caption: ('💬 ' + text).slice(0, 900) }
+      );
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('quotemaker', true);
+      } catch (_) {}
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('quotemaker', false, err?.message);
+        await reportError(err, 'quotemaker');
+      } catch (_) {}
+      await ctx.reply('quotemaker failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['selfreport', 'trainreport', 'cmdstats'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only.');
+        return;
+      }
+      const { buildSelfReport } = await import('../lib/errorRadar.js');
+      await ctx.reply(buildSelfReport().slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('selfreport failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['weather7', 'forecast7'], async (ctx) => {
+    try {
+      // Alias to existing 7-day forecast path
+      const place = (ctx.message.text || '')
+        .replace(/^\/(weather7|forecast7)(@\w+)?\s*/i, '')
+        .trim();
+      if (!place) {
+        await ctx.reply('Usage: /weather7 Colombo\n(7-day forecast via Open-Meteo)');
+        return;
+      }
+      // Reuse by rewriting text and calling same logic as /forecast Place 7
+      ctx.message.text = '/forecast ' + place + ' 7';
+      // Inline minimal duplicate using existing helpers
+      const uid = String(ctx.from.id);
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const geo = await geocodePlace(place);
+      if (!geo) {
+        await ctx.reply('Place not found.');
+        return;
+      }
+      const f = await fetchForecast(geo.lat, geo.lon, 7);
+      if (!f.ok) {
+        await ctx.reply('forecast failed: ' + (f.error || ''));
+        return;
+      }
+      const label = [geo.name, geo.admin1, geo.country].filter(Boolean).join(', ');
+      // fetchForecast returns { ok, lines: string[], timezone }
+      const body = Array.isArray(f.lines) ? f.lines.join('\n') : String(f.lines || '');
+      await ctx.reply(
+        ('📅 7-DAY · ' + label + '\n' + body + (f.timezone ? '\nTZ: ' + f.timezone : '')).slice(0, 3500)
+      );
+    } catch (err) {
+      // fallback message if shape differs
+      await ctx.reply(
+        'weather7 failed: ' +
+          String(err?.message || err).slice(0, 120) +
+          '\nTry: /forecast Colombo 7'
+      );
+    }
+  });
+
   // ——— Pack H: /diagnose + radar ———
   bot.command(['diagnose', 'radar', 'selfcheck'], async (ctx) => {
     try {
@@ -12454,6 +12715,33 @@ bot.command('commands', async (ctx) => {
         await ctx.answerInlineQuery([], { cache_time: 1 });
       } catch (_) {}
     }
+  });
+
+  
+  // Pack L: global blocklist gate (private + groups)
+  bot.use(async (ctx, next) => {
+    try {
+      const uid = ctx.from?.id != null ? String(ctx.from.id) : '';
+      if (uid && ADMIN_ID && uid === String(ADMIN_ID)) return next();
+      if (!uid) return next();
+      const raw = await getBotSetting('blocked_users');
+      if (!raw) return next();
+      let list = [];
+      try {
+        list = JSON.parse(raw);
+      } catch (_) {
+        return next();
+      }
+      if (Array.isArray(list) && list.map(String).includes(uid)) {
+        if (ctx.chat?.type === 'private') {
+          try {
+            await ctx.reply('You are blocked from this bot.');
+          } catch (_) {}
+        }
+        return;
+      }
+    } catch (_) {}
+    return next();
   });
 
   bot.catch(async (err, ctx) => {
