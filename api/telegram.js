@@ -128,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-packG'; // Pack G: search fix + Gemini 3.8 + browse/news/fix/compare
+const BOT_VERSION = 'v4.0-packH-radar'; // Pack H: diagnose + error radar + search/news fix
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -9826,7 +9826,7 @@ bot.command('commands', async (ctx) => {
     try {
       const q = (ctx.message.text || '')
         .replace(/^\/(news|headlines)(@\w+)?\s*/i, '')
-        .trim() || 'world news today';
+        .trim() || 'world';
       const uid = String(ctx.from.id);
       if (!isAdmin(ctx)) {
         const rate = await checkRateLimit(uid);
@@ -9836,19 +9836,28 @@ bot.command('commands', async (ctx) => {
         }
       }
       await ctx.sendChatAction('typing');
-      const { webSearch, formatSearchResults } = await import('../lib/webBoost.js');
-      const found = await webSearch(q + ' news');
+      const { searchNews, formatSearchResults } = await import('../lib/webBoost.js');
+      const found = await searchNews(q);
       if (!found.ok || !found.results?.length) {
-        await ctx.reply('News search empty. Try /askweb ' + q);
+        await ctx.reply('News empty. Try /search ' + q + ' or /askweb ' + q);
         return;
       }
-      const summary = await generateReply(
-        'Summarize these news-related search hits into 5 short bullet headlines with links.\n\n' +
-          formatSearchResults(found).slice(0, 4000),
-        ctx
-      );
-      await ctx.reply(('📰 NEWS · ' + (found.provider || '') + '\n\n' + summary).slice(0, 3500));
+      // Prefer raw headlines (not wiki)
+      const raw = formatSearchResults(found);
+      let summary = raw;
+      try {
+        summary = await generateReply(
+          'Turn these Google News headlines into 6 short bullets with source names. Keep links.\n\n' +
+            raw.slice(0, 4000),
+          ctx
+        );
+      } catch (_) {}
+      await ctx.reply(('📰 NEWS · google-news\n\n' + summary).slice(0, 3500));
     } catch (err) {
+      try {
+        const { reportError } = await import('../lib/errorRadar.js');
+        await reportError(err, 'news');
+      } catch (_) {}
       await ctx.reply('news failed: ' + String(err?.message || err).slice(0, 160));
     }
   });
@@ -9936,6 +9945,28 @@ bot.command('commands', async (ctx) => {
       await ctx.reply(('⚖️ COMPARE\n\n' + out).slice(0, 3500));
     } catch (err) {
       await ctx.reply('compare failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+    // ——— Pack H: /diagnose + radar ———
+  bot.command(['diagnose', 'radar', 'selfcheck'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only.');
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const { runDiagnose } = await import('../lib/errorRadar.js');
+      const report = await runDiagnose({
+        supabase,
+        BOT_TOKEN,
+        GEMINI_KEY,
+        ADMIN_ID,
+        GITHUB_TOKEN,
+      });
+      await ctx.reply(report.text.slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('diagnose failed: ' + String(err?.message || err).slice(0, 160));
     }
   });
 
@@ -11626,7 +11657,19 @@ bot.command('commands', async (ctx) => {
     }
   });
 
-  bot.catch((err) => console.error('telegram bot error', err));
+  bot.catch(async (err, ctx) => {
+    console.error('telegram bot error', err);
+    try {
+      const { reportError, autoHintFromError } = await import('../lib/errorRadar.js');
+      await reportError(err, 'bot.catch');
+      if (ctx && isAdmin(ctx)) {
+        const hints = autoHintFromError(err).join('\n');
+        try {
+          await ctx.reply('Radar caught error:\n' + String(err?.message || err).slice(0, 200) + (hints ? '\n' + hints : ''));
+        } catch (_) {}
+      }
+    } catch (_) {}
+  });
   return bot;
 }
 
@@ -11654,11 +11697,14 @@ export default async function handler(req, res) {
       return res.status(200).json({
         ok: true,
         service: 'radiant-queen-telegram',
+        version: typeof BOT_VERSION !== 'undefined' ? BOT_VERSION : '',
         hasToken: Boolean(BOT_TOKEN),
         hasGemini: Boolean(GEMINI_KEY),
+        hasGroq: Boolean(process.env.GROQ_API_KEY),
         hasAdmin: Boolean(ADMIN_ID),
         hasGitHub: Boolean(GITHUB_TOKEN),
         hasSupabase: Boolean(supabase),
+        hasSentry: Boolean(process.env.SENTRY_DSN),
       });
     }
 
@@ -11670,6 +11716,10 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   } catch (err) {
     console.error('telegram webhook', err);
+    try {
+      const { reportError } = await import('../lib/errorRadar.js');
+      await reportError(err, 'webhook');
+    } catch (_) {}
     return res.status(200).json({ ok: true });
   }
 }
