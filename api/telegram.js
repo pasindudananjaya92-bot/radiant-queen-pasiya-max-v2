@@ -128,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-packN'; // Pack N: RSS CDATA + trimage src fix + qrscan + aistory + weatheralert + voicetr + mentionadmins
+const BOT_VERSION = 'v4.0-packO'; // Pack O: barcode+receipt+identify+kb+expenses+units+pollquick+smart-errors
 /** Pack I: pending trivia answers chatId:userId -> trivia obj */
 const pendingTrivia = new Map();
 
@@ -11496,6 +11496,490 @@ bot.command('commands', async (ctx) => {
       await ctx.reply('mentionadmins failed: ' + String(err?.message || err).slice(0, 160));
     }
   });
+
+
+  // ——— Pack O: barcode / receipt / identify / kb / expenses / units / pollquick ———
+  bot.command(['barcode', 'productscan', 'scanproduct'], async (ctx) => {
+    try {
+      const rep = ctx.message.reply_to_message;
+      if (!rep?.photo?.length && !rep?.document) {
+        await ctx.reply(
+          '🛒 BARCODE / PRODUCT SCAN\n' +
+            'Reply to a product barcode photo with:\n' +
+            '/barcode\n\n' +
+            'Uses Open Food Facts (food) + UPCitemdb trial (other). Free, no key.'
+        );
+        return;
+      }
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(String(ctx.from.id));
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      let fileId = null;
+      if (rep.photo?.length) fileId = rep.photo[rep.photo.length - 1].file_id;
+      else if (rep.document?.file_id) fileId = rep.document.file_id;
+      const file = await ctx.telegram.getFile(fileId);
+      const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+      const { barcodeProductFromImage, formatProductCard, extractBarcodeDigits } = await import('../lib/packO.js');
+      let out = await barcodeProductFromImage(url);
+      // OCR fallback if image decode fails
+      if (!out.ok) {
+        try {
+          const imgRes = await fetch(url, { signal: AbortSignal.timeout(30000) });
+          const buf = Buffer.from(await imgRes.arrayBuffer());
+          const { ocrImageBuffer } = await import('../lib/ocrSpace.js');
+          const ocr = await ocrImageBuffer(buf, 'image/jpeg', 'eng');
+          const digits = extractBarcodeDigits(ocr.text || '');
+          if (digits) {
+            const { lookupOpenFoodFacts, lookupUpcItemDb, formatProductCard: fmt } = await import('../lib/packO.js');
+            let food = await lookupOpenFoodFacts(digits);
+            if (!food.ok) food = await lookupUpcItemDb(digits);
+            if (food.ok) {
+              out = { ok: true, barcode: digits, type: 'OCR', product: food };
+            } else {
+              out = { ok: true, barcode: digits, type: 'OCR', product: null, note: 'Digits found but product unknown' };
+            }
+          }
+        } catch (_) {}
+      }
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('barcode', out.ok);
+      } catch (_) {}
+      await ctx.reply(formatProductCard(out).slice(0, 3500), { parse_mode: 'Markdown' });
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('barcode', false, err?.message);
+        await reportError(err, 'barcode');
+      } catch (_) {}
+      await ctx.reply('barcode failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['receipt', 'scanreceipt', 'expenseadd'], async (ctx) => {
+    try {
+      const rep = ctx.message.reply_to_message;
+      if (!rep?.photo?.length && !rep?.document) {
+        await ctx.reply(
+          '🧾 RECEIPT SCANNER\n' +
+            'Reply to a receipt photo with:\n' +
+            '/receipt\n\n' +
+            'OCR → total/date/items → saved to your expenses.\n' +
+            'List: /expenses'
+        );
+        return;
+      }
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(String(ctx.from.id));
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      let fileId = null;
+      let mime = 'image/jpeg';
+      if (rep.photo?.length) fileId = rep.photo[rep.photo.length - 1].file_id;
+      else if (rep.document?.file_id) {
+        fileId = rep.document.file_id;
+        mime = rep.document.mime_type || mime;
+      }
+      const file = await ctx.telegram.getFile(fileId);
+      const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+      const imgRes = await fetch(url, { signal: AbortSignal.timeout(30000) });
+      const buf = Buffer.from(await imgRes.arrayBuffer());
+      const { ocrImageBuffer } = await import('../lib/ocrSpace.js');
+      const ocr = await ocrImageBuffer(buf, mime, 'eng');
+      if (!ocr.ok) {
+        await ctx.reply('OCR failed: ' + (ocr.error || 'unknown'));
+        return;
+      }
+      const { parseReceiptText, formatReceiptCard } = await import('../lib/packO.js');
+      const parsed = parseReceiptText(ocr.text);
+      // persist expense
+      let saved = false;
+      try {
+        const uid = String(ctx.from.id);
+        const key = 'expenses_' + uid;
+        let list = [];
+        const raw = await getBotSetting(key);
+        if (raw) {
+          try {
+            list = JSON.parse(raw);
+            if (!Array.isArray(list)) list = [];
+          } catch (_) {
+            list = [];
+          }
+        }
+        list.unshift({
+          at: new Date().toISOString(),
+          total: parsed.total,
+          currency: parsed.currency,
+          date: parsed.date,
+          merchant: parsed.merchant,
+          items: (parsed.items || []).slice(0, 8),
+        });
+        list = list.slice(0, 50);
+        await setBotSetting(key, JSON.stringify(list));
+        saved = true;
+      } catch (_) {}
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('receipt', true);
+      } catch (_) {}
+      await ctx.reply(formatReceiptCard(parsed, saved));
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('receipt', false, err?.message);
+        await reportError(err, 'receipt');
+      } catch (_) {}
+      await ctx.reply('receipt failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['expenses', 'explist', 'myspend'], async (ctx) => {
+    try {
+      const uid = String(ctx.from.id);
+      const raw = await getBotSetting('expenses_' + uid);
+      let list = [];
+      if (raw) {
+        try {
+          list = JSON.parse(raw);
+        } catch (_) {}
+      }
+      if (!Array.isArray(list) || !list.length) {
+        await ctx.reply('No expenses yet. Reply to a receipt photo with /receipt');
+        return;
+      }
+      const lines = ['📒 YOUR EXPENSES (last ' + list.length + ')', ''];
+      let sum = 0;
+      list.slice(0, 15).forEach((e, i) => {
+        const tot = e.total != null ? Number(e.total) : null;
+        if (tot != null) sum += tot;
+        lines.push(
+          i +
+            1 +
+            '. ' +
+            (e.currency || 'LKR') +
+            ' ' +
+            (tot != null ? tot.toFixed(2) : '?') +
+            (e.merchant ? ' · ' + String(e.merchant).slice(0, 30) : '') +
+            (e.date ? ' · ' + e.date : '')
+        );
+      });
+      lines.push('', 'Sum (shown): ~' + sum.toFixed(2));
+      lines.push('Clear all: /expclear');
+      await ctx.reply(lines.join('\n').slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('expenses failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['expclear', 'clearexpenses'], async (ctx) => {
+    try {
+      await setBotSetting('expenses_' + String(ctx.from.id), null);
+      await ctx.reply('Expenses cleared.');
+    } catch (err) {
+      await ctx.reply('expclear failed: ' + String(err?.message || err).slice(0, 120));
+    }
+  });
+
+  bot.command(['identify', 'species', 'whatisthis', 'plantid'], async (ctx) => {
+    try {
+      const rep = ctx.message.reply_to_message;
+      if (!rep?.photo?.length) {
+        await ctx.reply(
+          '🌿 SPECIES IDENTIFIER\n' +
+            'Reply to a plant/animal/bird/insect photo with:\n' +
+            '/identify\n\n' +
+            'Vision AI + iNaturalist taxa search (free).'
+        );
+        return;
+      }
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(String(ctx.from.id));
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+        const pay = await spendGold(ctx, 'vision');
+        if (!pay.ok) {
+          await ctx.reply(pay.message || 'Not enough gold. /balance');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const fileId = rep.photo[rep.photo.length - 1].file_id;
+      const file = await ctx.telegram.getFile(fileId);
+      const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+      const imgRes = await fetch(url, { signal: AbortSignal.timeout(30000) });
+      const buf = Buffer.from(await imgRes.arrayBuffer());
+      const b64 = buf.toString('base64');
+      const { identifyVisionPrompt, parseSpeciesGuess, searchINatTaxa } = await import('../lib/packO.js');
+      const visionOut = await generateReply(identifyVisionPrompt(), ctx, b64, 'image/jpeg');
+      const guess = parseSpeciesGuess(visionOut);
+      let msg =
+        '🌿 SPECIES ID\n\n' +
+        'Guess: ' +
+        (guess.species || '?') +
+        (guess.common ? '\nCommon: ' + guess.common : '') +
+        (guess.type ? '\nType: ' + guess.type : '') +
+        (guess.confidence ? '\nConfidence: ' + guess.confidence : '') +
+        (guess.notes ? '\n' + guess.notes : '');
+      // enrich via iNaturalist
+      const q = guess.species || guess.common;
+      if (q) {
+        const taxa = await searchINatTaxa(q);
+        if (taxa.ok && taxa.results?.length) {
+          msg += '\n\n— iNaturalist —';
+          taxa.results.slice(0, 3).forEach((t, i) => {
+            msg +=
+              '\n' +
+              (i + 1) +
+              '. ' +
+              t.name +
+              (t.preferred ? ' (' + t.preferred + ')' : '') +
+              (t.rank ? ' · ' + t.rank : '') +
+              (t.observations != null ? ' · obs ' + t.observations : '');
+            if (t.wikipedia) msg += '\n   ' + t.wikipedia;
+          });
+        }
+      }
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('identify', true);
+      } catch (_) {}
+      await ctx.reply(msg.slice(0, 3500));
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('identify', false, err?.message);
+        await reportError(err, 'identify');
+      } catch (_) {}
+      await ctx.reply('identify failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['kb', 'knowledge', 'faq'], async (ctx) => {
+    try {
+      const body = (ctx.message.text || '')
+        .replace(/^\/(kb|knowledge|faq)(@\w+)?\s*/i, '')
+        .trim();
+      const parts = body.split(/\s+/);
+      const sub = (parts[0] || '').toLowerCase();
+      const rest = parts.slice(1).join(' ').trim();
+
+      // load KB
+      async function loadKb() {
+        const raw = await getBotSetting('kb_global');
+        if (!raw) return [];
+        try {
+          const a = JSON.parse(raw);
+          return Array.isArray(a) ? a : [];
+        } catch (_) {
+          return [];
+        }
+      }
+      async function saveKb(rows) {
+        await setBotSetting('kb_global', JSON.stringify(rows.slice(0, 200)));
+      }
+
+      if (!sub || sub === 'help') {
+        await ctx.reply(
+          '📚 KNOWLEDGE BASE\n' +
+            '/kb add Question | Answer\n' +
+            '/kb list\n' +
+            '/kb del <id>\n' +
+            '/kb <question>   — search\n' +
+            '(Founder add/del; everyone can search)'
+        );
+        return;
+      }
+
+      if (sub === 'add') {
+        if (!isAdmin(ctx)) {
+          await ctx.reply('Founder only for /kb add');
+          return;
+        }
+        const payload = rest || body.replace(/^add\s*/i, '');
+        const pipe = payload.split('|').map((s) => s.trim());
+        if (pipe.length < 2 || !pipe[0] || !pipe[1]) {
+          await ctx.reply('Usage: /kb add Gold rules | Daily +50, premium +100');
+          return;
+        }
+        const rows = await loadKb();
+        const id = Date.now().toString(36);
+        rows.unshift({
+          id,
+          question: pipe[0].slice(0, 200),
+          answer: pipe.slice(1).join('|').slice(0, 800),
+          tags: '',
+          at: new Date().toISOString(),
+        });
+        await saveKb(rows);
+        await ctx.reply('✅ KB added · id=' + id + '\nQ: ' + pipe[0].slice(0, 80));
+        return;
+      }
+
+      if (sub === 'list') {
+        const rows = await loadKb();
+        if (!rows.length) {
+          await ctx.reply('KB empty. Founder: /kb add Q | A');
+          return;
+        }
+        const lines = ['📚 KB (' + rows.length + ')', ''];
+        rows.slice(0, 20).forEach((r, i) => {
+          lines.push(i + 1 + '. [' + r.id + '] ' + String(r.question).slice(0, 60));
+        });
+        await ctx.reply(lines.join('\n').slice(0, 3500));
+        return;
+      }
+
+      if (sub === 'del' || sub === 'delete' || sub === 'rm') {
+        if (!isAdmin(ctx)) {
+          await ctx.reply('Founder only for /kb del');
+          return;
+        }
+        const id = rest.split(/\s+/)[0];
+        if (!id) {
+          await ctx.reply('Usage: /kb del <id>');
+          return;
+        }
+        let rows = await loadKb();
+        const before = rows.length;
+        rows = rows.filter((r) => r.id !== id);
+        await saveKb(rows);
+        await ctx.reply(before === rows.length ? 'Id not found' : 'Deleted ' + id);
+        return;
+      }
+
+      // search
+      const q = body;
+      const rows = await loadKb();
+      const { searchKnowledge } = await import('../lib/packO.js');
+      const hit = searchKnowledge(rows, q);
+      if (hit) {
+        await ctx.reply(
+          ('📚 KB HIT\n\nQ: ' + hit.question + '\n\nA: ' + hit.answer).slice(0, 3500)
+        );
+        return;
+      }
+      await ctx.reply('No KB match. Try /ask for AI, or founder /kb add Q | A');
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('kb', false, err?.message);
+        await reportError(err, 'kb');
+      } catch (_) {}
+      await ctx.reply('kb failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['units', 'convert', 'unit'], async (ctx) => {
+    try {
+      const body = (ctx.message.text || '')
+        .replace(/^\/(units|convert|unit)(@\w+)?\s*/i, '')
+        .trim();
+      if (!body) {
+        await ctx.reply(
+          '📐 UNIT CONVERT\n' +
+            '/units 10 km to mi\n' +
+            '/units 5 kg to lb\n' +
+            '/units 100 C to F\n' +
+            '/units 2 L to ml'
+        );
+        return;
+      }
+      const { convertUnits } = await import('../lib/packO.js');
+      const r = convertUnits(body);
+      if (!r || !r.ok) {
+        await ctx.reply(r?.error || 'Could not parse. Example: /units 10 km to mi');
+        return;
+      }
+      await ctx.reply('📐 ' + r.text);
+    } catch (err) {
+      await ctx.reply('units failed: ' + String(err?.message || err).slice(0, 120));
+    }
+  });
+
+  bot.command(['pollquick', 'qpoll', 'quickpoll'], async (ctx) => {
+    try {
+      const body = (ctx.message.text || '')
+        .replace(/^\/(pollquick|qpoll|quickpoll)(@\w+)?\s*/i, '')
+        .trim();
+      // Question | Opt1 | Opt2 | Opt3
+      if (!body || !body.includes('|')) {
+        await ctx.reply(
+          '📊 QUICK POLL\n' +
+            '/pollquick Best day for run? | Sat | Sun | Weekday\n' +
+            '(2–10 options, anonymous)'
+        );
+        return;
+      }
+      const parts = body.split('|').map((s) => s.trim()).filter(Boolean);
+      const question = parts[0].slice(0, 200);
+      const options = parts.slice(1, 11).map((o) => o.slice(0, 100));
+      if (options.length < 2) {
+        await ctx.reply('Need at least 2 options separated by |');
+        return;
+      }
+      await ctx.telegram.sendPoll(ctx.chat.id, question, options, {
+        is_anonymous: true,
+        allows_multiple_answers: false,
+      });
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('pollquick', true);
+      } catch (_) {}
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('pollquick', false, err?.message);
+        await reportError(err, 'pollquick');
+      } catch (_) {}
+      await ctx.reply('pollquick failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['errorlearn', 'smarterrors', 'failreport'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only.');
+        return;
+      }
+      const { buildSelfReport, getCommandStats, getRecentErrors, autoHintFromError } = await import(
+        '../lib/errorRadar.js'
+      );
+      const stats = getCommandStats().filter((s) => s.fails > 0).slice(0, 5);
+      const errs = getRecentErrors(5);
+      const lines = ['🧠 SMART ERROR LEARNING', 'Time: ' + new Date().toISOString(), ''];
+      if (!stats.length) {
+        lines.push('No failing commands in this warm instance.');
+      } else {
+        lines.push('— Top fails —');
+        for (const s of stats) {
+          lines.push('/' + s.command + ' fails=' + s.fails + ' · ' + (s.lastFail || ''));
+          const hints = autoHintFromError(s.lastFail || '');
+          hints.slice(0, 2).forEach((h) => lines.push('  → ' + h));
+        }
+      }
+      if (errs.length) {
+        lines.push('', '— Recent radar —');
+        errs.forEach((e) => lines.push('• [' + e.context + '] ' + e.message));
+      }
+      lines.push('', 'Full: /selfreport · /diagnose');
+      await ctx.reply(lines.join('\n').slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('errorlearn failed: ' + String(err?.message || err).slice(0, 120));
+    }
+  });
+
 
   // ——— Pack H: /diagnose + radar ———
   bot.command(['diagnose', 'radar', 'selfcheck'], async (ctx) => {
