@@ -128,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-packI-profile-fun'; // Pack I: profile/achievements/level + poll/trivia/meme
+const BOT_VERSION = 'v4.0-packJ'; // Pack J: trivia Supabase + giveaway/translate/quote/wiki/stats
 /** Pack I: pending trivia answers chatId:userId -> trivia obj */
 const pendingTrivia = new Map();
 
@@ -10089,9 +10089,27 @@ bot.command('commands', async (ctx) => {
     try {
       const { pickTrivia, formatTrivia } = await import('../lib/funPack.js');
       const t = pickTrivia();
-      const key = String(ctx.chat.id) + ':' + String(ctx.from.id);
-      pendingTrivia.set(key, { ...t, at: Date.now() });
-      await ctx.reply(formatTrivia(t));
+      const key = 'trivia_' + String(ctx.chat.id) + '_' + String(ctx.from.id);
+      const payload = JSON.stringify({
+        index: t.index,
+        answer: t.answer,
+        q: t.q,
+        options: t.options,
+        at: Date.now(),
+        exp: Date.now() + 5 * 60 * 1000,
+      });
+      // memory + Supabase (survives Vercel cold start)
+      pendingTrivia.set(key, JSON.parse(payload));
+      if (typeof setBotSetting === 'function') {
+        await setBotSetting(key, payload);
+      } else if (supabase) {
+        await supabase.from('rq_bot_settings').upsert({
+          key,
+          value: payload,
+          updated_at: new Date().toISOString(),
+        });
+      }
+      await ctx.reply(formatTrivia(t) + '\n\n⏱ Answer within 5 minutes · /answer A');
     } catch (err) {
       await ctx.reply('trivia failed: ' + String(err?.message || err).slice(0, 160));
     }
@@ -10101,8 +10119,28 @@ bot.command('commands', async (ctx) => {
     try {
       const { checkTriviaAnswer, pickTrivia } = await import('../lib/funPack.js');
       const body = (ctx.message.text || '').replace(/^\/(answer|ans)(@\w+)?\s*/i, '').trim();
-      const key = String(ctx.chat.id) + ':' + String(ctx.from.id);
+      const key = 'trivia_' + String(ctx.chat.id) + '_' + String(ctx.from.id);
       let t = pendingTrivia.get(key);
+      if (!t && typeof getBotSetting === 'function') {
+        const raw = await getBotSetting(key);
+        if (raw) {
+          try {
+            t = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          } catch (_) {
+            t = null;
+          }
+        }
+      }
+      if (!t && supabase) {
+        try {
+          const { data } = await supabase
+            .from('rq_bot_settings')
+            .select('value')
+            .eq('key', key)
+            .maybeSingle();
+          if (data?.value) t = JSON.parse(data.value);
+        } catch (_) {}
+      }
       // allow /answer 3 B  (bank index + letter) OR just /answer B
       let letter = body;
       const m = body.match(/^(\d+)\s*([A-Da-d])$/);
@@ -10114,12 +10152,37 @@ bot.command('commands', async (ctx) => {
         await ctx.reply('No open trivia. Start with /trivia then /answer A');
         return;
       }
-      const r = checkTriviaAnswer(t, letter);
+      if (t.exp && Date.now() > Number(t.exp)) {
+        pendingTrivia.delete(key);
+        if (typeof setBotSetting === 'function') await setBotSetting(key, null);
+        await ctx.reply('⏱ Trivia expired. Send /trivia again.');
+        return;
+      }
+      // rebuild shape for checker
+      const shaped = {
+        index: t.index,
+        answer: t.answer,
+        q: t.q,
+        options: t.options || [],
+      };
+      if (!shaped.options?.length && typeof t.index === 'number') {
+        const full = pickTrivia(t.index);
+        shaped.options = full.options;
+        shaped.answer = full.answer;
+        shaped.q = full.q;
+      }
+      const r = checkTriviaAnswer(shaped, letter);
       if (!r.ok) {
         await ctx.reply(r.error);
         return;
       }
       pendingTrivia.delete(key);
+      if (typeof setBotSetting === 'function') await setBotSetting(key, null);
+      else if (supabase) {
+        try {
+          await supabase.from('rq_bot_settings').delete().eq('key', key);
+        } catch (_) {}
+      }
       if (r.correct) {
         await ctx.reply('✅ Correct! ' + r.correctLetter + ') ' + r.correctText);
       } else {
@@ -10173,6 +10236,278 @@ bot.command('commands', async (ctx) => {
       await ctx.reply('meme failed: ' + String(err?.message || err).slice(0, 160));
     }
   });
+
+  // ——— Pack J: giveaway / translate / daily-quote / wiki-random / stats-user ———
+  bot.command(['giveaway', 'ga'], async (ctx) => {
+    try {
+      const body = (ctx.message.text || '')
+        .replace(/^\/(giveaway|ga)(@\w+)?\s*/i, '')
+        .trim();
+      const chatId = String(ctx.chat.id);
+      const gkey = 'giveaway_' + chatId;
+      const sub = body.split(/\s+/)[0]?.toLowerCase() || '';
+
+      if (!sub || sub === 'help') {
+        await ctx.reply(
+          '🎁 GIVEAWAY\n' +
+            '/giveaway start Prize name | 10\n' +
+            '  (minutes, default 10)\n' +
+            '/giveaway join\n' +
+            '/giveaway status\n' +
+            '/giveaway end   (admin — pick winner)\n\n' +
+            'Group-friendly. Join before end.'
+        );
+        return;
+      }
+
+      if (sub === 'start') {
+        if (ctx.chat.type !== 'private' && !isAdmin(ctx)) {
+          // allow any member to start small giveaways; restrict end to admin optional
+        }
+        const rest = body.replace(/^start\s*/i, '').trim();
+        const { parseGiveawayStart } = await import('../lib/packJ.js');
+        const parsed = parseGiveawayStart(rest);
+        if (!parsed) {
+          await ctx.reply('Usage: /giveaway start AirPods | 15');
+          return;
+        }
+        const data = {
+          prize: parsed.prize,
+          mins: parsed.mins,
+          endsAt: Date.now() + parsed.mins * 60 * 1000,
+          hostId: String(ctx.from.id),
+          hostName: ctx.from.first_name || 'Host',
+          entries: [],
+        };
+        await setBotSetting(gkey, JSON.stringify(data));
+        await ctx.reply(
+          '🎁 GIVEAWAY STARTED\n' +
+            'Prize: ' +
+            data.prize +
+            '\n' +
+            'Ends in: ' +
+            data.mins +
+            ' min\n' +
+            'Join: /giveaway join\n' +
+            'Status: /giveaway status\n' +
+            'End: /giveaway end'
+        );
+        return;
+      }
+
+      const raw = await getBotSetting(gkey);
+      let data = null;
+      try {
+        data = raw ? JSON.parse(raw) : null;
+      } catch (_) {
+        data = null;
+      }
+
+      if (sub === 'join') {
+        if (!data) {
+          await ctx.reply('No active giveaway. /giveaway start Prize | 10');
+          return;
+        }
+        if (Date.now() > data.endsAt) {
+          await ctx.reply('Giveaway already ended. Host: /giveaway end');
+          return;
+        }
+        const uid = String(ctx.from.id);
+        const entry = {
+          id: uid,
+          name: ctx.from.first_name || 'User',
+          username: ctx.from.username || '',
+        };
+        data.entries = Array.isArray(data.entries) ? data.entries : [];
+        if (data.entries.some((e) => String(e.id) === uid)) {
+          await ctx.reply('You already joined. Entries: ' + data.entries.length);
+          return;
+        }
+        data.entries.push(entry);
+        await setBotSetting(gkey, JSON.stringify(data));
+        await ctx.reply('✅ Joined! Total entries: ' + data.entries.length);
+        return;
+      }
+
+      if (sub === 'status') {
+        if (!data) {
+          await ctx.reply('No active giveaway.');
+          return;
+        }
+        const left = Math.max(0, Math.round((data.endsAt - Date.now()) / 60000));
+        await ctx.reply(
+          '🎁 STATUS\nPrize: ' +
+            data.prize +
+            '\nEntries: ' +
+            (data.entries?.length || 0) +
+            '\nMinutes left: ~' +
+            left +
+            '\nHost: ' +
+            (data.hostName || '')
+        );
+        return;
+      }
+
+      if (sub === 'end') {
+        if (!data) {
+          await ctx.reply('No active giveaway.');
+          return;
+        }
+        const uid = String(ctx.from.id);
+        if (uid !== String(data.hostId) && !isAdmin(ctx)) {
+          await ctx.reply('Only host or founder can end.');
+          return;
+        }
+        const { pickWinner } = await import('../lib/packJ.js');
+        const win = pickWinner(data.entries || []);
+        await setBotSetting(gkey, null);
+        if (!win) {
+          await ctx.reply('🎁 Ended. No entries. Prize was: ' + data.prize);
+          return;
+        }
+        const tag = win.username ? '@' + win.username : win.name;
+        await ctx.reply(
+          '🏆 WINNER\n' +
+            tag +
+            ' (id ' +
+            win.id +
+            ')\n' +
+            'Prize: ' +
+            data.prize +
+            '\nEntries: ' +
+            (data.entries?.length || 0)
+        );
+        return;
+      }
+
+      await ctx.reply('Unknown. /giveaway help');
+    } catch (err) {
+      await ctx.reply('giveaway failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['translate', 'tr2', 'trpack'], async (ctx) => {
+    try {
+      const body = (ctx.message.text || '')
+        .replace(/^\/(translate|tr2|trpack)(@\w+)?\s*/i, '')
+        .trim();
+      // also support reply
+      let q = body;
+      if (!q && ctx.message.reply_to_message?.text) {
+        q = 'auto en ' + ctx.message.reply_to_message.text;
+      }
+      const { parseTranslateArgs, translateText } = await import('../lib/packJ.js');
+      const parsed = parseTranslateArgs(q);
+      if (!parsed?.q) {
+        await ctx.reply(
+          '🌐 TRANSLATE\n' +
+            '/translate si en ආයුබෝවන්\n' +
+            '/translate en si Hello friend\n' +
+            '/translate ta en வணக்கம்\n' +
+            'Or reply a message: /translate en si'
+        );
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const r = await translateText(parsed.q, parsed.from, parsed.to);
+      if (!r.ok) {
+        await ctx.reply('Translate failed: ' + (r.error || 'unknown'));
+        return;
+      }
+      await ctx.reply(
+        '🌐 ' +
+          (r.from || parsed.from) +
+          ' → ' +
+          r.to +
+          '\n\n' +
+          r.text +
+          '\n\n(' +
+          r.provider +
+          ' free)'
+      );
+    } catch (err) {
+      await ctx.reply('translate failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['dailyquote', 'dquote', 'motivation'], async (ctx) => {
+    try {
+      await ctx.sendChatAction('typing');
+      let quote =
+        'Consistency beats intensity. Show up today.';
+      try {
+        quote = await generateReply(
+          'Give ONE short motivational running or life quote (max 2 sentences). No hashtags. Sinhala or English matching user style.',
+          ctx
+        );
+      } catch (_) {}
+      await ctx.reply('💬 DAILY QUOTE\n\n' + String(quote).slice(0, 800) + '\n\n— Radiant Queen');
+    } catch (err) {
+      await ctx.reply('dailyquote failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['wikirandom', 'wiki-random', 'randomwiki'], async (ctx) => {
+    try {
+      await ctx.sendChatAction('typing');
+      const { randomWiki } = await import('../lib/packJ.js');
+      const r = await randomWiki();
+      if (!r.ok) {
+        await ctx.reply('wiki-random failed: ' + (r.error || ''));
+        return;
+      }
+      const text =
+        '📚 RANDOM WIKI\n' +
+        r.title +
+        '\n\n' +
+        String(r.extract || '').slice(0, 900) +
+        (r.url ? '\n\n' + r.url : '');
+      if (r.thumbnail) {
+        try {
+          await ctx.replyWithPhoto(r.thumbnail, { caption: text.slice(0, 900) });
+          return;
+        } catch (_) {}
+      }
+      await ctx.reply(text.slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('wikirandom failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['statsuser', 'userstats', 'whois'], async (ctx) => {
+    try {
+      let targetId = String(ctx.from.id);
+      let targetName = ctx.from.first_name || 'User';
+      if (ctx.message.reply_to_message?.from) {
+        targetId = String(ctx.message.reply_to_message.from.id);
+        targetName = ctx.message.reply_to_message.from.first_name || targetName;
+      }
+      const body = (ctx.message.text || '')
+        .replace(/^\/(statsuser|userstats|whois)(@\w+)?\s*/i, '')
+        .trim();
+      if (body && /^\d{5,}$/.test(body)) targetId = body;
+
+      const fakeCtx = {
+        from: { id: targetId, first_name: targetName },
+      };
+      // reuse loadProfileCtx with patched from
+      const origFrom = ctx.from;
+      ctx.from = { id: Number(targetId) || targetId, first_name: targetName };
+      let p;
+      try {
+        p = await loadProfileCtx(ctx);
+      } finally {
+        ctx.from = origFrom;
+      }
+      p.name = targetName;
+      p.userId = targetId;
+      const { formatProfileCard } = await import('../lib/profileHub.js');
+      await ctx.reply('📊 USER STATS\n\n' + formatProfileCard(p));
+    } catch (err) {
+      await ctx.reply('statsuser failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
 
 
   // ——— Pack H: /diagnose + radar ———
