@@ -128,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-packQ'; // Pack Q: track+remix+dream+voicedigest (impossible workarounds)
+const BOT_VERSION = 'v4.0-packR1'; // Pack R1: remix/voice fixes + debate/comic/watch/detective + stride bridge
 /** Pack I: pending trivia answers chatId:userId -> trivia obj */
 const pendingTrivia = new Map();
 
@@ -12575,7 +12575,7 @@ bot.command('commands', async (ctx) => {
         await ctx.reply(
           '🎨 REMIX (multi-seed)\n' +
             '/remix a golden runner at sunrise\n' +
-            'Generates 4 seed variations (Pollinations free). Pick your favorite.'
+            'Sends up to 3 variations (sequential download — more reliable).'
         );
         return;
       }
@@ -12594,30 +12594,26 @@ bot.command('commands', async (ctx) => {
         } catch (_) {}
       }
       await ctx.sendChatAction('upload_photo');
-      const { remixSeedUrls } = await import('../lib/packQ.js');
-      const plan = remixSeedUrls(body, 4);
-      // download up to 4 images sequentially (founder can afford wait)
+      const { buildRemixVariants, downloadImage } = await import('../lib/packR1.js');
+      const plan = buildRemixVariants(body, 3);
       const media = [];
       for (const v of plan.variants) {
         try {
-          const res = await fetch(v.url, {
-            headers: { Accept: 'image/*' },
-            signal: AbortSignal.timeout(45000),
-            redirect: 'follow',
-          });
-          if (!res.ok) continue;
-          const buf = Buffer.from(await res.arrayBuffer());
-          if (buf.length < 500) continue;
+          const img = await downloadImage(v.url);
+          if (!img.ok) continue;
           media.push({
             type: 'photo',
-            media: { source: buf },
-            caption: media.length === 0 ? ('🎨 REMIX · seed variations\n' + plan.prompt).slice(0, 900) : ('seed ' + v.seed),
+            media: { source: img.buffer },
+            caption:
+              media.length === 0
+                ? ('🎨 REMIX · ' + plan.prompt + '\nseed ' + v.seed).slice(0, 900)
+                : ('seed ' + v.seed),
           });
         } catch (_) {}
-        if (media.length >= 4) break;
+        if (media.length >= 3) break;
       }
       if (!media.length) {
-        await ctx.reply('Remix failed to download images. Try /imagine instead.');
+        await ctx.reply('Remix: no images downloaded. Try /imagine or retry.');
         return;
       }
       if (media.length === 1) {
@@ -12755,16 +12751,20 @@ bot.command('commands', async (ctx) => {
       const textOut = await generateReply(morningDigestPrompt(feed.items), ctx);
       const msg = String(textOut || '').slice(0, 1800);
       await ctx.reply(('🌅 VOICE DIGEST (text)\n\n' + msg).slice(0, 3500));
-      // TTS voice note
+      // TTS: split into 2-3 short clips (Google TTS length limit)
       try {
-        await ctx.sendChatAction('record_voice');
+        const { splitForTts } = await import('../lib/packR1.js');
         const { synthesizeSpeech } = await import('../lib/tts.js');
-        const tts = await synthesizeSpeech(msg.slice(0, 400));
-        if (tts.ok && tts.buffer) {
-          await ctx.replyWithVoice(
-            { source: tts.buffer },
-            { caption: '🎙️ Holofeed-lite · /morningdigest for text only' }
-          );
+        const chunks = splitForTts(msg, 180);
+        for (let i = 0; i < chunks.length; i++) {
+          await ctx.sendChatAction('record_voice');
+          const tts = await synthesizeSpeech(chunks[i]);
+          if (tts.ok && tts.buffer) {
+            await ctx.replyWithVoice(
+              { source: tts.buffer },
+              { caption: '🎙️ Digest ' + (i + 1) + '/' + chunks.length }
+            );
+          }
         }
       } catch (e) {
         console.error('voicedigest tts', e);
@@ -12780,6 +12780,335 @@ bot.command('commands', async (ctx) => {
         await reportError(err, 'voicedigest');
       } catch (_) {}
       await ctx.reply('voicedigest failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+
+
+  // ——— Pack R1: debate / comic / watch / detective / stride bridge ———
+  bot.command(['debate', 'aidebate'], async (ctx) => {
+    try {
+      const topic = (ctx.message.text || '')
+        .replace(/^\/(debate|aidebate)(@\w+)?\s*/i, '')
+        .trim();
+      if (!topic) {
+        await ctx.reply('⚔️ DEBATE\n/debate Should runners train twice a day?\n3 personas: Optimist · Skeptic · Judge');
+        return;
+      }
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(String(ctx.from.id));
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const { debatePersonas } = await import('../lib/packR1.js');
+      const personas = debatePersonas();
+      const lines = ['⚔️ DEBATE\nTopic: ' + topic.slice(0, 200), ''];
+      for (const p of personas) {
+        const out = await generateReply(
+          p.system + '\n\nDebate topic: ' + topic.slice(0, 400),
+          ctx
+        );
+        lines.push('— ' + p.name + ' —\n' + String(out || '').slice(0, 600));
+        lines.push('');
+      }
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('debate', true);
+      } catch (_) {}
+      await ctx.reply(lines.join('\n').slice(0, 3500));
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('debate', false, err?.message);
+        await reportError(err, 'debate');
+      } catch (_) {}
+      await ctx.reply('debate failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['comic', 'comicstrip'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only (image heavy).');
+        return;
+      }
+      const theme = (ctx.message.text || '')
+        .replace(/^\/(comic|comicstrip)(@\w+)?\s*/i, '')
+        .trim();
+      if (!theme) {
+        await ctx.reply('📚 COMIC\n/comic a runner vs the rain in Colombo\n6-panel story (founder-only)');
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const { comicBeatsPrompt, parseComicBeats, downloadImage, buildRemixVariants } = await import(
+        '../lib/packR1.js'
+      );
+      const outline = await generateReply(comicBeatsPrompt(theme), ctx);
+      let beats = parseComicBeats(outline);
+      if (beats.length < 3) {
+        // fallback fixed beats
+        beats = [1, 2, 3, 4, 5, 6].map((n) => ({
+          n,
+          visual: theme + ' comic panel ' + n + ', cinematic illustration',
+          dialogue: 'Panel ' + n,
+        }));
+      }
+      await ctx.reply(('📚 COMIC SCRIPT\n\n' + outline).slice(0, 3000));
+      await ctx.sendChatAction('upload_photo');
+      const media = [];
+      for (const b of beats.slice(0, 4)) {
+        const plan = buildRemixVariants(b.visual, 1);
+        const img = await downloadImage(plan.variants[0].url);
+        if (!img.ok) continue;
+        media.push({
+          type: 'photo',
+          media: { source: img.buffer },
+          caption: (b.n + '. ' + b.dialogue).slice(0, 200),
+        });
+      }
+      if (media.length >= 2) await ctx.replyWithMediaGroup(media);
+      else if (media.length === 1) await ctx.replyWithPhoto(media[0].media, { caption: media[0].caption });
+      else await ctx.reply('Comic images failed — script above still usable.');
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('comic', true);
+      } catch (_) {}
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('comic', false, err?.message);
+        await reportError(err, 'comic');
+      } catch (_) {}
+      await ctx.reply('comic failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['watch', 'watchpage', 'pagemonitor'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only feature.');
+        return;
+      }
+      const body = (ctx.message.text || '')
+        .replace(/^\/(watch|watchpage|pagemonitor)(@\w+)?\s*/i, '')
+        .trim();
+      if (!body) {
+        await ctx.reply(
+          '👀 PAGE WATCH\n/watch https://example.com\n/watchlist\n/unwatch <id>\nCron: /api/cron-watch'
+        );
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const { fetchPageForWatch } = await import('../lib/packR1.js');
+      const url = body.split(/\s+/)[0];
+      const page = await fetchPageForWatch(url);
+      if (!page.ok) {
+        await ctx.reply('Watch fetch failed: ' + (page.error || 'unknown'));
+        return;
+      }
+      const id = Date.now().toString(36);
+      let list = [];
+      const raw = await getBotSetting('watch_list');
+      if (raw) {
+        try {
+          list = JSON.parse(raw);
+        } catch (_) {}
+      }
+      if (!Array.isArray(list)) list = [];
+      list.unshift({
+        id,
+        userId: String(ctx.from.id),
+        url: page.url,
+        title: page.title,
+        hash: page.hash,
+        len: page.len,
+        sample: page.sample,
+        lastCheck: new Date().toISOString(),
+      });
+      await setBotSetting('watch_list', JSON.stringify(list.slice(0, 30)));
+      await ctx.reply(
+        (
+          '👀 WATCHING\nid: ' +
+          id +
+          '\n' +
+          (page.title || '') +
+          '\n' +
+          page.url +
+          '\nhash: ' +
+          page.hash +
+          '\n/watchlist'
+        ).slice(0, 3000)
+      );
+    } catch (err) {
+      await ctx.reply('watch failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['watchlist'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only feature.');
+        return;
+      }
+      const raw = await getBotSetting('watch_list');
+      let list = [];
+      if (raw) {
+        try {
+          list = JSON.parse(raw);
+        } catch (_) {}
+      }
+      if (!Array.isArray(list) || !list.length) {
+        await ctx.reply('No watches. /watch <url>');
+        return;
+      }
+      const lines = ['👀 WATCH LIST', ''];
+      list.slice(0, 15).forEach((w, i) => {
+        lines.push(i + 1 + '. [' + w.id + '] ' + String(w.url).slice(0, 70));
+      });
+      await ctx.reply(lines.join('\n'));
+    } catch (err) {
+      await ctx.reply('watchlist failed: ' + String(err?.message || err).slice(0, 120));
+    }
+  });
+
+  bot.command(['unwatch'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only feature.');
+        return;
+      }
+      const id = (ctx.message.text || '').replace(/^\/unwatch(@\w+)?\s*/i, '').trim();
+      if (!id) {
+        await ctx.reply('Usage: /unwatch <id>');
+        return;
+      }
+      let list = [];
+      const raw = await getBotSetting('watch_list');
+      if (raw) {
+        try {
+          list = JSON.parse(raw);
+        } catch (_) {}
+      }
+      const before = list.length;
+      list = (Array.isArray(list) ? list : []).filter((w) => w.id !== id);
+      await setBotSetting('watch_list', JSON.stringify(list));
+      await ctx.reply(before === list.length ? 'Not found' : 'Removed ' + id);
+    } catch (err) {
+      await ctx.reply('unwatch failed: ' + String(err?.message || err).slice(0, 120));
+    }
+  });
+
+  bot.command(['detective', 'mystery', 'case'], async (ctx) => {
+    try {
+      const body = (ctx.message.text || '')
+        .replace(/^\/(detective|mystery|case)(@\w+)?\s*/i, '')
+        .trim();
+      const uid = String(ctx.from.id);
+      const key = 'detective_' + uid;
+      const { detectiveStartPrompt, detectiveContinuePrompt, parseABC } = await import('../lib/packR1.js');
+      const choice = parseABC(body);
+      if (choice) {
+        const raw = await getBotSetting(key);
+        if (!raw) {
+          await ctx.reply('No active case. /detective <theme>');
+          return;
+        }
+        let st = {};
+        try {
+          st = JSON.parse(raw);
+        } catch (_) {}
+        await ctx.sendChatAction('typing');
+        const out = await generateReply(
+          detectiveContinuePrompt(st.theme, st.history || '', choice),
+          ctx
+        );
+        st.history = (String(st.history || '') + '\n[' + choice + '] ' + String(out).slice(0, 400)).slice(-2000);
+        st.turns = (st.turns || 0) + 1;
+        if (/SOLVED:/i.test(out || '') || st.turns >= 12) {
+          await setBotSetting(key, null);
+          await ctx.reply(('🔍 CASE CLOSED\n\n' + out).slice(0, 3500));
+        } else {
+          await setBotSetting(key, JSON.stringify(st));
+          await ctx.reply(
+            ('🔍 CASE · beat ' + st.turns + '\n\n' + out + '\n\n/detective A · B · C').slice(0, 3500)
+          );
+        }
+        return;
+      }
+      if (!body) {
+        await ctx.reply(
+          '🔍 DETECTIVE\n/detective missing shoes at the night market\nThen /detective A|B|C\n/detective end'
+        );
+        return;
+      }
+      if (body.toLowerCase() === 'end') {
+        await setBotSetting(key, null);
+        await ctx.reply('Case closed by player.');
+        return;
+      }
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const theme = body.slice(0, 200);
+      const out = await generateReply(detectiveStartPrompt(theme), ctx);
+      await setBotSetting(
+        key,
+        JSON.stringify({ theme, history: String(out).slice(0, 500), turns: 1 })
+      );
+      await ctx.reply(
+        ('🔍 CASE OPEN\n\n' + out + '\n\n/detective A · B · C').slice(0, 3500)
+      );
+    } catch (err) {
+      await ctx.reply('detective failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['stridecoach', 'agentcoach'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only feature.');
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const { callStrideAgent } = await import('../lib/packR1.js');
+      const r = await callStrideAgent('auto_coach', { source: 'telegram' });
+      if (!r.ok) {
+        await ctx.reply(
+          'Stride bridge not ready:\n' +
+            (r.error || '') +
+            '\n\nSee docs/STRIDE_BRIDGE.md — add /api/agents/run + STRIDE_AGENT_KEY + STRIDE_API_BASE'
+        );
+        return;
+      }
+      await ctx.reply(('🏃 STRIDE COACH\n\n' + JSON.stringify(r.data, null, 2)).slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('stridecoach failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['agentstatus', 'stridestatus'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only feature.');
+        return;
+      }
+      const { callStrideAgent } = await import('../lib/packR1.js');
+      const r = await callStrideAgent('status', {});
+      if (!r.ok) {
+        await ctx.reply('Agent status: bridge offline\n' + (r.error || ''));
+        return;
+      }
+      await ctx.reply(('🤖 AGENT STATUS\n\n' + JSON.stringify(r.data, null, 2)).slice(0, 3000));
+    } catch (err) {
+      await ctx.reply('agentstatus failed: ' + String(err?.message || err).slice(0, 120));
     }
   });
 
