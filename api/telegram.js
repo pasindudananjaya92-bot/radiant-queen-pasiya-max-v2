@@ -128,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-packJ'; // Pack J: trivia Supabase + giveaway/translate/quote/wiki/stats
+const BOT_VERSION = 'v4.0-packK'; // Pack K: statsuser fix + birthday/fx/aisummary/channelpost
 /** Pack I: pending trivia answers chatId:userId -> trivia obj */
 const pendingTrivia = new Map();
 
@@ -9953,13 +9953,26 @@ bot.command('commands', async (ctx) => {
 
   
   // ——— Pack I: profile / achievements / level / poll / trivia / meme ———
-  async function loadProfileCtx(ctx) {
-    const userId = String(ctx.from?.id || '');
-    const name = [ctx.from?.first_name, ctx.from?.last_name].filter(Boolean).join(' ') || ctx.from?.username || 'Runner';
+  /**
+   * Load profile stats for a user.
+   * @param {import('telegraf').Context} ctx
+   * @param {{ userId?: string, name?: string, isFounder?: boolean } | null} override
+   */
+  async function loadProfileCtx(ctx, override = null) {
+    const userId = String(override?.userId || ctx.from?.id || '');
+    const name =
+      override?.name ||
+      [ctx.from?.first_name, ctx.from?.last_name].filter(Boolean).join(' ') ||
+      ctx.from?.username ||
+      'Runner';
+    const founderFlag =
+      override && typeof override.isFounder === 'boolean'
+        ? override.isFounder
+        : Boolean(ADMIN_ID && userId === String(ADMIN_ID));
     const out = {
       userId,
       name,
-      isFounder: isAdmin(ctx),
+      isFounder: founderFlag,
       xp: 0,
       runs: 0,
       streak: 0,
@@ -10476,31 +10489,25 @@ bot.command('commands', async (ctx) => {
 
   bot.command(['statsuser', 'userstats', 'whois'], async (ctx) => {
     try {
-      let targetId = String(ctx.from.id);
-      let targetName = ctx.from.first_name || 'User';
-      if (ctx.message.reply_to_message?.from) {
-        targetId = String(ctx.message.reply_to_message.from.id);
-        targetName = ctx.message.reply_to_message.from.first_name || targetName;
-      }
+      const replyFrom = ctx.message?.reply_to_message?.from || null;
+      let targetId = String(replyFrom?.id || ctx.from.id);
+      let targetName =
+        replyFrom?.first_name ||
+        ctx.from.first_name ||
+        'User';
       const body = (ctx.message.text || '')
         .replace(/^\/(statsuser|userstats|whois)(@\w+)?\s*/i, '')
         .trim();
-      if (body && /^\d{5,}$/.test(body)) targetId = body;
-
-      const fakeCtx = {
-        from: { id: targetId, first_name: targetName },
-      };
-      // reuse loadProfileCtx with patched from
-      const origFrom = ctx.from;
-      ctx.from = { id: Number(targetId) || targetId, first_name: targetName };
-      let p;
-      try {
-        p = await loadProfileCtx(ctx);
-      } finally {
-        ctx.from = origFrom;
+      if (body && /^\d{5,}$/.test(body)) {
+        targetId = body;
+        targetName = 'User ' + body;
       }
-      p.name = targetName;
-      p.userId = targetId;
+      const isFounderTarget = Boolean(ADMIN_ID && targetId === String(ADMIN_ID));
+      const p = await loadProfileCtx(ctx, {
+        userId: targetId,
+        name: targetName,
+        isFounder: isFounderTarget,
+      });
       const { formatProfileCard } = await import('../lib/profileHub.js');
       await ctx.reply('📊 USER STATS\n\n' + formatProfileCard(p));
     } catch (err) {
@@ -10509,6 +10516,236 @@ bot.command('commands', async (ctx) => {
   });
 
 
+
+
+
+  // ——— Pack K: birthday / fx crypto / aisummary / channelpost ———
+  bot.command(['birthday', 'bday', 'birthdays'], async (ctx) => {
+    try {
+      const body = (ctx.message.text || '')
+        .replace(/^\/(birthday|bday|birthdays)(@\w+)?\s*/i, '')
+        .trim();
+      const chatId = String(ctx.chat.id);
+      const key = 'bdays_' + chatId;
+      const sub = (body.split(/\s+/)[0] || '').toLowerCase();
+      let list = [];
+      try {
+        const raw = await getBotSetting(key);
+        list = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(list)) list = [];
+      } catch (_) {
+        list = [];
+      }
+
+      if (!sub || sub === 'list' || sub === 'upcoming') {
+        const { upcomingBirthdays } = await import('../lib/packK.js');
+        const up = upcomingBirthdays(list, 60);
+        if (!list.length) {
+          await ctx.reply(
+            '🎂 No birthdays saved in this chat.\n' +
+              'Add: /birthday add 1998-05-20 Name\n' +
+              'Or: /birthday add 20/05 Name\n' +
+              'Remove: /birthday remove Name\n' +
+              'List: /birthday list'
+          );
+          return;
+        }
+        const lines = ['🎂 BIRTHDAYS (' + list.length + ')']
+        if (up.length) {
+          lines.push('Upcoming (60d):');
+          for (const u of up.slice(0, 12)) {
+            lines.push(
+              '• ' +
+                u.name +
+                ' — in ' +
+                u.inDays +
+                'd (' +
+                u.nextDate +
+                ')'
+            );
+          }
+        } else {
+          lines.push('No birthdays in next 60 days.');
+        }
+        lines.push('', 'All: ' + list.map((b) => b.name + ' ' + b.date).join(' · '));
+        await ctx.reply(lines.join('\n').slice(0, 3500));
+        return;
+      }
+
+      if (sub === 'add') {
+        const rest = body.replace(/^add\s*/i, '').trim();
+        const { parseBirthdayAdd } = await import('../lib/packK.js');
+        const parsed = parseBirthdayAdd(rest);
+        if (!parsed) {
+          await ctx.reply('Usage: /birthday add 1998-05-20 Name\nOr: /birthday add 20/05 Name');
+          return;
+        }
+        list = list.filter(
+          (b) => String(b.name).toLowerCase() !== parsed.name.toLowerCase()
+        );
+        list.push({
+          name: parsed.name,
+          date: parsed.date,
+          addedBy: String(ctx.from.id),
+        });
+        await setBotSetting(key, JSON.stringify(list));
+        await ctx.reply('✅ Saved birthday: ' + parsed.name + ' · ' + parsed.date);
+        return;
+      }
+
+      if (sub === 'remove' || sub === 'del' || sub === 'delete') {
+        const name = body.replace(/^(remove|del|delete)\s*/i, '').trim();
+        if (!name) {
+          await ctx.reply('Usage: /birthday remove Name');
+          return;
+        }
+        const before = list.length;
+        list = list.filter(
+          (b) => String(b.name).toLowerCase() !== name.toLowerCase()
+        );
+        await setBotSetting(key, JSON.stringify(list));
+        await ctx.reply(
+          before === list.length
+            ? 'Name not found.'
+            : 'Removed. Remaining: ' + list.length
+        );
+        return;
+      }
+
+      await ctx.reply('Use: /birthday add|list|remove');
+    } catch (err) {
+      await ctx.reply('birthday failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['fx', 'crypto', 'coin'], async (ctx) => {
+    try {
+      const body = (ctx.message.text || '')
+        .replace(/^\/(fx|crypto|coin)(@\w+)?\s*/i, '')
+        .trim();
+      if (!body) {
+        await ctx.reply(
+          '💱 CRYPTO (CoinGecko free)\n' +
+            '/fx btc\n' +
+            '/fx eth usd\n' +
+            '/fx sol lkr\n' +
+            'Aliases: btc eth sol doge xrp ada bnb'
+        );
+        return;
+      }
+      const parts = body.split(/\s+/);
+      const id = parts[0];
+      const vs = parts[1] || 'usd';
+      await ctx.sendChatAction('typing');
+      const { fetchCryptoPrice } = await import('../lib/packK.js');
+      const r = await fetchCryptoPrice(id, vs);
+      if (!r.ok) {
+        await ctx.reply('FX failed: ' + (r.error || 'unknown') + '\nTry /fx btc');
+        return;
+      }
+      const ch =
+        r.change24h != null ? Number(r.change24h).toFixed(2) + '% 24h' : 'n/a';
+      await ctx.reply(
+        '💱 ' +
+          r.id.toUpperCase() +
+          ' / ' +
+          r.vs.toUpperCase() +
+          '\nPrice: ' +
+          r.price +
+          '\nChange: ' +
+          ch +
+          '\n(CoinGecko free)'
+      );
+    } catch (err) {
+      await ctx.reply('fx failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['aisummary', 'summarize', 'sum'], async (ctx) => {
+    try {
+      let text = (ctx.message.text || '')
+        .replace(/^\/(aisummary|summarize|sum)(@\w+)?\s*/i, '')
+        .trim();
+      if (!text && ctx.message.reply_to_message?.text) {
+        text = ctx.message.reply_to_message.text;
+      }
+      if (!text || text.length < 20) {
+        await ctx.reply(
+          '📝 AI SUMMARY\n' +
+            'Reply to a long message with /aisummary\n' +
+            'Or: /aisummary <paste text>\n' +
+            '(Uses gold / AI quota)'
+        );
+        return;
+      }
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(String(ctx.from.id));
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const out = await generateReply(
+        'Summarize the following text in clear short bullet points. ' +
+          'If Sinhala, reply Sinhala. Max 12 bullets.\n\n' +
+          text.slice(0, 6000),
+        ctx
+      );
+      await ctx.reply(('📝 SUMMARY\n\n' + out).slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('aisummary failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['channelpost', 'cpost', 'postchannel'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('Founder only.');
+        return;
+      }
+      const body = (ctx.message.text || '')
+        .replace(/^\/(channelpost|cpost|postchannel)(@\w+)?\s*/i, '')
+        .trim();
+      // /channelpost @channel text...  OR /channelpost -100xxx text
+      const m = body.match(/^(@[\w_]+|-?\d+)\s+([\s\S]+)$/);
+      if (!m) {
+        await ctx.reply(
+          '📢 CHANNEL POST (founder)\n' +
+            'Bot must be admin in the channel.\n\n' +
+            '/channelpost @YourChannel Hello members\n' +
+            '/channelpost -100xxxxxxxxxx Hello\n\n' +
+            'Reply to a photo/text then:\n' +
+            '/channelpost @YourChannel'
+        );
+        return;
+      }
+      const target = m[1];
+      let text = m[2].trim();
+      if (text === '.' || text === 'reply') text = '';
+      const rep = ctx.message.reply_to_message;
+      if (rep?.photo?.length) {
+        const fileId = rep.photo[rep.photo.length - 1].file_id;
+        const cap = text || rep.caption || '';
+        await ctx.telegram.sendPhoto(target, fileId, { caption: cap.slice(0, 1024) });
+        await ctx.reply('✅ Photo posted to ' + target);
+        return;
+      }
+      if (!text && rep?.text) text = rep.text;
+      if (!text) {
+        await ctx.reply('No text/photo to post.');
+        return;
+      }
+      await ctx.telegram.sendMessage(target, text.slice(0, 4000));
+      await ctx.reply('✅ Posted to ' + target);
+    } catch (err) {
+      await ctx.reply(
+        'channelpost failed: ' +
+          String(err?.message || err).slice(0, 200) +
+          '\n(Is the bot admin in that channel?)'
+      );
+    }
+  });
 
   // ——— Pack H: /diagnose + radar ———
   bot.command(['diagnose', 'radar', 'selfcheck'], async (ctx) => {
