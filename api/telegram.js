@@ -128,7 +128,10 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-packH-radar'; // Pack H: diagnose + error radar + search/news fix
+const BOT_VERSION = 'v4.0-packI-profile-fun'; // Pack I: profile/achievements/level + poll/trivia/meme
+/** Pack I: pending trivia answers chatId:userId -> trivia obj */
+const pendingTrivia = new Map();
+
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -9948,7 +9951,231 @@ bot.command('commands', async (ctx) => {
     }
   });
 
-    // ——— Pack H: /diagnose + radar ———
+  
+  // ——— Pack I: profile / achievements / level / poll / trivia / meme ———
+  async function loadProfileCtx(ctx) {
+    const userId = String(ctx.from?.id || '');
+    const name = [ctx.from?.first_name, ctx.from?.last_name].filter(Boolean).join(' ') || ctx.from?.username || 'Runner';
+    const out = {
+      userId,
+      name,
+      isFounder: isAdmin(ctx),
+      xp: 0,
+      runs: 0,
+      streak: 0,
+      gold: 0,
+      premium: false,
+      vaultFiles: 0,
+      memoryRows: 0,
+      persona: 'default',
+      strideName: '',
+    };
+    if (!supabase || !userId) return out;
+    try {
+      const { data: xpRow } = await supabase
+        .from('rq_run_xp')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (xpRow) {
+        out.xp = Number(xpRow.xp || 0);
+        out.runs = Number(xpRow.runs || xpRow.run_count || 0);
+        out.streak = Number(xpRow.streak || 0);
+        out.strideName = xpRow.stride_name || '';
+      }
+    } catch (_) {}
+    try {
+      const { data: g } = await supabase
+        .from('rq_gold')
+        .select('gold, premium')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (g) {
+        out.gold = Number(g.gold || 0);
+        out.premium = !!g.premium;
+      }
+    } catch (_) {}
+    try {
+      const { data: p } = await supabase
+        .from('rq_user_personas')
+        .select('persona')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (p?.persona) out.persona = p.persona;
+    } catch (_) {}
+    try {
+      const { count } = await supabase
+        .from('rq_vault_files')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+      out.vaultFiles = Number(count || 0);
+    } catch (_) {}
+    try {
+      const { count } = await supabase
+        .from('rq_ai_memory')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+      out.memoryRows = Number(count || 0);
+    } catch (_) {}
+    return out;
+  }
+
+  bot.command(['profile', 'prof'], async (ctx) => {
+    try {
+      await ctx.sendChatAction('typing');
+      const { formatProfileCard } = await import('../lib/profileHub.js');
+      const p = await loadProfileCtx(ctx);
+      await ctx.reply(formatProfileCard(p));
+    } catch (err) {
+      try {
+        const { reportError } = await import('../lib/errorRadar.js');
+        await reportError(err, 'profile');
+      } catch (_) {}
+      await ctx.reply('profile failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['achievements', 'achieve', 'ach'], async (ctx) => {
+    try {
+      const { formatAchievementsBoard } = await import('../lib/profileHub.js');
+      const p = await loadProfileCtx(ctx);
+      await ctx.reply(formatAchievementsBoard(p));
+    } catch (err) {
+      await ctx.reply('achievements failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['level', 'lvl', 'xpbar'], async (ctx) => {
+    try {
+      const { formatLevelCard } = await import('../lib/profileHub.js');
+      const p = await loadProfileCtx(ctx);
+      await ctx.reply(formatLevelCard(p));
+    } catch (err) {
+      await ctx.reply('level failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['poll', 'newpoll'], async (ctx) => {
+    try {
+      const raw = (ctx.message.text || '').replace(/^\/(poll|newpoll)(@\w+)?\s*/i, '').trim();
+      // Format: Question | option1 | option2 | option3
+      if (!raw.includes('|')) {
+        await ctx.reply(
+          '📊 POLL format:\n/poll Your question? | Option A | Option B | Option C\n\nExample:\n/poll Best long-run day? | Saturday | Sunday | Midweek'
+        );
+        return;
+      }
+      const parts = raw.split('|').map((s) => s.trim()).filter(Boolean);
+      if (parts.length < 3) {
+        await ctx.reply('Need question + at least 2 options separated by |');
+        return;
+      }
+      const question = parts[0].slice(0, 300);
+      const options = parts.slice(1, 11).map((o) => o.slice(0, 100));
+      await ctx.telegram.sendPoll(ctx.chat.id, question, options, {
+        is_anonymous: true,
+        allows_multiple_answers: false,
+      });
+    } catch (err) {
+      await ctx.reply(
+        'poll failed: ' +
+          String(err?.message || err).slice(0, 200) +
+          '\n(Bot needs permission to create polls in groups.)'
+      );
+    }
+  });
+
+  bot.command(['trivia', 'quiz'], async (ctx) => {
+    try {
+      const { pickTrivia, formatTrivia } = await import('../lib/funPack.js');
+      const t = pickTrivia();
+      const key = String(ctx.chat.id) + ':' + String(ctx.from.id);
+      pendingTrivia.set(key, { ...t, at: Date.now() });
+      await ctx.reply(formatTrivia(t));
+    } catch (err) {
+      await ctx.reply('trivia failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['answer', 'ans'], async (ctx) => {
+    try {
+      const { checkTriviaAnswer, pickTrivia } = await import('../lib/funPack.js');
+      const body = (ctx.message.text || '').replace(/^\/(answer|ans)(@\w+)?\s*/i, '').trim();
+      const key = String(ctx.chat.id) + ':' + String(ctx.from.id);
+      let t = pendingTrivia.get(key);
+      // allow /answer 3 B  (bank index + letter) OR just /answer B
+      let letter = body;
+      const m = body.match(/^(\d+)\s*([A-Da-d])$/);
+      if (m) {
+        t = pickTrivia(Number(m[1]) - 1);
+        letter = m[2];
+      }
+      if (!t) {
+        await ctx.reply('No open trivia. Start with /trivia then /answer A');
+        return;
+      }
+      const r = checkTriviaAnswer(t, letter);
+      if (!r.ok) {
+        await ctx.reply(r.error);
+        return;
+      }
+      pendingTrivia.delete(key);
+      if (r.correct) {
+        await ctx.reply('✅ Correct! ' + r.correctLetter + ') ' + r.correctText);
+      } else {
+        await ctx.reply('❌ Not quite. Answer: ' + r.correctLetter + ') ' + r.correctText);
+      }
+    } catch (err) {
+      await ctx.reply('answer failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['meme'], async (ctx) => {
+    try {
+      const idea = (ctx.message.text || '').replace(/^\/meme(@\w+)?\s*/i, '').trim() || 'funny Monday motivation';
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(String(ctx.from.id));
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.reply('🎨 Cooking meme…');
+      const { memePrompt } = await import('../lib/funPack.js');
+      const prompt = memePrompt(idea);
+      // reuse free imagine path
+      let buffer = null;
+      try {
+        const { generateImaginImage, generateImage, generatePollinationsImage } = await import(
+          '../lib/imagine.js'
+        ).catch(() => ({}));
+        const fn = generateImaginImage || generateImage || generatePollinationsImage;
+        if (typeof fn === 'function') {
+          buffer = await fn(prompt);
+        }
+      } catch (_) {}
+      if (!buffer) {
+        // direct pollinations
+        const url =
+          'https://image.pollinations.ai/prompt/' +
+          encodeURIComponent(prompt) +
+          '?width=1024&height=1024&nologo=true&seed=' +
+          String(Date.now() % 1e9);
+        const res = await fetch(url, { signal: AbortSignal.timeout(60000) });
+        if (!res.ok) throw new Error('Image HTTP ' + res.status);
+        buffer = Buffer.from(await res.arrayBuffer());
+      }
+      await ctx.replyWithPhoto(
+        { source: buffer },
+        { caption: ('🎭 MEME\n' + idea).slice(0, 900) }
+      );
+    } catch (err) {
+      await ctx.reply('meme failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+
+  // ——— Pack H: /diagnose + radar ———
   bot.command(['diagnose', 'radar', 'selfcheck'], async (ctx) => {
     try {
       if (!isAdmin(ctx)) {
