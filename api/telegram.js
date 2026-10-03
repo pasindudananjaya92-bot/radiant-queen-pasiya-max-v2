@@ -128,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-packL'; // Pack L: blocklist + tutor + quotemaker + selfreport + weather7
+const BOT_VERSION = 'v4.0-packM'; // Pack M: trimage + v2v + quotecard + rss + aicoach
 /** Pack I: pending trivia answers chatId:userId -> trivia obj */
 const pendingTrivia = new Map();
 
@@ -11008,6 +11008,243 @@ bot.command('commands', async (ctx) => {
     }
   });
 
+
+
+  // ——— Pack M: trimage / voicemode / quotecard / rss / aicoach ———
+  bot.command(['trimage', 'translateimage', 'imgtr'], async (ctx) => {
+    try {
+      const rep = ctx.message.reply_to_message;
+      if (!rep?.photo?.length && !rep?.document) {
+        await ctx.reply(
+          '🖼️ TRANSLATE IMAGE\n' +
+            'Reply to a photo/screenshot with:\n' +
+            '/trimage\n' +
+            '/trimage si   (force target lang: si|en|ta)'
+        );
+        return;
+      }
+      const body = (ctx.message.text || '')
+        .replace(/^\/(trimage|translateimage|imgtr)(@\w+)?\s*/i, '')
+        .trim()
+        .toLowerCase();
+      const forceTo = ['si', 'en', 'ta', 'hi'].includes(body.split(/\s+/)[0])
+        ? body.split(/\s+/)[0]
+        : '';
+
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(String(ctx.from.id));
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      let fileId = null;
+      let mime = 'image/jpeg';
+      if (rep.photo?.length) {
+        fileId = rep.photo[rep.photo.length - 1].file_id;
+      } else if (rep.document?.file_id) {
+        fileId = rep.document.file_id;
+        mime = rep.document.mime_type || mime;
+      }
+      const file = await ctx.telegram.getFile(fileId);
+      const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+      const imgRes = await fetch(url, { signal: AbortSignal.timeout(30000) });
+      if (!imgRes.ok) throw new Error('download HTTP ' + imgRes.status);
+      const buf = Buffer.from(await imgRes.arrayBuffer());
+
+      const { ocrImageBuffer } = await import('../lib/ocrSpace.js');
+      const ocrOut = await ocrImageBuffer(buf, mime, 'eng');
+      if (!ocrOut.ok) {
+        await ctx.reply('OCR failed: ' + (ocrOut.error || 'unknown'));
+        return;
+      }
+
+      const { detectTranslateTarget } = await import('../lib/packM.js');
+      const { translateText } = await import('../lib/packJ.js');
+      const to = forceTo || detectTranslateTarget(ocrOut.text);
+      const from = to === 'en' ? 'auto' : 'auto';
+      const tr = await translateText(ocrOut.text.slice(0, 800), from, to);
+
+      let msg =
+        '🖼️ IMAGE → TEXT → TRANSLATE\n\n' +
+        '— OCR —\n' +
+        ocrOut.text.slice(0, 1500);
+      if (tr.ok) {
+        msg += '\n\n— Translate → ' + tr.to + ' —\n' + tr.text;
+      } else {
+        msg += '\n\n(Translate skipped: ' + (tr.error || 'fail') + ')';
+      }
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('trimage', true);
+      } catch (_) {}
+      await ctx.reply(msg.slice(0, 3500));
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('trimage', false, err?.message);
+        await reportError(err, 'trimage');
+      } catch (_) {}
+      await ctx.reply('trimage failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['voicemode', 'v2v', 'voicechat'], async (ctx) => {
+    try {
+      const arg = (ctx.message.text || '')
+        .replace(/^\/(voicemode|v2v|voicechat)(@\w+)?\s*/i, '')
+        .trim()
+        .toLowerCase();
+      const uid = String(ctx.from.id);
+      const key = 'v2v_' + uid;
+      if (arg === 'off' || arg === '0' || arg === 'stop') {
+        await setBotSetting(key, null);
+        await ctx.reply('🎙️ Voice mode OFF. Voice notes → text AI only.');
+        return;
+      }
+      // on
+      await setBotSetting(key, JSON.stringify({ on: true, at: Date.now() }));
+      await ctx.reply(
+        '🎙️ VOICE MODE ON\n' +
+          'Send a voice note → bot transcribes → AI replies → voice reply.\n' +
+          'Turn off: /voicemode off\n' +
+          '(Uses STT + TTS free paths; AI uses gold/quota)'
+      );
+    } catch (err) {
+      await ctx.reply('voicemode failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['quotecard', 'quotesvg', 'qcard'], async (ctx) => {
+    try {
+      let text = (ctx.message.text || '')
+        .replace(/^\/(quotecard|quotesvg|qcard)(@\w+)?\s*/i, '')
+        .trim();
+      let author = '';
+      if (text.includes('|')) {
+        const parts = text.split('|').map((s) => s.trim());
+        text = parts[0];
+        author = parts[1] || '';
+      }
+      if (!text && ctx.message.reply_to_message?.text) {
+        text = ctx.message.reply_to_message.text;
+      }
+      if (!text) {
+        await ctx.reply(
+          '💬 QUOTE CARD (no AI image — clear text)\n' +
+            '/quotecard Your quote here\n' +
+            '/quotecard Dream big | Pasiya Max\n' +
+            'Or reply to a message with /quotecard'
+        );
+        return;
+      }
+      const { formatQuoteCard } = await import('../lib/packM.js');
+      const card = formatQuoteCard(text, author || ctx.from.first_name || 'Radiant Queen');
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('quotecard', true);
+      } catch (_) {}
+      await ctx.reply(card);
+    } catch (err) {
+      await ctx.reply('quotecard failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['rss', 'rssfeed', 'feed'], async (ctx) => {
+    try {
+      const url = (ctx.message.text || '')
+        .replace(/^\/(rss|rssfeed|feed)(@\w+)?\s*/i, '')
+        .trim();
+      if (!url) {
+        await ctx.reply(
+          '📡 RSS FEED\n' +
+            '/rss https://example.com/feed.xml\n' +
+            '/rss https://hnrss.org/frontpage'
+        );
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const { fetchRss } = await import('../lib/packM.js');
+      const out = await fetchRss(url, 8);
+      if (!out.ok) {
+        await ctx.reply('RSS failed: ' + (out.error || 'unknown'));
+        return;
+      }
+      const lines = ['📡 ' + (out.title || 'Feed'), ''];
+      out.items.forEach((it, i) => {
+        lines.push(i + 1 + '. ' + it.title);
+        if (it.summary) lines.push(it.summary);
+        if (it.link) lines.push(it.link);
+        lines.push('');
+      });
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('rss', true);
+      } catch (_) {}
+      await ctx.reply(lines.join('\n').slice(0, 3500));
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('rss', false, err?.message);
+        await reportError(err, 'rss');
+      } catch (_) {}
+      await ctx.reply('rss failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['aicoach', 'coachplan', 'trainplan'], async (ctx) => {
+    try {
+      const goal = (ctx.message.text || '')
+        .replace(/^\/(aicoach|coachplan|trainplan)(@\w+)?\s*/i, '')
+        .trim();
+      if (!goal) {
+        await ctx.reply(
+          '🏃 AI COACH\n' +
+            '/aicoach 5K under 25 min\n' +
+            '/aicoach beginner return from injury\n' +
+            '/aicoach weekly mileage 40km'
+        );
+        return;
+      }
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(String(ctx.from.id));
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      // personalize with profile if available
+      let extra = '';
+      try {
+        const p = await loadProfileCtx(ctx);
+        extra =
+          `\nRunner profile: XP=${p.xp} runs=${p.runs} streak=${p.streak} stride=${p.strideName || 'n/a'}`;
+      } catch (_) {}
+      const out = await generateReply(
+        'You are Pasiya Max running coach for Radiant Queen / StrideClub. ' +
+          'Build a practical 7-day plan for the goal. Include easy/hard days, one tip, safety note. ' +
+          'Match language (Sinhala/English). Keep under 450 words.\n\nGoal: ' +
+          goal.slice(0, 400) +
+          extra,
+        ctx
+      );
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('aicoach', true);
+      } catch (_) {}
+      await ctx.reply(('🏃 AI COACH PLAN\n\n' + out).slice(0, 3500));
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('aicoach', false, err?.message);
+        await reportError(err, 'aicoach');
+      } catch (_) {}
+      await ctx.reply('aicoach failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
   // ——— Pack H: /diagnose + radar ———
   bot.command(['diagnose', 'radar', 'selfcheck'], async (ctx) => {
     try {
@@ -11890,6 +12127,16 @@ bot.command('commands', async (ctx) => {
   
   bot.on('voice', async (ctx) => {
     try {
+      // Pack M: voice mode flag (v2v)
+      let __v2v = false;
+      try {
+        const raw = await getBotSetting('v2v_' + String(ctx.from.id));
+        if (raw) {
+          const o = JSON.parse(raw);
+          __v2v = !!(o && o.on);
+        }
+      } catch (_) {}
+
       const payV = await spendGold(ctx, 'voice');
       if (!payV.ok) {
         await ctx.reply(payV.message || 'Not enough gold. /balance');
@@ -11944,7 +12191,24 @@ bot.command('commands', async (ctx) => {
           '\n\nReply helpfully in the same language (Sinhala or English). Keep under 12 lines.',
         ctx
       );
-      await ctx.reply('🎙 ' + transcript.slice(0, 500) + '\n\n' + String(out || '').slice(0, 3000));
+      const replyText = String(out || '').slice(0, 3000);
+      await ctx.reply('🎙 ' + transcript.slice(0, 500) + '\n\n' + replyText);
+      // Pack M: voice-to-voice when /voicemode on
+      if (__v2v && replyText) {
+        try {
+          await ctx.sendChatAction('record_voice');
+          const { synthesizeSpeech } = await import('../lib/tts.js');
+          const tts = await synthesizeSpeech(replyText.slice(0, 180));
+          if (tts.ok && tts.buffer) {
+            await ctx.replyWithVoice(
+              { source: tts.buffer },
+              { caption: '🎙️ Voice reply · /voicemode off' }
+            );
+          }
+        } catch (e) {
+          console.error('v2v tts', e);
+        }
+      }
     } catch (err) {
       console.error('voice', err);
       try {
