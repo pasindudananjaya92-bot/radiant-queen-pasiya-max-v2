@@ -128,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-packM'; // Pack M: trimage + v2v + quotecard + rss + aicoach
+const BOT_VERSION = 'v4.0-packN'; // Pack N: RSS CDATA + trimage src fix + qrscan + aistory + weatheralert + voicetr + mentionadmins
 /** Pack I: pending trivia answers chatId:userId -> trivia obj */
 const pendingTrivia = new Map();
 
@@ -10407,7 +10407,8 @@ bot.command('commands', async (ctx) => {
       // also support reply
       let q = body;
       if (!q && ctx.message.reply_to_message?.text) {
-        q = 'auto en ' + ctx.message.reply_to_message.text;
+        // never pass "auto" — parseTranslateArgs detects si/en from script
+        q = ctx.message.reply_to_message.text;
       }
       const { parseTranslateArgs, translateText } = await import('../lib/packJ.js');
       const parsed = parseTranslateArgs(q);
@@ -11060,10 +11061,11 @@ bot.command('commands', async (ctx) => {
         return;
       }
 
-      const { detectTranslateTarget } = await import('../lib/packM.js');
+      const { detectTranslateTarget, detectTranslateSource } = await import('../lib/packM.js');
       const { translateText } = await import('../lib/packJ.js');
       const to = forceTo || detectTranslateTarget(ocrOut.text);
-      const from = to === 'en' ? 'auto' : 'auto';
+      // MyMemory rejects "auto" as source — detect from OCR text
+      const from = detectTranslateSource(ocrOut.text);
       const tr = await translateText(ocrOut.text.slice(0, 800), from, to);
 
       let msg =
@@ -11242,6 +11244,256 @@ bot.command('commands', async (ctx) => {
         await reportError(err, 'aicoach');
       } catch (_) {}
       await ctx.reply('aicoach failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+
+  // ——— Pack N: qrscan / aistory / weatheralert / voicetr / mentionadmins ———
+  bot.command(['qrscan', 'qrread', 'scanqr'], async (ctx) => {
+    try {
+      const rep = ctx.message.reply_to_message;
+      if (!rep?.photo?.length && !rep?.document) {
+        await ctx.reply(
+          '📷 QR SCAN\n' +
+            'Reply to a photo containing a QR code with:\n' +
+            '/qrscan'
+        );
+        return;
+      }
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(String(ctx.from.id));
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      let fileId = null;
+      if (rep.photo?.length) {
+        fileId = rep.photo[rep.photo.length - 1].file_id;
+      } else if (rep.document?.file_id) {
+        fileId = rep.document.file_id;
+      }
+      const file = await ctx.telegram.getFile(fileId);
+      const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+      const { decodeQrFromUrl } = await import('../lib/packN.js');
+      const out = await decodeQrFromUrl(url);
+      if (!out.ok) {
+        await ctx.reply('QR scan failed: ' + (out.error || 'unknown'));
+        try {
+          const { trackCommand } = await import('../lib/errorRadar.js');
+          trackCommand('qrscan', false, out.error);
+        } catch (_) {}
+        return;
+      }
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('qrscan', true);
+      } catch (_) {}
+      await ctx.reply(
+        ('📷 QR DECODED\n\n' + out.data + '\n\n· ' + (out.provider || 'qr')).slice(0, 3500)
+      );
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('qrscan', false, err?.message);
+        await reportError(err, 'qrscan');
+      } catch (_) {}
+      await ctx.reply('qrscan failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['aistory', 'story', 'kidstory'], async (ctx) => {
+    try {
+      const topic = (ctx.message.text || '')
+        .replace(/^\/(aistory|story|kidstory)(@\w+)?\s*/i, '')
+        .trim();
+      if (!topic) {
+        await ctx.reply(
+          '📖 AI STORY (Sinhala children)\n' +
+            '/aistory මිතුරුකම\n' +
+            '/aistory brave little runner\n' +
+            '/aistory kindness'
+        );
+        return;
+      }
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(String(ctx.from.id));
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const { storyPrompt } = await import('../lib/packN.js');
+      const out = await generateReply(storyPrompt(topic), ctx);
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('aistory', true);
+      } catch (_) {}
+      await ctx.reply(('📖 STORY\n\n' + out).slice(0, 3500));
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('aistory', false, err?.message);
+        await reportError(err, 'aistory');
+      } catch (_) {}
+      await ctx.reply('aistory failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['weatheralert', 'wxalert', 'rainalert'], async (ctx) => {
+    try {
+      const place = (ctx.message.text || '')
+        .replace(/^\/(weatheralert|wxalert|rainalert)(@\w+)?\s*/i, '')
+        .trim() || 'Colombo';
+      await ctx.sendChatAction('typing');
+      const geo = await geocodePlace(place);
+      if (!geo) {
+        await ctx.reply('Place not found: ' + place);
+        return;
+      }
+      const w = await fetchWeather(geo.lat, geo.lon);
+      if (!w.ok) {
+        await ctx.reply('Weather failed: ' + (w.error || 'unknown'));
+        return;
+      }
+      const { weatherAlertLevel } = await import('../lib/packN.js');
+      const alert = weatherAlertLevel(w.code, w.precip);
+      const lines = [
+        alert.emoji + ' WEATHER ALERT — ' + geo.name + (geo.country ? ', ' + geo.country : ''),
+        '',
+        'Level: ' + alert.level.toUpperCase(),
+        alert.text,
+        '',
+        'Now: ' + (w.temp != null ? w.temp + '°C' : '?') +
+          (w.feels != null ? ' (feels ' + w.feels + '°C)' : ''),
+        'Condition: ' + weatherCodeText(w.code),
+        'Precip: ' + (w.precip != null ? w.precip + ' mm' : '?') +
+          (w.precipDay != null ? ' · day sum ' + w.precipDay + ' mm' : ''),
+        'Wind: ' + (w.wind != null ? w.wind + ' km/h' : '?'),
+        'Humidity: ' + (w.humidity != null ? w.humidity + '%' : '?'),
+      ];
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('weatheralert', true);
+      } catch (_) {}
+      await ctx.reply(lines.join('\n').slice(0, 3500));
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('weatheralert', false, err?.message);
+        await reportError(err, 'weatheralert');
+      } catch (_) {}
+      await ctx.reply('weatheralert failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['voicetr', 'voicetranslate', 'vtr'], async (ctx) => {
+    try {
+      const rep = ctx.message.reply_to_message;
+      if (!rep?.voice && !rep?.audio) {
+        await ctx.reply(
+          '🎙️ VOICE → TRANSLATE\n' +
+            'Reply to a voice note with:\n' +
+            '/voicetr\n' +
+            '/voicetr si   (force target: si|en|ta|hi)'
+        );
+        return;
+      }
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(String(ctx.from.id));
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      const body = (ctx.message.text || '')
+        .replace(/^\/(voicetr|voicetranslate|vtr)(@\w+)?\s*/i, '')
+        .trim()
+        .toLowerCase();
+      const forceTo = ['si', 'en', 'ta', 'hi'].includes(body.split(/\s+/)[0])
+        ? body.split(/\s+/)[0]
+        : '';
+
+      await ctx.sendChatAction('typing');
+      const voice = rep.voice || rep.audio;
+      if (voice.file_size && voice.file_size > 4_000_000) {
+        await ctx.reply('Voice note too large. Send a shorter one.');
+        return;
+      }
+      const file = await ctx.telegram.getFile(voice.file_id);
+      const fileUrl = 'https://api.telegram.org/file/bot' + BOT_TOKEN + '/' + file.file_path;
+      const res = await fetch(fileUrl, { signal: AbortSignal.timeout(30000) });
+      if (!res.ok) throw new Error('download HTTP ' + res.status);
+      const buf = Buffer.from(await res.arrayBuffer());
+
+      const { transcribeVoiceGroq } = await import('../lib/stt.js');
+      const stt = await transcribeVoiceGroq(buf, 'voice.ogg');
+      if (!stt.ok) {
+        await ctx.reply('STT failed: ' + String(stt.error || '').slice(0, 140));
+        return;
+      }
+      const transcript = String(stt.text || '').slice(0, 2000);
+      if (!transcript) {
+        await ctx.reply('Empty transcript.');
+        return;
+      }
+
+      const { detectTranslateTarget, detectTranslateSource } = await import('../lib/packM.js');
+      const { translateText } = await import('../lib/packJ.js');
+      const to = forceTo || detectTranslateTarget(transcript);
+      const from = detectTranslateSource(transcript);
+      const tr = await translateText(transcript, from, to);
+
+      let msg =
+        '🎙️ VOICE → TEXT → TRANSLATE\n\n' +
+        '— Transcript —\n' +
+        transcript.slice(0, 1500);
+      if (tr.ok) {
+        msg += '\n\n— Translate (' + from + '→' + tr.to + ') —\n' + tr.text;
+      } else {
+        msg += '\n\n(Translate skipped: ' + (tr.error || 'fail') + ')';
+      }
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('voicetr', true);
+      } catch (_) {}
+      await ctx.reply(msg.slice(0, 3500));
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('voicetr', false, err?.message);
+        await reportError(err, 'voicetr');
+      } catch (_) {}
+      await ctx.reply('voicetr failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['mentionadmins', 'admins', 'tagadmins'], async (ctx) => {
+    try {
+      if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') {
+        await ctx.reply('Use /mentionadmins inside a group.');
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const admins = await ctx.telegram.getChatAdministrators(ctx.chat.id);
+      const { formatAdminMentions } = await import('../lib/packN.js');
+      const body = formatAdminMentions(admins);
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('mentionadmins', true);
+      } catch (_) {}
+      await ctx.reply(
+        ('👮 GROUP ADMINS\n\n' + body + '\n\n(Safe list — no mass @all spam)').slice(0, 3500)
+      );
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('mentionadmins', false, err?.message);
+        await reportError(err, 'mentionadmins');
+      } catch (_) {}
+      await ctx.reply('mentionadmins failed: ' + String(err?.message || err).slice(0, 160));
     }
   });
 
