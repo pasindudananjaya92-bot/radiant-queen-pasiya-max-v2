@@ -128,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-packO'; // Pack O: barcode+receipt+identify+kb+expenses+units+pollquick+smart-errors
+const BOT_VERSION = 'v4.0-packP'; // Pack P: oracle+ghost+timecapsule+twin+forgepage+morningdigest
 /** Pack I: pending trivia answers chatId:userId -> trivia obj */
 const pendingTrivia = new Map();
 
@@ -11977,6 +11977,411 @@ bot.command('commands', async (ctx) => {
       await ctx.reply(lines.join('\n').slice(0, 3500));
     } catch (err) {
       await ctx.reply('errorlearn failed: ' + String(err?.message || err).slice(0, 120));
+    }
+  });
+
+
+
+  // ——— Pack P: oracle / ghost / timecapsule / twin / forgepage / morningdigest ———
+  bot.command(['oracle', 'predict', 'forecastme'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(String(ctx.from.id));
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      let facts = { xp: 0, runs: 0, streak: 0, strideName: '', gold: 0, birthday: '', notes: '' };
+      try {
+        const p = await loadProfileCtx(ctx);
+        facts.xp = p.xp;
+        facts.runs = p.runs;
+        facts.streak = p.streak;
+        facts.strideName = p.strideName || '';
+      } catch (_) {}
+      try {
+        const g = await getGold(ctx.from.id);
+        facts.gold = g;
+      } catch (_) {}
+      try {
+        const raw = await getBotSetting('bday_' + String(ctx.from.id));
+        if (raw) facts.birthday = String(raw).slice(0, 40);
+      } catch (_) {}
+      const { oraclePrompt } = await import('../lib/packP.js');
+      const out = await generateReply(oraclePrompt(facts), ctx);
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('oracle', true);
+      } catch (_) {}
+      await ctx.reply(('🔮 ORACLE · 7-DAY FORECAST\n\n' + out).slice(0, 3500));
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('oracle', false, err?.message);
+        await reportError(err, 'oracle');
+      } catch (_) {}
+      await ctx.reply('oracle failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['ghost', 'selfdestruct', 'sdmsg'], async (ctx) => {
+    try {
+      const body = (ctx.message.text || '')
+        .replace(/^\/(ghost|selfdestruct|sdmsg)(@\w+)?\s*/i, '')
+        .trim();
+      const { parseGhostArgs } = await import('../lib/packP.js');
+      const parsed = parseGhostArgs(body);
+      if (!parsed) {
+        await ctx.reply(
+          '👻 GHOST MESSAGE (self-destruct)\n' +
+            '/ghost 30 Your secret text\n' +
+            '/ghost 5m Meeting at 6\n' +
+            '(5–3600 seconds; bot deletes its own message after delay)\n' +
+            'Note: Telegram cannot detect screenshots.'
+        );
+        return;
+      }
+      const sent = await ctx.reply(
+        '👻 GHOST · deletes in ' + parsed.secs + 's\n\n' + parsed.msg,
+        { disable_notification: true }
+      );
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('ghost', true);
+      } catch (_) {}
+      // schedule delete (best-effort on serverless — may not fire if instance freezes)
+      const chatId = ctx.chat.id;
+      const msgId = sent.message_id;
+      setTimeout(async () => {
+        try {
+          await ctx.telegram.deleteMessage(chatId, msgId);
+        } catch (_) {}
+      }, parsed.secs * 1000);
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('ghost', false, err?.message);
+        await reportError(err, 'ghost');
+      } catch (_) {}
+      await ctx.reply('ghost failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['timecapsule', 'capsule', 'futureme'], async (ctx) => {
+    try {
+      const body = (ctx.message.text || '')
+        .replace(/^\/(timecapsule|capsule|futureme)(@\w+)?\s*/i, '')
+        .trim();
+      const { parseTimeCapsule, sealMessage } = await import('../lib/packP.js');
+      if (!body || body.toLowerCase() === 'list' || body.toLowerCase() === 'open') {
+        // list pending
+        if (body.toLowerCase() === 'list' || !body) {
+          const raw = await getBotSetting('capsules_' + String(ctx.from.id));
+          let list = [];
+          if (raw) {
+            try {
+              list = JSON.parse(raw);
+            } catch (_) {}
+          }
+          if (!Array.isArray(list) || !list.length) {
+            await ctx.reply(
+              '⏳ TIME CAPSULE\n' +
+                '/timecapsule open 2030-01-01 Message to future self\n' +
+                '/timecapsule open in 30d Keep going\n' +
+                '/timecapsule list\n' +
+                '/timecapsule open   (unlock due ones)\n' +
+                'Stored encrypted in bot settings (not blockchain).'
+            );
+            return;
+          }
+          const lines = ['⏳ YOUR CAPSULES', ''];
+          list.slice(0, 15).forEach((c, i) => {
+            lines.push(
+              i +
+                1 +
+                '. unlock ' +
+                String(c.unlockAt || '').slice(0, 10) +
+                (c.opened ? ' · OPENED' : ' · sealed')
+            );
+          });
+          await ctx.reply(lines.join('\n'));
+          return;
+        }
+      }
+
+      if (body.toLowerCase() === 'open' || body.toLowerCase().startsWith('open ')) {
+        // try unlock due
+        if (body.toLowerCase() === 'open') {
+          const key = 'capsules_' + String(ctx.from.id);
+          let list = [];
+          const raw = await getBotSetting(key);
+          if (raw) {
+            try {
+              list = JSON.parse(raw);
+            } catch (_) {}
+          }
+          const now = Date.now();
+          const { unsealMessage } = await import('../lib/packP.js');
+          const due = [];
+          for (const c of list) {
+            if (c.opened) continue;
+            if (new Date(c.unlockAt).getTime() <= now) {
+              const text = unsealMessage(c.sealed, String(ctx.from.id));
+              due.push(text || '(empty)');
+              c.opened = true;
+              c.openedAt = new Date().toISOString();
+            }
+          }
+          await setBotSetting(key, JSON.stringify(list.slice(0, 30)));
+          if (!due.length) {
+            await ctx.reply('No capsules ready to open yet. /timecapsule list');
+            return;
+          }
+          await ctx.reply(('📬 OPENED CAPSULE(S)\n\n' + due.join('\n---\n')).slice(0, 3500));
+          return;
+        }
+      }
+
+      const parsed = parseTimeCapsule(body);
+      if (!parsed || parsed.error) {
+        await ctx.reply(
+          (parsed && parsed.error ? parsed.error + '\n\n' : '') +
+            'Usage:\n/timecapsule open 2030-01-01 Hello future me\n/timecapsule open in 7d Stay strong'
+        );
+        return;
+      }
+      const sealed = sealMessage(parsed.message, String(ctx.from.id));
+      const key = 'capsules_' + String(ctx.from.id);
+      let list = [];
+      const raw = await getBotSetting(key);
+      if (raw) {
+        try {
+          list = JSON.parse(raw);
+        } catch (_) {}
+      }
+      if (!Array.isArray(list)) list = [];
+      list.unshift({
+        id: Date.now().toString(36),
+        unlockAt: parsed.unlockAt,
+        sealed,
+        opened: false,
+        createdAt: new Date().toISOString(),
+      });
+      await setBotSetting(key, JSON.stringify(list.slice(0, 30)));
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('timecapsule', true);
+      } catch (_) {}
+      await ctx.reply(
+        '⏳ CAPSULE SEALED\nUnlock: ' +
+          parsed.unlockAt.slice(0, 10) +
+          '\nWhen ready: /timecapsule open\n(Stored in bot settings; not on blockchain)'
+      );
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('timecapsule', false, err?.message);
+        await reportError(err, 'timecapsule');
+      } catch (_) {}
+      await ctx.reply('timecapsule failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['twin', 'clone', 'mystyle'], async (ctx) => {
+    try {
+      const body = (ctx.message.text || '')
+        .replace(/^\/(twin|clone|mystyle)(@\w+)?\s*/i, '')
+        .trim();
+      const uid = String(ctx.from.id);
+      const key = 'twin_' + uid;
+      const low = body.toLowerCase();
+
+      if (!body || low === 'help') {
+        await ctx.reply(
+          '🧬 TWIN (style clone)\n' +
+            '/twin on — enable\n' +
+            '/twin off — disable\n' +
+            '/twin sample Your example sentence here\n' +
+            '/twin as <message> — reply in YOUR style\n' +
+            '(Stores up to 12 style samples. Not full offline auto-DM.)'
+        );
+        return;
+      }
+      if (low === 'on' || low === 'enable') {
+        await setBotSetting(key, JSON.stringify({ on: true, samples: [] }));
+        await ctx.reply('🧬 Twin ON. Add samples: /twin sample <text>\nThen: /twin as Hello friend');
+        return;
+      }
+      if (low === 'off' || low === 'disable') {
+        const raw = await getBotSetting(key);
+        let o = { on: false, samples: [] };
+        if (raw) {
+          try {
+            o = JSON.parse(raw);
+          } catch (_) {}
+        }
+        o.on = false;
+        await setBotSetting(key, JSON.stringify(o));
+        await ctx.reply('🧬 Twin OFF');
+        return;
+      }
+      if (low.startsWith('sample ')) {
+        const sample = body.slice(7).trim().slice(0, 280);
+        if (!sample) {
+          await ctx.reply('Usage: /twin sample I usually write short and chill 😊');
+          return;
+        }
+        let o = { on: true, samples: [] };
+        const raw = await getBotSetting(key);
+        if (raw) {
+          try {
+            o = JSON.parse(raw);
+          } catch (_) {}
+        }
+        if (!Array.isArray(o.samples)) o.samples = [];
+        o.samples.unshift(sample);
+        o.samples = o.samples.slice(0, 12);
+        o.on = true;
+        await setBotSetting(key, JSON.stringify(o));
+        await ctx.reply('🧬 Sample saved (' + o.samples.length + '/12)');
+        return;
+      }
+      if (low.startsWith('as ')) {
+        const incoming = body.slice(3).trim();
+        if (!incoming) {
+          await ctx.reply('Usage: /twin as Can we run tomorrow?');
+          return;
+        }
+        let o = { samples: [] };
+        const raw = await getBotSetting(key);
+        if (raw) {
+          try {
+            o = JSON.parse(raw);
+          } catch (_) {}
+        }
+        await ctx.sendChatAction('typing');
+        const { twinReplyPrompt } = await import('../lib/packP.js');
+        const out = await generateReply(twinReplyPrompt(o.samples || [], incoming), ctx);
+        try {
+          const { trackCommand } = await import('../lib/errorRadar.js');
+          trackCommand('twin', true);
+        } catch (_) {}
+        await ctx.reply(('🧬 TWIN REPLY\n\n' + out).slice(0, 2000));
+        return;
+      }
+      await ctx.reply('Unknown twin subcommand. /twin help');
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('twin', false, err?.message);
+        await reportError(err, 'twin');
+      } catch (_) {}
+      await ctx.reply('twin failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['forgepage', 'forge', 'makepage'], async (ctx) => {
+    try {
+      const body = (ctx.message.text || '')
+        .replace(/^\/(forgepage|forge|makepage)(@\w+)?\s*/i, '')
+        .trim();
+      if (!body) {
+        await ctx.reply(
+          '🛠️ FORGE PAGE\n' +
+            '/forgepage Flower shop portfolio | Fresh roses daily, delivery in Colombo\n' +
+            '/forgepage Title | Description paragraph...\n' +
+            'Generates a single HTML landing page (copy or host yourself).'
+        );
+        return;
+      }
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(String(ctx.from.id));
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      let title = 'Radiant Page';
+      let brief = body;
+      if (body.includes('|')) {
+        const parts = body.split('|').map((s) => s.trim());
+        title = parts[0].slice(0, 80) || title;
+        brief = parts.slice(1).join('|').trim() || brief;
+      }
+      // Optional AI polish of brief
+      let polished = brief;
+      try {
+        const ai = await generateReply(
+          'Rewrite this landing-page blurb in clear, warm marketing English or Sinhala (match input). Max 80 words. No markdown.\n\n' +
+            brief.slice(0, 600),
+          ctx
+        );
+        if (ai && !/error|unavailable|rate limit/i.test(ai)) polished = ai.slice(0, 900);
+      } catch (_) {}
+      const { forgePageHtml } = await import('../lib/packP.js');
+      const html = forgePageHtml(polished, title);
+      // Store for founder download path via setting (snippet)
+      const id = Date.now().toString(36);
+      await setBotSetting('forge_' + id, html.slice(0, 50000));
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('forgepage', true);
+      } catch (_) {}
+      // Send as document
+      const buf = Buffer.from(html, 'utf8');
+      await ctx.replyWithDocument(
+        { source: buf, filename: 'forge-' + id + '.html' },
+        {
+          caption:
+            '🛠️ FORGED · ' +
+            title.slice(0, 60) +
+            '\nOpen the HTML file in a browser.\nHost on any static host (Vercel/Netlify/GitHub Pages).\n(id=' +
+            id +
+            ')',
+        }
+      );
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('forgepage', false, err?.message);
+        await reportError(err, 'forgepage');
+      } catch (_) {}
+      await ctx.reply('forgepage failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['morningdigest', 'digest', 'daynews'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(String(ctx.from.id));
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const { fetchDigestFeed, morningDigestPrompt } = await import('../lib/packP.js');
+      const feed = await fetchDigestFeed('https://hnrss.org/frontpage');
+      if (!feed.ok || !feed.items?.length) {
+        await ctx.reply('Digest feed empty: ' + (feed.error || 'no items'));
+        return;
+      }
+      const out = await generateReply(morningDigestPrompt(feed.items), ctx);
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('morningdigest', true);
+      } catch (_) {}
+      await ctx.reply(('🌅 MORNING DIGEST\n\n' + out).slice(0, 3500));
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('morningdigest', false, err?.message);
+        await reportError(err, 'morningdigest');
+      } catch (_) {}
+      await ctx.reply('morningdigest failed: ' + String(err?.message || err).slice(0, 160));
     }
   });
 
