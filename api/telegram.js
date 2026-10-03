@@ -21,9 +21,12 @@ const supabase =
 
 const MODELS = [
   'gemini-3.8-flash',
+  'gemini-3.7-flash',
   'gemini-3.6-flash',
   'gemini-3.5-flash',
   'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-3-flash-preview',
   'gemini-2.5-flash',
   'gemini-flash-latest',
 ];
@@ -125,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-packE-fix-F'; // Fix code syntax + Pack F QR/sticker/meta
+const BOT_VERSION = 'v4.0-packG'; // Pack G: search fix + Gemini 3.8 + browse/news/fix/compare
 const STRIDE_BASE =
   process.env.STRIDE_API_BASE ||
   'https://strideclub-platform-6b71a.containers.snapdeploy.app';
@@ -6544,9 +6547,19 @@ bot.command('commands', async (ctx) => {
       } catch (_) {}
       await ctx.sendChatAction('typing');
       const { webSearch, formatSearchResults } = await import('../lib/webBoost.js');
-      const found = await webSearch(q);
+      let found = await webSearch(q);
       if (!found.ok || !found.results?.length) {
-        await ctx.reply('Search failed: ' + (found.error || 'no results'));
+        const { searchWikipedia } = await import('../lib/webBoost.js');
+        found = await searchWikipedia(q);
+      }
+      if (!found.ok || !found.results?.length) {
+        await ctx.reply(
+          'Search empty for: ' +
+            q +
+            '\nTry /askweb ' +
+            q +
+            '\nOr set FIRECRAWL_API_KEY / BRAVE_SEARCH_API_KEY on Vercel.'
+        );
         return;
       }
       await ctx.reply(formatSearchResults(found).slice(0, 3500));
@@ -9746,6 +9759,183 @@ bot.command('commands', async (ctx) => {
       );
     } catch (err) {
       await ctx.reply('linkmeta failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+    // ——— Pack G: browse / news / fix / compare ———
+  bot.command(['browse', 'deepweb'], async (ctx) => {
+    try {
+      const arg = (ctx.message.text || '')
+        .replace(/^\/(browse|deepweb)(@\w+)?\s*/i, '')
+        .trim();
+      if (!arg) {
+        await ctx.reply(
+          'Deep browse a page + AI notes\n\nUsage:\n/browse https://example.com\n/browse https://site.com what is the pricing?'
+        );
+        return;
+      }
+      const uid = String(ctx.from.id);
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      try {
+        const pay = await spendGold(ctx, 'ask');
+        if (!pay.ok) return ctx.reply(pay.message || 'Not enough gold.');
+      } catch (_) {}
+      const parts = arg.split(/\s+/);
+      let url = parts[0];
+      let question = parts.slice(1).join(' ').trim();
+      if (!/^https?:\/\//i.test(url) && !url.includes('.')) {
+        await ctx.reply('First argument must be a URL.');
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const { fetchPageBoosted } = await import('../lib/webBoost.js');
+      const page = await fetchPageBoosted(url);
+      if (!page.ok) {
+        await ctx.reply('browse failed: ' + page.error);
+        return;
+      }
+      const prompt =
+        (question
+          ? 'Answer this question from the page content: ' + question + '\n\n'
+          : 'Provide: 1) what this page is 2) key facts 3) risks/caveats 4) useful links mentioned.\n\n') +
+        'URL: ' +
+        page.finalUrl +
+        '\nProvider: ' +
+        (page.provider || '') +
+        '\n\nCONTENT:\n' +
+        page.text.slice(0, 9000);
+      const out = await generateReply(prompt, ctx);
+      await ctx.reply(
+        ('🧭 BROWSE · ' + (page.provider || 'web') + '\n' + page.finalUrl + '\n\n' + out).slice(
+          0,
+          3500
+        )
+      );
+    } catch (err) {
+      await ctx.reply('browse failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['news', 'headlines'], async (ctx) => {
+    try {
+      const q = (ctx.message.text || '')
+        .replace(/^\/(news|headlines)(@\w+)?\s*/i, '')
+        .trim() || 'world news today';
+      const uid = String(ctx.from.id);
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const { webSearch, formatSearchResults } = await import('../lib/webBoost.js');
+      const found = await webSearch(q + ' news');
+      if (!found.ok || !found.results?.length) {
+        await ctx.reply('News search empty. Try /askweb ' + q);
+        return;
+      }
+      const summary = await generateReply(
+        'Summarize these news-related search hits into 5 short bullet headlines with links.\n\n' +
+          formatSearchResults(found).slice(0, 4000),
+        ctx
+      );
+      await ctx.reply(('📰 NEWS · ' + (found.provider || '') + '\n\n' + summary).slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('news failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['fix', 'debugsite', 'codefix'], async (ctx) => {
+    try {
+      const arg = (ctx.message.text || '')
+        .replace(/^\/(fix|debugsite|codefix)(@\w+)?\s*/i, '')
+        .trim();
+      if (!arg) {
+        await ctx.reply(
+          'Site / code fix helper\n\nUsage:\n/fix https://mysite.com error 500 on login\n/fix why does my Telegram webhook return 500?'
+        );
+        return;
+      }
+      const uid = String(ctx.from.id);
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      try {
+        const pay = await spendGold(ctx, 'ask');
+        if (!pay.ok) return ctx.reply(pay.message || 'Not enough gold.');
+      } catch (_) {}
+      await ctx.sendChatAction('typing');
+      let pageBlock = '';
+      const urlMatch = arg.match(/https?:\/\/\S+/i);
+      if (urlMatch) {
+        const { fetchPageBoosted } = await import('../lib/webBoost.js');
+        const page = await fetchPageBoosted(urlMatch[0]);
+        if (page.ok) {
+          pageBlock =
+            '\n\nPAGE FETCH (' +
+            (page.provider || '') +
+            '):\n' +
+            page.finalUrl +
+            '\n' +
+            page.text.slice(0, 5000);
+        }
+      }
+      const out = await generateReply(
+        'You are a staff engineer helping debug production issues. ' +
+          'Give: likely root causes, exact checks, and minimal fix steps. ' +
+          'Prefer Node/Telegram/Vercel/Supabase when relevant.\n\nUSER REPORT:\n' +
+          arg +
+          pageBlock,
+        ctx
+      );
+      await ctx.reply(('🛠️ FIX\n\n' + out).slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('fix failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['compare', 'vs'], async (ctx) => {
+    try {
+      const arg = (ctx.message.text || '')
+        .replace(/^\/(compare|vs)(@\w+)?\s*/i, '')
+        .trim();
+      if (!arg || !/\s(vs|versus|VS)\s|\s\|\s/.test(arg)) {
+        await ctx.reply('Usage:\n/compare React vs Vue\n/compare Nike Run Club | Strava');
+        return;
+      }
+      const uid = String(ctx.from.id);
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const { webSearch, formatSearchResults } = await import('../lib/webBoost.js');
+      const found = await webSearch(arg + ' comparison');
+      const bundle = found.ok ? formatSearchResults(found) : '';
+      const out = await generateReply(
+        'Compare fairly in a short table-like bullet list: pros, cons, who should pick which.\n\nTOPIC: ' +
+          arg +
+          (bundle ? '\n\nWEB HITS:\n' + bundle.slice(0, 3500) : ''),
+        ctx
+      );
+      await ctx.reply(('⚖️ COMPARE\n\n' + out).slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('compare failed: ' + String(err?.message || err).slice(0, 160));
     }
   });
 
