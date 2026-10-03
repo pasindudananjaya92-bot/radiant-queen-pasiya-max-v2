@@ -128,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-packP'; // Pack P: oracle+ghost+timecapsule+twin+forgepage+morningdigest
+const BOT_VERSION = 'v4.0-packPfix'; // Pack P-FIX: ghost/capsule cron queue, relative time, no setTimeout
 /** Pack I: pending trivia answers chatId:userId -> trivia obj */
 const pendingTrivia = new Map();
 
@@ -12028,37 +12028,56 @@ bot.command('commands', async (ctx) => {
 
   bot.command(['ghost', 'selfdestruct', 'sdmsg'], async (ctx) => {
     try {
+      // Founder-only (experimental durable delete)
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only feature.');
+        return;
+      }
       const body = (ctx.message.text || '')
         .replace(/^\/(ghost|selfdestruct|sdmsg)(@\w+)?\s*/i, '')
         .trim();
-      const { parseGhostArgs } = await import('../lib/packP.js');
+      const { parseGhostArgs, enqueueGhost } = await import('../lib/packP.js');
       const parsed = parseGhostArgs(body);
       if (!parsed) {
         await ctx.reply(
-          '👻 GHOST MESSAGE (self-destruct)\n' +
+          '👻 GHOST MESSAGE (self-destruct via cron)\n' +
             '/ghost 30 Your secret text\n' +
             '/ghost 5m Meeting at 6\n' +
-            '(5–3600 seconds; bot deletes its own message after delay)\n' +
+            '/ghost 2h Note\n' +
+            '(5s–47h; deleted by /api/cron-ghost — schedule every 30–60s)\n' +
             'Note: Telegram cannot detect screenshots.'
         );
         return;
       }
       const sent = await ctx.reply(
-        '👻 GHOST · deletes in ' + parsed.secs + 's\n\n' + parsed.msg,
+        '👻 GHOST · deletes ~' + parsed.secs + 's\n\n' + parsed.msg,
         { disable_notification: true }
       );
+      // Queue in Supabase (no setTimeout — survives serverless freeze)
+      try {
+        const raw = await getBotSetting('ghost_queue');
+        let list = [];
+        if (raw) {
+          try {
+            list = JSON.parse(raw);
+          } catch (_) {
+            list = [];
+          }
+        }
+        list = enqueueGhost(list, {
+          chatId: ctx.chat.id,
+          messageId: sent.message_id,
+          deleteAt: parsed.deleteAt,
+          userId: ctx.from.id,
+        });
+        await setBotSetting('ghost_queue', JSON.stringify(list));
+      } catch (e) {
+        console.error('ghost queue', e);
+      }
       try {
         const { trackCommand } = await import('../lib/errorRadar.js');
         trackCommand('ghost', true);
       } catch (_) {}
-      // schedule delete (best-effort on serverless — may not fire if instance freezes)
-      const chatId = ctx.chat.id;
-      const msgId = sent.message_id;
-      setTimeout(async () => {
-        try {
-          await ctx.telegram.deleteMessage(chatId, msgId);
-        } catch (_) {}
-      }, parsed.secs * 1000);
     } catch (err) {
       try {
         const { reportError, trackCommand } = await import('../lib/errorRadar.js');
@@ -12071,84 +12090,81 @@ bot.command('commands', async (ctx) => {
 
   bot.command(['timecapsule', 'capsule', 'futureme'], async (ctx) => {
     try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only feature.');
+        return;
+      }
       const body = (ctx.message.text || '')
         .replace(/^\/(timecapsule|capsule|futureme)(@\w+)?\s*/i, '')
         .trim();
-      const { parseTimeCapsule, sealMessage } = await import('../lib/packP.js');
-      if (!body || body.toLowerCase() === 'list' || body.toLowerCase() === 'open') {
-        // list pending
-        if (body.toLowerCase() === 'list' || !body) {
-          const raw = await getBotSetting('capsules_' + String(ctx.from.id));
-          let list = [];
-          if (raw) {
-            try {
-              list = JSON.parse(raw);
-            } catch (_) {}
-          }
-          if (!Array.isArray(list) || !list.length) {
-            await ctx.reply(
-              '⏳ TIME CAPSULE\n' +
-                '/timecapsule open 2030-01-01 Message to future self\n' +
-                '/timecapsule open in 30d Keep going\n' +
-                '/timecapsule list\n' +
-                '/timecapsule open   (unlock due ones)\n' +
-                'Stored encrypted in bot settings (not blockchain).'
-            );
-            return;
-          }
-          const lines = ['⏳ YOUR CAPSULES', ''];
-          list.slice(0, 15).forEach((c, i) => {
-            lines.push(
-              i +
-                1 +
-                '. unlock ' +
-                String(c.unlockAt || '').slice(0, 10) +
-                (c.opened ? ' · OPENED' : ' · sealed')
-            );
-          });
-          await ctx.reply(lines.join('\n'));
+      const { parseTimeCapsule, sealMessage, unsealMessage } = await import('../lib/packP.js');
+      const low = body.toLowerCase();
+
+      if (!body || low === 'list') {
+        const raw = await getBotSetting('capsules_' + String(ctx.from.id));
+        let list = [];
+        if (raw) {
+          try {
+            list = JSON.parse(raw);
+          } catch (_) {}
+        }
+        if (!Array.isArray(list) || !list.length) {
+          await ctx.reply(
+            '⏳ TIME CAPSULE\n' +
+              '/timecapsule open 2030-01-01 Message to future self\n' +
+              '/timecapsule in 2m Keep going\n' +
+              '/timecapsule open in 1h Check form\n' +
+              '/timecapsule list\n' +
+              '/timecapsule open   (manual unlock due ones)\n' +
+              'Auto-DM when due via /api/cron-ghost'
+          );
           return;
         }
+        const lines = ['⏳ YOUR CAPSULES', ''];
+        list.slice(0, 15).forEach((c, i) => {
+          lines.push(
+            i + 1 + '. unlock ' + String(c.unlockAt || '').slice(0, 19).replace('T', ' ') +
+            (c.opened ? ' · OPENED' : ' · sealed')
+          );
+        });
+        await ctx.reply(lines.join('\n'));
+        return;
       }
 
-      if (body.toLowerCase() === 'open' || body.toLowerCase().startsWith('open ')) {
-        // try unlock due
-        if (body.toLowerCase() === 'open') {
-          const key = 'capsules_' + String(ctx.from.id);
-          let list = [];
-          const raw = await getBotSetting(key);
-          if (raw) {
-            try {
-              list = JSON.parse(raw);
-            } catch (_) {}
+      if (low === 'open') {
+        const key = 'capsules_' + String(ctx.from.id);
+        let list = [];
+        const raw = await getBotSetting(key);
+        if (raw) {
+          try {
+            list = JSON.parse(raw);
+          } catch (_) {}
+        }
+        const now = Date.now();
+        const due = [];
+        for (const c of list) {
+          if (c.opened) continue;
+          if (new Date(c.unlockAt).getTime() <= now) {
+            const text = unsealMessage(c.sealed, String(ctx.from.id));
+            due.push(text || '(empty)');
+            c.opened = true;
+            c.openedAt = new Date().toISOString();
           }
-          const now = Date.now();
-          const { unsealMessage } = await import('../lib/packP.js');
-          const due = [];
-          for (const c of list) {
-            if (c.opened) continue;
-            if (new Date(c.unlockAt).getTime() <= now) {
-              const text = unsealMessage(c.sealed, String(ctx.from.id));
-              due.push(text || '(empty)');
-              c.opened = true;
-              c.openedAt = new Date().toISOString();
-            }
-          }
-          await setBotSetting(key, JSON.stringify(list.slice(0, 30)));
-          if (!due.length) {
-            await ctx.reply('No capsules ready to open yet. /timecapsule list');
-            return;
-          }
-          await ctx.reply(('📬 OPENED CAPSULE(S)\n\n' + due.join('\n---\n')).slice(0, 3500));
+        }
+        await setBotSetting(key, JSON.stringify(list.slice(0, 30)));
+        if (!due.length) {
+          await ctx.reply('No capsules ready yet. /timecapsule list');
           return;
         }
+        await ctx.reply(('📬 OPENED CAPSULE(S)\n\n' + due.join('\n---\n')).slice(0, 3500));
+        return;
       }
 
       const parsed = parseTimeCapsule(body);
       if (!parsed || parsed.error) {
         await ctx.reply(
           (parsed && parsed.error ? parsed.error + '\n\n' : '') +
-            'Usage:\n/timecapsule open 2030-01-01 Hello future me\n/timecapsule open in 7d Stay strong'
+            'Usage:\n/timecapsule in 2m Hello\n/timecapsule open in 1h Check form\n/timecapsule open 2030-01-01 Future me'
         );
         return;
       }
@@ -12170,14 +12186,29 @@ bot.command('commands', async (ctx) => {
         createdAt: new Date().toISOString(),
       });
       await setBotSetting(key, JSON.stringify(list.slice(0, 30)));
+      // index for cron auto-DM
+      try {
+        const idxRaw = await getBotSetting('capsule_index');
+        let idx = [];
+        if (idxRaw) {
+          try {
+            idx = JSON.parse(idxRaw);
+          } catch (_) {}
+        }
+        if (!Array.isArray(idx)) idx = [];
+        if (!idx.some((e) => String(e.userId) === String(ctx.from.id))) {
+          idx.push({ userId: String(ctx.from.id) });
+        }
+        await setBotSetting('capsule_index', JSON.stringify(idx.slice(-100)));
+      } catch (_) {}
       try {
         const { trackCommand } = await import('../lib/errorRadar.js');
         trackCommand('timecapsule', true);
       } catch (_) {}
       await ctx.reply(
         '⏳ CAPSULE SEALED\nUnlock: ' +
-          parsed.unlockAt.slice(0, 10) +
-          '\nWhen ready: /timecapsule open\n(Stored in bot settings; not on blockchain)'
+          parsed.unlockAt.slice(0, 19).replace('T', ' ') +
+          ' UTC\nAuto-DM via cron when due · or /timecapsule open'
       );
     } catch (err) {
       try {
@@ -12284,6 +12315,10 @@ bot.command('commands', async (ctx) => {
 
   bot.command(['forgepage', 'forge', 'makepage'], async (ctx) => {
     try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only feature.');
+        return;
+      }
       const body = (ctx.message.text || '')
         .replace(/^\/(forgepage|forge|makepage)(@\w+)?\s*/i, '')
         .trim();
