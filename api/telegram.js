@@ -128,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-packPfix'; // Pack P-FIX: ghost/capsule cron queue, relative time, no setTimeout
+const BOT_VERSION = 'v4.0-packQ'; // Pack Q: track+remix+dream+voicedigest (impossible workarounds)
 /** Pack I: pending trivia answers chatId:userId -> trivia obj */
 const pendingTrivia = new Map();
 
@@ -12417,6 +12417,369 @@ bot.command('commands', async (ctx) => {
         await reportError(err, 'morningdigest');
       } catch (_) {}
       await ctx.reply('morningdigest failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+
+
+  // ——— Pack Q: track / remix / dream / voicedigest ———
+  bot.command(['track', 'watchprice', 'autopilot'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only feature.');
+        return;
+      }
+      const body = (ctx.message.text || '')
+        .replace(/^\/(track|watchprice|autopilot)(@\w+)?\s*/i, '')
+        .trim();
+      const { parseTrackArgs, fetchPagePrice } = await import('../lib/packQ.js');
+      const parsed = parseTrackArgs(body);
+      if (!parsed?.url) {
+        await ctx.reply(
+          '📉 PRICE TRACK (autopilot-lite)\n' +
+            '/track https://example.com/product 15000\n' +
+            '/tracklist\n' +
+            '/untrack <id>\n' +
+            'Cron: /api/cron-track daily · plain HTML fetch (no paid scrape)'
+        );
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const probe = await fetchPagePrice(parsed.url);
+      const id = Date.now().toString(36);
+      const item = {
+        id,
+        userId: String(ctx.from.id),
+        url: parsed.url,
+        target: parsed.target,
+        title: probe.title || '',
+        lastPrice: probe.price,
+        lastCheck: new Date().toISOString(),
+        once: false,
+      };
+      let list = [];
+      const raw = await getBotSetting('track_list');
+      if (raw) {
+        try {
+          list = JSON.parse(raw);
+        } catch (_) {}
+      }
+      if (!Array.isArray(list)) list = [];
+      list.unshift(item);
+      await setBotSetting('track_list', JSON.stringify(list.slice(0, 40)));
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('track', true);
+      } catch (_) {}
+      await ctx.reply(
+        (
+          '📉 TRACKING\n' +
+          'id: ' +
+          id +
+          '\n' +
+          (item.title ? item.title + '\n' : '') +
+          'URL: ' +
+          parsed.url +
+          '\n' +
+          'Target: ' +
+          (parsed.target != null ? parsed.target : '(alert any drop vs last)') +
+          '\n' +
+          'Now: ' +
+          (probe.price != null ? probe.price + ' (' + probe.source + ')' : 'not detected') +
+          '\n/tracklist'
+        ).slice(0, 3500)
+      );
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('track', false, err?.message);
+        await reportError(err, 'track');
+      } catch (_) {}
+      await ctx.reply('track failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['tracklist', 'tracks'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only feature.');
+        return;
+      }
+      const raw = await getBotSetting('track_list');
+      let list = [];
+      if (raw) {
+        try {
+          list = JSON.parse(raw);
+        } catch (_) {}
+      }
+      if (!Array.isArray(list) || !list.length) {
+        await ctx.reply('No tracks. /track <url> <price>');
+        return;
+      }
+      const lines = ['📉 YOUR TRACKS', ''];
+      list.slice(0, 20).forEach((t, i) => {
+        lines.push(
+          i +
+            1 +
+            '. [' +
+            t.id +
+            '] target=' +
+            (t.target ?? '?') +
+            ' last=' +
+            (t.lastPrice ?? '?') +
+            '\n   ' +
+            String(t.url).slice(0, 80)
+        );
+      });
+      await ctx.reply(lines.join('\n').slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('tracklist failed: ' + String(err?.message || err).slice(0, 120));
+    }
+  });
+
+  bot.command(['untrack', 'trackdel'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only feature.');
+        return;
+      }
+      const id = (ctx.message.text || '')
+        .replace(/^\/(untrack|trackdel)(@\w+)?\s*/i, '')
+        .trim();
+      if (!id) {
+        await ctx.reply('Usage: /untrack <id>');
+        return;
+      }
+      let list = [];
+      const raw = await getBotSetting('track_list');
+      if (raw) {
+        try {
+          list = JSON.parse(raw);
+        } catch (_) {}
+      }
+      const before = list.length;
+      list = (Array.isArray(list) ? list : []).filter((t) => t.id !== id);
+      await setBotSetting('track_list', JSON.stringify(list));
+      await ctx.reply(before === list.length ? 'Id not found' : 'Removed ' + id);
+    } catch (err) {
+      await ctx.reply('untrack failed: ' + String(err?.message || err).slice(0, 120));
+    }
+  });
+
+  bot.command(['remix', 'variations', 'multiseed'], async (ctx) => {
+    try {
+      const body = (ctx.message.text || '')
+        .replace(/^\/(remix|variations|multiseed)(@\w+)?\s*/i, '')
+        .trim();
+      if (!body) {
+        await ctx.reply(
+          '🎨 REMIX (multi-seed)\n' +
+            '/remix a golden runner at sunrise\n' +
+            'Generates 4 seed variations (Pollinations free). Pick your favorite.'
+        );
+        return;
+      }
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(String(ctx.from.id));
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+        try {
+          const pay = await spendGold(ctx, 'vision');
+          if (!pay.ok) {
+            await ctx.reply(pay.message || 'Not enough gold. /balance');
+            return;
+          }
+        } catch (_) {}
+      }
+      await ctx.sendChatAction('upload_photo');
+      const { remixSeedUrls } = await import('../lib/packQ.js');
+      const plan = remixSeedUrls(body, 4);
+      // download up to 4 images sequentially (founder can afford wait)
+      const media = [];
+      for (const v of plan.variants) {
+        try {
+          const res = await fetch(v.url, {
+            headers: { Accept: 'image/*' },
+            signal: AbortSignal.timeout(45000),
+            redirect: 'follow',
+          });
+          if (!res.ok) continue;
+          const buf = Buffer.from(await res.arrayBuffer());
+          if (buf.length < 500) continue;
+          media.push({
+            type: 'photo',
+            media: { source: buf },
+            caption: media.length === 0 ? ('🎨 REMIX · seed variations\n' + plan.prompt).slice(0, 900) : ('seed ' + v.seed),
+          });
+        } catch (_) {}
+        if (media.length >= 4) break;
+      }
+      if (!media.length) {
+        await ctx.reply('Remix failed to download images. Try /imagine instead.');
+        return;
+      }
+      if (media.length === 1) {
+        await ctx.replyWithPhoto(media[0].media, { caption: media[0].caption });
+      } else {
+        await ctx.replyWithMediaGroup(media);
+      }
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('remix', true);
+      } catch (_) {}
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('remix', false, err?.message);
+        await reportError(err, 'remix');
+      } catch (_) {}
+      await ctx.reply('remix failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['dream', 'adventure', 'storypath'], async (ctx) => {
+    try {
+      const body = (ctx.message.text || '')
+        .replace(/^\/(dream|adventure|storypath)(@\w+)?\s*/i, '')
+        .trim();
+      const uid = String(ctx.from.id);
+      const key = 'dream_' + uid;
+      const { dreamStartPrompt, dreamContinuePrompt, parseDreamChoice } = await import('../lib/packQ.js');
+
+      // continue choice
+      const choice = parseDreamChoice(body);
+      if (choice) {
+        const raw = await getBotSetting(key);
+        if (!raw) {
+          await ctx.reply('No active dream. Start with /dream <theme>');
+          return;
+        }
+        let st = {};
+        try {
+          st = JSON.parse(raw);
+        } catch (_) {
+          st = {};
+        }
+        if (!st.theme) {
+          await ctx.reply('No active dream. Start with /dream <theme>');
+          return;
+        }
+        await ctx.sendChatAction('typing');
+        const out = await generateReply(
+          dreamContinuePrompt(st.theme, st.history || '', choice),
+          ctx
+        );
+        st.history = (String(st.history || '') + '\n[' + choice + '] ' + String(out || '').slice(0, 400)).slice(-2000);
+        st.turns = (st.turns || 0) + 1;
+        if (/ENDING:/i.test(out || '') || st.turns >= 12) {
+          await setBotSetting(key, null);
+          await ctx.reply(('🌙 DREAM ENDING\n\n' + out).slice(0, 3500));
+        } else {
+          await setBotSetting(key, JSON.stringify(st));
+          await ctx.reply(
+            ('🌙 DREAM · scene ' + st.turns + '\n\n' + out + '\n\nReply /dream A · /dream B · /dream C').slice(0, 3500)
+          );
+        }
+        return;
+      }
+
+      if (!body) {
+        await ctx.reply(
+          '🌙 DREAM (choose-your-path)\n' +
+            '/dream flying over Sigiriya with dragons\n' +
+            'Then: /dream A  or  /dream B  or  /dream C\n' +
+            '/dream end — stop adventure'
+        );
+        return;
+      }
+      if (body.toLowerCase() === 'end' || body.toLowerCase() === 'stop') {
+        await setBotSetting(key, null);
+        await ctx.reply('🌙 Dream ended.');
+        return;
+      }
+
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(uid);
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const theme = body.slice(0, 200);
+      const out = await generateReply(dreamStartPrompt(theme), ctx);
+      await setBotSetting(
+        key,
+        JSON.stringify({
+          theme,
+          history: String(out || '').slice(0, 500),
+          turns: 1,
+          at: Date.now(),
+        })
+      );
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('dream', true);
+      } catch (_) {}
+      await ctx.reply(
+        ('🌙 DREAM START\n\n' + out + '\n\nReply /dream A · /dream B · /dream C').slice(0, 3500)
+      );
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('dream', false, err?.message);
+        await reportError(err, 'dream');
+      } catch (_) {}
+      await ctx.reply('dream failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['voicedigest', 'voicenews', 'holofeed'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(String(ctx.from.id));
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const { fetchDigestFeed, morningDigestPrompt } = await import('../lib/packP.js');
+      const feed = await fetchDigestFeed('https://hnrss.org/frontpage');
+      if (!feed.ok || !feed.items?.length) {
+        await ctx.reply('Digest feed empty: ' + (feed.error || 'no items'));
+        return;
+      }
+      const textOut = await generateReply(morningDigestPrompt(feed.items), ctx);
+      const msg = String(textOut || '').slice(0, 1800);
+      await ctx.reply(('🌅 VOICE DIGEST (text)\n\n' + msg).slice(0, 3500));
+      // TTS voice note
+      try {
+        await ctx.sendChatAction('record_voice');
+        const { synthesizeSpeech } = await import('../lib/tts.js');
+        const tts = await synthesizeSpeech(msg.slice(0, 400));
+        if (tts.ok && tts.buffer) {
+          await ctx.replyWithVoice(
+            { source: tts.buffer },
+            { caption: '🎙️ Holofeed-lite · /morningdigest for text only' }
+          );
+        }
+      } catch (e) {
+        console.error('voicedigest tts', e);
+      }
+      try {
+        const { trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('voicedigest', true);
+      } catch (_) {}
+    } catch (err) {
+      try {
+        const { reportError, trackCommand } = await import('../lib/errorRadar.js');
+        trackCommand('voicedigest', false, err?.message);
+        await reportError(err, 'voicedigest');
+      } catch (_) {}
+      await ctx.reply('voicedigest failed: ' + String(err?.message || err).slice(0, 160));
     }
   });
 
