@@ -1,13 +1,10 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "crons": [
-    {
-      "path": "/api/cron-reminders",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron-digest",
-      "schedule": "0 3 * * *"
-    }
+  "rewrites": [
+    { "source": "/api/cron-ghost", "destination": "/api/cron?job=ghost" },
+    { "source": "/api/cron-track", "destination": "/api/cron?job=track" },
+    { "source": "/api/cron-watch", "destination": "/api/cron?job=watch" },
+    { "source": "/api/cron-reminders", "destination": "/api/cron?job=reminders" },
+    { "source": "/api/cron-reminder", "destination": "/api/cron?job=reminders" },
+    { "source": "/api/cron-digest", "destination": "/api/cron?job=digest" }
   ]
 }
