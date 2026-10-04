@@ -128,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-megaR'; // MEGA: podcast+rag+avatar+clone+screentrace+alive+miniapp + comic/remix harden
+const BOT_VERSION = 'v4.0-megaR-fix'; // embedding+TTS voices+comic/remix+miniapp auth
 /** Pack I: pending trivia answers chatId:userId -> trivia obj */
 const pendingTrivia = new Map();
 
@@ -12594,16 +12594,20 @@ bot.command('commands', async (ctx) => {
         } catch (_) {}
       }
       await ctx.sendChatAction('upload_photo');
-      const { downloadSeedAlbum } = await import('../lib/packMega.js');
-      const media = await downloadSeedAlbum('🎨 REMIX · ' + body, 2);
-      if (!media.length) {
+      const { downloadSeedAlbum, sleep } = await import('../lib/packMega.js');
+      const album = await downloadSeedAlbum(body, 2);
+      if (!album.length) {
         await ctx.reply('Remix: no images downloaded. Try /imagine or retry.');
         return;
       }
-      if (media.length === 1) {
-        await ctx.replyWithPhoto(media[0].media, { caption: media[0].caption });
-      } else {
-        await ctx.replyWithMediaGroup(media);
+      // Send ONE BY ONE (media groups often drop on serverless timeout)
+      for (let i = 0; i < album.length; i++) {
+        await ctx.sendChatAction('upload_photo');
+        await ctx.replyWithPhoto(
+          { source: album[i].buffer },
+          { caption: ('🎨 REMIX ' + (i + 1) + '/' + album.length + '\n' + album[i].caption).slice(0, 900) }
+        );
+        if (i < album.length - 1) await sleep(1500);
       }
       try {
         const { trackCommand } = await import('../lib/errorRadar.js');
@@ -12843,21 +12847,21 @@ bot.command('commands', async (ctx) => {
       await ctx.reply(('📚 COMIC SCRIPT\n\n' + outline).slice(0, 3000));
       await ctx.sendChatAction('upload_photo');
       const media = [];
+      const { downloadSeedAlbum, sleep } = await import('../lib/packMega.js');
+      let sent = 0;
       for (const b of beats.slice(0, 2)) {
-        const { downloadSeedAlbum } = await import('../lib/packMega.js');
+        await ctx.sendChatAction('upload_photo');
         const album = await downloadSeedAlbum(b.visual, 1);
         if (album[0]) {
-          media.push({
-            type: 'photo',
-            media: album[0].media,
-            caption: (b.n + '. ' + b.dialogue).slice(0, 200),
-          });
+          await ctx.replyWithPhoto(
+            { source: album[0].buffer },
+            { caption: (b.n + '. ' + b.dialogue).slice(0, 200) }
+          );
+          sent += 1;
         }
-        await new Promise((r) => setTimeout(r, 1000));
+        await sleep(2500);
       }
-      if (media.length >= 2) await ctx.replyWithMediaGroup(media);
-      else if (media.length === 1) await ctx.replyWithPhoto(media[0].media, { caption: media[0].caption });
-      else await ctx.reply('Comic images failed — script above still usable.');
+      if (!sent) await ctx.reply('Comic images failed — script above still usable.');
       try {
         const { trackCommand } = await import('../lib/errorRadar.js');
         trackCommand('comic', true);
@@ -13122,12 +13126,13 @@ bot.command('commands', async (ctx) => {
       for (let i = 0; i < Math.min(use.length, 8); i++) {
         const L = use[i];
         await ctx.sendChatAction('record_voice');
-        const spoken = (L.who === 'RINA' ? 'Rina. ' : 'Alex. ') + L.text;
-        const tts = await synthesizeSpeech(spoken.slice(0, 200));
+        const spoken = L.text;
+        const voice = L.who === 'RINA' ? 'rina' : 'alex'; // distinct accents
+        const tts = await synthesizeSpeech(spoken.slice(0, 180), voice);
         if (tts.ok && tts.buffer) {
           await ctx.replyWithVoice(
             { source: tts.buffer },
-            { caption: L.who + ' · ' + (i + 1) + '/' + Math.min(use.length, 8) }
+            { caption: L.who + ' · ' + (i + 1) + '/' + Math.min(use.length, 8) + ' · ' + (tts.lang || voice) }
           );
         }
       }
@@ -13220,7 +13225,7 @@ bot.command('commands', async (ctx) => {
         const { synthesizeSpeech } = await import('../lib/tts.js');
         const lines = parsePodcastLines(script).slice(0, 6);
         for (let i = 0; i < lines.length; i++) {
-          const tts = await synthesizeSpeech((lines[i].who + '. ' + lines[i].text).slice(0, 200));
+          const tts = await synthesizeSpeech(lines[i].text.slice(0, 180), lines[i].who === 'RINA' ? 'rina' : 'alex');
           if (tts.ok && tts.buffer) {
             await ctx.replyWithVoice({ source: tts.buffer }, { caption: lines[i].who });
           }
