@@ -128,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-megaR-quality'; // URL media-group comic/remix + robust TTS
+const BOT_VERSION = 'v4.0-packS1'; // podcast quality + website assistant + legendary 5
 /** Pack I: pending trivia answers chatId:userId -> trivia obj */
 const pendingTrivia = new Map();
 
@@ -13114,30 +13114,51 @@ bot.command('commands', async (ctx) => {
       const lines = parsePodcastLines(script);
       await ctx.reply(('🎙️ SCRIPT\n\n' + script).slice(0, 3500));
       const { synthesizeSpeech } = await import('../lib/tts.js');
-      const use = lines.length ? lines : [{ who: 'ALEX', text: String(script).slice(0, 180) }];
-      for (let i = 0; i < Math.min(use.length, 8); i++) {
-        const L = use[i];
-        await ctx.sendChatAction('record_voice');
-        const spoken = L.text;
-        const voice = L.who === 'RINA' ? 'rina' : 'alex'; // distinct accents
-        const tts = await synthesizeSpeech(spoken.slice(0, 160), voice);
-        if (tts.ok && tts.buffer) {
-          await ctx.replyWithVoice(
-            { source: tts.buffer },
-            { caption: L.who + ' · ' + (i + 1) + '/' + Math.min(use.length, 8) + ' · ' + (tts.lang || voice) }
-          );
-        } else {
-          // retry plain en
-          const tts2 = await synthesizeSpeech(spoken.slice(0, 160), 'en');
-          if (tts2.ok && tts2.buffer) {
+      const use = lines.length ? lines : [{ who: 'ALEX', text: String(script).slice(0, 160) }];
+      // QUALITY: merge into 2 longer host tracks (not 8 tiny fragments)
+      const alexParts = use.filter((L) => L.who === 'ALEX').map((L) => L.text);
+      const rinaParts = use.filter((L) => L.who === 'RINA').map((L) => L.text);
+      const tracks = [
+        { who: 'ALEX', voice: 'alex', text: alexParts.join('. ').slice(0, 280) },
+        { who: 'RINA', voice: 'rina', text: rinaParts.join('. ').slice(0, 280) },
+      ].filter((t) => t.text && t.text.length > 8);
+      for (let i = 0; i < tracks.length; i++) {
+        const T = tracks[i];
+        // split track into <=160 char chunks for gTTS limit
+        const chunks = [];
+        let rest = T.text;
+        while (rest.length && chunks.length < 3) {
+          if (rest.length <= 160) {
+            chunks.push(rest);
+            break;
+          }
+          let cut = rest.lastIndexOf('. ', 150);
+          if (cut < 40) cut = rest.lastIndexOf(' ', 150);
+          if (cut < 30) cut = 150;
+          chunks.push(rest.slice(0, cut + 1).trim());
+          rest = rest.slice(cut + 1).trim();
+        }
+        for (let c = 0; c < chunks.length; c++) {
+          await ctx.sendChatAction('record_voice');
+          let tts = await synthesizeSpeech(chunks[c], T.voice);
+          if (!tts.ok || !tts.buffer) tts = await synthesizeSpeech(chunks[c], 'en');
+          if (tts.ok && tts.buffer) {
             await ctx.replyWithVoice(
-              { source: tts2.buffer },
-              { caption: L.who + ' · ' + (i + 1) + ' · en-fallback' }
+              { source: tts.buffer },
+              {
+                caption:
+                  T.who +
+                  (chunks.length > 1 ? ' · part ' + (c + 1) : '') +
+                  ' · ' +
+                  (tts.lang || T.voice),
+              }
             );
           }
+          await new Promise((r) => setTimeout(r, 1200));
         }
-        // avoid gTTS rate limit
-        await new Promise((r) => setTimeout(r, 800));
+      }
+      if (!tracks.length) {
+        await ctx.reply('Podcast script ready above — voice synthesis unavailable right now.');
       }
     } catch (err) {
       await ctx.reply('podcast failed: ' + String(err?.message || err).slice(0, 160));
@@ -13608,6 +13629,176 @@ bot.command('commands', async (ctx) => {
       });
     } catch (err) {
       await ctx.reply('miniapp failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+
+
+  // ——— Pack S1: immortal / sleep / whatif / child / moodxray / private mode ———
+  bot.command(['immortal', 'legacy'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only experimental.');
+        return;
+      }
+      const body = (ctx.message.text || '').replace(/^\/(immortal|legacy)(@\w+)?\s*/i, '').trim();
+      if (!body) {
+        await ctx.reply('🕊️ /immortal <values, stories, message to future self>');
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const uid = String(ctx.from.id);
+      let mem = '';
+      try {
+        const raw = await getBotSetting('rag_mem_' + uid);
+        if (raw) {
+          const arr = JSON.parse(raw);
+          mem = (arr || []).slice(0, 5).map((x) => x.content).join('\n');
+        }
+      } catch (_) {}
+      const { immortalPrompt } = await import('../lib/packS.js');
+      const out = await generateReply(immortalPrompt(body, mem), ctx);
+      await setBotSetting(
+        'immortal_' + uid,
+        JSON.stringify({ body: body.slice(0, 1500), out: String(out).slice(0, 3000), at: new Date().toISOString() })
+      );
+      await ctx.reply(('🕊️ IMMORTAL CAPSULE\n\n' + out).slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('immortal failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['sleep', 'dreamcast'], async (ctx) => {
+    try {
+      const body = (ctx.message.text || '').replace(/^\/(sleep|dreamcast)(@\w+)?\s*/i, '').trim();
+      if (!body) {
+        await ctx.reply('🌙 /sleep <theme> [mood]\nExample: /sleep ocean calm');
+        return;
+      }
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(String(ctx.from.id));
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const parts = body.split(/\s+/);
+      const mood = parts.length > 1 ? parts[parts.length - 1] : 'calm';
+      const theme = parts.length > 1 ? parts.slice(0, -1).join(' ') : body;
+      const { sleepDreamPrompt } = await import('../lib/packS.js');
+      const out = await generateReply(sleepDreamPrompt(theme, mood), ctx);
+      await ctx.reply(('🌙 DREAMCAST\n\n' + out).slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('sleep failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['whatif', 'parallel'], async (ctx) => {
+    try {
+      const body = (ctx.message.text || '').replace(/^\/(whatif|parallel)(@\w+)?\s*/i, '').trim();
+      if (!body) {
+        await ctx.reply('🔀 /whatif I moved to another city for training');
+        return;
+      }
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(String(ctx.from.id));
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const { whatIfPrompt } = await import('../lib/packS.js');
+      const out = await generateReply(whatIfPrompt(body), ctx);
+      await ctx.reply(('🔀 WHAT IF\n\n' + out).slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('whatif failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['child', 'grow'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only experimental.');
+        return;
+      }
+      const body = (ctx.message.text || '').replace(/^\/(child|grow)(@\w+)?\s*/i, '').trim();
+      const uid = String(ctx.from.id);
+      const key = 'child_state_' + uid;
+      let st = { name: 'Seed', age: 1, last: 'newborn curiosity' };
+      const raw = await getBotSetting(key);
+      if (raw) {
+        try {
+          st = { ...st, ...JSON.parse(raw) };
+        } catch (_) {}
+      }
+      if (body.toLowerCase().startsWith('name ')) {
+        st.name = body.slice(5).trim().slice(0, 40) || st.name;
+        await setBotSetting(key, JSON.stringify(st));
+        await ctx.reply('Child named ' + st.name);
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const { childGrowthPrompt } = await import('../lib/packS.js');
+      const out = await generateReply(childGrowthPrompt(st.name, st.age, st.last), ctx);
+      st.age = Math.min(18, (st.age || 1) + 0.25);
+      st.last = String(out).slice(0, 400);
+      await setBotSetting(key, JSON.stringify(st));
+      await ctx.reply(('🌱 CHILD · ' + st.name + ' · age ~' + st.age + '\n\n' + out).slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('child failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['moodxray', 'mood', 'xray'], async (ctx) => {
+    try {
+      let body = (ctx.message.text || '').replace(/^\/(moodxray|mood|xray)(@\w+)?\s*/i, '').trim();
+      if (!body && ctx.message.reply_to_message?.text) {
+        body = ctx.message.reply_to_message.text;
+      }
+      if (!body) {
+        await ctx.reply('💓 /moodxray <text> or reply to a message');
+        return;
+      }
+      if (!isAdmin(ctx)) {
+        const rate = await checkRateLimit(String(ctx.from.id));
+        if (!rate.ok) {
+          await ctx.reply('Slow down. Retry in ~' + rate.waitSec + 's.');
+          return;
+        }
+      }
+      await ctx.sendChatAction('typing');
+      const { moodXrayPrompt } = await import('../lib/packS.js');
+      const out = await generateReply(moodXrayPrompt(body), ctx);
+      await ctx.reply(('💓 MOOD X-RAY\n\n' + out).slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('moodxray failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  // Private mode: when ON, non-founder gets soft redirect (not silent) — website + factory still public
+  bot.command(['privatemode', 'privatebot'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only setting.');
+        return;
+      }
+      const arg = (ctx.message.text || '').replace(/^\/(privatemode|privatebot)(@\w+)?\s*/i, '').trim().toLowerCase();
+      if (arg === 'on') {
+        await setBotSetting('private_mode', 'on');
+        await ctx.reply('🔒 Private mode ON — non-founders get website redirect on DMs.');
+        return;
+      }
+      if (arg === 'off') {
+        await setBotSetting('private_mode', 'off');
+        await ctx.reply('🔓 Private mode OFF — public bot.');
+        return;
+      }
+      const cur = (await getBotSetting('private_mode')) || 'off';
+      await ctx.reply('Private mode: ' + cur + '\n/privatemode on|off');
+    } catch (err) {
+      await ctx.reply('privatemode failed: ' + String(err?.message || err).slice(0, 120));
     }
   });
 
