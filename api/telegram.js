@@ -128,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-megaR-fix'; // embedding+TTS voices+comic/remix+miniapp auth
+const BOT_VERSION = 'v4.0-megaR-quality'; // URL media-group comic/remix + robust TTS
 /** Pack I: pending trivia answers chatId:userId -> trivia obj */
 const pendingTrivia = new Map();
 
@@ -12573,9 +12573,7 @@ bot.command('commands', async (ctx) => {
         .trim();
       if (!body) {
         await ctx.reply(
-          '🎨 REMIX (multi-seed)\n' +
-            '/remix a golden runner at sunrise\n' +
-            'Sends up to 3 variations (sequential download — more reliable).'
+          '🎨 REMIX\n/remix a golden runner at sunrise\nSends 2 variations as album (Telegram fetches images).'
         );
         return;
       }
@@ -12594,20 +12592,18 @@ bot.command('commands', async (ctx) => {
         } catch (_) {}
       }
       await ctx.sendChatAction('upload_photo');
-      const { downloadSeedAlbum, sleep } = await import('../lib/packMega.js');
-      const album = await downloadSeedAlbum(body, 2);
-      if (!album.length) {
-        await ctx.reply('Remix: no images downloaded. Try /imagine or retry.');
-        return;
-      }
-      // Send ONE BY ONE (media groups often drop on serverless timeout)
-      for (let i = 0; i < album.length; i++) {
-        await ctx.sendChatAction('upload_photo');
-        await ctx.replyWithPhoto(
-          { source: album[i].buffer },
-          { caption: ('🎨 REMIX ' + (i + 1) + '/' + album.length + '\n' + album[i].caption).slice(0, 900) }
-        );
-        if (i < album.length - 1) await sleep(1500);
+      const { buildUrlMediaGroup } = await import('../lib/packMega.js');
+      const media = buildUrlMediaGroup(body, 2);
+      try {
+        await ctx.replyWithMediaGroup(media);
+      } catch (e1) {
+        // fallback: first URL only
+        try {
+          await ctx.replyWithPhoto(media[0].media, { caption: media[0].caption });
+        } catch (e2) {
+          await ctx.reply('Remix failed: ' + String(e2?.message || e1?.message || e1).slice(0, 160));
+          return;
+        }
       }
       try {
         const { trackCommand } = await import('../lib/errorRadar.js');
@@ -12827,41 +12823,37 @@ bot.command('commands', async (ctx) => {
         .replace(/^\/(comic|comicstrip)(@\w+)?\s*/i, '')
         .trim();
       if (!theme) {
-        await ctx.reply('📚 COMIC\n/comic a runner vs the rain in Colombo\n6-panel story (founder-only)');
+        await ctx.reply('📚 COMIC\n/comic a runner vs the rain in Colombo\n4-panel album (founder)');
         return;
       }
       await ctx.sendChatAction('typing');
-      const { comicBeatsPrompt, parseComicBeats, downloadImage, buildRemixVariants } = await import(
-        '../lib/packR1.js'
-      );
+      const { comicBeatsPrompt, parseComicBeats, buildComicMediaGroup } = await import('../lib/packMega.js');
       const outline = await generateReply(comicBeatsPrompt(theme), ctx);
       let beats = parseComicBeats(outline);
-      if (beats.length < 3) {
-        // fallback fixed beats
-        beats = [1, 2, 3, 4, 5, 6].map((n) => ({
+      if (beats.length < 2) {
+        beats = [1, 2, 3, 4].map((n) => ({
           n,
-          visual: theme + ' comic panel ' + n + ', cinematic illustration',
+          visual: theme + ' comic panel ' + n + ', cinematic',
           dialogue: 'Panel ' + n,
         }));
       }
       await ctx.reply(('📚 COMIC SCRIPT\n\n' + outline).slice(0, 3000));
       await ctx.sendChatAction('upload_photo');
-      const media = [];
-      const { downloadSeedAlbum, sleep } = await import('../lib/packMega.js');
-      let sent = 0;
-      for (const b of beats.slice(0, 2)) {
-        await ctx.sendChatAction('upload_photo');
-        const album = await downloadSeedAlbum(b.visual, 1);
-        if (album[0]) {
-          await ctx.replyWithPhoto(
-            { source: album[0].buffer },
-            { caption: (b.n + '. ' + b.dialogue).slice(0, 200) }
-          );
-          sent += 1;
-        }
-        await sleep(2500);
+      const media = buildComicMediaGroup(beats.slice(0, 4));
+      if (!media.length) {
+        await ctx.reply('Comic images failed — script above still usable.');
+        return;
       }
-      if (!sent) await ctx.reply('Comic images failed — script above still usable.');
+      try {
+        await ctx.replyWithMediaGroup(media);
+      } catch (e1) {
+        try {
+          await ctx.replyWithPhoto(media[0].media, { caption: media[0].caption });
+          if (media[1]) await ctx.replyWithPhoto(media[1].media, { caption: media[1].caption });
+        } catch (e2) {
+          await ctx.reply('Comic images failed — script above still usable.\n' + String(e2.message || e1.message).slice(0, 100));
+        }
+      }
       try {
         const { trackCommand } = await import('../lib/errorRadar.js');
         trackCommand('comic', true);
@@ -13128,13 +13120,24 @@ bot.command('commands', async (ctx) => {
         await ctx.sendChatAction('record_voice');
         const spoken = L.text;
         const voice = L.who === 'RINA' ? 'rina' : 'alex'; // distinct accents
-        const tts = await synthesizeSpeech(spoken.slice(0, 180), voice);
+        const tts = await synthesizeSpeech(spoken.slice(0, 160), voice);
         if (tts.ok && tts.buffer) {
           await ctx.replyWithVoice(
             { source: tts.buffer },
             { caption: L.who + ' · ' + (i + 1) + '/' + Math.min(use.length, 8) + ' · ' + (tts.lang || voice) }
           );
+        } else {
+          // retry plain en
+          const tts2 = await synthesizeSpeech(spoken.slice(0, 160), 'en');
+          if (tts2.ok && tts2.buffer) {
+            await ctx.replyWithVoice(
+              { source: tts2.buffer },
+              { caption: L.who + ' · ' + (i + 1) + ' · en-fallback' }
+            );
+          }
         }
+        // avoid gTTS rate limit
+        await new Promise((r) => setTimeout(r, 800));
       }
     } catch (err) {
       await ctx.reply('podcast failed: ' + String(err?.message || err).slice(0, 160));
