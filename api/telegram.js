@@ -128,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-packR1'; // Pack R1: remix/voice fixes + debate/comic/watch/detective + stride bridge
+const BOT_VERSION = 'v4.0-megaR'; // MEGA: podcast+rag+avatar+clone+screentrace+alive+miniapp + comic/remix harden
 /** Pack I: pending trivia answers chatId:userId -> trivia obj */
 const pendingTrivia = new Map();
 
@@ -12594,24 +12594,8 @@ bot.command('commands', async (ctx) => {
         } catch (_) {}
       }
       await ctx.sendChatAction('upload_photo');
-      const { buildRemixVariants, downloadImage } = await import('../lib/packR1.js');
-      const plan = buildRemixVariants(body, 3);
-      const media = [];
-      for (const v of plan.variants) {
-        try {
-          const img = await downloadImage(v.url);
-          if (!img.ok) continue;
-          media.push({
-            type: 'photo',
-            media: { source: img.buffer },
-            caption:
-              media.length === 0
-                ? ('🎨 REMIX · ' + plan.prompt + '\nseed ' + v.seed).slice(0, 900)
-                : ('seed ' + v.seed),
-          });
-        } catch (_) {}
-        if (media.length >= 3) break;
-      }
+      const { downloadSeedAlbum } = await import('../lib/packMega.js');
+      const media = await downloadSeedAlbum('🎨 REMIX · ' + body, 2);
       if (!media.length) {
         await ctx.reply('Remix: no images downloaded. Try /imagine or retry.');
         return;
@@ -12859,15 +12843,17 @@ bot.command('commands', async (ctx) => {
       await ctx.reply(('📚 COMIC SCRIPT\n\n' + outline).slice(0, 3000));
       await ctx.sendChatAction('upload_photo');
       const media = [];
-      for (const b of beats.slice(0, 4)) {
-        const plan = buildRemixVariants(b.visual, 1);
-        const img = await downloadImage(plan.variants[0].url);
-        if (!img.ok) continue;
-        media.push({
-          type: 'photo',
-          media: { source: img.buffer },
-          caption: (b.n + '. ' + b.dialogue).slice(0, 200),
-        });
+      for (const b of beats.slice(0, 2)) {
+        const { downloadSeedAlbum } = await import('../lib/packMega.js');
+        const album = await downloadSeedAlbum(b.visual, 1);
+        if (album[0]) {
+          media.push({
+            type: 'photo',
+            media: album[0].media,
+            caption: (b.n + '. ' + b.dialogue).slice(0, 200),
+          });
+        }
+        await new Promise((r) => setTimeout(r, 1000));
       }
       if (media.length >= 2) await ctx.replyWithMediaGroup(media);
       else if (media.length === 1) await ctx.replyWithPhoto(media[0].media, { caption: media[0].caption });
@@ -13109,6 +13095,511 @@ bot.command('commands', async (ctx) => {
       await ctx.reply(('🤖 AGENT STATUS\n\n' + JSON.stringify(r.data, null, 2)).slice(0, 3000));
     } catch (err) {
       await ctx.reply('agentstatus failed: ' + String(err?.message || err).slice(0, 120));
+    }
+  });
+
+
+
+  // ——— MEGA R2/R3: podcast / rag / avatar / clone / screentrace / alive / miniapp ———
+  bot.command(['podcast'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only (multi-TTS).');
+        return;
+      }
+      const topic = (ctx.message.text || '').replace(/^\/podcast(@\w+)?\s*/i, '').trim();
+      if (!topic) {
+        await ctx.reply('🎙️ PODCAST\n/podcast recovery nutrition for runners\nTwo hosts · multi voice notes');
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const { podcastScriptPrompt, parsePodcastLines } = await import('../lib/packMega.js');
+      const script = await generateReply(podcastScriptPrompt(topic), ctx);
+      const lines = parsePodcastLines(script);
+      await ctx.reply(('🎙️ SCRIPT\n\n' + script).slice(0, 3500));
+      const { synthesizeSpeech } = await import('../lib/tts.js');
+      const use = lines.length ? lines : [{ who: 'ALEX', text: String(script).slice(0, 180) }];
+      for (let i = 0; i < Math.min(use.length, 8); i++) {
+        const L = use[i];
+        await ctx.sendChatAction('record_voice');
+        const spoken = (L.who === 'RINA' ? 'Rina. ' : 'Alex. ') + L.text;
+        const tts = await synthesizeSpeech(spoken.slice(0, 200));
+        if (tts.ok && tts.buffer) {
+          await ctx.replyWithVoice(
+            { source: tts.buffer },
+            { caption: L.who + ' · ' + (i + 1) + '/' + Math.min(use.length, 8) }
+          );
+        }
+      }
+    } catch (err) {
+      await ctx.reply('podcast failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['news_podcast', 'newspodcast'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const body = (ctx.message.text || '')
+        .replace(/^\/(news_podcast|newspodcast)(@\w+)?\s*/i, '')
+        .trim();
+      const uid = String(ctx.from.id);
+      if (!body || body === 'help') {
+        await ctx.reply(
+          '🎙️ NEWS PODCAST\n/news_podcast add https://hnrss.org/frontpage\n/news_podcast list\n/news_podcast play\n/news_podcast on|off\nCron: /api/cron?job=news_podcast'
+        );
+        return;
+      }
+      let subs = [];
+      const raw = await getBotSetting('news_podcast_subs');
+      if (raw) {
+        try {
+          subs = JSON.parse(raw);
+        } catch (_) {}
+      }
+      if (!Array.isArray(subs)) subs = [];
+      let me = subs.find((s) => s.userId === uid);
+      if (!me) {
+        me = { userId: uid, feeds: [], enabled: true };
+        subs.unshift(me);
+      }
+      const low = body.toLowerCase();
+      if (low === 'list') {
+        await ctx.reply(
+          'Feeds:\n' +
+            (me.feeds.length ? me.feeds.map((f, i) => i + 1 + '. ' + f).join('\n') : '(none)') +
+            '\nenabled=' +
+            me.enabled
+        );
+        return;
+      }
+      if (low === 'on' || low === 'off') {
+        me.enabled = low === 'on';
+        await setBotSetting('news_podcast_subs', JSON.stringify(subs.slice(0, 30)));
+        await ctx.reply('news_podcast ' + low);
+        return;
+      }
+      if (low.startsWith('add ')) {
+        const url = body.slice(4).trim();
+        if (!/^https?:\/\//i.test(url)) {
+          await ctx.reply('Need full https URL');
+          return;
+        }
+        me.feeds = Array.from(new Set([...(me.feeds || []), url])).slice(0, 5);
+        await setBotSetting('news_podcast_subs', JSON.stringify(subs.slice(0, 30)));
+        await ctx.reply('Added feed. /news_podcast play');
+        return;
+      }
+      if (low === 'play' || low.startsWith('play')) {
+        await ctx.sendChatAction('typing');
+        const feeds = me.feeds || [];
+        if (!feeds.length) {
+          await ctx.reply('Add a feed first: /news_podcast add URL');
+          return;
+        }
+        let items = '';
+        for (const url of feeds.slice(0, 2)) {
+          try {
+            const r = await fetch(url, {
+              headers: { Accept: 'application/rss+xml, text/xml', 'User-Agent': 'RadiantQueenBot/4.0' },
+              signal: AbortSignal.timeout(12000),
+            });
+            const xml = await r.text();
+            const titles = [...xml.matchAll(/<title[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/gi)]
+              .map((m) => m[1].replace(/<[^>]+>/g, '').trim())
+              .filter((t) => t && t.length > 8)
+              .slice(1, 6);
+            items += titles.map((t) => '- ' + t).join('\n') + '\n';
+          } catch (_) {}
+        }
+        const { newsPodcastPrompt, parsePodcastLines } = await import('../lib/packMega.js');
+        const script = await generateReply(newsPodcastPrompt(items || 'No headlines'), ctx);
+        await ctx.reply(('🎙️ NEWS SCRIPT\n\n' + script).slice(0, 3500));
+        const { synthesizeSpeech } = await import('../lib/tts.js');
+        const lines = parsePodcastLines(script).slice(0, 6);
+        for (let i = 0; i < lines.length; i++) {
+          const tts = await synthesizeSpeech((lines[i].who + '. ' + lines[i].text).slice(0, 200));
+          if (tts.ok && tts.buffer) {
+            await ctx.replyWithVoice({ source: tts.buffer }, { caption: lines[i].who });
+          }
+        }
+        return;
+      }
+      await ctx.reply('Unknown. /news_podcast help');
+    } catch (err) {
+      await ctx.reply('news_podcast failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['remember', 'memsave'], async (ctx) => {
+    try {
+      const body = (ctx.message.text || '')
+        .replace(/^\/(remember|memsave)(@\w+)?\s*/i, '')
+        .trim();
+      if (!body) {
+        await ctx.reply('🧠 /remember <fact>\n/recall <query>\n/forget <id>');
+        return;
+      }
+      const uid = String(ctx.from.id);
+      const { embedText } = await import('../lib/packMega.js');
+      const emb = await embedText(body);
+      // Always save to settings JSON fallback
+      let mem = [];
+      const raw = await getBotSetting('rag_mem_' + uid);
+      if (raw) {
+        try {
+          mem = JSON.parse(raw);
+        } catch (_) {}
+      }
+      const id = Date.now().toString(36);
+      const row = {
+        id,
+        content: body.slice(0, 2000),
+        embedding: emb.ok ? emb.embedding : null,
+        at: new Date().toISOString(),
+      };
+      mem.unshift(row);
+      await setBotSetting('rag_mem_' + uid, JSON.stringify(mem.slice(0, 80)));
+      // Try Supabase rq_embeddings
+      try {
+        const client = typeof getSupabase === 'function' ? getSupabase() : null;
+        if (client && emb.ok) {
+          await client.from('rq_embeddings').insert({
+            user_id: uid,
+            kind: 'note',
+            content: body.slice(0, 2000),
+            embedding: emb.embedding,
+          });
+        }
+      } catch (_) {}
+      await ctx.reply(
+        '🧠 Saved `' +
+          id +
+          '`\n' +
+          (emb.ok ? 'embedding: yes' : 'embedding: text-only (' + (emb.error || '') + ')')
+      );
+    } catch (err) {
+      await ctx.reply('remember failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['recall', 'memsearch'], async (ctx) => {
+    try {
+      const q = (ctx.message.text || '')
+        .replace(/^\/(recall|memsearch)(@\w+)?\s*/i, '')
+        .trim();
+      if (!q) {
+        await ctx.reply('🧠 /recall <query>');
+        return;
+      }
+      const uid = String(ctx.from.id);
+      const { embedText, cosineSim } = await import('../lib/packMega.js');
+      const emb = await embedText(q);
+      let mem = [];
+      const raw = await getBotSetting('rag_mem_' + uid);
+      if (raw) {
+        try {
+          mem = JSON.parse(raw);
+        } catch (_) {}
+      }
+      let scored = [];
+      if (emb.ok) {
+        scored = (mem || [])
+          .filter((m) => m.embedding)
+          .map((m) => ({ m, s: cosineSim(emb.embedding, m.embedding) }))
+          .sort((a, b) => b.s - a.s)
+          .slice(0, 5);
+      }
+      if (!scored.length) {
+        const ql = q.toLowerCase();
+        scored = (mem || [])
+          .filter((m) => String(m.content).toLowerCase().includes(ql))
+          .slice(0, 5)
+          .map((m) => ({ m, s: 0.5 }));
+      }
+      if (!scored.length) {
+        await ctx.reply('No memories. /remember something first.');
+        return;
+      }
+      const lines = scored.map(
+        (x, i) =>
+          i +
+          1 +
+          '. [' +
+          x.m.id +
+          '] (' +
+          (x.s * 100).toFixed(0) +
+          '%) ' +
+          String(x.m.content).slice(0, 180)
+      );
+      await ctx.reply(('🧠 RECALL\n\n' + lines.join('\n')).slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('recall failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['forget', 'memdel'], async (ctx) => {
+    try {
+      const id = (ctx.message.text || '')
+        .replace(/^\/(forget|memdel)(@\w+)?\s*/i, '')
+        .trim();
+      if (!id) {
+        await ctx.reply('/forget <id>');
+        return;
+      }
+      const uid = String(ctx.from.id);
+      let mem = [];
+      const raw = await getBotSetting('rag_mem_' + uid);
+      if (raw) {
+        try {
+          mem = JSON.parse(raw);
+        } catch (_) {}
+      }
+      const next = (mem || []).filter((m) => m.id !== id);
+      await setBotSetting('rag_mem_' + uid, JSON.stringify(next));
+      await ctx.reply(next.length === (mem || []).length ? 'Not found' : 'Forgot ' + id);
+    } catch (err) {
+      await ctx.reply('forget failed: ' + String(err?.message || err).slice(0, 120));
+    }
+  });
+
+  bot.command(['avatar'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const reply = ctx.message.reply_to_message;
+      const photo = reply?.photo;
+      const text = (ctx.message.text || '').replace(/^\/avatar(@\w+)?\s*/i, '').trim();
+      if (!photo || !photo.length) {
+        await ctx.reply(
+          '🖼️ /avatar (reply to photo) Hello, I am alive!\nNeeds HF_TOKEN + HF_SADTALKER_MODEL for MP4.\nWithout it: generates speech + keeps photo.'
+        );
+        return;
+      }
+      const speech = text || 'Hello! This is a Radiant Queen avatar test.';
+      const fileId = photo[photo.length - 1].file_id;
+      const link = await ctx.telegram.getFileLink(fileId);
+      const imageUrl = link.href || String(link);
+      await ctx.sendChatAction('record_video');
+      const { tryTalkingHead } = await import('../lib/packMega.js');
+      const vid = await tryTalkingHead(imageUrl, speech);
+      if (vid.ok && vid.buffer) {
+        await ctx.replyWithVideo(
+          { source: vid.buffer },
+          { caption: '🖼️ Avatar video' }
+        );
+        return;
+      }
+      // Fallback: voice + photo note
+      await ctx.reply(
+        'Avatar video API not configured.\n' +
+          (vid.error || '') +
+          '\nFallback: voice note on your photo.'
+      );
+      try {
+        const { synthesizeSpeech } = await import('../lib/tts.js');
+        const tts = await synthesizeSpeech(speech.slice(0, 300));
+        if (tts.ok && tts.buffer) {
+          await ctx.replyWithVoice({ source: tts.buffer }, { caption: '🗣️ Avatar audio fallback' });
+        }
+      } catch (_) {}
+    } catch (err) {
+      await ctx.reply('avatar failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['voiceclone', 'clonevoice'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const reply = ctx.message.reply_to_message;
+      const voice = reply?.voice || reply?.audio;
+      if (!voice) {
+        await ctx.reply(
+          '🎤 /voiceclone — reply to a voice note (10–30s sample)\nThen /say your text here'
+        );
+        return;
+      }
+      const uid = String(ctx.from.id);
+      const fileId = voice.file_id;
+      const link = await ctx.telegram.getFileLink(fileId);
+      await setBotSetting(
+        'voice_clone_' + uid,
+        JSON.stringify({
+          fileId,
+          url: link.href || String(link),
+          at: new Date().toISOString(),
+        })
+      );
+      await ctx.reply(
+        '🎤 Voice sample saved.\n/say Hello from my clone\nOptional: set HF_TTS_CLONE_MODEL for true clone; else standard TTS.'
+      );
+    } catch (err) {
+      await ctx.reply('voiceclone failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['say'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const text = (ctx.message.text || '').replace(/^\/say(@\w+)?\s*/i, '').trim();
+      if (!text) {
+        await ctx.reply('/say Hello world');
+        return;
+      }
+      const uid = String(ctx.from.id);
+      const raw = await getBotSetting('voice_clone_' + uid);
+      let sample = null;
+      if (raw) {
+        try {
+          sample = JSON.parse(raw);
+        } catch (_) {}
+      }
+      await ctx.sendChatAction('record_voice');
+      if (sample?.url) {
+        const { tryVoiceCloneTts } = await import('../lib/packMega.js');
+        const cloned = await tryVoiceCloneTts(text, sample.url);
+        if (cloned.ok && cloned.buffer) {
+          await ctx.replyWithVoice({ source: cloned.buffer }, { caption: '🎤 Cloned voice' });
+          return;
+        }
+      }
+      const { synthesizeSpeech } = await import('../lib/tts.js');
+      const tts = await synthesizeSpeech(text.slice(0, 400));
+      if (tts.ok && tts.buffer) {
+        await ctx.replyWithVoice(
+          { source: tts.buffer },
+          { caption: '🗣️ Standard TTS (set HF_TTS_CLONE_MODEL for clone)' }
+        );
+      } else {
+        await ctx.reply('TTS failed');
+      }
+    } catch (err) {
+      await ctx.reply('say failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['screentrace', 'screenanalyze'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const reply = ctx.message.reply_to_message;
+      const video = reply?.video || reply?.document;
+      const note = (ctx.message.text || '')
+        .replace(/^\/(screentrace|screenanalyze)(@\w+)?\s*/i, '')
+        .trim();
+      if (!video && !note) {
+        await ctx.reply(
+          '🎬 /screentrace (reply to video) optional notes\nUses AI timeline analysis. Frame-extract needs ffmpeg on host — caption/notes enhanced analysis always works.'
+        );
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      let meta = note || '';
+      if (video) {
+        meta +=
+          '\nVideo: duration=' +
+          (video.duration || '?') +
+          's file_id=' +
+          video.file_id +
+          ' mime=' +
+          (video.mime_type || '');
+      }
+      const { screentracePrompt } = await import('../lib/packMega.js');
+      const out = await generateReply(screentracePrompt(meta), ctx);
+      await ctx.reply(('🎬 SCREENTRACE\n\n' + out).slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('screentrace failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['alive'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const reply = ctx.message.reply_to_message;
+      const photo = reply?.photo;
+      const text = (ctx.message.text || '').replace(/^\/alive(@\w+)?\s*/i, '').trim();
+      if (!photo) {
+        await ctx.reply(
+          '✨ /alive (reply to photo) Your line of dialogue\nUses saved /voiceclone sample + avatar pipeline.\nFallback: photo caption + cloned/standard voice.'
+        );
+        return;
+      }
+      const speech = text || 'I am alive. Radiant Queen online.';
+      await ctx.reply('✨ Building alive avatar…');
+      // Reuse avatar path
+      const fileId = photo[photo.length - 1].file_id;
+      const link = await ctx.telegram.getFileLink(fileId);
+      const imageUrl = link.href || String(link);
+      const { tryTalkingHead, tryVoiceCloneTts } = await import('../lib/packMega.js');
+      const uid = String(ctx.from.id);
+      const raw = await getBotSetting('voice_clone_' + uid);
+      let sampleUrl = null;
+      if (raw) {
+        try {
+          sampleUrl = JSON.parse(raw).url;
+        } catch (_) {}
+      }
+      const vid = await tryTalkingHead(imageUrl, speech);
+      if (vid.ok && vid.buffer) {
+        await ctx.replyWithVideo({ source: vid.buffer }, { caption: '✨ ALIVE' });
+        return;
+      }
+      if (sampleUrl) {
+        const cl = await tryVoiceCloneTts(speech, sampleUrl);
+        if (cl.ok && cl.buffer) {
+          await ctx.replyWithPhoto(fileId, { caption: '✨ ALIVE (photo + clone audio)' });
+          await ctx.replyWithVoice({ source: cl.buffer });
+          return;
+        }
+      }
+      const { synthesizeSpeech } = await import('../lib/tts.js');
+      const tts = await synthesizeSpeech(speech.slice(0, 300));
+      await ctx.replyWithPhoto(fileId, { caption: '✨ ALIVE fallback' });
+      if (tts.ok && tts.buffer) await ctx.replyWithVoice({ source: tts.buffer });
+      await ctx.reply(
+        'Full MP4 needs HF_SADTALKER_MODEL. Audio path delivered.\n' + (vid.error || '')
+      );
+    } catch (err) {
+      await ctx.reply('alive failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['miniapp', 'queenstudio'], async (ctx) => {
+    try {
+      const url =
+        process.env.MINIAPP_URL ||
+        process.env.WEBAPP_URL ||
+        'https://radiant-queen-pasiya-max-v2.vercel.app/bot/';
+      const { miniAppSetupGuide } = await import('../lib/packMega.js');
+      const guide = miniAppSetupGuide(
+        (ctx.botInfo && ctx.botInfo.username) || 'PasiyaMaxQueen_bot',
+        url
+      );
+      await ctx.reply(guide.slice(0, 3500), {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🚀 Open Queen Studio', web_app: { url } }],
+            [{ text: 'Open in browser', url }],
+          ],
+        },
+      });
+    } catch (err) {
+      await ctx.reply('miniapp failed: ' + String(err?.message || err).slice(0, 160));
     }
   });
 

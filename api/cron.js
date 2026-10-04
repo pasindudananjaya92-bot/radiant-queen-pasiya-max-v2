@@ -408,6 +408,46 @@ async function jobDigest(client) {
   }
 }
 
+
+async function jobNewsPodcast(client) {
+  // Deliver text morning digest to subscribers; voice generated on-demand via /news_podcast
+  const raw = await getSetting(client, 'news_podcast_subs');
+  let subs = [];
+  try {
+    subs = raw ? JSON.parse(raw) : [];
+  } catch (_) {
+    subs = [];
+  }
+  if (!Array.isArray(subs)) subs = [];
+  let sent = 0;
+  for (const s of subs.slice(0, 20)) {
+    if (!s?.userId || s.enabled === false) continue;
+    const feeds = s.feeds || s.feed_urls || [];
+    const lines = ['🎙️ NEWS PODCAST READY', 'Time: ' + new Date().toISOString(), ''];
+    for (const url of (feeds || []).slice(0, 3)) {
+      try {
+        const r = await fetch(url, {
+          headers: { 'User-Agent': UA, Accept: 'application/rss+xml, application/xml, text/xml' },
+          signal: AbortSignal.timeout(12000),
+        });
+        const xml = await r.text();
+        const titles = [...xml.matchAll(/<title[^>]*>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/gi)]
+          .map((m) => m[1].replace(/<[^>]+>/g, '').trim())
+          .filter((t) => t && t.length > 5 && t.length < 180)
+          .slice(1, 5);
+        lines.push('• ' + (url.slice(0, 40)));
+        titles.forEach((t) => lines.push('  - ' + t));
+      } catch (_) {
+        lines.push('• feed error: ' + String(url).slice(0, 40));
+      }
+    }
+    lines.push('', 'Open Telegram → /news_podcast play for audio');
+    await tgSend(s.userId, lines.join('\n'));
+    sent += 1;
+  }
+  return { job: 'news_podcast', sent, subs: subs.length };
+}
+
 export default async function handler(req, res) {
   if (!authorized(req)) {
     res.status(401).json({ ok: false, error: 'unauthorized' });
@@ -420,7 +460,7 @@ export default async function handler(req, res) {
   if (job === 'help') {
     res.status(200).json({
       ok: true,
-      jobs: ['ghost', 'track', 'watch', 'reminders', 'digest', 'all'],
+      jobs: ['ghost', 'track', 'watch', 'reminders', 'digest', 'news_podcast', 'all'],
       example: '/api/cron?job=ghost&secret=CRON_SECRET',
     });
     return;
@@ -457,6 +497,11 @@ export default async function handler(req, res) {
       const track = await jobTrack(client);
       const watch = await jobWatch(client);
       res.status(200).json({ ok: true, job: 'all', ghost, track, watch });
+      return;
+    }
+
+    if (job === 'news_podcast' || job === 'newspodcast') {
+      res.status(200).json({ ok: true, ...(await jobNewsPodcast(client)) });
       return;
     }
     res.status(400).json({ ok: false, error: 'unknown job: ' + job });
