@@ -128,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-packS1'; // podcast quality + website assistant + legendary 5
+const BOT_VERSION = 'v4.0-packR-Dev'; // /git /vercel /supa /ops /brain /vault founder console
 /** Pack I: pending trivia answers chatId:userId -> trivia obj */
 const pendingTrivia = new Map();
 
@@ -13799,6 +13799,463 @@ bot.command('commands', async (ctx) => {
       await ctx.reply('Private mode: ' + cur + '\n/privatemode on|off');
     } catch (err) {
       await ctx.reply('privatemode failed: ' + String(err?.message || err).slice(0, 120));
+    }
+  });
+
+
+
+  // ——— Pack R-Dev: /git /vercel /supa /ops /brain /vault /forensic /warp /webhook ———
+  bot.command(['git'], async (ctx) => {
+    try {
+      const { requireFounder } = await import('../lib/devAuth.js');
+      if (!(await requireFounder(ctx, ADMIN_ID))) return;
+      const raw = (ctx.message.text || '').replace(/^\/git(@\w+)?\s*/i, '').trim();
+      const [sub, ...rest] = raw.split(/\s+/);
+      const arg = rest.join(' ').trim();
+      const g = await import('../lib/gitClient.js');
+      if (!sub || sub === 'help' || sub === 'status') {
+        if (sub === 'status' || !sub) {
+          const st = await g.gitStatus();
+          if (!st.ok) {
+            await ctx.reply('git: ' + (st.error || 'fail') + '\nSet GITHUB_TOKEN + GITHUB_REPO=owner/name');
+            return;
+          }
+          const lines = [
+            '📦 GIT STATUS',
+            st.repo + ' @ ' + st.branch,
+            'pushed: ' + st.pushed_at,
+            '',
+            'Recent:',
+            ...(st.recent || []).map((c) => c.sha + ' ' + c.msg),
+            '',
+            'cmds: browse|read|write|log|branch|pr|status|ai',
+          ];
+          await ctx.reply(lines.join('\n').slice(0, 3500));
+          return;
+        }
+      }
+      if (sub === 'browse' || sub === 'ls') {
+        const r = await g.gitBrowse(arg || '');
+        if (!r.ok) {
+          await ctx.reply('browse: ' + r.error);
+          return;
+        }
+        if (r.type === 'dir') {
+          const lines = ['📂 ' + r.path, ...r.entries.slice(0, 40).map((e) => (e.type === 'dir' ? '📁 ' : '📄 ') + e.name)];
+          await ctx.reply(lines.join('\n').slice(0, 3500));
+        } else {
+          await ctx.reply('📄 ' + r.path + ' (' + r.size + ' bytes)\n/git read ' + r.path);
+        }
+        return;
+      }
+      if (sub === 'read') {
+        if (!arg) {
+          await ctx.reply('Usage: /git read path/to/file.js');
+          return;
+        }
+        const r = await g.gitRead(arg);
+        if (!r.ok) {
+          await ctx.reply('read: ' + r.error);
+          return;
+        }
+        const body = r.content.slice(0, 3500);
+        await ctx.reply(('📄 ' + r.path + '\n\n' + body).slice(0, 3900));
+        return;
+      }
+      if (sub === 'log') {
+        const r = await g.gitLog(10);
+        if (!r.ok) {
+          await ctx.reply('log: ' + r.error);
+          return;
+        }
+        await ctx.reply(
+          ['📜 LOG', ...r.commits.map((c) => c.sha + ' ' + c.msg + ' · ' + (c.at || ''))].join('\n').slice(0, 3500)
+        );
+        return;
+      }
+      if (sub === 'branch' || sub === 'branches') {
+        if (arg) {
+          const r = await g.gitCreateBranch(arg);
+          await ctx.reply(r.ok ? 'Branch created: ' + r.branch : 'branch: ' + r.error);
+          return;
+        }
+        const r = await g.gitBranches();
+        if (!r.ok) {
+          await ctx.reply(r.error);
+          return;
+        }
+        await ctx.reply(['🌿 BRANCHES', ...r.branches.map((b) => b.name)].join('\n').slice(0, 3000));
+        return;
+      }
+      if (sub === 'write') {
+        await ctx.reply(
+          'Safety: /git write needs content via /git ai or paste flow.\nUse: /git ai fix path/to/file.js :: describe change'
+        );
+        return;
+      }
+      if (sub === 'pr') {
+        const title = arg || 'PR from Radiant Queen /git';
+        const r = await g.gitCreatePr(title);
+        await ctx.reply(r.ok ? 'PR #' + r.number + '\n' + r.url : 'pr: ' + r.error);
+        return;
+      }
+      if (sub === 'ai') {
+        // /git ai fix file.js :: message
+        const m = arg.match(/^fix\s+(\S+)\s*::\s*(.+)$/i) || arg.match(/^(\S+)\s*::\s*(.+)$/);
+        if (!m) {
+          await ctx.reply('Usage: /git ai fix lib/x.js :: add null check');
+          return;
+        }
+        const filePath = m[1];
+        const instruction = m[2];
+        await ctx.sendChatAction('typing');
+        const cur = await g.gitRead(filePath);
+        if (!cur.ok) {
+          await ctx.reply('Cannot read ' + filePath + ': ' + cur.error);
+          return;
+        }
+        const prompt =
+          'You edit code. Instruction: ' +
+          instruction +
+          '\nFile: ' +
+          filePath +
+          '\nReturn FULL updated file content only.\n\n' +
+          cur.content.slice(0, 100000);
+        const out = await generateReply(prompt, ctx);
+        const code = String(out || '')
+          .replace(/^```[\w]*\n?/, '')
+          .replace(/\n?```$/, '')
+          .trim();
+        if (code.length < 20) {
+          await ctx.reply('AI returned empty edit');
+          return;
+        }
+        const w = await g.gitWrite(filePath, code, 'AI: ' + instruction.slice(0, 80));
+        await ctx.reply(
+          w.ok
+            ? '✅ Written ' + filePath + '\ncommit ' + (w.commit || '') + '\nReview on GitHub!'
+            : 'write failed: ' + w.error
+        );
+        return;
+      }
+      await ctx.reply(
+        '📦 /git status|browse|read|log|branch|pr|ai\nExample: /git browse api\n/git read api/telegram.js\n/git ai fix lib/x.js :: improve error handling'
+      );
+    } catch (err) {
+      await ctx.reply('git failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['vercel'], async (ctx) => {
+    try {
+      const { requireFounder } = await import('../lib/devAuth.js');
+      if (!(await requireFounder(ctx, ADMIN_ID))) return;
+      const raw = (ctx.message.text || '').replace(/^\/vercel(@\w+)?\s*/i, '').trim();
+      const [sub, ...rest] = raw.split(/\s+/);
+      const arg = rest.join(' ');
+      const v = await import('../lib/vercelClient.js');
+      if (!sub || sub === 'help' || sub === 'deploys' || sub === 'list') {
+        const r = await v.listDeployments(8);
+        if (!r.ok) {
+          await ctx.reply('vercel: ' + r.error + '\nSet VERCEL_TOKEN + VERCEL_PROJECT_ID');
+          return;
+        }
+        const lines = [
+          '▲ VERCEL DEPLOYS',
+          ...r.deployments.map(
+            (d) => (d.state || '?') + ' · ' + (d.id || '').slice(0, 12) + '\n  ' + (d.url || '') + '\n  ' + (d.meta || '')
+          ),
+        ];
+        await ctx.reply(lines.join('\n').slice(0, 3500));
+        return;
+      }
+      if (sub === 'env') {
+        const r = await v.listEnv();
+        if (!r.ok) {
+          await ctx.reply(r.error);
+          return;
+        }
+        await ctx.reply(
+          ['🔐 ENV (masked)', ...r.envs.slice(0, 40).map((e) => e.key + ' · ' + (e.target || []).join(','))].join('\n').slice(0, 3500)
+        );
+        return;
+      }
+      if (sub === 'redeploy') {
+        const r = await v.redeploy(arg || undefined);
+        await ctx.reply(r.ok ? 'Redeploy started: ' + (r.url || r.id) : 'redeploy: ' + r.error);
+        return;
+      }
+      if (sub === 'inspect' || sub === 'deployment') {
+        if (!arg) {
+          await ctx.reply('/vercel inspect <deploymentId>');
+          return;
+        }
+        const r = await v.getDeployment(arg);
+        await ctx.reply(r.ok ? JSON.stringify(r, null, 2).slice(0, 3000) : r.error);
+        return;
+      }
+      await ctx.reply('▲ /vercel deploys|env|redeploy|inspect <id>');
+    } catch (err) {
+      await ctx.reply('vercel failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['supa', 'supabase'], async (ctx) => {
+    try {
+      const { requireFounder } = await import('../lib/devAuth.js');
+      if (!(await requireFounder(ctx, ADMIN_ID))) return;
+      const raw = (ctx.message.text || '').replace(/^\/(supa|supabase)(@\w+)?\s*/i, '').trim();
+      const [sub, ...rest] = raw.split(/\s+/);
+      const arg = rest.join(' ').trim();
+      const s = await import('../lib/supaAdmin.js');
+      if (!sub || sub === 'tables' || sub === 'help') {
+        const r = await s.listTables();
+        if (!r.ok) {
+          await ctx.reply(r.error);
+          return;
+        }
+        await ctx.reply(
+          ['🗄️ TABLES', ...r.tables.map((t) => t.table + (t.count != null ? ' · ' + t.count : ''))].join('\n').slice(0, 3500)
+        );
+        return;
+      }
+      if (sub === 'count') {
+        const r = await s.tableCount(arg);
+        await ctx.reply(r.ok ? r.table + ' count = ' + r.count : r.error);
+        return;
+      }
+      if (sub === 'peek' || sub === 'select') {
+        const r = await s.safeSelect(arg || 'rq_bot_settings', 5);
+        if (!r.ok) {
+          await ctx.reply(r.error);
+          return;
+        }
+        await ctx.reply(('👀 ' + r.table + '\n' + JSON.stringify(r.rows, null, 2)).slice(0, 3500));
+        return;
+      }
+      if (sub === 'storage') {
+        const r = await s.listStorageBuckets();
+        await ctx.reply(
+          r.ok ? ['📦 BUCKETS', ...r.buckets.map((b) => b.name + (b.public ? ' public' : ''))].join('\n') : r.error
+        );
+        return;
+      }
+      if (sub === 'backup') {
+        const r = await s.backupSettings();
+        if (!r.ok) {
+          await ctx.reply(r.error);
+          return;
+        }
+        await ctx.reply('Backup rq_bot_settings rows: ' + r.count + '\n(JSON truncated)\n' + JSON.stringify(r.rows?.slice(0, 3), null, 2).slice(0, 2500));
+        return;
+      }
+      if (sub === 'ai') {
+        await ctx.sendChatAction('typing');
+        const prompt =
+          'Convert to a SAFE read-only description of which Supabase table to peek for Radiant Queen bot.\nUser: ' +
+          arg +
+          '\nReply with one table name from: rq_bot_settings, rq_embeddings, rq_knowledge, rq_webchat_logs';
+        const out = await generateReply(prompt, ctx);
+        const table = String(out || '').match(/rq_[a-z0-9_]+/i)?.[0] || 'rq_bot_settings';
+        const r = await s.safeSelect(table, 5);
+        await ctx.reply(
+          (r.ok ? 'AI→' + table + '\n' + JSON.stringify(r.rows, null, 2) : r.error).slice(0, 3500)
+        );
+        return;
+      }
+      await ctx.reply('🗄️ /supa tables|count <t>|peek <t>|storage|backup|ai <nl>');
+    } catch (err) {
+      await ctx.reply('supa failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['ops'], async (ctx) => {
+    try {
+      const { requireFounder } = await import('../lib/devAuth.js');
+      if (!(await requireFounder(ctx, ADMIN_ID))) return;
+      const raw = (ctx.message.text || '').replace(/^\/ops(@\w+)?\s*/i, '').trim();
+      const sub = (raw.split(/\s+/)[0] || 'status').toLowerCase();
+      const o = await import('../lib/opsClient.js');
+      if (sub === 'status' || sub === 'help' || !raw) {
+        const st = o.opsStatus();
+        const lines = ['🛠️ OPS STATUS · ' + st.score, ''];
+        for (const [k, v] of Object.entries(st.checks)) {
+          lines.push((v ? '✅' : '❌') + ' ' + k);
+        }
+        await ctx.reply(lines.join('\n'));
+        return;
+      }
+      if (sub === 'quota' || sub === 'cost') {
+        const q = o.opsQuotaHints();
+        await ctx.reply(['📊 FREE TIER NOTES', ...q.free_tier_notes.map((x) => '• ' + x)].join('\n'));
+        return;
+      }
+      if (sub === 'doctor' || sub === 'debug') {
+        const st = o.opsStatus();
+        const d = o.opsDoctor(st);
+        await ctx.reply(['🩺 DOCTOR', ...d.tips.map((t, i) => i + 1 + '. ' + t)].join('\n'));
+        return;
+      }
+      if (sub === 'cron') {
+        await ctx.reply(
+          '⏰ CRON endpoints\n/api/cron?job=ghost|track|watch|reminders|digest|news_podcast&secret=CRON_SECRET\nExternal: cron-job.org'
+        );
+        return;
+      }
+      await ctx.reply('🛠️ /ops status|quota|doctor|cron');
+    } catch (err) {
+      await ctx.reply('ops failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['brain'], async (ctx) => {
+    try {
+      const { requireFounder } = await import('../lib/devAuth.js');
+      if (!(await requireFounder(ctx, ADMIN_ID))) return;
+      const raw = (ctx.message.text || '').replace(/^\/brain(@\w+)?\s*/i, '').trim();
+      const sub = (raw.split(/\s+/)[0] || 'propose').toLowerCase();
+      const { brainProposePrompt, brainCodePrompt } = await import('../lib/brainAgent.js');
+      await ctx.sendChatAction('typing');
+      if (sub === 'code') {
+        const proposal = raw.replace(/^code\s*/i, '') || 'small quality fix';
+        const out = await generateReply(brainCodePrompt(proposal, 'api/telegram.js'), ctx);
+        await ctx.reply(('🧠 CODE SKETCH\n\n' + out).slice(0, 3500));
+        return;
+      }
+      const o = await import('../lib/opsClient.js');
+      const st = o.opsStatus();
+      const out = await generateReply(
+        brainProposePrompt('env score ' + st.score + ' keys missing: ' + Object.entries(st.checks).filter(([, v]) => !v).map(([k]) => k).join(', ')),
+        ctx
+      );
+      await ctx.reply(('🧠 BRAIN PROPOSE\n\n' + out + '\n\nNext: /brain code <idea> or /git ai fix ...').slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('brain failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['vault'], async (ctx) => {
+    try {
+      const { requireFounder } = await import('../lib/devAuth.js');
+      if (!(await requireFounder(ctx, ADMIN_ID))) return;
+      const raw = (ctx.message.text || '').replace(/^\/vault(@\w+)?\s*/i, '').trim();
+      const [sub, ...rest] = raw.split(/\s+/);
+      const v = await import('../lib/vaultClient.js');
+      if (!sub || sub === 'list' || sub === 'help') {
+        const r = await v.vaultList();
+        await ctx.reply(r.ok ? '🔐 VAULT KEYS\n' + (r.keys.join('\n') || '(empty)') : r.error);
+        return;
+      }
+      if (sub === 'set') {
+        const name = rest[0];
+        const value = rest.slice(1).join(' ');
+        if (!name || !value) {
+          await ctx.reply('/vault set NAME value...');
+          return;
+        }
+        const r = await v.vaultSet(name, value);
+        await ctx.reply(r.ok ? 'Stored ' + r.name : r.error);
+        return;
+      }
+      if (sub === 'get') {
+        const r = await v.vaultGet(rest[0] || '');
+        if (!r.ok) {
+          await ctx.reply(r.error);
+          return;
+        }
+        // show once
+        await ctx.reply('🔐 ' + r.name + ' = `' + r.value + '`\n(delete this message after copy)');
+        return;
+      }
+      await ctx.reply('🔐 /vault list|set NAME val|get NAME');
+    } catch (err) {
+      await ctx.reply('vault failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['forensic'], async (ctx) => {
+    try {
+      const { requireFounder } = await import('../lib/devAuth.js');
+      if (!(await requireFounder(ctx, ADMIN_ID))) return;
+      const note = (ctx.message.text || '').replace(/^\/forensic(@\w+)?\s*/i, '').trim();
+      await ctx.sendChatAction('typing');
+      const o = await import('../lib/opsClient.js');
+      const st = o.opsStatus();
+      const prompt =
+        'You are a forensic SRE for Radiant Queen bot on Vercel+Supabase.\n' +
+        'Env score: ' +
+        st.score +
+        '\nUser note: ' +
+        (note || 'general health') +
+        '\nList top 5 likely failure points + fix steps. Be specific to free tier.';
+      const out = await generateReply(prompt, ctx);
+      await ctx.reply(('🔎 FORENSIC\n\n' + out).slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('forensic failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['warp'], async (ctx) => {
+    try {
+      const { requireFounder } = await import('../lib/devAuth.js');
+      if (!(await requireFounder(ctx, ADMIN_ID))) return;
+      await ctx.reply(
+        '⚡ /warp — Instant functions\n' +
+          'Hobby limit: ≤12 serverless functions.\n' +
+          'Use /git write api/hello.js + Vercel auto-deploy instead of new endpoints.\n' +
+          'Or: /vercel redeploy after /git push via GitHub.\n' +
+          'Alternative: Supabase Edge Functions in dashboard (free 500K/mo).'
+      );
+    } catch (err) {
+      await ctx.reply('warp: ' + String(err?.message || err).slice(0, 120));
+    }
+  });
+
+  bot.command(['webhook', 'hooks'], async (ctx) => {
+    try {
+      const { requireFounder } = await import('../lib/devAuth.js');
+      if (!(await requireFounder(ctx, ADMIN_ID))) return;
+      const raw = (ctx.message.text || '').replace(/^\/(webhook|hooks)(@\w+)?\s*/i, '').trim();
+      if (raw.startsWith('log ')) {
+        // store sample
+        try {
+          await setBotSetting(
+            'webhook_last',
+            JSON.stringify({ body: raw.slice(4).slice(0, 1500), at: new Date().toISOString() })
+          );
+        } catch (_) {}
+        await ctx.reply('Logged sample payload (webhook_last)');
+        return;
+      }
+      const last = await getBotSetting('webhook_last');
+      await ctx.reply(
+        (
+          ' Hook inspector\n' +
+          'Point GitHub/Stripe webhooks to your endpoint and log into rq_webhook_logs.\n' +
+          'Quick: /webhook log {json}\n' +
+          'Last:\n' +
+          (last || '(none)')
+        ).slice(0, 3500)
+      );
+    } catch (err) {
+      await ctx.reply('webhook: ' + String(err?.message || err).slice(0, 120));
+    }
+  });
+
+  bot.command(['shadow'], async (ctx) => {
+    try {
+      const { requireFounder } = await import('../lib/devAuth.js');
+      if (!(await requireFounder(ctx, ADMIN_ID))) return;
+      await ctx.reply(
+        '👻 /shadow — test clone\n' +
+          'Free path:\n' +
+          '1) GitHub branch: /git branch shadow-test\n' +
+          '2) Vercel Preview auto-builds on PR\n' +
+          '3) Supabase: use separate project or branching (Pro) — free alt: second free Supabase project as staging\n' +
+          'Never point shadow at production SERVICE_ROLE.'
+      );
+    } catch (err) {
+      await ctx.reply('shadow: ' + String(err?.message || err).slice(0, 120));
     }
   });
 
