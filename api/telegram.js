@@ -128,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-pasiyaOS-S1'; // PasiyaOS STEP1 shared FS kernel
+const BOT_VERSION = 'v4.0-pasiyaOS-S1-regexfix'; // fixed /\/\$/ invalid regex flags
 /** Pack I: pending trivia answers chatId:userId -> trivia obj */
 const pendingTrivia = new Map();
 
@@ -2989,7 +2989,17 @@ function buildBot() {
     return next();
   });
 
-  bot.start(async (ctx) => {
+  
+  // EMERGENCY: always-alive ping (hotfix)
+  bot.command(['ping', 'pong'], async (ctx) => {
+    try {
+      await ctx.reply('pong ✅ ' + (typeof BOT_VERSION !== 'undefined' ? BOT_VERSION : '') + ' · ' + new Date().toISOString());
+    } catch (e) {
+      console.error('ping', e);
+    }
+  });
+
+bot.start(async (ctx) => {
     try {
       await getOrCreateGold(ctx.from.id, ctx.from.username || ctx.from.first_name);
     } catch (_) {}
@@ -14830,10 +14840,7 @@ bot.command('commands', async (ctx) => {
   bot.command(['desktop'], async (ctx) => {
     try {
       const url =
-        (process.env.MINIAPP_URL || process.env.WEBAPP_URL || 'https://radiant-queen-pasiya-max-v2.vercel.app').replace(
-          /\\/$/,
-          ''
-        ) + '/bot/desktop.html';
+      const url = String(process.env.MINIAPP_URL || process.env.WEBAPP_URL || 'https://radiant-queen-pasiya-max-v2.vercel.app').replace(/\/$/, '') + '/bot/desktop.html';
       // seed fs for founder
       if (String(ctx.from.id) === String(ADMIN_ID)) {
         try {
