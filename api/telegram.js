@@ -128,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-pasiyaOS-S1-syntaxfix'; // removed duplicate const url
+const BOT_VERSION = 'v4.0-pasiyaOS-S1-alive'; // resilient webhook handler
 /** Pack I: pending trivia answers chatId:userId -> trivia obj */
 const pendingTrivia = new Map();
 
@@ -16648,23 +16648,35 @@ bot.command('commands', async (ctx) => {
 export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
-      if (req.query?.setup === '1') {
-        if (!BOT_TOKEN) {
-          return res.status(500).json({ ok: false, error: 'BOT_TOKEN missing' });
+      try {
+        if (req.query && (req.query.setup === '1' || req.query.setup === 1)) {
+          if (!BOT_TOKEN) {
+            return res.status(200).json({ ok: false, error: 'BOT_TOKEN missing' });
+          }
+          const host = req.headers['x-forwarded-host'] || req.headers.host;
+          const url = 'https://' + host + '/api/telegram';
+          const r = await fetch('https://api.telegram.org/bot' + BOT_TOKEN + '/setWebhook', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              url,
+              allowed_updates: [
+                'message',
+                'callback_query',
+                'inline_query',
+                'chosen_inline_result',
+                'chat_member',
+                'my_chat_member',
+                'chat_join_request',
+              ],
+              drop_pending_updates: true,
+            }),
+          });
+          const data = await r.json();
+          return res.status(200).json({ webhook: url, telegram: data });
         }
-        const host = req.headers['x-forwarded-host'] || req.headers.host;
-        const url = `https://${host}/api/telegram`;
-        const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/setWebhook`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            url,
-            allowed_updates: ['message', 'callback_query', 'inline_query', 'chosen_inline_result', 'chat_member', 'my_chat_member', 'chat_join_request'],
-            drop_pending_updates: true,
-          }),
-        });
-        const data = await r.json();
-        return res.status(200).json({ webhook: url, telegram: data });
+      } catch (e) {
+        return res.status(200).json({ ok: false, setupError: String(e.message || e) });
       }
       return res.status(200).json({
         ok: true,
@@ -16676,23 +16688,36 @@ export default async function handler(req, res) {
         hasAdmin: Boolean(ADMIN_ID),
         hasGitHub: Boolean(GITHUB_TOKEN),
         hasSupabase: Boolean(supabase),
-        hasSentry: Boolean(process.env.SENTRY_DSN),
       });
     }
 
-    const instance = buildBot();
-    if (!instance) {
-      return res.status(500).json({ ok: false, error: 'BOT_TOKEN missing' });
+    if (!BOT_TOKEN) {
+      return res.status(200).json({ ok: false, error: 'BOT_TOKEN missing' });
     }
-    await instance.handleUpdate(req.body);
+
+    let instance = null;
+    try {
+      instance = buildBot();
+    } catch (e) {
+      console.error('buildBot failed', e);
+      return res.status(200).json({ ok: false, error: 'buildBot: ' + String(e && e.message ? e.message : e) });
+    }
+    if (!instance) {
+      return res.status(200).json({ ok: false, error: 'no bot instance' });
+    }
+    try {
+      await instance.handleUpdate(req.body || {});
+    } catch (e) {
+      console.error('handleUpdate', e);
+    }
     return res.status(200).json({ ok: true });
   } catch (err) {
     console.error('telegram webhook', err);
     try {
-      const { reportError } = await import('../lib/errorRadar.js');
-      await reportError(err, 'webhook');
-    } catch (_) {}
-    return res.status(200).json({ ok: true });
+      return res.status(200).json({ ok: false, error: String(err && err.message ? err.message : err) });
+    } catch (_) {
+      return;
+    }
   }
 }
- 
+
