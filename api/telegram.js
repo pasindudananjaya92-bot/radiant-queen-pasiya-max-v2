@@ -128,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-pasiyaOS-S1-regexfix'; // fixed /\/\$/ invalid regex flags
+const BOT_VERSION = 'v4.0-pasiyaOS-S1-syntaxfix'; // removed duplicate const url
 /** Pack I: pending trivia answers chatId:userId -> trivia obj */
 const pendingTrivia = new Map();
 
@@ -14839,7 +14839,6 @@ bot.command('commands', async (ctx) => {
 
   bot.command(['desktop'], async (ctx) => {
     try {
-      const url =
       const url = String(process.env.MINIAPP_URL || process.env.WEBAPP_URL || 'https://radiant-queen-pasiya-max-v2.vercel.app').replace(/\/$/, '') + '/bot/desktop.html';
       // seed fs for founder
       if (String(ctx.from.id) === String(ADMIN_ID)) {
