@@ -128,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-packR-Factory'; // git fix + /flow /market /swarm
+const BOT_VERSION = 'v4.0-packR-FactoryV2'; // flow strict JSON + agent/genome/evolve/...
 /** Pack I: pending trivia answers chatId:userId -> trivia obj */
 const pendingTrivia = new Map();
 
@@ -14320,11 +14320,25 @@ bot.command('commands', async (ctx) => {
           return;
         }
         await ctx.sendChatAction('typing');
-        const spec = await generateReply(flowFromNlPrompt(arg), ctx);
-        const steps = fe.parseFlowSpec(spec);
+        const { flowFromNlPrompt, flowRetryPrompt, extractFlowSteps } = await import('../lib/flowAI.js');
+        let spec = await generateReply(flowFromNlPrompt(arg), ctx);
+        let steps = extractFlowSteps(spec);
         if (!steps.length) {
-          await ctx.reply('Could not parse steps. AI said:\n' + String(spec).slice(0, 1500));
-          return;
+          spec = await generateReply(flowRetryPrompt(arg), ctx);
+          steps = extractFlowSteps(spec);
+        }
+        if (!steps.length) {
+          if (/hn|hacker|news|summar|notify/i.test(arg)) {
+            steps = [
+              { type: 'http', payload: 'https://hacker-news.firebaseio.com/v0/topstories.json' },
+              { type: 'ai', payload: 'Turn INPUT into a clean numbered list of titles or IDs. Data only. No advice.' },
+              { type: 'notify', payload: 'HN digest ready' },
+            ];
+            spec = 'fallback:' + arg;
+          } else {
+            await ctx.reply('Could not parse steps. Raw:\n' + String(spec).slice(0, 1200));
+            return;
+          }
         }
         const saved = await fe.saveFlow(ctx.from.id, arg.slice(0, 40), steps, spec);
         await ctx.reply(
@@ -14434,6 +14448,223 @@ bot.command('commands', async (ctx) => {
       await ctx.reply(('🐝 SWARM\n\n' + agg).slice(0, 3500));
     } catch (err) {
       await ctx.reply('swarm failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+
+
+  // ——— Pack R-Factory V2: agent inception genome evolve bench mirror oracle graph ———
+  bot.command(['agent'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const raw = (ctx.message.text || '').replace(/^\/agent(@\w+)?\s*/i, '').trim();
+      const [sub, ...rest] = raw.split(/\s+/);
+      const topic = rest.join(' ').trim() || raw;
+      const p = await import('../lib/packFactory2.js');
+      await ctx.sendChatAction('typing');
+      if (sub === 'debate' || sub === 'chain') {
+        const t = topic.replace(/^(debate|chain)\s*/i, '') || topic;
+        if (sub === 'chain') {
+          let prior = '';
+          for (const role of ['RESEARCHER', 'WRITER', 'CRITIC']) {
+            prior = await generateReply(p.agentChainPrompt(role, t, prior), ctx);
+          }
+          await ctx.reply(('🔗 AGENT CHAIN\n\n' + prior).slice(0, 3500));
+          return;
+        }
+        const out = await generateReply(p.agentDebatePrompt(t), ctx);
+        await ctx.reply(('⚖️ AGENT DEBATE\n\n' + out).slice(0, 3500));
+        return;
+      }
+      if (!raw) {
+        await ctx.reply('/agent debate <topic>\n/agent chain <topic>');
+        return;
+      }
+      const out = await generateReply(p.agentDebatePrompt(raw), ctx);
+      await ctx.reply(('⚖️ AGENT\n\n' + out).slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('agent failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['inception'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const idea = (ctx.message.text || '').replace(/^\/inception(@\w+)?\s*/i, '').trim();
+      if (!idea) {
+        await ctx.reply('/inception fitness coach bot factory');
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const { inceptionPrompt } = await import('../lib/packFactory2.js');
+      const out = await generateReply(inceptionPrompt(idea), ctx);
+      await ctx.reply(('🧬 INCEPTION (blueprint, 2 levels)\n\n' + out).slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('inception failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['genome'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const raw = (ctx.message.text || '').replace(/^\/genome(@\w+)?\s*/i, '').trim();
+      const [sub, ...rest] = raw.split(/\s+/);
+      const uid = String(ctx.from.id);
+      if (sub === 'show' || !raw) {
+        const dna = (await getBotSetting('genome_' + uid)) || '{"tone":"helpful","features":["ask","flow"],"version":1}';
+        await ctx.reply('🧬 DNA\n' + dna.slice(0, 3000) + '\n/genome mutate');
+        return;
+      }
+      if (sub === 'set') {
+        await setBotSetting('genome_' + uid, rest.join(' ').slice(0, 3000));
+        await ctx.reply('DNA updated');
+        return;
+      }
+      if (sub === 'mutate') {
+        await ctx.sendChatAction('typing');
+        const dna = (await getBotSetting('genome_' + uid)) || '{"tone":"helpful","features":["ask"],"version":1}';
+        const { genomeMutatePrompt } = await import('../lib/packFactory2.js');
+        const out = await generateReply(genomeMutatePrompt(dna), ctx);
+        await setBotSetting('genome_' + uid, String(out).slice(0, 3000));
+        await ctx.reply(('🧬 MUTATED DNA\n\n' + out).slice(0, 3500));
+        return;
+      }
+      await ctx.reply('/genome show|set|mutate');
+    } catch (err) {
+      await ctx.reply('genome failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['evolve'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const logs = (ctx.message.text || '').replace(/^\/evolve(@\w+)?\s*/i, '').trim();
+      await ctx.sendChatAction('typing');
+      const { evolveFromLogsPrompt } = await import('../lib/packFactory2.js');
+      const o = await import('../lib/opsClient.js');
+      const st = o.opsStatus();
+      const out = await generateReply(
+        evolveFromLogsPrompt((logs || 'no paste') + '\nOPS ' + JSON.stringify(st.checks)),
+        ctx
+      );
+      await ctx.reply(('🩹 EVOLVE\n\n' + out + '\n\nOptional: /git ai fix <file> :: ...').slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('evolve failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['bench'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const prompt = (ctx.message.text || '').replace(/^\/bench(@\w+)?\s*/i, '').trim() || 'Say hello in one short sentence.';
+      await ctx.sendChatAction('typing');
+      const t0 = Date.now();
+      const out = await generateReply(prompt, ctx);
+      const ms = Date.now() - t0;
+      await ctx.reply(
+        ('⏱️ BENCH\nlatency: ' + ms + 'ms\nprovider: generateReply router (Groq→Gemini)\n\n' + String(out).slice(0, 1500)).slice(0, 3500)
+      );
+    } catch (err) {
+      await ctx.reply('bench failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['mirror'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const who = (ctx.message.text || '').replace(/^\/mirror(@\w+)?\s*/i, '').trim();
+      if (!who) {
+        await ctx.reply('/mirror @BotUsername or description of features');
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      let info = who;
+      // try getChat if @username
+      try {
+        if (who.startsWith('@')) {
+          const chat = await ctx.telegram.getChat(who);
+          info = JSON.stringify({ username: chat.username, title: chat.title, type: chat.type, description: chat.description });
+        }
+      } catch (_) {}
+      const { mirrorPrompt } = await import('../lib/packFactory2.js');
+      const out = await generateReply(mirrorPrompt(info), ctx);
+      await ctx.reply(('🪞 MIRROR BLUEPRINT\n\n' + out).slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('mirror failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['oracle'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      let market = '';
+      try {
+        const m = await import('../lib/marketClient.js');
+        const r = await m.browseTemplates(15);
+        market = (r.templates || []).map((t) => t.name + ' installs=' + (t.installs || 0)).join('\n');
+      } catch (_) {}
+      const { oraclePrompt } = await import('../lib/packFactory2.js');
+      const out = await generateReply(oraclePrompt(market || 'empty marketplace'), ctx);
+      await ctx.reply(('🔮 ORACLE\n\n' + out).slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('oracle failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['graph'], async (ctx) => {
+    try {
+      const raw = (ctx.message.text || '').replace(/^\/graph(@\w+)?\s*/i, '').trim();
+      // /graph link A | B | relation
+      if (!raw.startsWith('link')) {
+        await ctx.reply('/graph link ConceptA | ConceptB | relation');
+        return;
+      }
+      const body = raw.replace(/^link\s*/i, '');
+      const parts = body.split('|').map((x) => x.trim());
+      if (parts.length < 2) {
+        await ctx.reply('Usage: /graph link A | B | relation');
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const { graphLinkPrompt } = await import('../lib/packFactory2.js');
+      const note = await generateReply(graphLinkPrompt(parts[0], parts[1], parts[2] || 'related'), ctx);
+      const uid = String(ctx.from.id);
+      // store into rag memory JSON
+      let mem = [];
+      const prev = await getBotSetting('rag_mem_' + uid);
+      if (prev) {
+        try {
+          mem = JSON.parse(prev);
+        } catch (_) {}
+      }
+      const id = Date.now().toString(36);
+      mem.unshift({ id, content: note, at: new Date().toISOString(), kind: 'graph' });
+      await setBotSetting('rag_mem_' + uid, JSON.stringify(mem.slice(0, 80)));
+      await ctx.reply(('🕸️ GRAPH LINK SAVED\n\n' + note + '\n\nid=' + id + ' · /recall ' + parts[0]).slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('graph failed: ' + String(err?.message || err).slice(0, 160));
     }
   });
 
