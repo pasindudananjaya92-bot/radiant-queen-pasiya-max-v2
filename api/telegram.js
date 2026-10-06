@@ -128,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-packR-Dev'; // /git /vercel /supa /ops /brain /vault founder console
+const BOT_VERSION = 'v4.0-packR-Factory'; // git fix + /flow /market /swarm
 /** Pack I: pending trivia answers chatId:userId -> trivia obj */
 const pendingTrivia = new Map();
 
@@ -13813,11 +13813,44 @@ bot.command('commands', async (ctx) => {
       const [sub, ...rest] = raw.split(/\s+/);
       const arg = rest.join(' ').trim();
       const g = await import('../lib/gitClient.js');
+      if (sub === 'whoami' || sub === 'me') {
+        const w = await g.gitWhoami();
+        const c = g.cfg();
+        await ctx.reply(
+          w.ok
+            ? ('👤 GitHub: @' + w.login + '\nrepo env: ' + (c.repo || '(empty)') + '\nbranch: ' + c.branch)
+            : ('whoami failed: ' + w.error + ' (HTTP ' + (w.status || '?') + ')')
+        );
+        return;
+      }
+      if (sub === 'diff' || sub === 'compare') {
+        const parts = arg.split(/\s+/);
+        if (parts.length < 2) {
+          await ctx.reply('Usage: /git diff base head');
+          return;
+        }
+        const r = await g.gitCompare(parts[0], parts[1]);
+        if (!r.ok) {
+          await ctx.reply('diff: ' + r.error);
+          return;
+        }
+        const lines = [
+          '📊 COMPARE ' + parts[0] + '...' + parts[1],
+          'status=' + r.status + ' ahead=' + r.ahead + ' behind=' + r.behind,
+          ...r.files.slice(0, 20).map((f) => f.status + ' ' + f.filename + ' (+' + f.changes + ')'),
+        ];
+        await ctx.reply(lines.join('\n').slice(0, 3500));
+        return;
+      }
       if (!sub || sub === 'help' || sub === 'status') {
         if (sub === 'status' || !sub) {
           const st = await g.gitStatus();
           if (!st.ok) {
-            await ctx.reply('git: ' + (st.error || 'fail') + '\nSet GITHUB_TOKEN + GITHUB_REPO=owner/name');
+            await ctx.reply(
+              'git: ' +
+                (st.error || 'fail') +
+                '\n\nDebug: /git whoami\nGITHUB_REPO must be exactly owner/name\nToken needs repo scope for private repos'
+            );
             return;
           }
           const lines = [
@@ -14256,6 +14289,151 @@ bot.command('commands', async (ctx) => {
       );
     } catch (err) {
       await ctx.reply('shadow: ' + String(err?.message || err).slice(0, 120));
+    }
+  });
+
+
+
+  // ——— Pack R-Factory: /flow /market /swarm ———
+  bot.command(['flow'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only (factory).');
+        return;
+      }
+      const raw = (ctx.message.text || '').replace(/^\/flow(@\w+)?\s*/i, '').trim();
+      const [sub, ...rest] = raw.split(/\s+/);
+      const arg = rest.join(' ').trim();
+      const fe = await import('../lib/flowEngine.js');
+      const { flowFromNlPrompt } = await import('../lib/flowAI.js');
+      if (!sub || sub === 'help' || sub === 'list') {
+        if (sub === 'list' || !sub) {
+          const r = await fe.listFlows(String(ctx.from.id));
+          const lines = ['🔀 FLOWS', ...(r.flows || []).map((f) => f.id + ' · ' + f.name + ' · ' + (f.steps?.length || 0) + ' steps')];
+          await ctx.reply(lines.join('\n').slice(0, 3000) || 'No flows. /flow ai <description>');
+          return;
+        }
+      }
+      if (sub === 'ai') {
+        if (!arg) {
+          await ctx.reply('Usage: /flow ai every morning summarize HN and notify me');
+          return;
+        }
+        await ctx.sendChatAction('typing');
+        const spec = await generateReply(flowFromNlPrompt(arg), ctx);
+        const steps = fe.parseFlowSpec(spec);
+        if (!steps.length) {
+          await ctx.reply('Could not parse steps. AI said:\n' + String(spec).slice(0, 1500));
+          return;
+        }
+        const saved = await fe.saveFlow(ctx.from.id, arg.slice(0, 40), steps, spec);
+        await ctx.reply(
+          ('✅ Flow ' + saved.id + '\n' + steps.map((s, i) => i + 1 + '. ' + s.type + ': ' + s.payload.slice(0, 60)).join('\n') + '\n/flow test ' + saved.id).slice(0, 3500)
+        );
+        return;
+      }
+      if (sub === 'test') {
+        const id = arg;
+        const list = await fe.listFlows(String(ctx.from.id));
+        const flow = (list.flows || []).find((f) => f.id === id);
+        if (!flow) {
+          await ctx.reply('Flow not found');
+          return;
+        }
+        await ctx.sendChatAction('typing');
+        const run = await fe.runFlowSteps(flow.steps, generateReply, ctx);
+        await ctx.reply(
+          ('▶️ RUN ' + id + '\n' + run.logs.map((l) => l.type + ': ' + l.out).join('\n') + '\n\nLast:\n' + (run.last || '')).slice(0, 3500)
+        );
+        return;
+      }
+      if (sub === 'create') {
+        await ctx.reply('Use /flow ai <natural language>\nOr paste steps:\nai: ...\ntext: ...\nnotify: ...');
+        return;
+      }
+      await ctx.reply('🔀 /flow list|ai <desc>|test <id>');
+    } catch (err) {
+      await ctx.reply('flow failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['market'], async (ctx) => {
+    try {
+      const raw = (ctx.message.text || '').replace(/^\/market(@\w+)?\s*/i, '').trim();
+      const [sub, ...rest] = raw.split(/\s+/);
+      const arg = rest.join(' ').trim();
+      const m = await import('../lib/marketClient.js');
+      if (!sub || sub === 'browse' || sub === 'top' || sub === 'list') {
+        const r = await m.browseTemplates(10);
+        if (!(r.templates || []).length) {
+          await ctx.reply('🛒 Marketplace empty.\nFounder: /market publish Name | description | prompt or flow json');
+          return;
+        }
+        const lines = ['🛒 MARKET', ...r.templates.map((t) => t.id + ' · ' + t.name + ' · installs ' + (t.installs || 0))];
+        await ctx.reply(lines.join('\n').slice(0, 3500));
+        return;
+      }
+      if (sub === 'publish') {
+        if (String(ctx.from.id) !== String(ADMIN_ID)) {
+          await ctx.reply('👑 Publish is founder-only in V1.');
+          return;
+        }
+        // name | desc | payload
+        const parts = arg.split('|').map((x) => x.trim());
+        if (parts.length < 2) {
+          await ctx.reply('Usage: /market publish Name | description | optional payload');
+          return;
+        }
+        const r = await m.publishTemplate(ctx.from.id, parts[0], parts[1], { body: parts[2] || parts[1] });
+        await ctx.reply(r.ok ? 'Published ' + r.id + ' · ' + r.name : 'fail');
+        return;
+      }
+      if (sub === 'install') {
+        if (!arg) {
+          await ctx.reply('/market install <id>');
+          return;
+        }
+        const r = await m.installTemplate(String(ctx.from.id), arg);
+        if (!r.ok) {
+          await ctx.reply(r.error);
+          return;
+        }
+        await ctx.reply('✅ Installed ' + r.template.name + '\n' + String(r.template.description || '').slice(0, 500));
+        return;
+      }
+      await ctx.reply('🛒 /market browse|publish|install <id>');
+    } catch (err) {
+      await ctx.reply('market failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['swarm'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only (swarm AI cost).');
+        return;
+      }
+      const raw = (ctx.message.text || '').replace(/^\/swarm(@\w+)?\s*/i, '').trim();
+      const [sub, ...rest] = raw.split(/\s+/);
+      const topic = rest.join(' ').trim() || raw;
+      if (!topic || sub === 'help') {
+        await ctx.reply('🐝 /swarm research <topic>\nRuns up to 4 parallel AI agents → aggregate briefing');
+        return;
+      }
+      const q = sub === 'research' || sub === 'analyze' || sub === 'aggregate' ? topic : raw;
+      await ctx.sendChatAction('typing');
+      const { swarmRun, swarmAggregatePrompt } = await import('../lib/swarmEngine.js');
+      const tasks = [
+        { prompt: 'Research angles for: ' + q + ' — list 5 facts. Concise.' },
+        { prompt: 'Risks / downsides of: ' + q + ' — 4 bullets.' },
+        { prompt: 'Opportunities for Radiant Queen bot related to: ' + q },
+        { prompt: 'Action checklist (5 steps) for: ' + q },
+      ];
+      const run = await swarmRun(tasks, generateReply, ctx);
+      const agg = await generateReply(swarmAggregatePrompt(run.results), ctx);
+      await ctx.reply(('🐝 SWARM\n\n' + agg).slice(0, 3500));
+    } catch (err) {
+      await ctx.reply('swarm failed: ' + String(err?.message || err).slice(0, 160));
     }
   });
 
