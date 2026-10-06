@@ -43,7 +43,7 @@ export default async function handler(req, res) {
     return;
   }
   if (req.method === 'GET') {
-    res.status(200).json({ ok: true, service: 'pasiya-fs', version: 'S2' });
+    res.status(200).json({ ok: true, service: 'pasiya-fs', version: 'S3' });
     return;
   }
   if (req.method !== 'POST') {
@@ -101,6 +101,113 @@ export default async function handler(req, res) {
       res.status(200).json(await fs.fsStat(userId, path));
       return;
     }
+
+    if (action === 'shell') {
+      // body.cwd + body.line → { cwd, output }
+      const cwd0 = fs.normalizePath(body.cwd || '/');
+      const line = String(body.line || '').trim();
+      if (!line) {
+        res.status(200).json({ ok: true, cwd: cwd0, output: '' });
+        return;
+      }
+      const parts = line.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
+      const argv = parts.map((p) => p.replace(/^"|"$/g, ''));
+      const cmd = (argv[0] || '').toLowerCase();
+      const arg1 = argv[1] || '';
+      const resolve = (p) => {
+        if (!p || p === '.') return cwd0;
+        if (p.startsWith('/')) return fs.normalizePath(p);
+        if (cwd0 === '/') return fs.normalizePath('/' + p);
+        return fs.normalizePath(cwd0 + '/' + p);
+      };
+      let cwd = cwd0;
+      let output = '';
+      try {
+        if (cmd === 'help') {
+          output = 'ls cd pwd cat mkdir rm touch echo tree df clear help';
+        } else if (cmd === 'pwd') {
+          output = cwd0;
+        } else if (cmd === 'cd') {
+          const dest = resolve(arg1 || '/');
+          const st = await fs.fsStat(userId, dest);
+          if (!st.ok || st.stat?.type !== 'dir') {
+            res.status(200).json({ ok: true, cwd: cwd0, output: 'cd: not a directory: ' + dest });
+            return;
+          }
+          cwd = dest;
+          output = '';
+        } else if (cmd === 'ls' || cmd === 'dir') {
+          const target = resolve(arg1 || '.');
+          const r = await fs.fsList(userId, target);
+          if (!r.ok) output = r.error;
+          else {
+            output = (r.entries || [])
+              .map((e) => (e.type === 'dir' ? '📁 ' : '📄 ') + e.path.split('/').filter(Boolean).pop())
+              .join('\\n') || '(empty)';
+          }
+        } else if (cmd === 'cat') {
+          if (!arg1) output = 'cat: missing file';
+          else {
+            const r = await fs.fsRead(userId, resolve(arg1));
+            output = r.ok ? r.content : r.error;
+          }
+        } else if (cmd === 'mkdir') {
+          if (!arg1) output = 'mkdir: missing operand';
+          else {
+            const r = await fs.fsMkdir(userId, resolve(arg1));
+            output = r.ok ? '' : r.error;
+          }
+        } else if (cmd === 'rm' || cmd === 'del') {
+          if (!arg1) output = 'rm: missing operand';
+          else {
+            const r = await fs.fsRm(userId, resolve(arg1), argv.includes('-f') || argv.includes('--hard'));
+            output = r.ok ? '' : r.error;
+          }
+        } else if (cmd === 'touch') {
+          if (!arg1) output = 'touch: missing file';
+          else {
+            const p = resolve(arg1);
+            const existing = await fs.fsRead(userId, p);
+            const r = await fs.fsWrite(userId, p, existing.ok ? existing.content : '');
+            output = r.ok ? '' : r.error;
+          }
+        } else if (cmd === 'echo') {
+          // echo hello > file  OR  echo hello >> file  OR  echo hello
+          const full = line.slice(4).trim();
+          const m = full.match(/^(.*?)\\s*(>>|>)\\s*(\\S+)$/);
+          if (m) {
+            const text = m[1].replace(/^["']|["']$/g, '');
+            const p = resolve(m[3]);
+            if (m[2] === '>>') {
+              const prev = await fs.fsRead(userId, p);
+              const r = await fs.fsWrite(userId, p, (prev.ok ? prev.content : '') + text + '\\n');
+              output = r.ok ? '' : r.error;
+            } else {
+              const r = await fs.fsWrite(userId, p, text + '\\n');
+              output = r.ok ? '' : r.error;
+            }
+          } else {
+            output = full.replace(/^["']|["']$/g, '');
+          }
+        } else if (cmd === 'tree') {
+          const r = await fs.fsTree(userId, resolve(arg1 || '.'), 4);
+          output = r.ok ? r.tree : r.error;
+        } else if (cmd === 'df' || cmd === 'quota') {
+          const r = await fs.fsQuotaUsed(userId);
+          output = r.ok ? 'used ' + r.used + ' / ' + r.max + ' bytes (left ' + r.left + ')' : r.error;
+        } else if (cmd === 'clear') {
+          output = '__CLEAR__';
+        } else {
+          output = cmd + ': command not found. Try help';
+        }
+      } catch (e) {
+        output = String(e.message || e);
+      }
+      res.status(200).json({ ok: true, cwd, output });
+      return;
+    }
+
+
     res.status(400).json({ ok: false, error: 'unknown action' });
   } catch (e) {
     console.error('api/fs', e);
