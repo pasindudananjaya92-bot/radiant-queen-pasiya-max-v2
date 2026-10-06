@@ -128,7 +128,7 @@ function toChatId(chatId) {
   return Number.isFinite(n) ? n : chatId;
 }
 
-const BOT_VERSION = 'v4.0-packR-FactoryV2'; // flow strict JSON + agent/genome/evolve/...
+const BOT_VERSION = 'v4.0-pasiyaOS-S1'; // PasiyaOS STEP1 shared FS kernel
 /** Pack I: pending trivia answers chatId:userId -> trivia obj */
 const pendingTrivia = new Map();
 
@@ -14665,6 +14665,197 @@ bot.command('commands', async (ctx) => {
       await ctx.reply(('🕸️ GRAPH LINK SAVED\n\n' + note + '\n\nid=' + id + ' · /recall ' + parts[0]).slice(0, 3500));
     } catch (err) {
       await ctx.reply('graph failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+
+
+  // ——— PasiyaOS STEP 1: /fs /kernel /boot ———
+  bot.command(['fs', 'disk'], async (ctx) => {
+    try {
+      const uid = String(ctx.from.id);
+      // founder-only for write-heavy OS disk in S1; read allowed for admin testing
+      if (uid !== String(ADMIN_ID)) {
+        await ctx.reply('👑 PasiyaOS disk is founder-only in STEP 1 (shared multi-user FS lands after desktop).');
+        return;
+      }
+      const raw = (ctx.message.text || '').replace(/^\/(fs|disk)(@\w+)?\s*/i, '').trim();
+      const [sub, ...rest] = raw.split(/\s+/);
+      const arg = rest.join(' ').trim();
+      const fs = await import('../lib/pasiyaFs.js');
+      await fs.ensureUserSeed(uid);
+
+      if (!sub || sub === 'help') {
+        await ctx.reply(
+          '💻 PasiyaFS\\n' +
+            '/fs ls [path]\\n' +
+            '/fs cat <path>\\n' +
+            '/fs write <path> | <content>\\n' +
+            '/fs mkdir <path>\\n' +
+            '/fs rm <path>\\n' +
+            '/fs tree [path]\\n' +
+            '/fs df\\n' +
+            '/fs stat <path>\\n' +
+            '/kernel'
+        );
+        return;
+      }
+      if (sub === 'ls' || sub === 'dir') {
+        const r = await fs.fsList(uid, arg || '/');
+        if (!r.ok) {
+          await ctx.reply(r.error);
+          return;
+        }
+        if (!r.entries.length) {
+          await ctx.reply('📂 ' + r.path + '\\n(empty)');
+          return;
+        }
+        const lines = r.entries.map(
+          (e) => (e.type === 'dir' ? '📁 ' : '📄 ') + fs.baseName(e.path) + (e.type === 'file' ? '  ' + e.size + 'b' : '')
+        );
+        await ctx.reply(('📂 ' + r.path + '\\n' + lines.join('\\n')).slice(0, 3500));
+        return;
+      }
+      if (sub === 'cat' || sub === 'read') {
+        if (!arg) {
+          await ctx.reply('/fs cat /Documents/Welcome.txt');
+          return;
+        }
+        const r = await fs.fsRead(uid, arg);
+        if (!r.ok) {
+          await ctx.reply(r.error);
+          return;
+        }
+        await ctx.reply(('📄 ' + r.path + ' (' + r.size + 'b)\\n\\n' + r.content).slice(0, 3500));
+        return;
+      }
+      if (sub === 'write') {
+        const pipe = arg.split('|');
+        if (pipe.length < 2) {
+          await ctx.reply('Usage: /fs write /Documents/notes.txt | my content here');
+          return;
+        }
+        const fpath = pipe[0].trim();
+        const content = pipe.slice(1).join('|').trim();
+        const r = await fs.fsWrite(uid, fpath, content);
+        await ctx.reply(r.ok ? '✅ wrote ' + r.path + ' (' + r.size + 'b)' : '❌ ' + r.error);
+        return;
+      }
+      if (sub === 'mkdir') {
+        if (!arg) {
+          await ctx.reply('/fs mkdir /Projects/demo');
+          return;
+        }
+        const r = await fs.fsMkdir(uid, arg);
+        await ctx.reply(r.ok ? '✅ mkdir ' + r.path : '❌ ' + r.error);
+        return;
+      }
+      if (sub === 'rm' || sub === 'del') {
+        if (!arg) {
+          await ctx.reply('/fs rm /Documents/old.txt');
+          return;
+        }
+        const hard = /\\s--hard$/.test(arg);
+        const fpath = arg.replace(/\\s--hard$/, '').trim();
+        const r = await fs.fsRm(uid, fpath, hard);
+        await ctx.reply(
+          r.ok
+            ? r.mode === 'soft'
+              ? '🗑️ trashed ' + r.removed + ' → ' + r.trash
+              : '🗑️ hard removed ' + r.removed
+            : '❌ ' + r.error
+        );
+        return;
+      }
+      if (sub === 'tree') {
+        const r = await fs.fsTree(uid, arg || '/', 4);
+        await ctx.reply(r.ok ? ('🌳\\n' + r.tree).slice(0, 3500) : r.error);
+        return;
+      }
+      if (sub === 'df' || sub === 'quota') {
+        const r = await fs.fsQuotaUsed(uid);
+        await ctx.reply(
+          r.ok
+            ? '💾 DF\\nused ' + r.used + ' / ' + r.max + ' bytes\\nleft ' + r.left
+            : r.error
+        );
+        return;
+      }
+      if (sub === 'stat') {
+        const r = await fs.fsStat(uid, arg || '/');
+        await ctx.reply(r.ok ? JSON.stringify(r.stat, null, 2).slice(0, 3000) : r.error);
+        return;
+      }
+      if (sub === 'seed' || sub === 'boot') {
+        const r = await fs.ensureUserSeed(uid);
+        await ctx.reply(r.ok ? '🟢 FS seeded (PC folders ready)' : r.error);
+        return;
+      }
+      await ctx.reply('Unknown. /fs help');
+    } catch (err) {
+      await ctx.reply('fs failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['kernel'], async (ctx) => {
+    try {
+      if (String(ctx.from.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const fs = await import('../lib/pasiyaFs.js');
+      await fs.ensureUserSeed(String(ctx.from.id));
+      const q = await fs.fsQuotaUsed(String(ctx.from.id));
+      const o = await import('../lib/opsClient.js');
+      const st = o.opsStatus();
+      const lines = [
+        '🧠 PASIYAOS KERNEL',
+        'version: ' + BOT_VERSION,
+        '',
+        'DISK: ' + (q.ok ? q.used + '/' + q.max + 'b (' + q.left + ' free)' : q.error),
+        'ENV: ' + st.score,
+        '',
+        'Services: cron multi-job · git · vercel · supa · flow · swarm',
+        'Next: STEP 2 Desktop shell mounts this disk',
+        '',
+        '/fs tree /',
+        '/fs ls /Documents',
+      ];
+      await ctx.reply(lines.join('\\n'));
+    } catch (err) {
+      await ctx.reply('kernel failed: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+  bot.command(['desktop'], async (ctx) => {
+    try {
+      const url =
+        (process.env.MINIAPP_URL || process.env.WEBAPP_URL || 'https://radiant-queen-pasiya-max-v2.vercel.app').replace(
+          /\\/$/,
+          ''
+        ) + '/bot/desktop.html';
+      // seed fs for founder
+      if (String(ctx.from.id) === String(ADMIN_ID)) {
+        try {
+          const fs = await import('../lib/pasiyaFs.js');
+          await fs.ensureUserSeed(String(ctx.from.id));
+        } catch (_) {}
+      }
+      await ctx.reply(
+        '🖥️ PasiyaOS Desktop (STEP 2 UI mounts STEP 1 disk)\\n' +
+          'Disk is live via /fs — GUI shell next.\\n' +
+          url,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '🖥️ Open Desktop', web_app: { url } }],
+              [{ text: 'Browser', url }],
+            ],
+          },
+        }
+      );
+    } catch (err) {
+      await ctx.reply('desktop: ' + String(err?.message || err).slice(0, 120));
     }
   });
 
