@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PasiyaOS</title>
+  <style>
+    body { margin:0; min-height:100vh; background: radial-gradient(ellipse at center,#1a0a0a 0%,#050505 70%);
+      color:#f5e6c8; font-family: system-ui,sans-serif; display:flex; flex-direction:column; }
+    .bar { margin-top:auto; height:48px; background:rgba(20,12,8,.92); border-top:1px solid #c9a22755;
+      display:flex; align-items:center; gap:12px; padding:0 12px; }
+    .icon { width:40px; height:40px; border-radius:10px; background:#22180f; border:1px solid #c9a22744;
+      display:flex; align-items:center; justify-content:center; font-size:18px; }
+    .msg { padding:24px; max-width:480px; margin:40px auto; background:#120c08; border:1px solid #c9a22733;
+      border-radius:16px; line-height:1.5; }
+    h1 { color:#c9a227; font-size:1.25rem; margin:0 0 8px; }
+  </style>
+</head>
+<body>
+  <div class="msg">
+    <h1>PasiyaOS · Desktop Shell</h1>
+    <p><strong>STEP 1 complete on bot:</strong> shared disk (<code>/fs</code>).</p>
+    <p>This page is the STEP 2 host. Explorer / Notepad will mount <code>pasiya_fs</code> next.</p>
+    <p>Telegram: <code>/fs tree /</code> · <code>/kernel</code></p>
+  </div>
+  <div class="bar">
+    <div class="icon" title="Start">✦</div>
+    <div class="icon" title="Explorer">📁</div>
+    <div class="icon" title="Notepad">📝</div>
+    <div class="icon" title="Terminal">⌨</div>
+    <span style="margin-left:auto;opacity:.7;font-size:12px">PasiyaOS</span>
+  </div>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</body>
+</html>
