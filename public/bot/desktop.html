@@ -20,24 +20,23 @@
     }
     #desktop-icons {
       position: fixed; left: 0; right: 0; top: 0; bottom: 52px;
-      padding: 16px; z-index: 2; overflow: auto;
+      padding: 12px; z-index: 2; overflow: auto;
     }
     .desk-icon {
-      width: 80px; display: inline-flex; flex-direction: column; align-items: center;
-      gap: 6px; margin: 8px; cursor: pointer; user-select: none;
+      width: 76px; display: inline-flex; flex-direction: column; align-items: center;
+      gap: 5px; margin: 6px; cursor: pointer; user-select: none;
       -webkit-tap-highlight-color: transparent;
     }
     .desk-icon .ic {
-      width: 52px; height: 52px; border-radius: 14px; background: var(--panel);
+      width: 50px; height: 50px; border-radius: 14px; background: var(--panel);
       border: 1px solid var(--border); display: flex; align-items: center; justify-content: center;
-      font-size: 24px; pointer-events: none;
+      font-size: 22px; pointer-events: none;
     }
-    .desk-icon span { font-size: 11px; text-align: center; pointer-events: none; text-shadow: 0 1px 3px #000; }
+    .desk-icon span { font-size: 10px; text-align: center; pointer-events: none; text-shadow: 0 1px 3px #000; }
     .desk-icon:active .ic { border-color: var(--gold); background: #2a2010; }
 
     .window {
-      position: fixed; z-index: 50;
-      min-width: 280px; min-height: 180px;
+      position: fixed; z-index: 50; min-width: 260px; min-height: 160px;
       background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
       box-shadow: 0 16px 48px rgba(0,0,0,.6);
       display: none; flex-direction: column; overflow: hidden;
@@ -45,7 +44,7 @@
     .window.open { display: flex !important; }
     .window.focused { border-color: var(--gold); z-index: 60; }
     .w-title {
-      height: 42px; background: linear-gradient(180deg, #221810, #18120c);
+      height: 40px; background: linear-gradient(180deg, #221810, #18120c);
       border-bottom: 1px solid var(--border); display: flex; align-items: center;
       padding: 0 10px; gap: 8px; flex-shrink: 0;
     }
@@ -55,50 +54,63 @@
       background: #3a1515; color: #f0c0c0; font-size: 16px; cursor: pointer;
     }
     .w-body { flex: 1; display: flex; min-height: 0; overflow: hidden; }
+    .toolbar {
+      display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--border);
+      flex-shrink: 0; flex-wrap: wrap;
+    }
+    .toolbar button, .btn {
+      border: 1px solid var(--border); background: var(--panel2); color: var(--text);
+      border-radius: 8px; padding: 8px 10px; font-size: 12px; cursor: pointer;
+    }
+    .pad { padding: 10px; overflow: auto; flex: 1; font-size: 13px; line-height: 1.45; }
+    .muted { color: var(--muted); }
+    input.line, textarea.area {
+      width: 100%; background: #0e0b09; border: 1px solid var(--border); color: var(--text);
+      border-radius: 8px; padding: 8px; font-size: 13px; outline: none;
+    }
+    textarea.area { min-height: 160px; font-family: ui-monospace, Menlo, monospace; resize: vertical; }
 
-    #win-explorer { width: min(400px, 94vw); height: min(460px, 68vh); left: 10px; top: 10px; }
-    #win-notepad { width: min(400px, 94vw); height: min(460px, 68vh); left: 20px; top: 20px; }
-    #win-term { width: min(420px, 94vw); height: min(400px, 62vh); left: 16px; top: 16px; }
-    #win-ide { width: min(500px, 96vw); height: min(520px, 74vh); left: 8px; top: 8px; }
+    #win-explorer { width: min(400px, 94vw); height: min(460px, 68vh); left: 8px; top: 8px; }
+    #win-notepad { width: min(400px, 94vw); height: min(460px, 68vh); left: 16px; top: 16px; }
+    #win-term { width: min(420px, 94vw); height: min(400px, 62vh); left: 12px; top: 12px; }
+    #win-ide { width: min(500px, 96vw); height: min(520px, 74vh); left: 6px; top: 6px; }
+    #win-kernel { width: min(400px, 94vw); height: min(420px, 64vh); left: 20px; top: 20px; }
+    #win-office { width: min(440px, 96vw); height: min(500px, 72vh); left: 10px; top: 10px; }
+    #win-store { width: min(400px, 94vw); height: min(440px, 66vh); left: 14px; top: 14px; }
+    #win-browser { width: min(440px, 96vw); height: min(480px, 70vh); left: 8px; top: 8px; }
+    #win-settings { width: min(380px, 94vw); height: min(400px, 60vh); left: 24px; top: 24px; }
 
     .exp-side {
-      width: 110px; border-right: 1px solid var(--border); background: var(--panel2);
-      padding: 8px; overflow-y: auto; font-size: 12px; flex-shrink: 0;
+      width: 100px; border-right: 1px solid var(--border); background: var(--panel2);
+      padding: 6px; overflow-y: auto; font-size: 11px; flex-shrink: 0;
     }
     .exp-side div { padding: 8px; border-radius: 8px; cursor: pointer; color: var(--muted); }
-    .exp-side div:active { background: #2a2010; color: var(--gold2); }
     .exp-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-    .exp-path { padding: 8px 10px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); }
-    .exp-list { flex: 1; overflow-y: auto; padding: 8px; }
+    .exp-path { padding: 8px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); }
+    .exp-list { flex: 1; overflow-y: auto; padding: 6px; }
     .exp-row {
-      display: flex; align-items: center; gap: 8px; padding: 10px; border-radius: 8px;
+      display: flex; align-items: center; gap: 8px; padding: 9px; border-radius: 8px;
       cursor: pointer; font-size: 13px;
     }
     .exp-row:active { background: #2a2010; }
     .exp-row .meta { margin-left: auto; font-size: 11px; color: var(--muted); }
-    .toolbar { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--border); flex-shrink: 0; }
-    .toolbar button {
-      flex: 1; border: 1px solid var(--border); background: var(--panel2); color: var(--text);
-      border-radius: 8px; padding: 10px 6px; font-size: 12px; cursor: pointer;
-    }
 
-    #np-path { padding: 8px 10px; font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--border); }
-    #np-editor {
+    #np-path, #ide-tab, #of-path { padding: 8px; font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--border); }
+    #np-editor, #ide-fallback, #of-editor {
       flex: 1; width: 100%; border: none; resize: none; padding: 12px;
       background: #0e0b09; color: var(--text); font-family: ui-monospace, Menlo, monospace;
       font-size: 13px; line-height: 1.45; outline: none;
     }
-
     #win-term .w-body { flex-direction: column; background: #0a0c0a; }
     #term-out {
-      flex: 1; overflow-y: auto; padding: 10px 12px;
+      flex: 1; overflow-y: auto; padding: 10px;
       font-family: ui-monospace, Menlo, monospace; font-size: 12px; line-height: 1.45;
       color: #c8e6c9; white-space: pre-wrap; word-break: break-word;
     }
     #term-out .cmd { color: #e8c547; }
     #term-out .err { color: #f0a0a0; }
     #term-form {
-      display: flex; align-items: center; gap: 6px; padding: 8px 10px;
+      display: flex; align-items: center; gap: 6px; padding: 8px;
       border-top: 1px solid #1e2a1e; background: #0d100d;
     }
     #term-prompt { color: #c9a227; font-family: ui-monospace, monospace; font-size: 11px; white-space: nowrap; }
@@ -106,62 +118,76 @@
       flex: 1; background: transparent; border: none; outline: none; color: #e8ffe8;
       font-family: ui-monospace, monospace; font-size: 12px;
     }
-
     .ide-side {
-      width: 130px; border-right: 1px solid var(--border); background: var(--panel2);
+      width: 120px; border-right: 1px solid var(--border); background: var(--panel2);
       display: flex; flex-direction: column; min-height: 0; flex-shrink: 0;
     }
     .ide-side-h { padding: 8px; font-size: 11px; color: var(--gold); border-bottom: 1px solid var(--border); }
     #ide-tree { flex: 1; overflow-y: auto; padding: 6px; font-size: 12px; }
     .ide-file { padding: 8px; border-radius: 6px; cursor: pointer; color: var(--muted); }
-    .ide-file:active, .ide-file.on { background: #2a2010; color: var(--gold2); }
+    .ide-file:active { background: #2a2010; color: var(--gold2); }
     .ide-main { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-    #ide-tab { padding: 6px 10px; font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--border); }
-    #ide-editor-wrap { flex: 1; min-height: 180px; position: relative; }
-    #ide-fallback {
-      position: absolute; inset: 0; width: 100%; height: 100%; border: 0;
-      background: #0e0b09; color: #f3e6c8; padding: 12px; font-family: monospace; font-size: 13px;
-      resize: none; outline: none;
+
+    .k-card {
+      background: var(--panel2); border: 1px solid var(--border); border-radius: 10px;
+      padding: 10px; margin-bottom: 8px;
+    }
+    .k-card h4 { margin: 0 0 6px; color: var(--gold2); font-size: 12px; }
+    .bar { height: 8px; background: #0e0b09; border-radius: 99px; overflow: hidden; }
+    .bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--gold), #8b1e1e); }
+
+    .store-item {
+      display: flex; gap: 10px; align-items: center; padding: 10px;
+      border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px;
+      background: var(--panel2); cursor: pointer;
+    }
+    .store-item:active { border-color: var(--gold); }
+    .store-item .ic { font-size: 22px; width: 36px; text-align: center; }
+    .store-item b { display: block; font-size: 13px; color: var(--gold2); }
+    .store-item span { font-size: 11px; color: var(--muted); }
+
+    #br-bar { display: flex; gap: 6px; padding: 8px; border-bottom: 1px solid var(--border); }
+    #br-url { flex: 1; }
+    #br-view {
+      flex: 1; overflow: auto; padding: 10px; font-size: 12px; white-space: pre-wrap;
+      word-break: break-word; background: #0e0b09; color: #d8c8a8;
     }
 
     #taskbar {
       position: fixed; left: 0; right: 0; bottom: 0; height: 52px; z-index: 100;
       background: rgba(12, 9, 7, 0.96); border-top: 1px solid var(--border);
-      display: flex; align-items: center; gap: 8px; padding: 0 10px;
+      display: flex; align-items: center; gap: 6px; padding: 0 8px; overflow-x: auto;
     }
     .tb-btn {
-      width: 42px; height: 42px; border-radius: 10px; border: 1px solid var(--border);
-      background: var(--panel2); color: var(--gold2); font-size: 18px; cursor: pointer;
+      width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--border);
+      background: var(--panel2); color: var(--gold2); font-size: 16px; cursor: pointer; flex-shrink: 0;
     }
-    .tb-btn:active { border-color: var(--gold); }
-    .tb-title { font-size: 12px; color: var(--gold); font-weight: 700; margin-left: 4px; }
-    .tb-clock { margin-left: auto; font-size: 12px; color: var(--muted); }
-
+    .tb-title { font-size: 11px; color: var(--gold); font-weight: 700; margin-left: 2px; white-space: nowrap; }
+    .tb-clock { margin-left: auto; font-size: 11px; color: var(--muted); flex-shrink: 0; }
     #toast {
       position: fixed; left: 50%; transform: translateX(-50%); bottom: 64px; z-index: 200;
       background: #1a120c; border: 1px solid var(--border); color: var(--text);
       padding: 8px 14px; border-radius: 999px; font-size: 12px; display: none; max-width: 90vw;
     }
     #toast.show { display: block; }
-    #dbg {
-      position: fixed; left: 8px; right: 8px; top: 8px; z-index: 300;
-      background: #300; color: #fcc; font-size: 11px; padding: 8px; border-radius: 8px;
-      display: none; max-height: 80px; overflow: auto;
-    }
   </style>
 </head>
 <body>
-  <div id="dbg"></div>
   <div id="desktop-icons">
     <div class="desk-icon" id="icon-explorer"><div class="ic">📁</div><span>Explorer</span></div>
     <div class="desk-icon" id="icon-notepad"><div class="ic">📝</div><span>Notepad</span></div>
-    <div class="desk-icon" id="icon-docs"><div class="ic">📄</div><span>Documents</span></div>
     <div class="desk-icon" id="icon-term"><div class="ic">⌨</div><span>Terminal</span></div>
     <div class="desk-icon" id="icon-ide"><div class="ic">💻</div><span>IDE</span></div>
+    <div class="desk-icon" id="icon-kernel"><div class="ic">🧠</div><span>Kernel</span></div>
+    <div class="desk-icon" id="icon-office"><div class="ic">📄</div><span>Office</span></div>
+    <div class="desk-icon" id="icon-store"><div class="ic">🏪</div><span>App Store</span></div>
+    <div class="desk-icon" id="icon-browser"><div class="ic">🌐</div><span>Browser</span></div>
+    <div class="desk-icon" id="icon-settings"><div class="ic">⚙</div><span>Settings</span></div>
   </div>
 
+  <!-- Explorer -->
   <div class="window" id="win-explorer">
-    <div class="w-title"><b>📁 File Explorer</b><button type="button" class="w-x" id="close-explorer">✕</button></div>
+    <div class="w-title"><b>📁 Explorer</b><button type="button" class="w-x" data-close="explorer">✕</button></div>
     <div class="w-body">
       <div class="exp-side" id="exp-side"></div>
       <div class="exp-main">
@@ -177,8 +203,9 @@
     </div>
   </div>
 
+  <!-- Notepad -->
   <div class="window" id="win-notepad">
-    <div class="w-title"><b>📝 Notepad</b><button type="button" class="w-x" id="close-notepad">✕</button></div>
+    <div class="w-title"><b>📝 Notepad</b><button type="button" class="w-x" data-close="notepad">✕</button></div>
     <div class="w-body" style="flex-direction:column">
       <div id="np-path">No file open</div>
       <textarea id="np-editor" placeholder="Open a file from Explorer…"></textarea>
@@ -189,8 +216,9 @@
     </div>
   </div>
 
+  <!-- Terminal -->
   <div class="window" id="win-term">
-    <div class="w-title"><b>⌨ Terminal</b><button type="button" class="w-x" id="close-term">✕</button></div>
+    <div class="w-title"><b>⌨ Terminal</b><button type="button" class="w-x" data-close="term">✕</button></div>
     <div class="w-body">
       <div id="term-out"></div>
       <form id="term-form" autocomplete="off">
@@ -200,8 +228,9 @@
     </div>
   </div>
 
+  <!-- IDE -->
   <div class="window" id="win-ide">
-    <div class="w-title"><b>💻 IDE</b><button type="button" class="w-x" id="close-ide">✕</button></div>
+    <div class="w-title"><b>💻 IDE</b><button type="button" class="w-x" data-close="ide">✕</button></div>
     <div class="w-body">
       <div class="ide-side">
         <div class="ide-side-h">/Projects</div>
@@ -209,10 +238,10 @@
       </div>
       <div class="ide-main">
         <div id="ide-tab">No file open</div>
-        <div id="ide-editor-wrap"><textarea id="ide-fallback" placeholder="// code"></textarea></div>
+        <textarea id="ide-fallback" placeholder="// code"></textarea>
         <div class="toolbar">
           <button type="button" id="ide-save">💾 Save</button>
-          <button type="button" id="ide-refresh">↻ Tree</button>
+          <button type="button" id="ide-refresh">↻</button>
           <button type="button" id="ide-new">＋ File</button>
           <button type="button" id="ide-preview">Preview</button>
         </div>
@@ -220,11 +249,89 @@
     </div>
   </div>
 
+  <!-- STEP5 Kernel -->
+  <div class="window" id="win-kernel">
+    <div class="w-title"><b>🧠 Kernel</b><button type="button" class="w-x" data-close="kernel">✕</button></div>
+    <div class="w-body" style="flex-direction:column">
+      <div class="pad" id="kernel-body">Loading…</div>
+      <div class="toolbar">
+        <button type="button" id="k-refresh">↻ Refresh</button>
+        <button type="button" id="k-seed">Seed FS</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP6 Office -->
+  <div class="window" id="win-office">
+    <div class="w-title"><b>📄 Office</b><button type="button" class="w-x" data-close="office">✕</button></div>
+    <div class="w-body" style="flex-direction:column">
+      <div id="of-path">/Documents/Office/notes.txt</div>
+      <textarea id="of-editor" placeholder="Write your document…"></textarea>
+      <div class="toolbar">
+        <button type="button" id="of-save">💾 Save</button>
+        <button type="button" id="of-load">📂 Load</button>
+        <button type="button" id="of-csv">CSV mode</button>
+        <button type="button" id="of-export">Export path</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP7 App Store -->
+  <div class="window" id="win-store">
+    <div class="w-title"><b>🏪 App Store</b><button type="button" class="w-x" data-close="store">✕</button></div>
+    <div class="w-body" style="flex-direction:column">
+      <div class="pad" id="store-body"></div>
+    </div>
+  </div>
+
+  <!-- STEP8 Browser -->
+  <div class="window" id="win-browser">
+    <div class="w-title"><b>🌐 Browser</b><button type="button" class="w-x" data-close="browser">✕</button></div>
+    <div class="w-body" style="flex-direction:column">
+      <div id="br-bar">
+        <input class="line" id="br-url" type="url" placeholder="https://example.com" value="https://example.com" />
+        <button type="button" class="btn" id="br-go">Go</button>
+      </div>
+      <div id="br-view" class="muted">Enter https URL → text snapshot (safe fetch via /api/fs)</div>
+      <div class="toolbar">
+        <button type="button" id="br-hn">HN</button>
+        <button type="button" id="br-wiki">Wikipedia</button>
+        <button type="button" id="br-save">Save page → FS</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP9 Settings -->
+  <div class="window" id="win-settings">
+    <div class="w-title"><b>⚙ Settings</b><button type="button" class="w-x" data-close="settings">✕</button></div>
+    <div class="w-body" style="flex-direction:column">
+      <div class="pad">
+        <div class="k-card">
+          <h4>PasiyaOS</h4>
+          <div class="muted" id="set-ver">Desktop S5–S9</div>
+        </div>
+        <div class="k-card">
+          <h4>Clipboard → FS</h4>
+          <textarea class="area" id="clip-text" placeholder="Paste text to save…"></textarea>
+          <button type="button" class="btn" id="clip-save" style="margin-top:8px">Save to /Documents/clipboard.txt</button>
+        </div>
+        <div class="k-card">
+          <h4>About</h4>
+          <div class="muted">Shared disk: Supabase pasiya_fs<br/>API: /api/fs · no extra Vercel functions</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="taskbar">
-    <button type="button" class="tb-btn" id="tb-explorer" title="Explorer">📁</button>
-    <button type="button" class="tb-btn" id="tb-notepad" title="Notepad">📝</button>
-    <button type="button" class="tb-btn" id="tb-term" title="Terminal">⌨</button>
-    <button type="button" class="tb-btn" id="tb-ide" title="IDE">💻</button>
+    <button type="button" class="tb-btn" data-open="explorer">📁</button>
+    <button type="button" class="tb-btn" data-open="term">⌨</button>
+    <button type="button" class="tb-btn" data-open="ide">💻</button>
+    <button type="button" class="tb-btn" data-open="kernel">🧠</button>
+    <button type="button" class="tb-btn" data-open="office">📄</button>
+    <button type="button" class="tb-btn" data-open="store">🏪</button>
+    <button type="button" class="tb-btn" data-open="browser">🌐</button>
+    <button type="button" class="tb-btn" data-open="settings">⚙</button>
     <span class="tb-title">PASIYA OS</span>
     <span class="tb-clock" id="clock"></span>
   </div>
@@ -237,31 +344,19 @@
   var tg = window.Telegram && window.Telegram.WebApp;
   if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
 
-  function dbg(msg) {
-    var el = document.getElementById('dbg');
-    el.style.display = 'block';
-    el.textContent = String(msg);
-  }
-
   function toast(msg) {
     var el = document.getElementById('toast');
     el.textContent = msg;
     el.classList.add('show');
     clearTimeout(window.__t);
-    window.__t = setTimeout(function () { el.classList.remove('show'); }, 2500);
+    window.__t = setTimeout(function () { el.classList.remove('show'); }, 2800);
   }
 
-  function initData() {
-    return (tg && tg.initData) ? tg.initData : '';
-  }
+  function initData() { return (tg && tg.initData) ? tg.initData : ''; }
 
   function fsApi(action, path, content, extra) {
     var body = { action: action, path: path || '/', initData: initData() };
-    if (extra) {
-      for (var k in extra) {
-        if (Object.prototype.hasOwnProperty.call(extra, k)) body[k] = extra[k];
-      }
-    }
+    if (extra) for (var k in extra) if (Object.prototype.hasOwnProperty.call(extra, k)) body[k] = extra[k];
     if (content !== undefined) body.content = content;
     return fetch(API, {
       method: 'POST',
@@ -269,20 +364,10 @@
       body: JSON.stringify(body)
     }).then(function (res) {
       return res.text().then(function (text) {
-        var j = null;
-        try {
-          j = text ? JSON.parse(text) : {};
-        } catch (e) {
-          return {
-            ok: false,
-            error: 'API non-JSON (HTTP ' + res.status + '): ' + String(text).slice(0, 120)
-          };
+        try { return text ? JSON.parse(text) : {}; }
+        catch (e) {
+          return { ok: false, error: 'API non-JSON HTTP ' + res.status + ': ' + String(text).slice(0, 100) };
         }
-        if (!res.ok && j && !j.error) {
-          j.ok = false;
-          j.error = j.error || ('HTTP ' + res.status);
-        }
-        return j || { ok: false, error: 'empty response' };
       });
     }).catch(function (e) {
       return { ok: false, error: 'network: ' + String(e.message || e) };
@@ -292,48 +377,36 @@
     });
   }
 
-  /* —— Windows —— */
+  var WINS = {
+    explorer: 'win-explorer', notepad: 'win-notepad', term: 'win-term', ide: 'win-ide',
+    kernel: 'win-kernel', office: 'win-office', store: 'win-store', browser: 'win-browser',
+    settings: 'win-settings'
+  };
+
   function openWin(name) {
-    var map = {
-      explorer: 'win-explorer',
-      notepad: 'win-notepad',
-      term: 'win-term',
-      ide: 'win-ide'
-    };
-    var id = map[name];
-    if (!id) { toast('Unknown app: ' + name); return; }
+    var id = WINS[name];
+    if (!id) return;
     var el = document.getElementById(id);
-    if (!el) { toast('Missing window: ' + id); return; }
+    if (!el) return;
     el.classList.add('open', 'focused');
-    var wins = document.querySelectorAll('.window');
-    for (var i = 0; i < wins.length; i++) {
-      if (wins[i] !== el) wins[i].classList.remove('focused');
-    }
+    document.querySelectorAll('.window').forEach(function (w) {
+      if (w !== el) w.classList.remove('focused');
+    });
     if (name === 'explorer') refreshList();
-    if (name === 'term') {
-      setTimeout(function () {
-        var inp = document.getElementById('term-input');
-        if (inp) inp.focus();
-      }, 50);
-    }
+    if (name === 'term') setTimeout(function () { document.getElementById('term-input').focus(); }, 40);
     if (name === 'ide') ideLoadTree();
-    toast(name + ' open');
+    if (name === 'kernel') kernelRefresh();
+    if (name === 'store') renderStore();
+    if (name === 'office') officeEnsure();
   }
 
   function closeWin(name) {
-    var map = {
-      explorer: 'win-explorer',
-      notepad: 'win-notepad',
-      term: 'win-term',
-      ide: 'win-ide'
-    };
-    var el = document.getElementById(map[name]);
+    var el = document.getElementById(WINS[name]);
     if (el) el.classList.remove('open', 'focused');
   }
 
-  /* —— Explorer —— */
-  var cwd = '/';
-  var npPath = null;
+  /* Explorer / Notepad / Term / IDE — same as S4 fix */
+  var cwd = '/', npPath = null, termCwd = '/', idePath = null;
 
   function baseName(p) {
     var parts = String(p).split('/').filter(Boolean);
@@ -346,10 +419,7 @@
     list.innerHTML = '<div class="exp-row">Loading…</div>';
     fsApi('list', cwd).then(function (j) {
       list.innerHTML = '';
-      if (!j.ok) {
-        list.innerHTML = '<div class="exp-row">' + (j.error || 'error') + '</div>';
-        return;
-      }
+      if (!j.ok) { list.innerHTML = '<div class="exp-row">' + (j.error || 'error') + '</div>'; return; }
       if (cwd !== '/') {
         var up = document.createElement('div');
         up.className = 'exp-row';
@@ -357,38 +427,25 @@
         up.onclick = goUp;
         list.appendChild(up);
       }
-      var entries = j.entries || [];
-      for (var i = 0; i < entries.length; i++) {
-        (function (e) {
-          var row = document.createElement('div');
-          row.className = 'exp-row';
-          var label = (e.type === 'dir' ? '📁 ' : '📄 ') + baseName(e.path);
-          row.innerHTML = label + (e.type === 'file' ? '<span class="meta">' + (e.size || 0) + 'b</span>' : '');
-          row.onclick = function () {
-            if (e.type === 'dir') {
-              cwd = e.path;
-              refreshList();
-            } else {
-              openFile(e.path);
-            }
-          };
-          list.appendChild(row);
-        })(entries[i]);
-      }
-      if (!entries.length) {
-        list.innerHTML += '<div class="exp-row">(empty)</div>';
-      }
+      (j.entries || []).forEach(function (e) {
+        var row = document.createElement('div');
+        row.className = 'exp-row';
+        row.innerHTML = (e.type === 'dir' ? '📁 ' : '📄 ') + baseName(e.path) +
+          (e.type === 'file' ? '<span class="meta">' + (e.size || 0) + 'b</span>' : '');
+        row.onclick = function () {
+          if (e.type === 'dir') { cwd = e.path; refreshList(); }
+          else openFile(e.path);
+        };
+        list.appendChild(row);
+      });
     });
   }
-
   function goUp() {
     if (cwd === '/') return;
-    var parts = cwd.split('/').filter(Boolean);
-    parts.pop();
+    var parts = cwd.split('/').filter(Boolean); parts.pop();
     cwd = parts.length ? '/' + parts.join('/') : '/';
     refreshList();
   }
-
   function openFile(path) {
     fsApi('read', path).then(function (j) {
       if (!j.ok) return;
@@ -399,13 +456,9 @@
     });
   }
 
-  /* —— Terminal —— */
-  var termCwd = '/';
-
   function termPrompt() {
     document.getElementById('term-prompt').textContent = 'founder@pasiyaos:' + termCwd + '$';
   }
-
   function termPrint(text, cls) {
     var out = document.getElementById('term-out');
     var line = document.createElement('div');
@@ -414,45 +467,27 @@
     out.appendChild(line);
     out.scrollTop = out.scrollHeight;
   }
-
   function termRun(line) {
     line = String(line || '').trim();
     if (!line) return;
     termPrint('founder@pasiyaos:' + termCwd + '$ ' + line, 'cmd');
     fsApi('shell', '/', undefined, { cwd: termCwd, line: line }).then(function (j) {
-      if (!j.ok) {
-        termPrint(j.error || 'error', 'err');
-        return;
-      }
+      if (!j.ok) { termPrint(j.error || 'error', 'err'); return; }
       if (j.cwd) termCwd = j.cwd;
       termPrompt();
-      if (j.output === '__CLEAR__') {
-        document.getElementById('term-out').innerHTML = '';
-        return;
-      }
-      if (j.output) {
-        var lines = String(j.output).split('\n');
-        for (var i = 0; i < lines.length; i++) {
-          termPrint(lines[i], /not found|error|missing/i.test(lines[i]) ? 'err' : '');
-        }
-      }
+      if (j.output === '__CLEAR__') { document.getElementById('term-out').innerHTML = ''; return; }
+      if (j.output) String(j.output).split('\n').forEach(function (ln) {
+        termPrint(ln, /not found|error|missing|failed/i.test(ln) ? 'err' : '');
+      });
     });
   }
-
-  /* —— IDE —— */
-  var idePath = null;
 
   function ideLoadTree() {
     var tree = document.getElementById('ide-tree');
     tree.innerHTML = '…';
-    fsApi('mkdir', '/Projects').then(function () {
-      return fsApi('list', '/Projects');
-    }).then(function (j) {
+    fsApi('mkdir', '/Projects').then(function () { return fsApi('list', '/Projects'); }).then(function (j) {
       tree.innerHTML = '';
-      if (!j.ok) {
-        tree.textContent = j.error || 'error';
-        return;
-      }
+      if (!j.ok) { tree.textContent = j.error || 'error'; return; }
       var n = 0;
       (j.entries || []).forEach(function (e) {
         if (e.type !== 'file') return;
@@ -463,10 +498,9 @@
         row.onclick = function () { ideOpen(e.path); };
         tree.appendChild(row);
       });
-      if (!n) tree.innerHTML = '<div class="ide-file">No files yet</div>';
+      if (!n) tree.innerHTML = '<div class="ide-file">No files</div>';
     });
   }
-
   function ideOpen(path) {
     fsApi('read', path).then(function (j) {
       if (!j.ok) return;
@@ -477,64 +511,142 @@
       ideLoadTree();
     });
   }
-
   function ideSave() {
     if (!idePath) {
-      var name = prompt('File name in /Projects', 'index.html');
+      var name = prompt('File in /Projects', 'index.html');
       if (!name) return;
       idePath = '/Projects/' + String(name).replace(/^\/+/, '');
     }
-    // always absolute under /Projects
-    if (idePath.charAt(0) !== '/') idePath = '/Projects/' + idePath;
-    if (idePath.indexOf('/Projects/') !== 0 && idePath !== '/Projects') {
-      idePath = '/Projects/' + idePath.replace(/^\/+/, '');
-    }
+    if (idePath.indexOf('/Projects/') !== 0) idePath = '/Projects/' + idePath.replace(/^\/+/, '');
     var val = document.getElementById('ide-fallback').value;
-    toast('Saving ' + idePath + '…');
     fsApi('write', idePath, val).then(function (j) {
       if (j && j.ok) {
-        document.getElementById('ide-tab').textContent = idePath + ' · saved (' + (j.size || 0) + 'b)';
+        document.getElementById('ide-tab').textContent = idePath + ' · saved';
         toast('Saved ' + idePath + ' (' + (j.size || 0) + 'b)');
         ideLoadTree();
-      } else {
-        toast('Save failed: ' + ((j && j.error) || 'unknown'));
       }
     });
   }
 
-  /* —— Bind UI (explicit IDs — reliable on mobile) —— */
+  /* STEP 5 Kernel */
+  function kernelRefresh() {
+    var body = document.getElementById('kernel-body');
+    body.innerHTML = 'Loading…';
+    Promise.all([fsApi('df', '/'), fsApi('list', '/'), fsApi('seed', '/')]).then(function (arr) {
+      var df = arr[0], ls = arr[1];
+      var used = df.ok ? df.used : 0;
+      var max = df.ok ? df.max : 1;
+      var pct = Math.min(100, Math.round((used / max) * 100));
+      var dirs = (ls.ok ? ls.entries : []) || [];
+      body.innerHTML =
+        '<div class="k-card"><h4>Disk (pasiya_fs)</h4>' +
+        '<div class="muted">' + used + ' / ' + max + ' bytes (' + pct + '%)</div>' +
+        '<div class="bar" style="margin-top:8px"><i style="width:' + pct + '%"></i></div></div>' +
+        '<div class="k-card"><h4>Root entries</h4><div class="muted">' +
+        (dirs.map(function (e) { return baseName(e.path); }).join(', ') || '(empty)') +
+        '</div></div>' +
+        '<div class="k-card"><h4>Services</h4><div class="muted">API /api/fs · Telegram bot · Supabase · Vercel</div></div>' +
+        '<div class="k-card"><h4>Apps</h4><div class="muted">Explorer · Notepad · Terminal · IDE · Office · Browser · Store</div></div>';
+    });
+  }
+
+  /* STEP 6 Office */
+  var ofPath = '/Documents/Office/notes.txt';
+  function officeEnsure() {
+    document.getElementById('of-path').textContent = ofPath;
+    fsApi('mkdir', '/Documents/Office').then(function () {
+      return fsApi('read', ofPath);
+    }).then(function (j) {
+      if (j.ok) document.getElementById('of-editor').value = j.content || '';
+    });
+  }
+  function officeSave() {
+    var val = document.getElementById('of-editor').value;
+    fsApi('mkdir', '/Documents/Office').then(function () {
+      return fsApi('write', ofPath, val);
+    }).then(function (j) {
+      if (j.ok) toast('Office saved ' + ofPath + ' (' + j.size + 'b)');
+    });
+  }
+
+  /* STEP 7 Store */
+  var APPS = [
+    { id: 'explorer', ic: '📁', name: 'Explorer', desc: 'File manager' },
+    { id: 'notepad', ic: '📝', name: 'Notepad', desc: 'Quick text' },
+    { id: 'term', ic: '⌨', name: 'Terminal', desc: 'VFS shell' },
+    { id: 'ide', ic: '💻', name: 'IDE', desc: '/Projects editor' },
+    { id: 'kernel', ic: '🧠', name: 'Kernel', desc: 'Disk & status' },
+    { id: 'office', ic: '📄', name: 'Office', desc: 'Documents' },
+    { id: 'browser', ic: '🌐', name: 'Browser', desc: 'HTTPS text view' },
+    { id: 'settings', ic: '⚙', name: 'Settings', desc: 'Clipboard & about' }
+  ];
+  function renderStore() {
+    var el = document.getElementById('store-body');
+    el.innerHTML = '';
+    APPS.forEach(function (a) {
+      var d = document.createElement('div');
+      d.className = 'store-item';
+      d.innerHTML = '<div class="ic">' + a.ic + '</div><div><b>' + a.name + '</b><span>' + a.desc + '</span></div>';
+      d.onclick = function () { openWin(a.id); };
+      el.appendChild(d);
+    });
+  }
+
+  /* STEP 8 Browser */
+  function browserGo() {
+    var url = document.getElementById('br-url').value.trim();
+    if (!url) return;
+    if (!/^https:\/\//i.test(url)) url = 'https://' + url;
+    document.getElementById('br-url').value = url;
+    document.getElementById('br-view').textContent = 'Loading…';
+    fsApi('httpget', '/', undefined, { url: url }).then(function (j) {
+      if (!j.ok) {
+        document.getElementById('br-view').textContent = j.error || 'fail';
+        return;
+      }
+      var text = j.text || '';
+      // strip tags lightly for readability
+      text = text.replace(/<script[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      document.getElementById('br-view').textContent =
+        'HTTP ' + j.status + ' · ' + (j.contentType || '') + '\n\n' + text.slice(0, 12000);
+    });
+  }
+
+  /* Bind */
   function bind() {
     document.getElementById('icon-explorer').onclick = function () { openWin('explorer'); };
     document.getElementById('icon-notepad').onclick = function () { openWin('notepad'); };
-    document.getElementById('icon-docs').onclick = function () {
-      cwd = '/Documents';
-      openWin('explorer');
-    };
     document.getElementById('icon-term').onclick = function () { openWin('term'); };
     document.getElementById('icon-ide').onclick = function () { openWin('ide'); };
+    document.getElementById('icon-kernel').onclick = function () { openWin('kernel'); };
+    document.getElementById('icon-office').onclick = function () { openWin('office'); };
+    document.getElementById('icon-store').onclick = function () { openWin('store'); };
+    document.getElementById('icon-browser').onclick = function () { openWin('browser'); };
+    document.getElementById('icon-settings').onclick = function () { openWin('settings'); };
 
-    document.getElementById('tb-explorer').onclick = function () { openWin('explorer'); };
-    document.getElementById('tb-notepad').onclick = function () { openWin('notepad'); };
-    document.getElementById('tb-term').onclick = function () { openWin('term'); };
-    document.getElementById('tb-ide').onclick = function () { openWin('ide'); };
-
-    document.getElementById('close-explorer').onclick = function () { closeWin('explorer'); };
-    document.getElementById('close-notepad').onclick = function () { closeWin('notepad'); };
-    document.getElementById('close-term').onclick = function () { closeWin('term'); };
-    document.getElementById('close-ide').onclick = function () { closeWin('ide'); };
+    document.querySelectorAll('[data-open]').forEach(function (b) {
+      b.onclick = function () { openWin(b.getAttribute('data-open')); };
+    });
+    document.querySelectorAll('[data-close]').forEach(function (b) {
+      b.onclick = function () { closeWin(b.getAttribute('data-close')); };
+    });
 
     document.getElementById('btn-up').onclick = goUp;
     document.getElementById('btn-refresh').onclick = refreshList;
     document.getElementById('btn-new-folder').onclick = function () {
       var name = prompt('Folder name');
       if (!name) return;
-      var p = (cwd === '/' ? '' : cwd) + '/' + name.replace(/^\/+/g, '');
+      var p = (cwd === '/' ? '' : cwd) + '/' + name.replace(/^\/+/, '');
       fsApi('mkdir', p).then(function (j) { if (j.ok) refreshList(); });
     };
     document.getElementById('btn-new-file').onclick = function () {
       var name = prompt('File name', 'notes.txt');
       if (!name) return;
-      var p = (cwd === '/' ? '' : cwd) + '/' + name.replace(/^\/+/g, '');
+      var p = (cwd === '/' ? '' : cwd) + '/' + name.replace(/^\/+/, '');
       fsApi('write', p, '').then(function (j) { if (j.ok) { refreshList(); openFile(p); } });
     };
     document.getElementById('btn-save').onclick = function () {
@@ -543,72 +655,99 @@
         if (!name) return;
         npPath = name;
       }
-      var text = document.getElementById('np-editor').value;
-      fsApi('write', npPath, text).then(function (j) {
-        if (j.ok) toast('Saved ' + npPath + ' (' + j.size + 'b)');
+      fsApi('write', npPath, document.getElementById('np-editor').value).then(function (j) {
+        if (j.ok) toast('Saved ' + npPath);
       });
     };
-    document.getElementById('btn-np-docs').onclick = function () {
-      cwd = '/Documents';
-      openWin('explorer');
-    };
+    document.getElementById('btn-np-docs').onclick = function () { cwd = '/Documents'; openWin('explorer'); };
 
     document.getElementById('term-form').onsubmit = function (e) {
       e.preventDefault();
       var input = document.getElementById('term-input');
-      var v = input.value;
-      input.value = '';
+      var v = input.value; input.value = '';
       termRun(v);
     };
 
     document.getElementById('ide-save').onclick = ideSave;
     document.getElementById('ide-refresh').onclick = ideLoadTree;
     document.getElementById('ide-new').onclick = function () {
-      var name = prompt('New file in /Projects', 'app.js');
+      var name = prompt('New file', 'app.js');
       if (!name) return;
-      var p = '/Projects/' + name.replace(/^\/+/g, '');
+      var p = '/Projects/' + name.replace(/^\/+/, '');
       fsApi('write', p, '').then(function (j) { if (j.ok) ideOpen(p); });
     };
     document.getElementById('ide-preview').onclick = function () {
-      if (!idePath || !/\.html?$/i.test(idePath)) {
-        toast('Open an .html file first');
-        return;
-      }
-      var html = document.getElementById('ide-fallback').value;
+      if (!idePath || !/\.html?$/i.test(idePath)) { toast('Open .html first'); return; }
       var w = window.open('', '_blank');
-      if (w) { w.document.write(html); w.document.close(); }
+      if (w) { w.document.write(document.getElementById('ide-fallback').value); w.document.close(); }
+    };
+
+    document.getElementById('k-refresh').onclick = kernelRefresh;
+    document.getElementById('k-seed').onclick = function () {
+      fsApi('seed', '/').then(function (j) { toast(j.ok ? 'Seeded' : (j.error || 'fail')); kernelRefresh(); });
+    };
+
+    document.getElementById('of-save').onclick = officeSave;
+    document.getElementById('of-load').onclick = officeEnsure;
+    document.getElementById('of-csv').onclick = function () {
+      ofPath = '/Documents/Office/sheet.csv';
+      document.getElementById('of-path').textContent = ofPath;
+      document.getElementById('of-editor').value = 'name,value\nalpha,1\nbeta,2\n';
+      toast('CSV template');
+    };
+    document.getElementById('of-export').onclick = function () {
+      toast('Path: ' + ofPath + ' — use /fs cat ' + ofPath);
+    };
+
+    document.getElementById('br-go').onclick = browserGo;
+    document.getElementById('br-hn').onclick = function () {
+      document.getElementById('br-url').value = 'https://news.ycombinator.com';
+      browserGo();
+    };
+    document.getElementById('br-wiki').onclick = function () {
+      document.getElementById('br-url').value = 'https://en.wikipedia.org/wiki/Sri_Lanka';
+      browserGo();
+    };
+    document.getElementById('br-save').onclick = function () {
+      var text = document.getElementById('br-view').textContent || '';
+      var p = '/Documents/browser-save.txt';
+      fsApi('write', p, text).then(function (j) {
+        if (j.ok) toast('Saved ' + p);
+      });
+    };
+
+    document.getElementById('clip-save').onclick = function () {
+      var t = document.getElementById('clip-text').value || '';
+      fsApi('write', '/Documents/clipboard.txt', t).then(function (j) {
+        if (j.ok) toast('Clipboard saved');
+      });
     };
 
     var shortcuts = ['/', '/Desktop', '/Documents', '/Downloads', '/Pictures', '/Projects', '/.Trash'];
     var side = document.getElementById('exp-side');
     side.innerHTML = '';
-    for (var i = 0; i < shortcuts.length; i++) {
-      (function (p) {
-        var d = document.createElement('div');
-        d.textContent = p === '/' ? 'This PC' : baseName(p);
-        d.onclick = function () { cwd = p; refreshList(); };
-        side.appendChild(d);
-      })(shortcuts[i]);
-    }
+    shortcuts.forEach(function (p) {
+      var d = document.createElement('div');
+      d.textContent = p === '/' ? 'This PC' : baseName(p);
+      d.onclick = function () { cwd = p; refreshList(); };
+      side.appendChild(d);
+    });
   }
 
   function tick() {
-    var d = new Date();
     document.getElementById('clock').textContent =
-      d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
   try {
     bind();
     termPrompt();
-    termPrint('PasiyaOS Terminal — type help', '');
+    termPrint('PasiyaOS S5–S9 — type help', '');
     tick();
     setInterval(tick, 15000);
-    fsApi('seed', '/').then(function () {
-      toast('Desktop ready — tap an icon');
-    });
+    fsApi('seed', '/').then(function () { toast('Desktop S5–S9 ready'); });
   } catch (e) {
-    dbg('JS error: ' + (e.message || e));
+    toast('JS: ' + (e.message || e));
   }
 })();
   </script>
