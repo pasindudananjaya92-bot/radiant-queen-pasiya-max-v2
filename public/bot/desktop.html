@@ -145,6 +145,27 @@
       font-family: ui-monospace, monospace; font-size: 12px;
     }
 
+  
+    /* IDE */
+    #win-ide { width: min(520px, 98vw); height: min(560px, 78vh); left: 8px; top: 8px; }
+    #win-ide .w-body { flex-direction: row; }
+    .ide-side {
+      width: 140px; border-right: 1px solid var(--border); background: var(--panel2);
+      display: flex; flex-direction: column; min-height: 0;
+    }
+    .ide-side-h { padding: 8px; font-size: 11px; color: var(--gold); border-bottom: 1px solid var(--border); }
+    #ide-tree { flex: 1; overflow-y: auto; padding: 6px; font-size: 12px; }
+    .ide-file { padding: 6px 8px; border-radius: 6px; cursor: pointer; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ide-file:hover, .ide-file.on { background: #2a2010; color: var(--gold2); }
+    .ide-main { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+    #ide-tab { padding: 6px 10px; font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--border); }
+    #ide-editor { flex: 1; min-height: 200px; }
+    .ide-bar { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+    .ide-bar button {
+      border: 1px solid var(--border); background: var(--panel2); color: var(--text);
+      border-radius: 8px; padding: 8px 10px; font-size: 11px; cursor: pointer;
+    }
+
   </style>
 </head>
 <body>
@@ -155,6 +176,7 @@
     <div class="desk-icon" data-app="notepad"><div class="ic">📝</div><span>Notepad</span></div>
     <div class="desk-icon" data-app="docs"><div class="ic">📄</div><span>Documents</span></div>
     <div class="desk-icon" data-app="term"><div class="ic">⌨</div><span>Terminal</span></div>
+    <div class="desk-icon" data-app="ide"><div class="ic">💻</div><span>IDE</span></div>
   </div>
 
   <!-- Explorer -->
@@ -203,11 +225,34 @@
     </div>
   </div>
 
+  
+  <!-- IDE -->
+  <div class="window" id="win-ide">
+    <div class="w-title"><b>💻 IDE</b><button class="w-x" data-close="ide">✕</button></div>
+    <div class="w-body">
+      <div class="ide-side">
+        <div class="ide-side-h">/Projects</div>
+        <div id="ide-tree"></div>
+      </div>
+      <div class="ide-main">
+        <div id="ide-tab">No file open</div>
+        <div id="ide-editor"></div>
+        <div class="ide-bar">
+          <button type="button" id="ide-save">💾 Save</button>
+          <button type="button" id="ide-refresh">↻ Tree</button>
+          <button type="button" id="ide-new">＋ File</button>
+          <button type="button" id="ide-preview">Preview HTML</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="taskbar">
     <button class="tb-btn" id="tb-start" title="Start">✦</button>
     <button class="tb-btn" data-app="explorer" title="Explorer">📁</button>
     <button class="tb-btn" data-app="notepad" title="Notepad">📝</button>
     <button class="tb-btn" data-app="term" title="Terminal">⌨</button>
+    <button class="tb-btn" data-app="ide" title="IDE">💻</button>
     <span class="tb-title">PASIYA OS</span>
     <span class="tb-clock" id="clock"></span>
   </div>
@@ -254,7 +299,7 @@
   }
 
   function openWin(name) {
-    var map = { explorer: 'win-explorer', notepad: 'win-notepad', term: 'win-term' };
+    var map = { explorer: 'win-explorer', notepad: 'win-notepad', term: 'win-term', ide: 'win-ide' };
     var id = map[name];
     if (!id) return;
     var el = document.getElementById(id);
@@ -272,10 +317,152 @@
   }
 
   function closeWin(name) {
-    var map = { explorer: 'win-explorer', notepad: 'win-notepad', term: 'win-term' };
+    var map = { explorer: 'win-explorer', notepad: 'win-notepad', term: 'win-term', ide: 'win-ide' };
     var el = document.getElementById(map[name]);
     if (el) el.classList.remove('open', 'focused');
   }
+
+
+  /* —— IDE (Monaco + pasiya_fs) —— */
+  var idePath = null;
+  var ideEditor = null;
+  var ideDirty = false;
+
+  function ideLang(path) {
+    path = String(path || '');
+    if (/\.html?$/i.test(path)) return 'html';
+    if (/\.css$/i.test(path)) return 'css';
+    if (/\.json$/i.test(path)) return 'json';
+    if (/\.md$/i.test(path)) return 'markdown';
+    if (/\.py$/i.test(path)) return 'python';
+    if (/\.ts$/i.test(path)) return 'typescript';
+    if (/\.js$/i.test(path)) return 'javascript';
+    return 'plaintext';
+  }
+
+  async function ensureIdeEditor() {
+    if (ideEditor) return ideEditor;
+    var ok = await (window.__PASIYA_MONACO_READY || Promise.resolve(false));
+    var el = document.getElementById('ide-editor');
+    if (ok && window.monaco) {
+      ideEditor = monaco.editor.create(el, {
+        value: '',
+        language: 'javascript',
+        theme: 'vs-dark',
+        automaticLayout: true,
+        minimap: { enabled: false },
+        fontSize: 13,
+      });
+      ideEditor.onDidChangeModelContent(function () { ideDirty = true; });
+    } else {
+      // fallback textarea
+      el.innerHTML = '';
+      var ta = document.createElement('textarea');
+      ta.id = 'ide-fallback';
+      ta.style.cssText = 'width:100%;height:100%;border:0;background:#0e0b09;color:#f3e6c8;padding:12px;font-family:monospace;font-size:13px;resize:none;outline:none;';
+      ta.addEventListener('input', function () { ideDirty = true; });
+      el.appendChild(ta);
+      ideEditor = {
+        getValue: function () { return ta.value; },
+        setValue: function (v) { ta.value = v; },
+        layout: function () {},
+      };
+    }
+    return ideEditor;
+  }
+
+  async function ideLoadTree() {
+    var tree = document.getElementById('ide-tree');
+    tree.innerHTML = 'Loading…';
+    await fsApi('mkdir', '/Projects');
+    var j = await fsApi('list', '/Projects');
+    tree.innerHTML = '';
+    if (!j.ok) {
+      tree.textContent = j.error || 'error';
+      return;
+    }
+    (j.entries || []).forEach(function (e) {
+      if (e.type !== 'file') return;
+      var name = e.path.split('/').filter(Boolean).pop();
+      var row = document.createElement('div');
+      row.className = 'ide-file' + (idePath === e.path ? ' on' : '');
+      row.textContent = name;
+      row.onclick = function () { ideOpen(e.path); };
+      tree.appendChild(row);
+    });
+    if (!(j.entries || []).filter(function (e) { return e.type === 'file'; }).length) {
+      tree.innerHTML = '<div class="ide-file">No files — create one</div>';
+    }
+  }
+
+  async function ideOpen(path) {
+    await ensureIdeEditor();
+    var j = await fsApi('read', path);
+    if (!j.ok) return;
+    idePath = path;
+    ideDirty = false;
+    document.getElementById('ide-tab').textContent = path;
+    ideEditor.setValue(j.content || '');
+    if (window.monaco && ideEditor.setModel) {
+      /* monaco instance */
+    }
+    if (window.monaco && ideEditor.getModel) {
+      try {
+        monaco.editor.setModelLanguage(ideEditor.getModel(), ideLang(path));
+      } catch (e) {}
+    }
+    openWin('ide');
+    ideLoadTree();
+    toast('IDE: ' + path);
+  }
+
+  async function ideSave() {
+    if (!idePath) {
+      var name = prompt('File name in /Projects', 'index.html');
+      if (!name) return;
+      idePath = '/Projects/' + name.replace(/^\/+/, '');
+    }
+    await ensureIdeEditor();
+    var val = ideEditor.getValue();
+    var j = await fsApi('write', idePath, val);
+    if (j.ok) {
+      ideDirty = false;
+      document.getElementById('ide-tab').textContent = idePath + ' · saved';
+      toast('Saved ' + idePath + ' (' + j.size + 'b)');
+      ideLoadTree();
+    }
+  }
+
+  document.getElementById('ide-save').onclick = ideSave;
+  document.getElementById('ide-refresh').onclick = ideLoadTree;
+  document.getElementById('ide-new').onclick = async function () {
+    var name = prompt('New file in /Projects', 'app.js');
+    if (!name) return;
+    var p = '/Projects/' + name.replace(/^\/+/, '');
+    var j = await fsApi('write', p, '');
+    if (j.ok) ideOpen(p);
+  };
+  document.getElementById('ide-preview').onclick = function () {
+    if (!idePath || !/\.html?$/i.test(idePath)) {
+      toast('Open an .html file to preview');
+      return;
+    }
+    var html = ideEditor ? ideEditor.getValue() : '';
+    var w = window.open('', '_blank');
+    if (w) {
+      w.document.write(html);
+      w.document.close();
+    }
+  };
+
+  var _openWin = openWin;
+  openWin = function (name) {
+    _openWin(name);
+    if (name === 'ide') {
+      ensureIdeEditor().then(function () { ideLoadTree(); });
+    }
+  };
+
 
   /* —— Terminal VFS —— */
   var termCwd = '/';
@@ -314,7 +501,8 @@
       return;
     }
     if (j.output) {
-      String(j.output).split('\n').forEach(function (ln) {
+      String(j.output).split('
+').forEach(function (ln) {
         termPrint(ln, /not found|error|missing/i.test(ln) ? 'err' : '');
       });
     }
@@ -512,5 +700,13 @@
   })();
 })();
   </script>
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+<script>
+window.__PASIYA_MONACO_READY = new Promise(function(resolve) {
+  if (typeof require === 'undefined') { resolve(false); return; }
+  require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
+  require(['vs/editor/editor.main'], function () { resolve(true); }, function () { resolve(false); });
+});
+</script>
 </body>
 </html>
