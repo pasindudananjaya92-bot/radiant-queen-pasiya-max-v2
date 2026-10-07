@@ -1,13 +1,11 @@
 /**
- * api/fs.js — PasiyaOS filesystem API for Mini App
- * POST JSON: { initData, action, path, content }
- * actions: list | read | write | mkdir | rm | tree | df | seed
- *
- * Auth: Telegram WebApp initData HMAC (preferred)
- * Fallback: x-os-secret === process.env.OS_FS_SECRET (founder tools)
+ * api/fs.js — PasiyaOS FS API (always JSON, Node runtime)
+ * POST { initData, action, path, content, cwd, line }
  */
+export const config = { runtime: 'nodejs', maxDuration: 30 };
+
 import { validateInitData } from '../lib/tgWebAppAuth.js';
-import * as fs from '../lib/pasiyaFs.js';
+import * as vfs from '../lib/pasiyaFs.js';
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ADMIN_ID = String(process.env.ADMIN_ID || '').trim();
@@ -15,219 +13,261 @@ const OS_FS_SECRET = String(process.env.OS_FS_SECRET || '').trim();
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS, GET');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-os-secret');
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+}
+
+function json(res, status, obj) {
+  cors(res);
+  res.statusCode = status;
+  res.end(JSON.stringify(obj));
+}
+
+function parseBody(req) {
+  if (req.body && typeof req.body === 'object') return req.body;
+  if (typeof req.body === 'string') {
+    try {
+      return JSON.parse(req.body || '{}');
+    } catch (_) {
+      return {};
+    }
+  }
+  return {};
 }
 
 function resolveUser(req, body) {
-  const secret = req.headers['x-os-secret'] || body.secret || '';
+  const secret = String(req.headers['x-os-secret'] || body.secret || '').trim();
   if (OS_FS_SECRET && secret && secret === OS_FS_SECRET) {
     return { ok: true, userId: ADMIN_ID || 'founder', via: 'secret' };
   }
-  const initData = body.initData || '';
-  const v = validateInitData(initData, BOT_TOKEN);
-  if (!v.ok) return { ok: false, error: 'auth: ' + (v.error || 'fail') };
-  const uid = v.user?.id != null ? String(v.user.id) : '';
+  const v = validateInitData(body.initData || '', BOT_TOKEN);
+  if (!v.ok) return { ok: false, error: v.error || 'auth failed' };
+  const uid = v.user && v.user.id != null ? String(v.user.id) : '';
   if (!uid) return { ok: false, error: 'no user in initData' };
-  // STEP 2: founder-only write disk (same as /fs bot gate)
   if (ADMIN_ID && uid !== ADMIN_ID) {
-    return { ok: false, error: 'founder-only disk in STEP 2' };
+    return { ok: false, error: 'founder-only disk (ADMIN_ID mismatch)' };
   }
   return { ok: true, userId: uid, via: 'telegram' };
+}
+
+function resolvePath(cwd, p) {
+  const c = vfs.normalizePath(cwd || '/');
+  if (!p || p === '.') return c;
+  if (String(p).startsWith('/')) return vfs.normalizePath(p);
+  if (c === '/') return vfs.normalizePath('/' + p);
+  return vfs.normalizePath(c + '/' + p);
+}
+
+async function runShell(userId, cwd0, line) {
+  const cwdStart = vfs.normalizePath(cwd0 || '/');
+  const raw = String(line || '').trim();
+  if (!raw) return { ok: true, cwd: cwdStart, output: '' };
+
+  // tokenize respecting simple quotes
+  const parts = raw.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
+  const argv = parts.map((p) => p.replace(/^"|"$/g, ''));
+  const cmd = String(argv[0] || '').toLowerCase();
+  const arg1 = argv[1] || '';
+  let cwd = cwdStart;
+  let output = '';
+
+  if (cmd === 'help') {
+    output = 'ls cd pwd cat mkdir rm touch tree df clear help\necho text > /path/file\necho text >> /path/file';
+  } else if (cmd === 'pwd') {
+    output = cwdStart;
+  } else if (cmd === 'cd') {
+    const dest = resolvePath(cwdStart, arg1 || '/');
+    const st = await vfs.fsStat(userId, dest);
+    if (!st.ok || !st.stat || st.stat.type !== 'dir') {
+      output = 'cd: not a directory: ' + dest;
+    } else {
+      cwd = dest;
+      output = '';
+    }
+  } else if (cmd === 'ls' || cmd === 'dir') {
+    const target = resolvePath(cwdStart, arg1 || '.');
+    const r = await vfs.fsList(userId, target);
+    if (!r.ok) output = r.error || 'ls failed';
+    else {
+      const ents = r.entries || [];
+      output =
+        ents
+          .map((e) => {
+            const name = String(e.path).split('/').filter(Boolean).pop() || e.path;
+            return (e.type === 'dir' ? '📁 ' : '📄 ') + name;
+          })
+          .join('\n') || '(empty)';
+    }
+  } else if (cmd === 'cat') {
+    if (!arg1) output = 'cat: missing file';
+    else {
+      const r = await vfs.fsRead(userId, resolvePath(cwdStart, arg1));
+      output = r.ok ? String(r.content || '') : r.error || 'not found';
+    }
+  } else if (cmd === 'mkdir') {
+    if (!arg1) output = 'mkdir: missing operand';
+    else {
+      const r = await vfs.fsMkdir(userId, resolvePath(cwdStart, arg1));
+      output = r.ok ? 'ok ' + r.path : r.error || 'mkdir failed';
+    }
+  } else if (cmd === 'rm' || cmd === 'del') {
+    if (!arg1) output = 'rm: missing operand';
+    else {
+      const hard = argv.includes('-f') || argv.includes('--hard');
+      const r = await vfs.fsRm(userId, resolvePath(cwdStart, arg1), hard);
+      output = r.ok ? 'removed' : r.error || 'rm failed';
+    }
+  } else if (cmd === 'touch') {
+    if (!arg1) output = 'touch: missing file';
+    else {
+      const p = resolvePath(cwdStart, arg1);
+      const existing = await vfs.fsRead(userId, p);
+      const r = await vfs.fsWrite(userId, p, existing.ok ? existing.content : '');
+      output = r.ok ? 'ok ' + p : r.error || 'touch failed';
+    }
+  } else if (cmd === 'echo') {
+    // CRITICAL: robust redirect parse (no fragile regex flags)
+    const full = raw.replace(/^echo\s+/i, '').trim();
+    let append = false;
+    let textPart = full;
+    let redir = '';
+    const ia = full.indexOf('>>');
+    const iw = full.indexOf('>');
+    if (ia >= 0) {
+      append = true;
+      textPart = full.slice(0, ia).trim();
+      redir = full.slice(ia + 2).trim();
+    } else if (iw >= 0) {
+      textPart = full.slice(0, iw).trim();
+      redir = full.slice(iw + 1).trim();
+    }
+    textPart = textPart.replace(/^["']|["']$/g, '');
+    if (redir) {
+      redir = redir.replace(/^["']|["']$/g, '').split(/\s+/)[0];
+      const p = resolvePath(cwdStart, redir);
+      let body = textPart + '\n';
+      if (append) {
+        const prev = await vfs.fsRead(userId, p);
+        body = (prev.ok ? String(prev.content || '') : '') + textPart + '\n';
+      }
+      const r = await vfs.fsWrite(userId, p, body);
+      output = r.ok ? 'wrote ' + p + ' (' + r.size + 'b)' : r.error || 'write failed';
+    } else {
+      output = textPart;
+    }
+  } else if (cmd === 'tree') {
+    const r = await vfs.fsTree(userId, resolvePath(cwdStart, arg1 || '.'), 4);
+    output = r.ok ? r.tree : r.error || 'tree failed';
+  } else if (cmd === 'df' || cmd === 'quota') {
+    const r = await vfs.fsQuotaUsed(userId);
+    output = r.ok
+      ? 'used ' + r.used + ' / ' + r.max + ' bytes (left ' + r.left + ')'
+      : r.error || 'df failed';
+  } else if (cmd === 'clear') {
+    output = '__CLEAR__';
+  } else {
+    output = cmd + ': command not found — try help';
+  }
+
+  return { ok: true, cwd, output };
 }
 
 export default async function handler(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') {
-    res.status(204).end();
+    res.statusCode = 204;
+    res.end();
     return;
   }
+
   if (req.method === 'GET') {
-    res.status(200).json({ ok: true, service: 'pasiya-fs', version: 'S4' });
+    json(res, 200, {
+      ok: true,
+      service: 'pasiya-fs',
+      version: 'S4-fix',
+      hasBotToken: Boolean(BOT_TOKEN),
+      hasAdmin: Boolean(ADMIN_ID),
+    });
     return;
   }
+
   if (req.method !== 'POST') {
-    res.status(405).json({ ok: false, error: 'POST only' });
+    json(res, 405, { ok: false, error: 'POST only' });
     return;
   }
 
   try {
-    const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
+    const body = parseBody(req);
     const auth = resolveUser(req, body);
     if (!auth.ok) {
-      res.status(401).json({ ok: false, error: auth.error });
+      json(res, 200, { ok: false, error: auth.error });
       return;
     }
     const userId = auth.userId;
-    const action = String(body.action || 'list').toLowerCase();
+    const action = String(body.action || 'list').toLowerCase().trim();
     const path = body.path || '/';
-    const content = body.content;
 
-    await fs.ensureUserSeed(userId);
+    // seed before mutating ops
+    try {
+      await vfs.ensureUserSeed(userId);
+    } catch (e) {
+      json(res, 200, { ok: false, error: 'seed: ' + String(e.message || e) });
+      return;
+    }
 
     if (action === 'seed') {
-      res.status(200).json(await fs.ensureUserSeed(userId));
+      json(res, 200, await vfs.ensureUserSeed(userId));
       return;
     }
     if (action === 'list' || action === 'ls') {
-      res.status(200).json(await fs.fsList(userId, path));
+      json(res, 200, await vfs.fsList(userId, path));
       return;
     }
     if (action === 'read' || action === 'cat') {
-      res.status(200).json(await fs.fsRead(userId, path));
+      json(res, 200, await vfs.fsRead(userId, path));
       return;
     }
     if (action === 'write') {
-      res.status(200).json(await fs.fsWrite(userId, path, content ?? ''));
+      const r = await vfs.fsWrite(userId, path, body.content ?? '');
+      json(res, 200, r);
       return;
     }
     if (action === 'mkdir') {
-      res.status(200).json(await fs.fsMkdir(userId, path));
+      json(res, 200, await vfs.fsMkdir(userId, path));
       return;
     }
     if (action === 'rm' || action === 'delete') {
-      res.status(200).json(await fs.fsRm(userId, path, !!body.hard));
+      json(res, 200, await vfs.fsRm(userId, path, !!body.hard));
       return;
     }
     if (action === 'tree') {
-      res.status(200).json(await fs.fsTree(userId, path, body.depth || 4));
+      json(res, 200, await vfs.fsTree(userId, path, body.depth || 4));
       return;
     }
     if (action === 'df' || action === 'quota') {
-      res.status(200).json(await fs.fsQuotaUsed(userId));
+      json(res, 200, await vfs.fsQuotaUsed(userId));
       return;
     }
     if (action === 'stat') {
-      res.status(200).json(await fs.fsStat(userId, path));
+      json(res, 200, await vfs.fsStat(userId, path));
       return;
     }
-
     if (action === 'shell') {
-      // body.cwd + body.line → { cwd, output }
-      const cwd0 = fs.normalizePath(body.cwd || '/');
-      const line = String(body.line || '').trim();
-      if (!line) {
-        res.status(200).json({ ok: true, cwd: cwd0, output: '' });
-        return;
-      }
-      const parts = line.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
-      const argv = parts.map((p) => p.replace(/^"|"$/g, ''));
-      const cmd = (argv[0] || '').toLowerCase();
-      const arg1 = argv[1] || '';
-      const resolve = (p) => {
-        if (!p || p === '.') return cwd0;
-        if (p.startsWith('/')) return fs.normalizePath(p);
-        if (cwd0 === '/') return fs.normalizePath('/' + p);
-        return fs.normalizePath(cwd0 + '/' + p);
-      };
-      let cwd = cwd0;
-      let output = '';
-      try {
-        if (cmd === 'help') {
-          output = 'ls cd pwd cat mkdir rm touch echo tree df clear help';
-        } else if (cmd === 'pwd') {
-          output = cwd0;
-        } else if (cmd === 'cd') {
-          const dest = resolve(arg1 || '/');
-          const st = await fs.fsStat(userId, dest);
-          if (!st.ok || st.stat?.type !== 'dir') {
-            res.status(200).json({ ok: true, cwd: cwd0, output: 'cd: not a directory: ' + dest });
-            return;
-          }
-          cwd = dest;
-          output = '';
-        } else if (cmd === 'ls' || cmd === 'dir') {
-          const target = resolve(arg1 || '.');
-          const r = await fs.fsList(userId, target);
-          if (!r.ok) output = r.error;
-          else {
-            output = (r.entries || [])
-              .map((e) => (e.type === 'dir' ? '📁 ' : '📄 ') + e.path.split('/').filter(Boolean).pop())
-              .join('
-') || '(empty)';
-          }
-        } else if (cmd === 'cat') {
-          if (!arg1) output = 'cat: missing file';
-          else {
-            const r = await fs.fsRead(userId, resolve(arg1));
-            output = r.ok ? r.content : r.error;
-          }
-        } else if (cmd === 'mkdir') {
-          if (!arg1) output = 'mkdir: missing operand';
-          else {
-            const r = await fs.fsMkdir(userId, resolve(arg1));
-            output = r.ok ? '' : r.error;
-          }
-        } else if (cmd === 'rm' || cmd === 'del') {
-          if (!arg1) output = 'rm: missing operand';
-          else {
-            const r = await fs.fsRm(userId, resolve(arg1), argv.includes('-f') || argv.includes('--hard'));
-            output = r.ok ? '' : r.error;
-          }
-        } else if (cmd === 'touch') {
-          if (!arg1) output = 'touch: missing file';
-          else {
-            const p = resolve(arg1);
-            const existing = await fs.fsRead(userId, p);
-            const r = await fs.fsWrite(userId, p, existing.ok ? existing.content : '');
-            output = r.ok ? '' : r.error;
-          }
-        } else if (cmd === 'echo') {
-          // Support: echo hello
-          //          echo hello > /path/file
-          //          echo hello >> /path/file
-          const full = line.replace(/^echo\s+/i, '').trim();
-          let redir = null;
-          let append = false;
-          let textPart = full;
-          const idxAppend = full.indexOf('>>');
-          const idxWrite = full.indexOf('>');
-          if (idxAppend >= 0) {
-            append = true;
-            textPart = full.slice(0, idxAppend).trim();
-            redir = full.slice(idxAppend + 2).trim();
-          } else if (idxWrite >= 0) {
-            textPart = full.slice(0, idxWrite).trim();
-            redir = full.slice(idxWrite + 1).trim();
-          }
-          textPart = textPart.replace(/^["']|["']$/g, '');
-          if (redir) {
-            // strip quotes around path
-            redir = redir.replace(/^["']|["']$/g, '').split(/\s+/)[0];
-            const p = resolve(redir);
-            if (append) {
-              const prev = await fs.fsRead(userId, p);
-              const r = await fs.fsWrite(userId, p, (prev.ok ? prev.content : '') + textPart + '\n');
-              output = r.ok ? 'wrote ' + p : r.error;
-            } else {
-              const r = await fs.fsWrite(userId, p, textPart + '\n');
-              output = r.ok ? 'wrote ' + p : r.error;
-            }
-          } else {
-            output = textPart;
-          }
-        } else if (cmd === 'tree') {
-          const r = await fs.fsTree(userId, resolve(arg1 || '.'), 4);
-          output = r.ok ? r.tree : r.error;
-        } else if (cmd === 'df' || cmd === 'quota') {
-          const r = await fs.fsQuotaUsed(userId);
-          output = r.ok ? 'used ' + r.used + ' / ' + r.max + ' bytes (left ' + r.left + ')' : r.error;
-        } else if (cmd === 'clear') {
-          output = '__CLEAR__';
-        } else {
-          output = cmd + ': command not found. Try help';
-        }
-      } catch (e) {
-        output = String(e.message || e);
-      }
-      res.status(200).json({ ok: true, cwd, output });
+      const out = await runShell(userId, body.cwd || '/', body.line || '');
+      json(res, 200, out);
       return;
     }
 
-
-    res.status(400).json({ ok: false, error: 'unknown action' });
+    json(res, 200, { ok: false, error: 'unknown action: ' + action });
   } catch (e) {
-    console.error('api/fs', e);
-    res.status(200).json({ ok: false, error: String(e.message || e) });
+    console.error('api/fs fatal', e);
+    try {
+      json(res, 200, { ok: false, error: 'server: ' + String(e.message || e) });
+    } catch (_) {
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ ok: false, error: 'fatal' }));
+    }
   }
 }
