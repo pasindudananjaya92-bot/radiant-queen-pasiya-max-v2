@@ -43,7 +43,7 @@ export default async function handler(req, res) {
     return;
   }
   if (req.method === 'GET') {
-    res.status(200).json({ ok: true, service: 'pasiya-fs', version: 'S3' });
+    res.status(200).json({ ok: true, service: 'pasiya-fs', version: 'S4' });
     return;
   }
   if (req.method !== 'POST') {
@@ -143,7 +143,8 @@ export default async function handler(req, res) {
           else {
             output = (r.entries || [])
               .map((e) => (e.type === 'dir' ? '📁 ' : '📄 ') + e.path.split('/').filter(Boolean).pop())
-              .join('\\n') || '(empty)';
+              .join('
+') || '(empty)';
           }
         } else if (cmd === 'cat') {
           if (!arg1) output = 'cat: missing file';
@@ -172,22 +173,38 @@ export default async function handler(req, res) {
             output = r.ok ? '' : r.error;
           }
         } else if (cmd === 'echo') {
-          // echo hello > file  OR  echo hello >> file  OR  echo hello
-          const full = line.slice(4).trim();
-          const m = full.match(/^(.*?)\\s*(>>|>)\\s*(\\S+)$/);
-          if (m) {
-            const text = m[1].replace(/^["']|["']$/g, '');
-            const p = resolve(m[3]);
-            if (m[2] === '>>') {
+          // Support: echo hello
+          //          echo hello > /path/file
+          //          echo hello >> /path/file
+          const full = line.replace(/^echo\s+/i, '').trim();
+          let redir = null;
+          let append = false;
+          let textPart = full;
+          const idxAppend = full.indexOf('>>');
+          const idxWrite = full.indexOf('>');
+          if (idxAppend >= 0) {
+            append = true;
+            textPart = full.slice(0, idxAppend).trim();
+            redir = full.slice(idxAppend + 2).trim();
+          } else if (idxWrite >= 0) {
+            textPart = full.slice(0, idxWrite).trim();
+            redir = full.slice(idxWrite + 1).trim();
+          }
+          textPart = textPart.replace(/^["']|["']$/g, '');
+          if (redir) {
+            // strip quotes around path
+            redir = redir.replace(/^["']|["']$/g, '').split(/\s+/)[0];
+            const p = resolve(redir);
+            if (append) {
               const prev = await fs.fsRead(userId, p);
-              const r = await fs.fsWrite(userId, p, (prev.ok ? prev.content : '') + text + '\\n');
-              output = r.ok ? '' : r.error;
+              const r = await fs.fsWrite(userId, p, (prev.ok ? prev.content : '') + textPart + '\n');
+              output = r.ok ? 'wrote ' + p : r.error;
             } else {
-              const r = await fs.fsWrite(userId, p, text + '\\n');
-              output = r.ok ? '' : r.error;
+              const r = await fs.fsWrite(userId, p, textPart + '\n');
+              output = r.ok ? 'wrote ' + p : r.error;
             }
           } else {
-            output = full.replace(/^["']|["']$/g, '');
+            output = textPart;
           }
         } else if (cmd === 'tree') {
           const r = await fs.fsTree(userId, resolve(arg1 || '.'), 4);
