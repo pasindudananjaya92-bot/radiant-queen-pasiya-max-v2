@@ -7,187 +7,167 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root {
-      --bg: #0a0706;
-      --panel: #14100c;
-      --panel2: #1c1510;
-      --gold: #c9a227;
-      --gold2: #e8c547;
-      --text: #f3e6c8;
-      --muted: #9a8b6e;
-      --border: #3a2e1a;
-      --danger: #a33;
-      --ok: #3a8f5a;
+      --bg: #0a0706; --panel: #14100c; --panel2: #1c1510;
+      --gold: #c9a227; --gold2: #e8c547; --text: #f3e6c8;
+      --muted: #9a8b6e; --border: #3a2e1a;
     }
     * { box-sizing: border-box; }
-    html, body { margin: 0; height: 100%; overflow: hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); }
+    html, body { margin: 0; height: 100%; overflow: hidden;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: #0a0706; color: var(--text); }
     body {
       background: radial-gradient(ellipse 120% 80% at 50% 20%, #1a0f0a 0%, #0a0706 55%, #050304 100%);
     }
-    #wallpaper {
-      position: fixed; inset: 0; z-index: 0;
-      background-image: radial-gradient(circle at 20% 80%, rgba(201,162,39,.08), transparent 40%),
-        radial-gradient(circle at 80% 20%, rgba(139,30,30,.12), transparent 35%);
-      pointer-events: none;
-    }
-    #taskbar {
-      position: fixed; left: 0; right: 0; bottom: 0; height: 52px; z-index: 1000;
-      background: rgba(12, 9, 7, 0.94); border-top: 1px solid var(--border);
-      display: flex; align-items: center; gap: 8px; padding: 0 10px;
-      backdrop-filter: blur(8px);
-    }
-    .tb-btn {
-      width: 42px; height: 42px; border-radius: 10px; border: 1px solid var(--border);
-      background: var(--panel2); color: var(--gold2); font-size: 18px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .tb-btn:active, .tb-btn.active { border-color: var(--gold); background: #2a2010; }
-    .tb-title { font-size: 12px; color: var(--gold); font-weight: 700; margin-left: 4px; letter-spacing: .04em; }
-    .tb-clock { margin-left: auto; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-    #desktop-area {
-      position: fixed; left: 0; right: 0; top: 0; bottom: 52px; z-index: 1;
-      padding: 16px; overflow: hidden;
+    #desktop-icons {
+      position: fixed; left: 0; right: 0; top: 0; bottom: 52px;
+      padding: 16px; z-index: 2; overflow: auto;
     }
     .desk-icon {
-      width: 76px; text-align: center; display: inline-flex; flex-direction: column; align-items: center;
+      width: 80px; display: inline-flex; flex-direction: column; align-items: center;
       gap: 6px; margin: 8px; cursor: pointer; user-select: none;
+      -webkit-tap-highlight-color: transparent;
     }
     .desk-icon .ic {
-      width: 48px; height: 48px; border-radius: 12px; background: var(--panel);
-      border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 22px;
+      width: 52px; height: 52px; border-radius: 14px; background: var(--panel);
+      border: 1px solid var(--border); display: flex; align-items: center; justify-content: center;
+      font-size: 24px; pointer-events: none;
     }
-    .desk-icon span { font-size: 11px; color: var(--text); text-shadow: 0 1px 2px #000; }
+    .desk-icon span { font-size: 11px; text-align: center; pointer-events: none; text-shadow: 0 1px 3px #000; }
+    .desk-icon:active .ic { border-color: var(--gold); background: #2a2010; }
+
     .window {
-      position: absolute; min-width: 280px; min-height: 200px;
+      position: fixed; z-index: 50;
+      min-width: 280px; min-height: 180px;
       background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
-      box-shadow: 0 16px 48px rgba(0,0,0,.55); display: none; flex-direction: column;
-      overflow: hidden; z-index: 10;
+      box-shadow: 0 16px 48px rgba(0,0,0,.6);
+      display: none; flex-direction: column; overflow: hidden;
     }
-    .window.open { display: flex; }
-    .window.focused { border-color: var(--gold); z-index: 20; }
+    .window.open { display: flex !important; }
+    .window.focused { border-color: var(--gold); z-index: 60; }
     .w-title {
-      height: 40px; background: linear-gradient(180deg, #221810, #18120c);
+      height: 42px; background: linear-gradient(180deg, #221810, #18120c);
       border-bottom: 1px solid var(--border); display: flex; align-items: center;
-      padding: 0 10px; gap: 8px; cursor: default; user-select: none;
+      padding: 0 10px; gap: 8px; flex-shrink: 0;
     }
     .w-title b { font-size: 13px; color: var(--gold2); flex: 1; }
     .w-x {
-      width: 28px; height: 28px; border: none; border-radius: 8px; background: #3a1515;
-      color: #f0c0c0; cursor: pointer; font-size: 14px;
+      width: 32px; height: 32px; border: none; border-radius: 8px;
+      background: #3a1515; color: #f0c0c0; font-size: 16px; cursor: pointer;
     }
-    .w-body { flex: 1; display: flex; min-height: 0; }
-    /* Explorer */
-    #win-explorer { width: min(420px, 96vw); height: min(480px, 70vh); left: 12px; top: 12px; }
+    .w-body { flex: 1; display: flex; min-height: 0; overflow: hidden; }
+
+    #win-explorer { width: min(400px, 94vw); height: min(460px, 68vh); left: 10px; top: 10px; }
+    #win-notepad { width: min(400px, 94vw); height: min(460px, 68vh); left: 20px; top: 20px; }
+    #win-term { width: min(420px, 94vw); height: min(400px, 62vh); left: 16px; top: 16px; }
+    #win-ide { width: min(500px, 96vw); height: min(520px, 74vh); left: 8px; top: 8px; }
+
     .exp-side {
-      width: 120px; border-right: 1px solid var(--border); background: var(--panel2);
-      padding: 8px; overflow-y: auto; font-size: 12px;
+      width: 110px; border-right: 1px solid var(--border); background: var(--panel2);
+      padding: 8px; overflow-y: auto; font-size: 12px; flex-shrink: 0;
     }
-    .exp-side div {
-      padding: 8px 8px; border-radius: 8px; cursor: pointer; color: var(--muted);
-    }
-    .exp-side div:hover, .exp-side div.on { background: #2a2010; color: var(--gold2); }
+    .exp-side div { padding: 8px; border-radius: 8px; cursor: pointer; color: var(--muted); }
+    .exp-side div:active { background: #2a2010; color: var(--gold2); }
     .exp-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-    .exp-path {
-      padding: 8px 10px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
+    .exp-path { padding: 8px 10px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); }
     .exp-list { flex: 1; overflow-y: auto; padding: 8px; }
     .exp-row {
-      display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px;
+      display: flex; align-items: center; gap: 8px; padding: 10px; border-radius: 8px;
       cursor: pointer; font-size: 13px;
     }
-    .exp-row:hover { background: #2a2010; }
+    .exp-row:active { background: #2a2010; }
     .exp-row .meta { margin-left: auto; font-size: 11px; color: var(--muted); }
-    .exp-toolbar { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--border); }
-    .exp-toolbar button, .np-toolbar button {
+    .toolbar { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--border); flex-shrink: 0; }
+    .toolbar button {
       flex: 1; border: 1px solid var(--border); background: var(--panel2); color: var(--text);
-      border-radius: 8px; padding: 8px; font-size: 12px; cursor: pointer;
+      border-radius: 8px; padding: 10px 6px; font-size: 12px; cursor: pointer;
     }
-    .exp-toolbar button:active, .np-toolbar button:active { border-color: var(--gold); }
-    /* Notepad */
-    #win-notepad { width: min(420px, 96vw); height: min(480px, 70vh); right: 12px; top: 24px; left: auto; }
-    .np-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-    #np-path { padding: 6px 10px; font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--border); }
+
+    #np-path { padding: 8px 10px; font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--border); }
     #np-editor {
       flex: 1; width: 100%; border: none; resize: none; padding: 12px;
-      background: #0e0b09; color: var(--text); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      background: #0e0b09; color: var(--text); font-family: ui-monospace, Menlo, monospace;
       font-size: 13px; line-height: 1.45; outline: none;
     }
-    .np-toolbar { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--border); }
-    #status {
-      position: fixed; left: 50%; transform: translateX(-50%); bottom: 60px; z-index: 2000;
-      background: #1a120c; border: 1px solid var(--border); color: var(--text);
-      padding: 8px 14px; border-radius: 999px; font-size: 12px; display: none;
-      max-width: 90vw; box-shadow: 0 8px 24px rgba(0,0,0,.4);
-    }
-    #status.show { display: block; }
-    #auth-banner {
-      position: fixed; left: 12px; right: 12px; top: 12px; z-index: 50;
-      background: #1a120c; border: 1px solid var(--border); border-radius: 12px;
-      padding: 12px; font-size: 13px; display: none;
-    }
-  
-    /* Terminal */
-    #win-term { width: min(440px, 96vw); height: min(420px, 65vh); left: 50%; top: 40px; transform: translateX(-50%); }
+
     #win-term .w-body { flex-direction: column; background: #0a0c0a; }
     #term-out {
-      flex: 1; overflow-y: auto; padding: 10px 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 12px; line-height: 1.45; color: #c8e6c9; white-space: pre-wrap; word-break: break-word;
+      flex: 1; overflow-y: auto; padding: 10px 12px;
+      font-family: ui-monospace, Menlo, monospace; font-size: 12px; line-height: 1.45;
+      color: #c8e6c9; white-space: pre-wrap; word-break: break-word;
     }
     #term-out .cmd { color: #e8c547; }
     #term-out .err { color: #f0a0a0; }
     #term-form {
-      display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-top: 1px solid #1e2a1e;
-      background: #0d100d;
+      display: flex; align-items: center; gap: 6px; padding: 8px 10px;
+      border-top: 1px solid #1e2a1e; background: #0d100d;
     }
-    #term-prompt { color: #c9a227; font-family: ui-monospace, monospace; font-size: 12px; white-space: nowrap; }
+    #term-prompt { color: #c9a227; font-family: ui-monospace, monospace; font-size: 11px; white-space: nowrap; }
     #term-input {
       flex: 1; background: transparent; border: none; outline: none; color: #e8ffe8;
       font-family: ui-monospace, monospace; font-size: 12px;
     }
 
-  
-    /* IDE */
-    #win-ide { width: min(520px, 98vw); height: min(560px, 78vh); left: 8px; top: 8px; }
-    #win-ide .w-body { flex-direction: row; }
     .ide-side {
-      width: 140px; border-right: 1px solid var(--border); background: var(--panel2);
-      display: flex; flex-direction: column; min-height: 0;
+      width: 130px; border-right: 1px solid var(--border); background: var(--panel2);
+      display: flex; flex-direction: column; min-height: 0; flex-shrink: 0;
     }
     .ide-side-h { padding: 8px; font-size: 11px; color: var(--gold); border-bottom: 1px solid var(--border); }
     #ide-tree { flex: 1; overflow-y: auto; padding: 6px; font-size: 12px; }
-    .ide-file { padding: 6px 8px; border-radius: 6px; cursor: pointer; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .ide-file:hover, .ide-file.on { background: #2a2010; color: var(--gold2); }
+    .ide-file { padding: 8px; border-radius: 6px; cursor: pointer; color: var(--muted); }
+    .ide-file:active, .ide-file.on { background: #2a2010; color: var(--gold2); }
     .ide-main { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
     #ide-tab { padding: 6px 10px; font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--border); }
-    #ide-editor { flex: 1; min-height: 200px; }
-    .ide-bar { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--border); flex-wrap: wrap; }
-    .ide-bar button {
-      border: 1px solid var(--border); background: var(--panel2); color: var(--text);
-      border-radius: 8px; padding: 8px 10px; font-size: 11px; cursor: pointer;
+    #ide-editor-wrap { flex: 1; min-height: 180px; position: relative; }
+    #ide-fallback {
+      position: absolute; inset: 0; width: 100%; height: 100%; border: 0;
+      background: #0e0b09; color: #f3e6c8; padding: 12px; font-family: monospace; font-size: 13px;
+      resize: none; outline: none;
     }
 
+    #taskbar {
+      position: fixed; left: 0; right: 0; bottom: 0; height: 52px; z-index: 100;
+      background: rgba(12, 9, 7, 0.96); border-top: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px; padding: 0 10px;
+    }
+    .tb-btn {
+      width: 42px; height: 42px; border-radius: 10px; border: 1px solid var(--border);
+      background: var(--panel2); color: var(--gold2); font-size: 18px; cursor: pointer;
+    }
+    .tb-btn:active { border-color: var(--gold); }
+    .tb-title { font-size: 12px; color: var(--gold); font-weight: 700; margin-left: 4px; }
+    .tb-clock { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+    #toast {
+      position: fixed; left: 50%; transform: translateX(-50%); bottom: 64px; z-index: 200;
+      background: #1a120c; border: 1px solid var(--border); color: var(--text);
+      padding: 8px 14px; border-radius: 999px; font-size: 12px; display: none; max-width: 90vw;
+    }
+    #toast.show { display: block; }
+    #dbg {
+      position: fixed; left: 8px; right: 8px; top: 8px; z-index: 300;
+      background: #300; color: #fcc; font-size: 11px; padding: 8px; border-radius: 8px;
+      display: none; max-height: 80px; overflow: auto;
+    }
   </style>
 </head>
 <body>
-  <div id="wallpaper"></div>
-  <div id="auth-banner"></div>
-  <div id="desktop-area">
-    <div class="desk-icon" data-app="explorer"><div class="ic">📁</div><span>Explorer</span></div>
-    <div class="desk-icon" data-app="notepad"><div class="ic">📝</div><span>Notepad</span></div>
-    <div class="desk-icon" data-app="docs"><div class="ic">📄</div><span>Documents</span></div>
-    <div class="desk-icon" data-app="term"><div class="ic">⌨</div><span>Terminal</span></div>
-    <div class="desk-icon" data-app="ide"><div class="ic">💻</div><span>IDE</span></div>
+  <div id="dbg"></div>
+  <div id="desktop-icons">
+    <div class="desk-icon" id="icon-explorer"><div class="ic">📁</div><span>Explorer</span></div>
+    <div class="desk-icon" id="icon-notepad"><div class="ic">📝</div><span>Notepad</span></div>
+    <div class="desk-icon" id="icon-docs"><div class="ic">📄</div><span>Documents</span></div>
+    <div class="desk-icon" id="icon-term"><div class="ic">⌨</div><span>Terminal</span></div>
+    <div class="desk-icon" id="icon-ide"><div class="ic">💻</div><span>IDE</span></div>
   </div>
 
-  <!-- Explorer -->
   <div class="window" id="win-explorer">
-    <div class="w-title"><b>📁 File Explorer</b><button class="w-x" data-close="explorer">✕</button></div>
+    <div class="w-title"><b>📁 File Explorer</b><button type="button" class="w-x" id="close-explorer">✕</button></div>
     <div class="w-body">
       <div class="exp-side" id="exp-side"></div>
       <div class="exp-main">
         <div class="exp-path" id="exp-path">/</div>
         <div class="exp-list" id="exp-list"></div>
-        <div class="exp-toolbar">
+        <div class="toolbar">
           <button type="button" id="btn-up">⬆ Up</button>
           <button type="button" id="btn-new-file">＋ File</button>
           <button type="button" id="btn-new-folder">＋ Folder</button>
@@ -197,25 +177,20 @@
     </div>
   </div>
 
-  <!-- Notepad -->
   <div class="window" id="win-notepad">
-    <div class="w-title"><b>📝 Notepad</b><button class="w-x" data-close="notepad">✕</button></div>
-    <div class="w-body">
-      <div class="np-wrap">
-        <div id="np-path">No file open</div>
-        <textarea id="np-editor" placeholder="Open a file from Explorer or create one…"></textarea>
-        <div class="np-toolbar">
-          <button type="button" id="btn-save">💾 Save</button>
-          <button type="button" id="btn-np-docs">Documents</button>
-        </div>
+    <div class="w-title"><b>📝 Notepad</b><button type="button" class="w-x" id="close-notepad">✕</button></div>
+    <div class="w-body" style="flex-direction:column">
+      <div id="np-path">No file open</div>
+      <textarea id="np-editor" placeholder="Open a file from Explorer…"></textarea>
+      <div class="toolbar">
+        <button type="button" id="btn-save">💾 Save</button>
+        <button type="button" id="btn-np-docs">Documents</button>
       </div>
     </div>
   </div>
 
-  
-  <!-- Terminal -->
   <div class="window" id="win-term">
-    <div class="w-title"><b>⌨ Terminal</b><button class="w-x" data-close="term">✕</button></div>
+    <div class="w-title"><b>⌨ Terminal</b><button type="button" class="w-x" id="close-term">✕</button></div>
     <div class="w-body">
       <div id="term-out"></div>
       <form id="term-form" autocomplete="off">
@@ -225,10 +200,8 @@
     </div>
   </div>
 
-  
-  <!-- IDE -->
   <div class="window" id="win-ide">
-    <div class="w-title"><b>💻 IDE</b><button class="w-x" data-close="ide">✕</button></div>
+    <div class="w-title"><b>💻 IDE</b><button type="button" class="w-x" id="close-ide">✕</button></div>
     <div class="w-body">
       <div class="ide-side">
         <div class="ide-side-h">/Projects</div>
@@ -236,242 +209,182 @@
       </div>
       <div class="ide-main">
         <div id="ide-tab">No file open</div>
-        <div id="ide-editor"></div>
-        <div class="ide-bar">
+        <div id="ide-editor-wrap"><textarea id="ide-fallback" placeholder="// code"></textarea></div>
+        <div class="toolbar">
           <button type="button" id="ide-save">💾 Save</button>
           <button type="button" id="ide-refresh">↻ Tree</button>
           <button type="button" id="ide-new">＋ File</button>
-          <button type="button" id="ide-preview">Preview HTML</button>
+          <button type="button" id="ide-preview">Preview</button>
         </div>
       </div>
     </div>
   </div>
 
   <div id="taskbar">
-    <button class="tb-btn" id="tb-start" title="Start">✦</button>
-    <button class="tb-btn" data-app="explorer" title="Explorer">📁</button>
-    <button class="tb-btn" data-app="notepad" title="Notepad">📝</button>
-    <button class="tb-btn" data-app="term" title="Terminal">⌨</button>
-    <button class="tb-btn" data-app="ide" title="IDE">💻</button>
+    <button type="button" class="tb-btn" id="tb-explorer" title="Explorer">📁</button>
+    <button type="button" class="tb-btn" id="tb-notepad" title="Notepad">📝</button>
+    <button type="button" class="tb-btn" id="tb-term" title="Terminal">⌨</button>
+    <button type="button" class="tb-btn" id="tb-ide" title="IDE">💻</button>
     <span class="tb-title">PASIYA OS</span>
     <span class="tb-clock" id="clock"></span>
   </div>
-  <div id="status"></div>
+  <div id="toast"></div>
 
   <script>
 (function () {
-  var API = (window.PASIYA_FS_API || '/api/fs');
+  'use strict';
+  var API = '/api/fs';
   var tg = window.Telegram && window.Telegram.WebApp;
-  if (tg) {
-    try { tg.ready(); tg.expand(); } catch (e) {}
+  if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
+
+  function dbg(msg) {
+    var el = document.getElementById('dbg');
+    el.style.display = 'block';
+    el.textContent = String(msg);
   }
 
-  var state = {
-    cwd: '/',
-    npPath: null,
-    dirty: false,
-  };
-
   function toast(msg) {
-    var el = document.getElementById('status');
+    var el = document.getElementById('toast');
     el.textContent = msg;
     el.classList.add('show');
-    clearTimeout(window.__toastT);
-    window.__toastT = setTimeout(function () { el.classList.remove('show'); }, 2800);
+    clearTimeout(window.__t);
+    window.__t = setTimeout(function () { el.classList.remove('show'); }, 2500);
   }
 
   function initData() {
-    if (tg && tg.initData) return tg.initData;
-    return '';
+    return (tg && tg.initData) ? tg.initData : '';
   }
 
-  async function fsApi(action, path, content, extra) {
-    var body = Object.assign({ action: action, path: path || '/', initData: initData() }, extra || {});
+  function fsApi(action, path, content, extra) {
+    var body = { action: action, path: path || '/', initData: initData() };
+    if (extra) {
+      for (var k in extra) body[k] = extra[k];
+    }
     if (content !== undefined) body.content = content;
-    var res = await fetch(API, {
+    return fetch(API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(body)
+    }).then(function (res) { return res.json(); }).catch(function (e) {
+      return { ok: false, error: String(e.message || e) };
+    }).then(function (j) {
+      if (j && j.error) toast(j.error);
+      return j || { ok: false, error: 'empty' };
     });
-    var j = await res.json().catch(function () { return { ok: false, error: 'bad json' }; });
-    if (!j.ok && j.error) toast(j.error);
-    return j;
   }
 
+  /* —— Windows —— */
   function openWin(name) {
-    var map = { explorer: 'win-explorer', notepad: 'win-notepad', term: 'win-term', ide: 'win-ide' };
+    var map = {
+      explorer: 'win-explorer',
+      notepad: 'win-notepad',
+      term: 'win-term',
+      ide: 'win-ide'
+    };
     var id = map[name];
-    if (!id) return;
+    if (!id) { toast('Unknown app: ' + name); return; }
     var el = document.getElementById(id);
+    if (!el) { toast('Missing window: ' + id); return; }
     el.classList.add('open', 'focused');
-    document.querySelectorAll('.window').forEach(function (w) {
-      if (w !== el) w.classList.remove('focused');
-    });
-    document.querySelectorAll('.tb-btn[data-app]').forEach(function (b) {
-      b.classList.toggle('active', b.getAttribute('data-app') === name);
-    });
+    var wins = document.querySelectorAll('.window');
+    for (var i = 0; i < wins.length; i++) {
+      if (wins[i] !== el) wins[i].classList.remove('focused');
+    }
     if (name === 'explorer') refreshList();
     if (name === 'term') {
-      setTimeout(function () { document.getElementById('term-input').focus(); }, 100);
+      setTimeout(function () {
+        var inp = document.getElementById('term-input');
+        if (inp) inp.focus();
+      }, 50);
     }
+    if (name === 'ide') ideLoadTree();
+    toast(name + ' open');
   }
 
   function closeWin(name) {
-    var map = { explorer: 'win-explorer', notepad: 'win-notepad', term: 'win-term', ide: 'win-ide' };
+    var map = {
+      explorer: 'win-explorer',
+      notepad: 'win-notepad',
+      term: 'win-term',
+      ide: 'win-ide'
+    };
     var el = document.getElementById(map[name]);
     if (el) el.classList.remove('open', 'focused');
   }
 
+  /* —— Explorer —— */
+  var cwd = '/';
+  var npPath = null;
 
-  /* —— IDE (Monaco + pasiya_fs) —— */
-  var idePath = null;
-  var ideEditor = null;
-  var ideDirty = false;
-
-  function ideLang(path) {
-    path = String(path || '');
-    if (/\.html?$/i.test(path)) return 'html';
-    if (/\.css$/i.test(path)) return 'css';
-    if (/\.json$/i.test(path)) return 'json';
-    if (/\.md$/i.test(path)) return 'markdown';
-    if (/\.py$/i.test(path)) return 'python';
-    if (/\.ts$/i.test(path)) return 'typescript';
-    if (/\.js$/i.test(path)) return 'javascript';
-    return 'plaintext';
+  function baseName(p) {
+    var parts = String(p).split('/').filter(Boolean);
+    return parts.length ? parts[parts.length - 1] : p;
   }
 
-  async function ensureIdeEditor() {
-    if (ideEditor) return ideEditor;
-    var ok = await (window.__PASIYA_MONACO_READY || Promise.resolve(false));
-    var el = document.getElementById('ide-editor');
-    if (ok && window.monaco) {
-      ideEditor = monaco.editor.create(el, {
-        value: '',
-        language: 'javascript',
-        theme: 'vs-dark',
-        automaticLayout: true,
-        minimap: { enabled: false },
-        fontSize: 13,
-      });
-      ideEditor.onDidChangeModelContent(function () { ideDirty = true; });
-    } else {
-      // fallback textarea
-      el.innerHTML = '';
-      var ta = document.createElement('textarea');
-      ta.id = 'ide-fallback';
-      ta.style.cssText = 'width:100%;height:100%;border:0;background:#0e0b09;color:#f3e6c8;padding:12px;font-family:monospace;font-size:13px;resize:none;outline:none;';
-      ta.addEventListener('input', function () { ideDirty = true; });
-      el.appendChild(ta);
-      ideEditor = {
-        getValue: function () { return ta.value; },
-        setValue: function (v) { ta.value = v; },
-        layout: function () {},
-      };
-    }
-    return ideEditor;
-  }
-
-  async function ideLoadTree() {
-    var tree = document.getElementById('ide-tree');
-    tree.innerHTML = 'Loading…';
-    await fsApi('mkdir', '/Projects');
-    var j = await fsApi('list', '/Projects');
-    tree.innerHTML = '';
-    if (!j.ok) {
-      tree.textContent = j.error || 'error';
-      return;
-    }
-    (j.entries || []).forEach(function (e) {
-      if (e.type !== 'file') return;
-      var name = e.path.split('/').filter(Boolean).pop();
-      var row = document.createElement('div');
-      row.className = 'ide-file' + (idePath === e.path ? ' on' : '');
-      row.textContent = name;
-      row.onclick = function () { ideOpen(e.path); };
-      tree.appendChild(row);
+  function refreshList() {
+    document.getElementById('exp-path').textContent = cwd;
+    var list = document.getElementById('exp-list');
+    list.innerHTML = '<div class="exp-row">Loading…</div>';
+    fsApi('list', cwd).then(function (j) {
+      list.innerHTML = '';
+      if (!j.ok) {
+        list.innerHTML = '<div class="exp-row">' + (j.error || 'error') + '</div>';
+        return;
+      }
+      if (cwd !== '/') {
+        var up = document.createElement('div');
+        up.className = 'exp-row';
+        up.textContent = '📁 ..';
+        up.onclick = goUp;
+        list.appendChild(up);
+      }
+      var entries = j.entries || [];
+      for (var i = 0; i < entries.length; i++) {
+        (function (e) {
+          var row = document.createElement('div');
+          row.className = 'exp-row';
+          var label = (e.type === 'dir' ? '📁 ' : '📄 ') + baseName(e.path);
+          row.innerHTML = label + (e.type === 'file' ? '<span class="meta">' + (e.size || 0) + 'b</span>' : '');
+          row.onclick = function () {
+            if (e.type === 'dir') {
+              cwd = e.path;
+              refreshList();
+            } else {
+              openFile(e.path);
+            }
+          };
+          list.appendChild(row);
+        })(entries[i]);
+      }
+      if (!entries.length) {
+        list.innerHTML += '<div class="exp-row">(empty)</div>';
+      }
     });
-    if (!(j.entries || []).filter(function (e) { return e.type === 'file'; }).length) {
-      tree.innerHTML = '<div class="ide-file">No files — create one</div>';
-    }
   }
 
-  async function ideOpen(path) {
-    await ensureIdeEditor();
-    var j = await fsApi('read', path);
-    if (!j.ok) return;
-    idePath = path;
-    ideDirty = false;
-    document.getElementById('ide-tab').textContent = path;
-    ideEditor.setValue(j.content || '');
-    if (window.monaco && ideEditor.setModel) {
-      /* monaco instance */
-    }
-    if (window.monaco && ideEditor.getModel) {
-      try {
-        monaco.editor.setModelLanguage(ideEditor.getModel(), ideLang(path));
-      } catch (e) {}
-    }
-    openWin('ide');
-    ideLoadTree();
-    toast('IDE: ' + path);
+  function goUp() {
+    if (cwd === '/') return;
+    var parts = cwd.split('/').filter(Boolean);
+    parts.pop();
+    cwd = parts.length ? '/' + parts.join('/') : '/';
+    refreshList();
   }
 
-  async function ideSave() {
-    if (!idePath) {
-      var name = prompt('File name in /Projects', 'index.html');
-      if (!name) return;
-      idePath = '/Projects/' + name.replace(/^\/+/, '');
-    }
-    await ensureIdeEditor();
-    var val = ideEditor.getValue();
-    var j = await fsApi('write', idePath, val);
-    if (j.ok) {
-      ideDirty = false;
-      document.getElementById('ide-tab').textContent = idePath + ' · saved';
-      toast('Saved ' + idePath + ' (' + j.size + 'b)');
-      ideLoadTree();
-    }
+  function openFile(path) {
+    fsApi('read', path).then(function (j) {
+      if (!j.ok) return;
+      npPath = path;
+      document.getElementById('np-path').textContent = path;
+      document.getElementById('np-editor').value = j.content || '';
+      openWin('notepad');
+    });
   }
 
-  document.getElementById('ide-save').onclick = ideSave;
-  document.getElementById('ide-refresh').onclick = ideLoadTree;
-  document.getElementById('ide-new').onclick = async function () {
-    var name = prompt('New file in /Projects', 'app.js');
-    if (!name) return;
-    var p = '/Projects/' + name.replace(/^\/+/, '');
-    var j = await fsApi('write', p, '');
-    if (j.ok) ideOpen(p);
-  };
-  document.getElementById('ide-preview').onclick = function () {
-    if (!idePath || !/\.html?$/i.test(idePath)) {
-      toast('Open an .html file to preview');
-      return;
-    }
-    var html = ideEditor ? ideEditor.getValue() : '';
-    var w = window.open('', '_blank');
-    if (w) {
-      w.document.write(html);
-      w.document.close();
-    }
-  };
-
-  var _openWin = openWin;
-  openWin = function (name) {
-    _openWin(name);
-    if (name === 'ide') {
-      ensureIdeEditor().then(function () { ideLoadTree(); });
-    }
-  };
-
-
-  /* —— Terminal VFS —— */
+  /* —— Terminal —— */
   var termCwd = '/';
-  var termHist = [];
-  var termHistI = -1;
 
   function termPrompt() {
-    var short = termCwd === '/' ? '/' : termCwd;
-    document.getElementById('term-prompt').textContent = 'founder@pasiyaos:' + short + '$';
+    document.getElementById('term-prompt').textContent = 'founder@pasiyaos:' + termCwd + '$';
   }
 
   function termPrint(text, cls) {
@@ -483,230 +396,194 @@
     out.scrollTop = out.scrollHeight;
   }
 
-  async function termRun(line) {
+  function termRun(line) {
     line = String(line || '').trim();
     if (!line) return;
     termPrint('founder@pasiyaos:' + termCwd + '$ ' + line, 'cmd');
-    termHist.push(line);
-    termHistI = termHist.length;
-    var j = await fsApi('shell', '/', undefined, { cwd: termCwd, line: line });
-    if (!j.ok) {
-      termPrint(j.error || 'error', 'err');
-      return;
-    }
-    if (j.cwd) termCwd = j.cwd;
-    termPrompt();
-    if (j.output === '__CLEAR__') {
-      document.getElementById('term-out').innerHTML = '';
-      return;
-    }
-    if (j.output) {
-      String(j.output).split('
-').forEach(function (ln) {
-        termPrint(ln, /not found|error|missing/i.test(ln) ? 'err' : '');
-      });
-    }
-  }
-
-  document.getElementById('term-form').addEventListener('submit', function (e) {
-    e.preventDefault();
-    var input = document.getElementById('term-input');
-    var v = input.value;
-    input.value = '';
-    termRun(v);
-  });
-
-  document.getElementById('term-input').addEventListener('keydown', function (e) {
-    if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      if (termHistI > 0) {
-        termHistI--;
-        e.target.value = termHist[termHistI] || '';
-      }
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      if (termHistI < termHist.length - 1) {
-        termHistI++;
-        e.target.value = termHist[termHistI] || '';
-      } else {
-        termHistI = termHist.length;
-        e.target.value = '';
-      }
-    }
-  });
-
-
-  document.querySelectorAll('[data-app]').forEach(function (el) {
-    el.addEventListener('click', function () {
-      var app = el.getAttribute('data-app');
-      if (app === 'docs') {
-        state.cwd = '/Documents';
-        openWin('explorer');
+    fsApi('shell', '/', undefined, { cwd: termCwd, line: line }).then(function (j) {
+      if (!j.ok) {
+        termPrint(j.error || 'error', 'err');
         return;
       }
-      openWin(app);
-    });
-  });
-  document.querySelectorAll('[data-close]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      closeWin(btn.getAttribute('data-close'));
-    });
-  });
-
-  var shortcuts = ['/', '/Desktop', '/Documents', '/Downloads', '/Pictures', '/Projects', '/.Trash'];
-  var side = document.getElementById('exp-side');
-  shortcuts.forEach(function (p) {
-    var d = document.createElement('div');
-    d.textContent = p === '/' ? 'This PC' : p.split('/').pop();
-    d.onclick = function () {
-      state.cwd = p;
-      refreshList();
-    };
-    side.appendChild(d);
-  });
-
-  async function refreshList() {
-    document.getElementById('exp-path').textContent = state.cwd;
-    var list = document.getElementById('exp-list');
-    list.innerHTML = '<div class="exp-row">Loading…</div>';
-    var j = await fsApi('list', state.cwd);
-    list.innerHTML = '';
-    if (!j.ok) {
-      list.innerHTML = '<div class="exp-row">' + (j.error || 'error') + '</div>';
-      return;
-    }
-    if (state.cwd !== '/') {
-      var up = document.createElement('div');
-      up.className = 'exp-row';
-      up.innerHTML = '<span>📁</span><span>..</span>';
-      up.onclick = function () { goUp(); };
-      list.appendChild(up);
-    }
-    (j.entries || []).forEach(function (e) {
-      var name = e.path.split('/').filter(Boolean).pop() || e.path;
-      var row = document.createElement('div');
-      row.className = 'exp-row';
-      row.innerHTML =
-        '<span>' + (e.type === 'dir' ? '📁' : '📄') + '</span>' +
-        '<span>' + name + '</span>' +
-        (e.type === 'file' ? '<span class="meta">' + (e.size || 0) + 'b</span>' : '');
-      row.onclick = function () {
-        if (e.type === 'dir') {
-          state.cwd = e.path;
-          refreshList();
-        } else {
-          openFile(e.path);
+      if (j.cwd) termCwd = j.cwd;
+      termPrompt();
+      if (j.output === '__CLEAR__') {
+        document.getElementById('term-out').innerHTML = '';
+        return;
+      }
+      if (j.output) {
+        var lines = String(j.output).split('\n');
+        for (var i = 0; i < lines.length; i++) {
+          termPrint(lines[i], /not found|error|missing/i.test(lines[i]) ? 'err' : '');
         }
-      };
-      list.appendChild(row);
+      }
     });
-    if (!(j.entries || []).length && state.cwd === '/') {
-      list.innerHTML += '<div class="exp-row">Empty — try Documents</div>';
-    }
   }
 
-  function goUp() {
-    if (state.cwd === '/') return;
-    var parts = state.cwd.split('/').filter(Boolean);
-    parts.pop();
-    state.cwd = '/' + parts.join('/');
-    if (state.cwd === '/') state.cwd = '/';
-    refreshList();
+  /* —— IDE —— */
+  var idePath = null;
+
+  function ideLoadTree() {
+    var tree = document.getElementById('ide-tree');
+    tree.innerHTML = '…';
+    fsApi('mkdir', '/Projects').then(function () {
+      return fsApi('list', '/Projects');
+    }).then(function (j) {
+      tree.innerHTML = '';
+      if (!j.ok) {
+        tree.textContent = j.error || 'error';
+        return;
+      }
+      var n = 0;
+      (j.entries || []).forEach(function (e) {
+        if (e.type !== 'file') return;
+        n++;
+        var row = document.createElement('div');
+        row.className = 'ide-file';
+        row.textContent = baseName(e.path);
+        row.onclick = function () { ideOpen(e.path); };
+        tree.appendChild(row);
+      });
+      if (!n) tree.innerHTML = '<div class="ide-file">No files yet</div>';
+    });
   }
 
-  document.getElementById('btn-up').onclick = goUp;
-  document.getElementById('btn-refresh').onclick = refreshList;
-
-  document.getElementById('btn-new-folder').onclick = async function () {
-    var name = prompt('Folder name');
-    if (!name) return;
-    var p = (state.cwd === '/' ? '' : state.cwd) + '/' + name.replace(/^\/+/, '');
-    var j = await fsApi('mkdir', p);
-    if (j.ok) { toast('Folder created'); refreshList(); }
-  };
-
-  document.getElementById('btn-new-file').onclick = async function () {
-    var name = prompt('File name', 'notes.txt');
-    if (!name) return;
-    var p = (state.cwd === '/' ? '' : state.cwd) + '/' + name.replace(/^\/+/, '');
-    var j = await fsApi('write', p, '');
-    if (j.ok) {
-      toast('File created');
-      refreshList();
-      openFile(p);
-    }
-  };
-
-  async function openFile(path) {
-    var j = await fsApi('read', path);
-    if (!j.ok) return;
-    state.npPath = path;
-    state.dirty = false;
-    document.getElementById('np-path').textContent = path;
-    document.getElementById('np-editor').value = j.content || '';
-    openWin('notepad');
-    toast('Opened ' + path);
+  function ideOpen(path) {
+    fsApi('read', path).then(function (j) {
+      if (!j.ok) return;
+      idePath = path;
+      document.getElementById('ide-tab').textContent = path;
+      document.getElementById('ide-fallback').value = j.content || '';
+      openWin('ide');
+      ideLoadTree();
+    });
   }
 
-  document.getElementById('np-editor').addEventListener('input', function () {
-    state.dirty = true;
-  });
-
-  document.getElementById('btn-save').onclick = async function () {
-    if (!state.npPath) {
-      var name = prompt('Save as path', '/Documents/untitled.txt');
+  function ideSave() {
+    if (!idePath) {
+      var name = prompt('File name in /Projects', 'index.html');
       if (!name) return;
-      state.npPath = name;
+      idePath = '/Projects/' + name.replace(/^\/+/g, '');
     }
-    var text = document.getElementById('np-editor').value;
-    var j = await fsApi('write', state.npPath, text);
-    if (j.ok) {
-      state.dirty = false;
-      document.getElementById('np-path').textContent = state.npPath + ' · saved';
-      toast('Saved ' + state.npPath + ' (' + j.size + 'b)');
-      if (document.getElementById('win-explorer').classList.contains('open')) refreshList();
+    var val = document.getElementById('ide-fallback').value;
+    fsApi('write', idePath, val).then(function (j) {
+      if (j.ok) {
+        document.getElementById('ide-tab').textContent = idePath + ' · saved';
+        toast('Saved ' + idePath);
+        ideLoadTree();
+      }
+    });
+  }
+
+  /* —— Bind UI (explicit IDs — reliable on mobile) —— */
+  function bind() {
+    document.getElementById('icon-explorer').onclick = function () { openWin('explorer'); };
+    document.getElementById('icon-notepad').onclick = function () { openWin('notepad'); };
+    document.getElementById('icon-docs').onclick = function () {
+      cwd = '/Documents';
+      openWin('explorer');
+    };
+    document.getElementById('icon-term').onclick = function () { openWin('term'); };
+    document.getElementById('icon-ide').onclick = function () { openWin('ide'); };
+
+    document.getElementById('tb-explorer').onclick = function () { openWin('explorer'); };
+    document.getElementById('tb-notepad').onclick = function () { openWin('notepad'); };
+    document.getElementById('tb-term').onclick = function () { openWin('term'); };
+    document.getElementById('tb-ide').onclick = function () { openWin('ide'); };
+
+    document.getElementById('close-explorer').onclick = function () { closeWin('explorer'); };
+    document.getElementById('close-notepad').onclick = function () { closeWin('notepad'); };
+    document.getElementById('close-term').onclick = function () { closeWin('term'); };
+    document.getElementById('close-ide').onclick = function () { closeWin('ide'); };
+
+    document.getElementById('btn-up').onclick = goUp;
+    document.getElementById('btn-refresh').onclick = refreshList;
+    document.getElementById('btn-new-folder').onclick = function () {
+      var name = prompt('Folder name');
+      if (!name) return;
+      var p = (cwd === '/' ? '' : cwd) + '/' + name.replace(/^\/+/g, '');
+      fsApi('mkdir', p).then(function (j) { if (j.ok) refreshList(); });
+    };
+    document.getElementById('btn-new-file').onclick = function () {
+      var name = prompt('File name', 'notes.txt');
+      if (!name) return;
+      var p = (cwd === '/' ? '' : cwd) + '/' + name.replace(/^\/+/g, '');
+      fsApi('write', p, '').then(function (j) { if (j.ok) { refreshList(); openFile(p); } });
+    };
+    document.getElementById('btn-save').onclick = function () {
+      if (!npPath) {
+        var name = prompt('Save as', '/Documents/untitled.txt');
+        if (!name) return;
+        npPath = name;
+      }
+      var text = document.getElementById('np-editor').value;
+      fsApi('write', npPath, text).then(function (j) {
+        if (j.ok) toast('Saved ' + npPath + ' (' + j.size + 'b)');
+      });
+    };
+    document.getElementById('btn-np-docs').onclick = function () {
+      cwd = '/Documents';
+      openWin('explorer');
+    };
+
+    document.getElementById('term-form').onsubmit = function (e) {
+      e.preventDefault();
+      var input = document.getElementById('term-input');
+      var v = input.value;
+      input.value = '';
+      termRun(v);
+    };
+
+    document.getElementById('ide-save').onclick = ideSave;
+    document.getElementById('ide-refresh').onclick = ideLoadTree;
+    document.getElementById('ide-new').onclick = function () {
+      var name = prompt('New file in /Projects', 'app.js');
+      if (!name) return;
+      var p = '/Projects/' + name.replace(/^\/+/g, '');
+      fsApi('write', p, '').then(function (j) { if (j.ok) ideOpen(p); });
+    };
+    document.getElementById('ide-preview').onclick = function () {
+      if (!idePath || !/\.html?$/i.test(idePath)) {
+        toast('Open an .html file first');
+        return;
+      }
+      var html = document.getElementById('ide-fallback').value;
+      var w = window.open('', '_blank');
+      if (w) { w.document.write(html); w.document.close(); }
+    };
+
+    var shortcuts = ['/', '/Desktop', '/Documents', '/Downloads', '/Pictures', '/Projects', '/.Trash'];
+    var side = document.getElementById('exp-side');
+    side.innerHTML = '';
+    for (var i = 0; i < shortcuts.length; i++) {
+      (function (p) {
+        var d = document.createElement('div');
+        d.textContent = p === '/' ? 'This PC' : baseName(p);
+        d.onclick = function () { cwd = p; refreshList(); };
+        side.appendChild(d);
+      })(shortcuts[i]);
     }
-  };
-
-  document.getElementById('btn-np-docs').onclick = function () {
-    state.cwd = '/Documents';
-    openWin('explorer');
-  };
-
-  document.getElementById('tb-start').onclick = function () {
-    openWin('explorer');
-  };
+  }
 
   function tick() {
     var d = new Date();
     document.getElementById('clock').textContent =
       d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
-  tick();
-  setInterval(tick, 15000);
 
-  // Boot: seed + open explorer
-  (async function boot() {
-    if (!initData()) {
-      var b = document.getElementById('auth-banner');
-      b.style.display = 'block';
-      b.innerHTML = '<b>Open from Telegram</b> via /desktop for full disk access. (initData required)';
-    }
-    await fsApi('seed', '/');
-    state.cwd = '/';
+  try {
+    bind();
     termPrompt();
-    termPrint('PasiyaOS Terminal VFS — type help', '');
-    openWin('explorer');
-  })();
+    termPrint('PasiyaOS Terminal — type help', '');
+    tick();
+    setInterval(tick, 15000);
+    fsApi('seed', '/').then(function () {
+      toast('Desktop ready — tap an icon');
+    });
+  } catch (e) {
+    dbg('JS error: ' + (e.message || e));
+  }
 })();
   </script>
-<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
-<script>
-window.__PASIYA_MONACO_READY = new Promise(function(resolve) {
-  if (typeof require === 'undefined') { resolve(false); return; }
-  require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
-  require(['vs/editor/editor.main'], function () { resolve(true); }, function () { resolve(false); });
-});
-</script>
 </body>
 </html>
