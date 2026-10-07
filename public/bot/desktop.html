@@ -171,17 +171,14 @@
     }
     #toast.show { display: block; }
   
-    #win-studio { width: min(440px, 96vw); height: min(520px, 74vh); left: 10px; top: 10px; }
-    .st-item {
-      border: 1px solid var(--border); border-radius: 10px; padding: 8px; margin-bottom: 8px;
-      background: var(--panel2);
+    #win-studio,#win-calc,#win-journal,#win-tasks,#win-themes,#win-share {
+      width: min(420px, 94vw); height: min(480px, 70vh); left: 12px; top: 12px;
     }
-    .st-item img {
-      max-width: 100%; max-height: 140px; border-radius: 8px; display: block; margin-top: 6px;
-      background: #0e0b09;
-    }
-    .st-item .cap { font-size: 12px; color: var(--muted); margin-top: 4px; }
-    #st-form { padding: 8px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
+    .st-item { border: 1px solid var(--border); border-radius: 10px; padding: 8px; margin-bottom: 8px; background: var(--panel2); }
+    .st-item img { max-width: 100%; max-height: 120px; border-radius: 8px; display: block; margin-top: 6px; }
+    #calc-display { width: 100%; background: #0e0b09; border: 1px solid var(--border); color: var(--gold2); font-size: 22px; padding: 12px; border-radius: 8px; text-align: right; margin-bottom: 8px; }
+    .calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .calc-grid button { padding: 14px 0; font-size: 16px; }
 
   </style>
 </head>
@@ -196,6 +193,11 @@
     <div class="desk-icon" id="icon-store"><div class="ic">🏪</div><span>App Store</span></div>
     <div class="desk-icon" id="icon-browser"><div class="ic">🌐</div><span>Browser</span></div>
     <div class="desk-icon" id="icon-studio"><div class="ic">🎬</div><span>Studio</span></div>
+    <div class="desk-icon" id="icon-calc"><div class="ic">🔢</div><span>Calc</span></div>
+    <div class="desk-icon" id="icon-journal"><div class="ic">📔</div><span>Journal</span></div>
+    <div class="desk-icon" id="icon-tasks"><div class="ic">✅</div><span>Tasks</span></div>
+    <div class="desk-icon" id="icon-themes"><div class="ic">🎨</div><span>Themes</span></div>
+    <div class="desk-icon" id="icon-share"><div class="ic">📦</div><span>Share</span></div>
     <div class="desk-icon" id="icon-settings"><div class="ic">⚙</div><span>Settings</span></div>
   </div>
 
@@ -338,22 +340,72 @@
   </div>
 
   
-  <!-- STEP 10 Studio -->
   <div class="window" id="win-studio">
-    <div class="w-title"><b>🎬 Studio</b><button type="button" class="w-x" data-close="studio">✕</button></div>
+    <div class="w-title"><b>🎬 Studio</b><button type="button" class="w-x" id="x-studio">✕</button></div>
     <div class="w-body" style="flex-direction:column">
-      <div id="st-form">
-        <input class="line" id="st-url" type="url" placeholder="https://… image URL" />
-        <input class="line" id="st-cap" type="text" placeholder="Caption (optional)" />
-        <div style="display:flex;gap:6px">
-          <button type="button" class="btn" id="st-add" style="flex:1">＋ Add</button>
-          <button type="button" class="btn" id="st-reload" style="flex:1">↻ Reload</button>
-        </div>
+      <div class="pad" style="flex:0;border-bottom:1px solid var(--border)">
+        <input class="line" id="st-url" placeholder="https:// image URL" style="margin-bottom:6px" />
+        <input class="line" id="st-cap" placeholder="Caption" style="margin-bottom:6px" />
+        <button type="button" class="btn" id="st-add">+ Add</button>
+        <button type="button" class="btn" id="st-reload">Reload</button>
       </div>
-      <div class="pad" id="st-list">Loading…</div>
+      <div class="pad" id="st-list">Empty</div>
       <div class="toolbar">
-        <button type="button" id="st-clear">Clear board</button>
-        <button type="button" id="st-export">Export JSON path</button>
+        <button type="button" id="st-clear">Clear</button>
+        <button type="button" id="st-path">Path</button>
+      </div>
+    </div>
+  </div>
+  <div class="window" id="win-calc">
+    <div class="w-title"><b>Calculator</b><button type="button" class="w-x" id="x-calc">✕</button></div>
+    <div class="w-body" style="flex-direction:column">
+      <div class="pad">
+        <input id="calc-display" class="line" type="text" value="0" readonly style="font-size:22px;text-align:right;margin-bottom:8px" />
+        <div class="calc-grid" id="calc-grid"></div>
+      </div>
+      <div class="toolbar"><button type="button" id="calc-hist">Save history</button></div>
+    </div>
+  </div>
+  <div class="window" id="win-journal">
+    <div class="w-title"><b>Journal</b><button type="button" class="w-x" id="x-journal">✕</button></div>
+    <div class="w-body" style="flex-direction:column">
+      <div id="jn-path" class="muted" style="padding:8px;border-bottom:1px solid var(--border)"></div>
+      <textarea id="jn-editor" class="area" style="flex:1;border:none;background:#0e0b09;color:var(--text);padding:12px;font-family:monospace" placeholder="Today..."></textarea>
+      <div class="toolbar">
+        <button type="button" id="jn-save">Save today</button>
+        <button type="button" id="jn-load">Reload</button>
+      </div>
+    </div>
+  </div>
+  <div class="window" id="win-tasks">
+    <div class="w-title"><b>Tasks</b><button type="button" class="w-x" id="x-tasks">✕</button></div>
+    <div class="w-body" style="flex-direction:column">
+      <div class="pad" style="flex:0;border-bottom:1px solid var(--border)">
+        <input class="line" id="tk-input" placeholder="New task" style="margin-bottom:6px" />
+        <button type="button" class="btn" id="tk-add">Add</button>
+      </div>
+      <div class="pad" id="tk-list"></div>
+      <div class="toolbar"><button type="button" id="tk-save">Save</button></div>
+    </div>
+  </div>
+  <div class="window" id="win-themes">
+    <div class="w-title"><b>Themes</b><button type="button" class="w-x" id="x-themes">✕</button></div>
+    <div class="w-body" style="flex-direction:column">
+      <div class="pad">
+        <button type="button" class="btn" id="th-gold">Gold Dark</button>
+        <button type="button" class="btn" id="th-crimson">Crimson</button>
+        <button type="button" class="btn" id="th-matrix">Matrix</button>
+        <div class="muted" id="th-status" style="margin-top:10px">Current: gold</div>
+      </div>
+    </div>
+  </div>
+  <div class="window" id="win-share">
+    <div class="w-title"><b>Share Pack</b><button type="button" class="w-x" id="x-share">✕</button></div>
+    <div class="w-body" style="flex-direction:column">
+      <div class="pad" id="sh-out">Build export of folders</div>
+      <div class="toolbar">
+        <button type="button" id="sh-build">Build</button>
+        <button type="button" id="sh-save">Save export</button>
       </div>
     </div>
   </div>
@@ -366,7 +418,6 @@
     <button type="button" class="tb-btn" data-open="office">📄</button>
     <button type="button" class="tb-btn" data-open="store">🏪</button>
     <button type="button" class="tb-btn" data-open="browser">🌐</button>
-    <button type="button" class="tb-btn" data-open="studio">🎬</button>
     <button type="button" class="tb-btn" data-open="settings">⚙</button>
     <span class="tb-title">PASIYA OS</span>
     <span class="tb-clock" id="clock"></span>
@@ -416,7 +467,8 @@
   var WINS = {
     explorer: 'win-explorer', notepad: 'win-notepad', term: 'win-term', ide: 'win-ide',
     kernel: 'win-kernel', office: 'win-office', store: 'win-store', browser: 'win-browser',
-    settings: 'win-settings', studio: 'win-studio'
+    settings: 'win-settings', studio: 'win-studio', calc: 'win-calc',
+    journal: 'win-journal', tasks: 'win-tasks', themes: 'win-themes', share: 'win-share'
   };
 
   function openWin(name) {
@@ -435,6 +487,9 @@
     if (name === 'store') renderStore();
     if (name === 'office') officeEnsure();
     if (name === 'studio') studioLoad();
+    if (name === 'journal') journalLoad();
+    if (name === 'tasks') tasksLoad();
+    if (name === 'calc' && window.buildCalc) buildCalc();
   }
 
   function closeWin(name) {
@@ -615,7 +670,12 @@
     { id: 'kernel', ic: '🧠', name: 'Kernel', desc: 'Disk & status' },
     { id: 'office', ic: '📄', name: 'Office', desc: 'Documents' },
     { id: 'browser', ic: '🌐', name: 'Browser', desc: 'HTTPS text view' },
-    { id: 'studio', ic: '🎬', name: 'Studio', desc: 'Media board' },
+    { id: 'studio', ic: '🎬', name: 'Studio', desc: 'Media' },
+    { id: 'calc', ic: '🔢', name: 'Calc', desc: 'Math' },
+    { id: 'journal', ic: '📔', name: 'Journal', desc: 'Daily' },
+    { id: 'tasks', ic: '✅', name: 'Tasks', desc: 'Todo' },
+    { id: 'themes', ic: '🎨', name: 'Themes', desc: 'Look' },
+    { id: 'share', ic: '📦', name: 'Share', desc: 'Export' },
     { id: 'settings', ic: '⚙', name: 'Settings', desc: 'Clipboard & about' }
   ];
   function renderStore() {
@@ -655,12 +715,17 @@
   }
 
 
-  /* STEP 10 Studio — media board on pasiya_fs */
   var ST_PATH = '/Documents/Studio/board.json';
+  var TK_PATH = '/Documents/Tasks/todo.json';
+  var calcExpr = '';
+  var calcHistory = [];
+  var taskItems = [];
+  var shareText = '';
 
   function studioLoad() {
     var list = document.getElementById('st-list');
-    list.innerHTML = 'Loading…';
+    if (!list) return;
+    list.textContent = 'Loading...';
     fsApi('mkdir', '/Documents/Studio').then(function () {
       return fsApi('read', ST_PATH);
     }).then(function (j) {
@@ -672,44 +737,186 @@
       window.__studioItems = items;
       list.innerHTML = '';
       if (!items.length) {
-        list.innerHTML = '<div class="muted">No media yet. Paste an image URL above.</div>';
+        list.innerHTML = '<div class="muted">No media yet</div>';
         return;
       }
       items.forEach(function (it, idx) {
         var d = document.createElement('div');
         d.className = 'st-item';
-        var cap = (it.cap || '').replace(/</g, '&lt;');
-        var url = String(it.url || '');
-        d.innerHTML =
-          '<div style="font-size:11px;color:var(--gold2)">#' + (idx + 1) + '</div>' +
-          (url ? '<img src="' + url.replace(/"/g, '') + '" alt="" loading="lazy" onerror="this.style.display=\\'none\\'" />' : '') +
-          '<div class="cap">' + (cap || url) + '</div>' +
-          '<button type="button" class="btn" data-st-del="' + idx + '" style="margin-top:6px">Remove</button>';
-        list.appendChild(d);
-      });
-      list.querySelectorAll('[data-st-del]').forEach(function (btn) {
-        btn.onclick = function () {
-          var i = Number(btn.getAttribute('data-st-del'));
+        var t = document.createElement('div');
+        t.style.fontSize = '11px';
+        t.style.color = 'var(--gold2)';
+        t.textContent = '#' + (idx + 1);
+        d.appendChild(t);
+        if (it.url) {
+          var img = document.createElement('img');
+          img.src = String(it.url);
+          img.alt = '';
+          img.loading = 'lazy';
+          img.onerror = function () { img.style.display = 'none'; };
+          d.appendChild(img);
+        }
+        var c = document.createElement('div');
+        c.className = 'muted';
+        c.style.fontSize = '12px';
+        c.textContent = it.cap || it.url || '';
+        d.appendChild(c);
+        var rm = document.createElement('button');
+        rm.type = 'button';
+        rm.className = 'btn';
+        rm.textContent = 'Remove';
+        rm.onclick = function () {
           var arr = window.__studioItems || [];
-          arr.splice(i, 1);
+          arr.splice(idx, 1);
           studioSave(arr);
         };
+        d.appendChild(rm);
+        list.appendChild(d);
       });
     });
   }
-
   function studioSave(items) {
     window.__studioItems = items || [];
-    var body = JSON.stringify(window.__studioItems, null, 2);
     return fsApi('mkdir', '/Documents/Studio').then(function () {
-      return fsApi('write', ST_PATH, body);
+      return fsApi('write', ST_PATH, JSON.stringify(window.__studioItems, null, 2));
     }).then(function (j) {
-      if (j.ok) {
-        toast('Studio saved (' + (j.size || 0) + 'b)');
-        studioLoad();
-      }
+      if (j.ok) { toast('Studio saved'); studioLoad(); }
       return j;
     });
+  }
+  function calcSet(v) {
+    var el = document.getElementById('calc-display');
+    if (el) el.value = v;
+  }
+  function calcPress(key) {
+    if (key === 'C') { calcExpr = ''; calcSet('0'); return; }
+    if (key === '=') {
+      try {
+        var safe = calcExpr.replace(/[^0-9+\-*/().]/g, '');
+        var r = Function('"use strict";return (' + safe + ')')();
+        calcHistory.push(calcExpr + ' = ' + r);
+        calcExpr = String(r);
+        calcSet(calcExpr);
+      } catch (e) { calcSet('Error'); calcExpr = ''; }
+      return;
+    }
+    if (calcExpr === '0' && key !== '.') calcExpr = key;
+    else calcExpr += key;
+    calcSet(calcExpr);
+  }
+  function buildCalc() {
+    var g = document.getElementById('calc-grid');
+    if (!g || g.childNodes.length) return;
+    var keys = ['7','8','9','/','4','5','6','*','1','2','3','-','0','.','=','+','C'];
+    keys.forEach(function (k) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn';
+      b.textContent = k;
+      b.onclick = function () { calcPress(k); };
+      g.appendChild(b);
+    });
+  }
+  function journalPath() {
+    var d = new Date();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var day = String(d.getDate()).padStart(2, '0');
+    return '/Documents/Journal/' + d.getFullYear() + '-' + m + '-' + day + '.txt';
+  }
+  function journalLoad() {
+    var p = journalPath();
+    var el = document.getElementById('jn-path');
+    if (el) el.textContent = p;
+    fsApi('mkdir', '/Documents/Journal').then(function () {
+      return fsApi('read', p);
+    }).then(function (j) {
+      var ed = document.getElementById('jn-editor');
+      if (ed) ed.value = j.ok ? (j.content || '') : '';
+    });
+  }
+  function tasksRender() {
+    var list = document.getElementById('tk-list');
+    if (!list) return;
+    list.innerHTML = '';
+    taskItems.forEach(function (t, i) {
+      var d = document.createElement('div');
+      d.className = 'k-card';
+      var lab = document.createElement('label');
+      lab.style.display = 'flex';
+      lab.style.gap = '8px';
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = !!t.done;
+      cb.onchange = function () { taskItems[i].done = cb.checked; };
+      var sp = document.createElement('span');
+      sp.textContent = t.text || '';
+      lab.appendChild(cb);
+      lab.appendChild(sp);
+      d.appendChild(lab);
+      list.appendChild(d);
+    });
+  }
+  function tasksLoad() {
+    fsApi('mkdir', '/Documents/Tasks').then(function () {
+      return fsApi('read', TK_PATH);
+    }).then(function (j) {
+      taskItems = [];
+      if (j.ok && j.content) {
+        try { taskItems = JSON.parse(j.content); } catch (e) { taskItems = []; }
+      }
+      if (!Array.isArray(taskItems)) taskItems = [];
+      tasksRender();
+    });
+  }
+  function tasksSave() {
+    return fsApi('mkdir', '/Documents/Tasks').then(function () {
+      return fsApi('write', TK_PATH, JSON.stringify(taskItems, null, 2));
+    }).then(function (j) {
+      if (j.ok) toast('Tasks saved');
+      return j;
+    });
+  }
+  function applyTheme(name) {
+    var root = document.documentElement;
+    if (name === 'crimson') {
+      root.style.setProperty('--gold', '#e85d4c');
+      root.style.setProperty('--gold2', '#ff8a7a');
+      root.style.setProperty('--border', '#4a2018');
+    } else if (name === 'matrix') {
+      root.style.setProperty('--gold', '#33ff66');
+      root.style.setProperty('--gold2', '#99ffbb');
+      root.style.setProperty('--border', '#1a3a20');
+      root.style.setProperty('--text', '#c8ffd0');
+    } else {
+      root.style.setProperty('--gold', '#c9a227');
+      root.style.setProperty('--gold2', '#e8c547');
+      root.style.setProperty('--border', '#3a2e1a');
+      root.style.setProperty('--text', '#f3e6c8');
+    }
+    var st = document.getElementById('th-status');
+    if (st) st.textContent = 'Current: ' + name;
+    fsApi('write', '/Documents/theme.txt', name);
+  }
+  function shareBuild() {
+    var outEl = document.getElementById('sh-out');
+    if (outEl) outEl.textContent = 'Building...';
+    var paths = ['/Documents', '/Projects', '/Documents/Studio', '/Documents/Journal', '/Documents/Tasks'];
+    var out = '=== PASIYAOS SHARE ===\n' + new Date().toISOString() + '\n\n';
+    var i = 0;
+    function next() {
+      if (i >= paths.length) {
+        shareText = out;
+        if (outEl) outEl.textContent = out.slice(0, 8000);
+        toast('Export ready');
+        return;
+      }
+      var p = paths[i++];
+      fsApi('tree', p).then(function (j) {
+        out += '--- ' + p + ' ---\n' + (j.ok ? j.tree : (j.error || '')) + '\n\n';
+        next();
+      });
+    }
+    next();
   }
 
 
@@ -723,7 +930,6 @@
     document.getElementById('icon-office').onclick = function () { openWin('office'); };
     document.getElementById('icon-store').onclick = function () { openWin('store'); };
     document.getElementById('icon-browser').onclick = function () { openWin('browser'); };
-    document.getElementById('icon-studio').onclick = function () { openWin('studio'); };
     document.getElementById('icon-settings').onclick = function () { openWin('settings'); };
 
     document.querySelectorAll('[data-open]').forEach(function (b) {
@@ -822,10 +1028,18 @@
     };
 
 
-    document.getElementById('st-add').onclick = function () {
+    var extraApps = ['studio', 'calc', 'journal', 'tasks', 'themes', 'share'];
+    extraApps.forEach(function (n) {
+      var ic = document.getElementById('icon-' + n);
+      if (ic) ic.onclick = function () { openWin(n); };
+      var xc = document.getElementById('x-' + n);
+      if (xc) xc.onclick = function () { closeWin(n); };
+    });
+    var stAdd = document.getElementById('st-add');
+    if (stAdd) stAdd.onclick = function () {
       var url = document.getElementById('st-url').value.trim();
       var cap = document.getElementById('st-cap').value.trim();
-      if (!url) { toast('Image URL required'); return; }
+      if (!url) { toast('URL required'); return; }
       if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
       var arr = window.__studioItems || [];
       arr.unshift({ url: url, cap: cap, ts: Date.now() });
@@ -833,13 +1047,50 @@
       document.getElementById('st-cap').value = '';
       studioSave(arr);
     };
-    document.getElementById('st-reload').onclick = studioLoad;
-    document.getElementById('st-clear').onclick = function () {
-      if (!confirm('Clear Studio board?')) return;
-      studioSave([]);
+    var stRel = document.getElementById('st-reload');
+    if (stRel) stRel.onclick = studioLoad;
+    var stClr = document.getElementById('st-clear');
+    if (stClr) stClr.onclick = function () { if (confirm('Clear?')) studioSave([]); };
+    var stPath = document.getElementById('st-path');
+    if (stPath) stPath.onclick = function () { toast(ST_PATH); };
+    buildCalc();
+    var ch = document.getElementById('calc-hist');
+    if (ch) ch.onclick = function () {
+      fsApi('write', '/Documents/calc-history.txt', calcHistory.join('\n') || '(empty)').then(function (j) {
+        if (j.ok) toast('History saved');
+      });
     };
-    document.getElementById('st-export').onclick = function () {
-      toast('Path: ' + ST_PATH + ' — /fs cat ' + ST_PATH);
+    var jnS = document.getElementById('jn-save');
+    if (jnS) jnS.onclick = function () {
+      var p = journalPath();
+      fsApi('mkdir', '/Documents/Journal').then(function () {
+        return fsApi('write', p, document.getElementById('jn-editor').value);
+      }).then(function (j) { if (j.ok) toast('Journal saved'); });
+    };
+    var jnL = document.getElementById('jn-load');
+    if (jnL) jnL.onclick = journalLoad;
+    var tkA = document.getElementById('tk-add');
+    if (tkA) tkA.onclick = function () {
+      var t = document.getElementById('tk-input').value.trim();
+      if (!t) return;
+      taskItems.push({ text: t, done: false });
+      document.getElementById('tk-input').value = '';
+      tasksRender();
+    };
+    var tkS = document.getElementById('tk-save');
+    if (tkS) tkS.onclick = tasksSave;
+    var tg = document.getElementById('th-gold');
+    if (tg) tg.onclick = function () { applyTheme('gold'); };
+    var tc = document.getElementById('th-crimson');
+    if (tc) tc.onclick = function () { applyTheme('crimson'); };
+    var tm = document.getElementById('th-matrix');
+    if (tm) tm.onclick = function () { applyTheme('matrix'); };
+    var sb = document.getElementById('sh-build');
+    if (sb) sb.onclick = shareBuild;
+    var ss = document.getElementById('sh-save');
+    if (ss) ss.onclick = function () {
+      fsApi('write', '/Documents/share-export.txt', shareText || document.getElementById('sh-out').textContent || '')
+        .then(function (j) { if (j.ok) toast('Export saved'); });
     };
 
     var shortcuts = ['/', '/Desktop', '/Documents', '/Downloads', '/Pictures', '/Projects', '/.Trash'];
