@@ -185,7 +185,7 @@ export default async function handler(req, res) {
     json(res, 200, {
       ok: true,
       service: 'pasiya-fs',
-      version: 'S4-fix',
+      version: 'S5-S9',
       hasBotToken: Boolean(BOT_TOKEN),
       hasAdmin: Boolean(ADMIN_ID),
     });
@@ -259,7 +259,40 @@ export default async function handler(req, res) {
       return;
     }
 
-    json(res, 200, { ok: false, error: 'unknown action: ' + action });
+    
+    if (action === 'httpget') {
+      // Safe text fetch for Mini Browser (founder disk API already auth'd)
+      const url = String(body.url || '').trim();
+      if (!/^https:\/\//i.test(url)) {
+        json(res, 200, { ok: false, error: 'only https URLs allowed' });
+        return;
+      }
+      try {
+        const ac = new AbortController();
+        const timer = setTimeout(() => ac.abort(), 12000);
+        const r = await fetch(url, {
+          signal: ac.signal,
+          headers: { 'User-Agent': 'PasiyaOS-Browser/1.0', Accept: 'text/html,text/plain,application/json' },
+          redirect: 'follow',
+        });
+        clearTimeout(timer);
+        const ct = r.headers.get('content-type') || '';
+        let text = await r.text();
+        if (text.length > 200000) text = text.slice(0, 200000) + '\n…[truncated]';
+        json(res, 200, {
+          ok: true,
+          status: r.status,
+          contentType: ct,
+          url: r.url,
+          text,
+        });
+      } catch (e) {
+        json(res, 200, { ok: false, error: 'fetch: ' + String(e.message || e) });
+      }
+      return;
+    }
+
+json(res, 200, { ok: false, error: 'unknown action: ' + action });
   } catch (e) {
     console.error('api/fs fatal', e);
     try {
