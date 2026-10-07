@@ -170,6 +170,19 @@
       padding: 8px 14px; border-radius: 999px; font-size: 12px; display: none; max-width: 90vw;
     }
     #toast.show { display: block; }
+  
+    #win-studio { width: min(440px, 96vw); height: min(520px, 74vh); left: 10px; top: 10px; }
+    .st-item {
+      border: 1px solid var(--border); border-radius: 10px; padding: 8px; margin-bottom: 8px;
+      background: var(--panel2);
+    }
+    .st-item img {
+      max-width: 100%; max-height: 140px; border-radius: 8px; display: block; margin-top: 6px;
+      background: #0e0b09;
+    }
+    .st-item .cap { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    #st-form { padding: 8px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
+
   </style>
 </head>
 <body>
@@ -182,6 +195,7 @@
     <div class="desk-icon" id="icon-office"><div class="ic">📄</div><span>Office</span></div>
     <div class="desk-icon" id="icon-store"><div class="ic">🏪</div><span>App Store</span></div>
     <div class="desk-icon" id="icon-browser"><div class="ic">🌐</div><span>Browser</span></div>
+    <div class="desk-icon" id="icon-studio"><div class="ic">🎬</div><span>Studio</span></div>
     <div class="desk-icon" id="icon-settings"><div class="ic">⚙</div><span>Settings</span></div>
   </div>
 
@@ -323,6 +337,27 @@
     </div>
   </div>
 
+  
+  <!-- STEP 10 Studio -->
+  <div class="window" id="win-studio">
+    <div class="w-title"><b>🎬 Studio</b><button type="button" class="w-x" data-close="studio">✕</button></div>
+    <div class="w-body" style="flex-direction:column">
+      <div id="st-form">
+        <input class="line" id="st-url" type="url" placeholder="https://… image URL" />
+        <input class="line" id="st-cap" type="text" placeholder="Caption (optional)" />
+        <div style="display:flex;gap:6px">
+          <button type="button" class="btn" id="st-add" style="flex:1">＋ Add</button>
+          <button type="button" class="btn" id="st-reload" style="flex:1">↻ Reload</button>
+        </div>
+      </div>
+      <div class="pad" id="st-list">Loading…</div>
+      <div class="toolbar">
+        <button type="button" id="st-clear">Clear board</button>
+        <button type="button" id="st-export">Export JSON path</button>
+      </div>
+    </div>
+  </div>
+
   <div id="taskbar">
     <button type="button" class="tb-btn" data-open="explorer">📁</button>
     <button type="button" class="tb-btn" data-open="term">⌨</button>
@@ -331,6 +366,7 @@
     <button type="button" class="tb-btn" data-open="office">📄</button>
     <button type="button" class="tb-btn" data-open="store">🏪</button>
     <button type="button" class="tb-btn" data-open="browser">🌐</button>
+    <button type="button" class="tb-btn" data-open="studio">🎬</button>
     <button type="button" class="tb-btn" data-open="settings">⚙</button>
     <span class="tb-title">PASIYA OS</span>
     <span class="tb-clock" id="clock"></span>
@@ -380,7 +416,7 @@
   var WINS = {
     explorer: 'win-explorer', notepad: 'win-notepad', term: 'win-term', ide: 'win-ide',
     kernel: 'win-kernel', office: 'win-office', store: 'win-store', browser: 'win-browser',
-    settings: 'win-settings'
+    settings: 'win-settings', studio: 'win-studio'
   };
 
   function openWin(name) {
@@ -398,6 +434,7 @@
     if (name === 'kernel') kernelRefresh();
     if (name === 'store') renderStore();
     if (name === 'office') officeEnsure();
+    if (name === 'studio') studioLoad();
   }
 
   function closeWin(name) {
@@ -578,6 +615,7 @@
     { id: 'kernel', ic: '🧠', name: 'Kernel', desc: 'Disk & status' },
     { id: 'office', ic: '📄', name: 'Office', desc: 'Documents' },
     { id: 'browser', ic: '🌐', name: 'Browser', desc: 'HTTPS text view' },
+    { id: 'studio', ic: '🎬', name: 'Studio', desc: 'Media board' },
     { id: 'settings', ic: '⚙', name: 'Settings', desc: 'Clipboard & about' }
   ];
   function renderStore() {
@@ -616,6 +654,65 @@
     });
   }
 
+
+  /* STEP 10 Studio — media board on pasiya_fs */
+  var ST_PATH = '/Documents/Studio/board.json';
+
+  function studioLoad() {
+    var list = document.getElementById('st-list');
+    list.innerHTML = 'Loading…';
+    fsApi('mkdir', '/Documents/Studio').then(function () {
+      return fsApi('read', ST_PATH);
+    }).then(function (j) {
+      var items = [];
+      if (j.ok && j.content) {
+        try { items = JSON.parse(j.content); } catch (e) { items = []; }
+      }
+      if (!Array.isArray(items)) items = [];
+      window.__studioItems = items;
+      list.innerHTML = '';
+      if (!items.length) {
+        list.innerHTML = '<div class="muted">No media yet. Paste an image URL above.</div>';
+        return;
+      }
+      items.forEach(function (it, idx) {
+        var d = document.createElement('div');
+        d.className = 'st-item';
+        var cap = (it.cap || '').replace(/</g, '&lt;');
+        var url = String(it.url || '');
+        d.innerHTML =
+          '<div style="font-size:11px;color:var(--gold2)">#' + (idx + 1) + '</div>' +
+          (url ? '<img src="' + url.replace(/"/g, '') + '" alt="" loading="lazy" onerror="this.style.display=\\'none\\'" />' : '') +
+          '<div class="cap">' + (cap || url) + '</div>' +
+          '<button type="button" class="btn" data-st-del="' + idx + '" style="margin-top:6px">Remove</button>';
+        list.appendChild(d);
+      });
+      list.querySelectorAll('[data-st-del]').forEach(function (btn) {
+        btn.onclick = function () {
+          var i = Number(btn.getAttribute('data-st-del'));
+          var arr = window.__studioItems || [];
+          arr.splice(i, 1);
+          studioSave(arr);
+        };
+      });
+    });
+  }
+
+  function studioSave(items) {
+    window.__studioItems = items || [];
+    var body = JSON.stringify(window.__studioItems, null, 2);
+    return fsApi('mkdir', '/Documents/Studio').then(function () {
+      return fsApi('write', ST_PATH, body);
+    }).then(function (j) {
+      if (j.ok) {
+        toast('Studio saved (' + (j.size || 0) + 'b)');
+        studioLoad();
+      }
+      return j;
+    });
+  }
+
+
   /* Bind */
   function bind() {
     document.getElementById('icon-explorer').onclick = function () { openWin('explorer'); };
@@ -626,6 +723,7 @@
     document.getElementById('icon-office').onclick = function () { openWin('office'); };
     document.getElementById('icon-store').onclick = function () { openWin('store'); };
     document.getElementById('icon-browser').onclick = function () { openWin('browser'); };
+    document.getElementById('icon-studio').onclick = function () { openWin('studio'); };
     document.getElementById('icon-settings').onclick = function () { openWin('settings'); };
 
     document.querySelectorAll('[data-open]').forEach(function (b) {
@@ -721,6 +819,27 @@
       fsApi('write', '/Documents/clipboard.txt', t).then(function (j) {
         if (j.ok) toast('Clipboard saved');
       });
+    };
+
+
+    document.getElementById('st-add').onclick = function () {
+      var url = document.getElementById('st-url').value.trim();
+      var cap = document.getElementById('st-cap').value.trim();
+      if (!url) { toast('Image URL required'); return; }
+      if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+      var arr = window.__studioItems || [];
+      arr.unshift({ url: url, cap: cap, ts: Date.now() });
+      document.getElementById('st-url').value = '';
+      document.getElementById('st-cap').value = '';
+      studioSave(arr);
+    };
+    document.getElementById('st-reload').onclick = studioLoad;
+    document.getElementById('st-clear').onclick = function () {
+      if (!confirm('Clear Studio board?')) return;
+      studioSave([]);
+    };
+    document.getElementById('st-export').onclick = function () {
+      toast('Path: ' + ST_PATH + ' — /fs cat ' + ST_PATH);
     };
 
     var shortcuts = ['/', '/Desktop', '/Documents', '/Downloads', '/Pictures', '/Projects', '/.Trash'];
