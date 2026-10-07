@@ -258,15 +258,34 @@
   function fsApi(action, path, content, extra) {
     var body = { action: action, path: path || '/', initData: initData() };
     if (extra) {
-      for (var k in extra) body[k] = extra[k];
+      for (var k in extra) {
+        if (Object.prototype.hasOwnProperty.call(extra, k)) body[k] = extra[k];
+      }
     }
     if (content !== undefined) body.content = content;
     return fetch(API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
-    }).then(function (res) { return res.json(); }).catch(function (e) {
-      return { ok: false, error: String(e.message || e) };
+    }).then(function (res) {
+      return res.text().then(function (text) {
+        var j = null;
+        try {
+          j = text ? JSON.parse(text) : {};
+        } catch (e) {
+          return {
+            ok: false,
+            error: 'API non-JSON (HTTP ' + res.status + '): ' + String(text).slice(0, 120)
+          };
+        }
+        if (!res.ok && j && !j.error) {
+          j.ok = false;
+          j.error = j.error || ('HTTP ' + res.status);
+        }
+        return j || { ok: false, error: 'empty response' };
+      });
+    }).catch(function (e) {
+      return { ok: false, error: 'network: ' + String(e.message || e) };
     }).then(function (j) {
       if (j && j.error) toast(j.error);
       return j || { ok: false, error: 'empty' };
@@ -463,14 +482,22 @@
     if (!idePath) {
       var name = prompt('File name in /Projects', 'index.html');
       if (!name) return;
-      idePath = '/Projects/' + name.replace(/^\/+/g, '');
+      idePath = '/Projects/' + String(name).replace(/^\/+/, '');
+    }
+    // always absolute under /Projects
+    if (idePath.charAt(0) !== '/') idePath = '/Projects/' + idePath;
+    if (idePath.indexOf('/Projects/') !== 0 && idePath !== '/Projects') {
+      idePath = '/Projects/' + idePath.replace(/^\/+/, '');
     }
     var val = document.getElementById('ide-fallback').value;
+    toast('Saving ' + idePath + '…');
     fsApi('write', idePath, val).then(function (j) {
-      if (j.ok) {
-        document.getElementById('ide-tab').textContent = idePath + ' · saved';
-        toast('Saved ' + idePath);
+      if (j && j.ok) {
+        document.getElementById('ide-tab').textContent = idePath + ' · saved (' + (j.size || 0) + 'b)';
+        toast('Saved ' + idePath + ' (' + (j.size || 0) + 'b)');
         ideLoadTree();
+      } else {
+        toast('Save failed: ' + ((j && j.error) || 'unknown'));
       }
     });
   }
