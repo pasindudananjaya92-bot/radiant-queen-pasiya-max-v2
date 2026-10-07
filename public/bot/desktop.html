@@ -1,1125 +1,423 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
-  <title>PasiyaOS Desktop</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <style>
-    :root {
-      --bg: #0a0706; --panel: #14100c; --panel2: #1c1510;
-      --gold: #c9a227; --gold2: #e8c547; --text: #f3e6c8;
-      --muted: #9a8b6e; --border: #3a2e1a;
-    }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; height: 100%; overflow: hidden;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-      background: #0a0706; color: var(--text); }
-    body {
-      background: radial-gradient(ellipse 120% 80% at 50% 20%, #1a0f0a 0%, #0a0706 55%, #050304 100%);
-    }
-    #desktop-icons {
-      position: fixed; left: 0; right: 0; top: 0; bottom: 52px;
-      padding: 12px; z-index: 2; overflow: auto;
-    }
-    .desk-icon {
-      width: 76px; display: inline-flex; flex-direction: column; align-items: center;
-      gap: 5px; margin: 6px; cursor: pointer; user-select: none;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .desk-icon .ic {
-      width: 50px; height: 50px; border-radius: 14px; background: var(--panel);
-      border: 1px solid var(--border); display: flex; align-items: center; justify-content: center;
-      font-size: 22px; pointer-events: none;
-    }
-    .desk-icon span { font-size: 10px; text-align: center; pointer-events: none; text-shadow: 0 1px 3px #000; }
-    .desk-icon:active .ic { border-color: var(--gold); background: #2a2010; }
-
-    .window {
-      position: fixed; z-index: 50; min-width: 260px; min-height: 160px;
-      background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
-      box-shadow: 0 16px 48px rgba(0,0,0,.6);
-      display: none; flex-direction: column; overflow: hidden;
-    }
-    .window.open { display: flex !important; }
-    .window.focused { border-color: var(--gold); z-index: 60; }
-    .w-title {
-      height: 40px; background: linear-gradient(180deg, #221810, #18120c);
-      border-bottom: 1px solid var(--border); display: flex; align-items: center;
-      padding: 0 10px; gap: 8px; flex-shrink: 0;
-    }
-    .w-title b { font-size: 13px; color: var(--gold2); flex: 1; }
-    .w-x {
-      width: 32px; height: 32px; border: none; border-radius: 8px;
-      background: #3a1515; color: #f0c0c0; font-size: 16px; cursor: pointer;
-    }
-    .w-body { flex: 1; display: flex; min-height: 0; overflow: hidden; }
-    .toolbar {
-      display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--border);
-      flex-shrink: 0; flex-wrap: wrap;
-    }
-    .toolbar button, .btn {
-      border: 1px solid var(--border); background: var(--panel2); color: var(--text);
-      border-radius: 8px; padding: 8px 10px; font-size: 12px; cursor: pointer;
-    }
-    .pad { padding: 10px; overflow: auto; flex: 1; font-size: 13px; line-height: 1.45; }
-    .muted { color: var(--muted); }
-    input.line, textarea.area {
-      width: 100%; background: #0e0b09; border: 1px solid var(--border); color: var(--text);
-      border-radius: 8px; padding: 8px; font-size: 13px; outline: none;
-    }
-    textarea.area { min-height: 160px; font-family: ui-monospace, Menlo, monospace; resize: vertical; }
-
-    #win-explorer { width: min(400px, 94vw); height: min(460px, 68vh); left: 8px; top: 8px; }
-    #win-notepad { width: min(400px, 94vw); height: min(460px, 68vh); left: 16px; top: 16px; }
-    #win-term { width: min(420px, 94vw); height: min(400px, 62vh); left: 12px; top: 12px; }
-    #win-ide { width: min(500px, 96vw); height: min(520px, 74vh); left: 6px; top: 6px; }
-    #win-kernel { width: min(400px, 94vw); height: min(420px, 64vh); left: 20px; top: 20px; }
-    #win-office { width: min(440px, 96vw); height: min(500px, 72vh); left: 10px; top: 10px; }
-    #win-store { width: min(400px, 94vw); height: min(440px, 66vh); left: 14px; top: 14px; }
-    #win-browser { width: min(440px, 96vw); height: min(480px, 70vh); left: 8px; top: 8px; }
-    #win-settings { width: min(380px, 94vw); height: min(400px, 60vh); left: 24px; top: 24px; }
-
-    .exp-side {
-      width: 100px; border-right: 1px solid var(--border); background: var(--panel2);
-      padding: 6px; overflow-y: auto; font-size: 11px; flex-shrink: 0;
-    }
-    .exp-side div { padding: 8px; border-radius: 8px; cursor: pointer; color: var(--muted); }
-    .exp-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-    .exp-path { padding: 8px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); }
-    .exp-list { flex: 1; overflow-y: auto; padding: 6px; }
-    .exp-row {
-      display: flex; align-items: center; gap: 8px; padding: 9px; border-radius: 8px;
-      cursor: pointer; font-size: 13px;
-    }
-    .exp-row:active { background: #2a2010; }
-    .exp-row .meta { margin-left: auto; font-size: 11px; color: var(--muted); }
-
-    #np-path, #ide-tab, #of-path { padding: 8px; font-size: 11px; color: var(--muted); border-bottom: 1px solid var(--border); }
-    #np-editor, #ide-fallback, #of-editor {
-      flex: 1; width: 100%; border: none; resize: none; padding: 12px;
-      background: #0e0b09; color: var(--text); font-family: ui-monospace, Menlo, monospace;
-      font-size: 13px; line-height: 1.45; outline: none;
-    }
-    #win-term .w-body { flex-direction: column; background: #0a0c0a; }
-    #term-out {
-      flex: 1; overflow-y: auto; padding: 10px;
-      font-family: ui-monospace, Menlo, monospace; font-size: 12px; line-height: 1.45;
-      color: #c8e6c9; white-space: pre-wrap; word-break: break-word;
-    }
-    #term-out .cmd { color: #e8c547; }
-    #term-out .err { color: #f0a0a0; }
-    #term-form {
-      display: flex; align-items: center; gap: 6px; padding: 8px;
-      border-top: 1px solid #1e2a1e; background: #0d100d;
-    }
-    #term-prompt { color: #c9a227; font-family: ui-monospace, monospace; font-size: 11px; white-space: nowrap; }
-    #term-input {
-      flex: 1; background: transparent; border: none; outline: none; color: #e8ffe8;
-      font-family: ui-monospace, monospace; font-size: 12px;
-    }
-    .ide-side {
-      width: 120px; border-right: 1px solid var(--border); background: var(--panel2);
-      display: flex; flex-direction: column; min-height: 0; flex-shrink: 0;
-    }
-    .ide-side-h { padding: 8px; font-size: 11px; color: var(--gold); border-bottom: 1px solid var(--border); }
-    #ide-tree { flex: 1; overflow-y: auto; padding: 6px; font-size: 12px; }
-    .ide-file { padding: 8px; border-radius: 6px; cursor: pointer; color: var(--muted); }
-    .ide-file:active { background: #2a2010; color: var(--gold2); }
-    .ide-main { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-
-    .k-card {
-      background: var(--panel2); border: 1px solid var(--border); border-radius: 10px;
-      padding: 10px; margin-bottom: 8px;
-    }
-    .k-card h4 { margin: 0 0 6px; color: var(--gold2); font-size: 12px; }
-    .bar { height: 8px; background: #0e0b09; border-radius: 99px; overflow: hidden; }
-    .bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--gold), #8b1e1e); }
-
-    .store-item {
-      display: flex; gap: 10px; align-items: center; padding: 10px;
-      border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px;
-      background: var(--panel2); cursor: pointer;
-    }
-    .store-item:active { border-color: var(--gold); }
-    .store-item .ic { font-size: 22px; width: 36px; text-align: center; }
-    .store-item b { display: block; font-size: 13px; color: var(--gold2); }
-    .store-item span { font-size: 11px; color: var(--muted); }
-
-    #br-bar { display: flex; gap: 6px; padding: 8px; border-bottom: 1px solid var(--border); }
-    #br-url { flex: 1; }
-    #br-view {
-      flex: 1; overflow: auto; padding: 10px; font-size: 12px; white-space: pre-wrap;
-      word-break: break-word; background: #0e0b09; color: #d8c8a8;
-    }
-
-    #taskbar {
-      position: fixed; left: 0; right: 0; bottom: 0; height: 52px; z-index: 100;
-      background: rgba(12, 9, 7, 0.96); border-top: 1px solid var(--border);
-      display: flex; align-items: center; gap: 6px; padding: 0 8px; overflow-x: auto;
-    }
-    .tb-btn {
-      width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--border);
-      background: var(--panel2); color: var(--gold2); font-size: 16px; cursor: pointer; flex-shrink: 0;
-    }
-    .tb-title { font-size: 11px; color: var(--gold); font-weight: 700; margin-left: 2px; white-space: nowrap; }
-    .tb-clock { margin-left: auto; font-size: 11px; color: var(--muted); flex-shrink: 0; }
-    #toast {
-      position: fixed; left: 50%; transform: translateX(-50%); bottom: 64px; z-index: 200;
-      background: #1a120c; border: 1px solid var(--border); color: var(--text);
-      padding: 8px 14px; border-radius: 999px; font-size: 12px; display: none; max-width: 90vw;
-    }
-    #toast.show { display: block; }
-  
-    #win-studio,#win-calc,#win-journal,#win-tasks,#win-themes,#win-share {
-      width: min(420px, 94vw); height: min(480px, 70vh); left: 12px; top: 12px;
-    }
-    .st-item { border: 1px solid var(--border); border-radius: 10px; padding: 8px; margin-bottom: 8px; background: var(--panel2); }
-    .st-item img { max-width: 100%; max-height: 120px; border-radius: 8px; display: block; margin-top: 6px; }
-    #calc-display { width: 100%; background: #0e0b09; border: 1px solid var(--border); color: var(--gold2); font-size: 22px; padding: 12px; border-radius: 8px; text-align: right; margin-bottom: 8px; }
-    .calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-    .calc-grid button { padding: 14px 0; font-size: 16px; }
-
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>PasiyaOS</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--bg:#0a0706;--panel:#14100c;--panel2:#1c1510;--gold:#c9a227;--gold2:#e8c547;--text:#f3e6c8;--muted:#9a8b6e;--border:#3a2e1a}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-system,sans-serif;background:#0a0706;color:var(--text)}
+body{background:radial-gradient(ellipse 120% 80% at 50% 20%,#1a0f0a,#0a0706 55%,#050304)}
+#icons{position:fixed;inset:0 0 52px 0;padding:10px;overflow:auto;z-index:2}
+.icon{width:72px;display:inline-flex;flex-direction:column;align-items:center;gap:4px;margin:5px;cursor:pointer;user-select:none}
+.icon .ic{width:46px;height:46px;border-radius:12px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px;pointer-events:none}
+.icon span{font-size:10px;text-align:center;pointer-events:none;text-shadow:0 1px 2px #000}
+.icon:active .ic{border-color:var(--gold)}
+.win{position:fixed;z-index:50;width:min(400px,94vw);height:min(520px,78vh);left:8px;top:8px;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 40px #000a;display:none;flex-direction:column;overflow:hidden}
+.win.open{display:flex!important}
+.win.foc{border-color:var(--gold);z-index:60}
+.hd{height:40px;flex-shrink:0;display:flex;align-items:center;padding:0 10px;background:linear-gradient(180deg,#221810,#18120c);border-bottom:1px solid var(--border)}
+.hd b{flex:1;font-size:13px;color:var(--gold2)}
+.hd button{width:32px;height:32px;border:0;border-radius:8px;background:#3a1515;color:#f0c0c0;cursor:pointer}
+.bd{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.form{flex-shrink:0;padding:10px;border-bottom:1px solid var(--border);background:var(--panel2)}
+.form input,.form textarea{width:100%;margin:0 0 8px;padding:10px;border:1px solid var(--border);border-radius:8px;background:#0e0b09;color:var(--text);font-size:13px;outline:0}
+.form .row{display:flex;gap:6px;flex-wrap:wrap}
+.scroll{flex:1;min-height:80px;overflow:auto;padding:10px}
+.tb{flex-shrink:0;display:flex;gap:6px;padding:8px;border-top:1px solid var(--border);flex-wrap:wrap}
+button.b{border:1px solid var(--border);background:var(--panel2);color:var(--text);border-radius:8px;padding:8px 12px;font-size:12px;cursor:pointer}
+button.b:active{border-color:var(--gold)}
+.muted{color:var(--muted);font-size:12px}
+.card{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px}
+.card h4{margin:0 0 6px;color:var(--gold2);font-size:12px}
+.bar{height:8px;background:#0e0b09;border-radius:99px;overflow:hidden}
+.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),#8b1e1e)}
+.item{display:flex;gap:8px;align-items:center;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--panel2);cursor:pointer}
+.item img{max-width:100%;max-height:100px;border-radius:6px;display:block}
+#taskbar{position:fixed;left:0;right:0;bottom:0;height:52px;z-index:100;background:#0c0907f5;border-top:1px solid var(--border);display:flex;align-items:center;gap:5px;padding:0 8px;overflow-x:auto}
+.tbtn{width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);font-size:15px;cursor:pointer;flex-shrink:0}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:64px;z-index:200;background:#1a120c;border:1px solid var(--border);padding:8px 14px;border-radius:999px;font-size:12px;display:none;max-width:90vw}
+#toast.show{display:block}
+#np-ed,#ide-ed,#of-ed,#jn-ed,#nt-ed{flex:1;width:100%;min-height:120px;border:0;padding:12px;background:#0e0b09;color:var(--text);font-family:ui-monospace,monospace;font-size:13px;resize:none;outline:0}
+#term-out{flex:1;overflow:auto;padding:10px;font-family:ui-monospace,monospace;font-size:12px;color:#c8e6c9;white-space:pre-wrap;background:#0a0c0a}
+#term-out .cmd{color:#e8c547}#term-out .err{color:#f0a0a0}
+#term-form{display:flex;gap:6px;padding:8px;border-top:1px solid #1e2a1e;background:#0d100d;flex-shrink:0}
+#term-form input{flex:1;background:transparent;border:0;color:#e8ffe8;font-family:monospace;outline:0}
+#calc-disp{width:100%;font-size:22px;text-align:right;padding:12px;margin-bottom:8px;background:#0e0b09;border:1px solid var(--border);border-radius:8px;color:var(--gold2)}
+.cg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.cg button{padding:14px 0;font-size:16px}
+.side{width:100px;border-right:1px solid var(--border);background:var(--panel2);overflow:auto;font-size:11px;flex-shrink:0}
+.side div{padding:8px;cursor:pointer;color:var(--muted)}
+.rowflex{display:flex;flex:1;min-height:0}
+.list{flex:1;overflow:auto;padding:8px}
+.path{padding:8px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);flex-shrink:0}
+</style>
 </head>
 <body>
-  <div id="desktop-icons">
-    <div class="desk-icon" id="icon-explorer"><div class="ic">📁</div><span>Explorer</span></div>
-    <div class="desk-icon" id="icon-notepad"><div class="ic">📝</div><span>Notepad</span></div>
-    <div class="desk-icon" id="icon-term"><div class="ic">⌨</div><span>Terminal</span></div>
-    <div class="desk-icon" id="icon-ide"><div class="ic">💻</div><span>IDE</span></div>
-    <div class="desk-icon" id="icon-kernel"><div class="ic">🧠</div><span>Kernel</span></div>
-    <div class="desk-icon" id="icon-office"><div class="ic">📄</div><span>Office</span></div>
-    <div class="desk-icon" id="icon-store"><div class="ic">🏪</div><span>App Store</span></div>
-    <div class="desk-icon" id="icon-browser"><div class="ic">🌐</div><span>Browser</span></div>
-    <div class="desk-icon" id="icon-studio"><div class="ic">🎬</div><span>Studio</span></div>
-    <div class="desk-icon" id="icon-calc"><div class="ic">🔢</div><span>Calc</span></div>
-    <div class="desk-icon" id="icon-journal"><div class="ic">📔</div><span>Journal</span></div>
-    <div class="desk-icon" id="icon-tasks"><div class="ic">✅</div><span>Tasks</span></div>
-    <div class="desk-icon" id="icon-themes"><div class="ic">🎨</div><span>Themes</span></div>
-    <div class="desk-icon" id="icon-share"><div class="ic">📦</div><span>Share</span></div>
-    <div class="desk-icon" id="icon-settings"><div class="ic">⚙</div><span>Settings</span></div>
-  </div>
+<div id="icons"></div>
 
-  <!-- Explorer -->
-  <div class="window" id="win-explorer">
-    <div class="w-title"><b>📁 Explorer</b><button type="button" class="w-x" data-close="explorer">✕</button></div>
-    <div class="w-body">
-      <div class="exp-side" id="exp-side"></div>
-      <div class="exp-main">
-        <div class="exp-path" id="exp-path">/</div>
-        <div class="exp-list" id="exp-list"></div>
-        <div class="toolbar">
-          <button type="button" id="btn-up">⬆ Up</button>
-          <button type="button" id="btn-new-file">＋ File</button>
-          <button type="button" id="btn-new-folder">＋ Folder</button>
-          <button type="button" id="btn-refresh">↻</button>
-        </div>
-      </div>
-    </div>
-  </div>
+<div class="win" id="w-explorer"><div class="hd"><b>Explorer</b><button type="button" data-x="explorer">X</button></div><div class="bd rowflex"><div class="side" id="exp-side"></div><div style="flex:1;display:flex;flex-direction:column;min-width:0"><div class="path" id="exp-path">/</div><div class="list" id="exp-list"></div><div class="tb"><button type="button" class="b" id="exp-up">Up</button><button type="button" class="b" id="exp-nf">+File</button><button type="button" class="b" id="exp-nd">+Dir</button><button type="button" class="b" id="exp-ref">Refresh</button></div></div></div></div>
 
-  <!-- Notepad -->
-  <div class="window" id="win-notepad">
-    <div class="w-title"><b>📝 Notepad</b><button type="button" class="w-x" data-close="notepad">✕</button></div>
-    <div class="w-body" style="flex-direction:column">
-      <div id="np-path">No file open</div>
-      <textarea id="np-editor" placeholder="Open a file from Explorer…"></textarea>
-      <div class="toolbar">
-        <button type="button" id="btn-save">💾 Save</button>
-        <button type="button" id="btn-np-docs">Documents</button>
-      </div>
-    </div>
-  </div>
+<div class="win" id="w-notepad"><div class="hd"><b>Notepad</b><button type="button" data-x="notepad">X</button></div><div class="bd"><div class="path" id="np-path">No file</div><textarea id="np-ed"></textarea><div class="tb"><button type="button" class="b" id="np-save">Save</button></div></div></div>
 
-  <!-- Terminal -->
-  <div class="window" id="win-term">
-    <div class="w-title"><b>⌨ Terminal</b><button type="button" class="w-x" data-close="term">✕</button></div>
-    <div class="w-body">
-      <div id="term-out"></div>
-      <form id="term-form" autocomplete="off">
-        <span id="term-prompt">founder@pasiyaos:/$</span>
-        <input id="term-input" type="text" spellcheck="false" autocapitalize="off" />
-      </form>
-    </div>
-  </div>
+<div class="win" id="w-term"><div class="hd"><b>Terminal</b><button type="button" data-x="term">X</button></div><div class="bd"><div id="term-out"></div><form id="term-form"><span style="color:var(--gold);font-family:monospace;font-size:11px" id="term-pr">$</span><input id="term-in" autocomplete="off"/></form></div></div>
 
-  <!-- IDE -->
-  <div class="window" id="win-ide">
-    <div class="w-title"><b>💻 IDE</b><button type="button" class="w-x" data-close="ide">✕</button></div>
-    <div class="w-body">
-      <div class="ide-side">
-        <div class="ide-side-h">/Projects</div>
-        <div id="ide-tree"></div>
-      </div>
-      <div class="ide-main">
-        <div id="ide-tab">No file open</div>
-        <textarea id="ide-fallback" placeholder="// code"></textarea>
-        <div class="toolbar">
-          <button type="button" id="ide-save">💾 Save</button>
-          <button type="button" id="ide-refresh">↻</button>
-          <button type="button" id="ide-new">＋ File</button>
-          <button type="button" id="ide-preview">Preview</button>
-        </div>
-      </div>
-    </div>
-  </div>
+<div class="win" id="w-ide"><div class="hd"><b>IDE</b><button type="button" data-x="ide">X</button></div><div class="bd"><div class="path" id="ide-path">/Projects</div><textarea id="ide-ed" placeholder="// code"></textarea><div class="tb"><button type="button" class="b" id="ide-save">Save</button><button type="button" class="b" id="ide-new">New</button></div></div></div>
 
-  <!-- STEP5 Kernel -->
-  <div class="window" id="win-kernel">
-    <div class="w-title"><b>🧠 Kernel</b><button type="button" class="w-x" data-close="kernel">✕</button></div>
-    <div class="w-body" style="flex-direction:column">
-      <div class="pad" id="kernel-body">Loading…</div>
-      <div class="toolbar">
-        <button type="button" id="k-refresh">↻ Refresh</button>
-        <button type="button" id="k-seed">Seed FS</button>
-      </div>
-    </div>
-  </div>
+<div class="win" id="w-kernel"><div class="hd"><b>Kernel</b><button type="button" data-x="kernel">X</button></div><div class="bd"><div class="scroll" id="k-body">...</div><div class="tb"><button type="button" class="b" id="k-ref">Refresh</button></div></div></div>
 
-  <!-- STEP6 Office -->
-  <div class="window" id="win-office">
-    <div class="w-title"><b>📄 Office</b><button type="button" class="w-x" data-close="office">✕</button></div>
-    <div class="w-body" style="flex-direction:column">
-      <div id="of-path">/Documents/Office/notes.txt</div>
-      <textarea id="of-editor" placeholder="Write your document…"></textarea>
-      <div class="toolbar">
-        <button type="button" id="of-save">💾 Save</button>
-        <button type="button" id="of-load">📂 Load</button>
-        <button type="button" id="of-csv">CSV mode</button>
-        <button type="button" id="of-export">Export path</button>
-      </div>
-    </div>
-  </div>
+<div class="win" id="w-office"><div class="hd"><b>Office</b><button type="button" data-x="office">X</button></div><div class="bd"><div class="path" id="of-path">/Documents/Office/notes.txt</div><textarea id="of-ed"></textarea><div class="tb"><button type="button" class="b" id="of-save">Save</button><button type="button" class="b" id="of-load">Load</button></div></div></div>
 
-  <!-- STEP7 App Store -->
-  <div class="window" id="win-store">
-    <div class="w-title"><b>🏪 App Store</b><button type="button" class="w-x" data-close="store">✕</button></div>
-    <div class="w-body" style="flex-direction:column">
-      <div class="pad" id="store-body"></div>
-    </div>
-  </div>
+<div class="win" id="w-browser"><div class="hd"><b>Browser</b><button type="button" data-x="browser">X</button></div><div class="bd"><div class="form"><input id="br-url" value="https://example.com"/><div class="row"><button type="button" class="b" id="br-go">Go</button><button type="button" class="b" id="br-save">Save page</button></div></div><div class="scroll muted" id="br-view">HTTPS text</div></div></div>
 
-  <!-- STEP8 Browser -->
-  <div class="window" id="win-browser">
-    <div class="w-title"><b>🌐 Browser</b><button type="button" class="w-x" data-close="browser">✕</button></div>
-    <div class="w-body" style="flex-direction:column">
-      <div id="br-bar">
-        <input class="line" id="br-url" type="url" placeholder="https://example.com" value="https://example.com" />
-        <button type="button" class="btn" id="br-go">Go</button>
-      </div>
-      <div id="br-view" class="muted">Enter https URL → text snapshot (safe fetch via /api/fs)</div>
-      <div class="toolbar">
-        <button type="button" id="br-hn">HN</button>
-        <button type="button" id="br-wiki">Wikipedia</button>
-        <button type="button" id="br-save">Save page → FS</button>
-      </div>
-    </div>
-  </div>
+<div class="win" id="w-studio"><div class="hd"><b>Studio</b><button type="button" data-x="studio">X</button></div><div class="bd"><div class="form"><input id="st-url" placeholder="https:// image URL"/><input id="st-cap" placeholder="Caption"/><div class="row"><button type="button" class="b" id="st-add">Add to board</button><button type="button" class="b" id="st-reload">Reload</button></div></div><div class="scroll" id="st-list"></div><div class="tb"><button type="button" class="b" id="st-clear">Clear</button><button type="button" class="b" id="st-path">Show path</button></div></div></div>
 
-  <!-- STEP9 Settings -->
-  <div class="window" id="win-settings">
-    <div class="w-title"><b>⚙ Settings</b><button type="button" class="w-x" data-close="settings">✕</button></div>
-    <div class="w-body" style="flex-direction:column">
-      <div class="pad">
-        <div class="k-card">
-          <h4>PasiyaOS</h4>
-          <div class="muted" id="set-ver">Desktop S5–S9</div>
-        </div>
-        <div class="k-card">
-          <h4>Clipboard → FS</h4>
-          <textarea class="area" id="clip-text" placeholder="Paste text to save…"></textarea>
-          <button type="button" class="btn" id="clip-save" style="margin-top:8px">Save to /Documents/clipboard.txt</button>
-        </div>
-        <div class="k-card">
-          <h4>About</h4>
-          <div class="muted">Shared disk: Supabase pasiya_fs<br/>API: /api/fs · no extra Vercel functions</div>
-        </div>
-      </div>
-    </div>
-  </div>
+<div class="win" id="w-calc"><div class="hd"><b>Calculator</b><button type="button" data-x="calc">X</button></div><div class="bd"><div class="scroll"><input id="calc-disp" readonly value="0"/><div class="cg" id="calc-g"></div></div><div class="tb"><button type="button" class="b" id="calc-hist">Save history</button></div></div></div>
 
-  
-  <div class="window" id="win-studio">
-    <div class="w-title"><b>🎬 Studio</b><button type="button" class="w-x" id="x-studio">✕</button></div>
-    <div class="w-body" style="flex-direction:column">
-      <div class="pad" style="flex:0;border-bottom:1px solid var(--border)">
-        <input class="line" id="st-url" placeholder="https:// image URL" style="margin-bottom:6px" />
-        <input class="line" id="st-cap" placeholder="Caption" style="margin-bottom:6px" />
-        <button type="button" class="btn" id="st-add">+ Add</button>
-        <button type="button" class="btn" id="st-reload">Reload</button>
-      </div>
-      <div class="pad" id="st-list">Empty</div>
-      <div class="toolbar">
-        <button type="button" id="st-clear">Clear</button>
-        <button type="button" id="st-path">Path</button>
-      </div>
-    </div>
-  </div>
-  <div class="window" id="win-calc">
-    <div class="w-title"><b>Calculator</b><button type="button" class="w-x" id="x-calc">✕</button></div>
-    <div class="w-body" style="flex-direction:column">
-      <div class="pad">
-        <input id="calc-display" class="line" type="text" value="0" readonly style="font-size:22px;text-align:right;margin-bottom:8px" />
-        <div class="calc-grid" id="calc-grid"></div>
-      </div>
-      <div class="toolbar"><button type="button" id="calc-hist">Save history</button></div>
-    </div>
-  </div>
-  <div class="window" id="win-journal">
-    <div class="w-title"><b>Journal</b><button type="button" class="w-x" id="x-journal">✕</button></div>
-    <div class="w-body" style="flex-direction:column">
-      <div id="jn-path" class="muted" style="padding:8px;border-bottom:1px solid var(--border)"></div>
-      <textarea id="jn-editor" class="area" style="flex:1;border:none;background:#0e0b09;color:var(--text);padding:12px;font-family:monospace" placeholder="Today..."></textarea>
-      <div class="toolbar">
-        <button type="button" id="jn-save">Save today</button>
-        <button type="button" id="jn-load">Reload</button>
-      </div>
-    </div>
-  </div>
-  <div class="window" id="win-tasks">
-    <div class="w-title"><b>Tasks</b><button type="button" class="w-x" id="x-tasks">✕</button></div>
-    <div class="w-body" style="flex-direction:column">
-      <div class="pad" style="flex:0;border-bottom:1px solid var(--border)">
-        <input class="line" id="tk-input" placeholder="New task" style="margin-bottom:6px" />
-        <button type="button" class="btn" id="tk-add">Add</button>
-      </div>
-      <div class="pad" id="tk-list"></div>
-      <div class="toolbar"><button type="button" id="tk-save">Save</button></div>
-    </div>
-  </div>
-  <div class="window" id="win-themes">
-    <div class="w-title"><b>Themes</b><button type="button" class="w-x" id="x-themes">✕</button></div>
-    <div class="w-body" style="flex-direction:column">
-      <div class="pad">
-        <button type="button" class="btn" id="th-gold">Gold Dark</button>
-        <button type="button" class="btn" id="th-crimson">Crimson</button>
-        <button type="button" class="btn" id="th-matrix">Matrix</button>
-        <div class="muted" id="th-status" style="margin-top:10px">Current: gold</div>
-      </div>
-    </div>
-  </div>
-  <div class="window" id="win-share">
-    <div class="w-title"><b>Share Pack</b><button type="button" class="w-x" id="x-share">✕</button></div>
-    <div class="w-body" style="flex-direction:column">
-      <div class="pad" id="sh-out">Build export of folders</div>
-      <div class="toolbar">
-        <button type="button" id="sh-build">Build</button>
-        <button type="button" id="sh-save">Save export</button>
-      </div>
-    </div>
-  </div>
+<div class="win" id="w-journal"><div class="hd"><b>Journal</b><button type="button" data-x="journal">X</button></div><div class="bd"><div class="path" id="jn-path">today</div><textarea id="jn-ed" placeholder="Write today's journal..."></textarea><div class="tb"><button type="button" class="b" id="jn-save">Save today</button><button type="button" class="b" id="jn-load">Reload</button></div></div></div>
 
-  <div id="taskbar">
-    <button type="button" class="tb-btn" data-open="explorer">📁</button>
-    <button type="button" class="tb-btn" data-open="term">⌨</button>
-    <button type="button" class="tb-btn" data-open="ide">💻</button>
-    <button type="button" class="tb-btn" data-open="kernel">🧠</button>
-    <button type="button" class="tb-btn" data-open="office">📄</button>
-    <button type="button" class="tb-btn" data-open="store">🏪</button>
-    <button type="button" class="tb-btn" data-open="browser">🌐</button>
-    <button type="button" class="tb-btn" data-open="settings">⚙</button>
-    <span class="tb-title">PASIYA OS</span>
-    <span class="tb-clock" id="clock"></span>
-  </div>
-  <div id="toast"></div>
+<div class="win" id="w-tasks"><div class="hd"><b>Tasks</b><button type="button" data-x="tasks">X</button></div><div class="bd"><div class="form"><input id="tk-in" placeholder="New task..."/><div class="row"><button type="button" class="b" id="tk-add">Add task</button></div></div><div class="scroll" id="tk-list"></div><div class="tb"><button type="button" class="b" id="tk-save">Save list</button></div></div></div>
 
-  <script>
-(function () {
-  'use strict';
-  var API = '/api/fs';
-  var tg = window.Telegram && window.Telegram.WebApp;
-  if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
+<div class="win" id="w-themes"><div class="hd"><b>Themes</b><button type="button" data-x="themes">X</button></div><div class="bd"><div class="scroll"><button type="button" class="b" id="th-gold">Gold Dark</button> <button type="button" class="b" id="th-crimson">Crimson</button> <button type="button" class="b" id="th-matrix">Matrix</button><p class="muted" id="th-st">Current: gold</p></div></div></div>
 
-  function toast(msg) {
-    var el = document.getElementById('toast');
-    el.textContent = msg;
-    el.classList.add('show');
-    clearTimeout(window.__t);
-    window.__t = setTimeout(function () { el.classList.remove('show'); }, 2800);
-  }
+<div class="win" id="w-share"><div class="hd"><b>Share</b><button type="button" data-x="share">X</button></div><div class="bd"><div class="scroll muted" id="sh-out">Build export</div><div class="tb"><button type="button" class="b" id="sh-build">Build</button><button type="button" class="b" id="sh-save">Save</button></div></div></div>
 
-  function initData() { return (tg && tg.initData) ? tg.initData : ''; }
+<div class="win" id="w-settings"><div class="hd"><b>Settings</b><button type="button" data-x="settings">X</button></div><div class="bd"><div class="form"><textarea id="clip" rows="4" placeholder="Clipboard text"></textarea><button type="button" class="b" id="clip-save">Save clipboard.txt</button></div><div class="scroll muted">PasiyaOS S10–S20 · /api/fs</div></div></div>
 
-  function fsApi(action, path, content, extra) {
-    var body = { action: action, path: path || '/', initData: initData() };
-    if (extra) for (var k in extra) if (Object.prototype.hasOwnProperty.call(extra, k)) body[k] = extra[k];
-    if (content !== undefined) body.content = content;
-    return fetch(API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    }).then(function (res) {
-      return res.text().then(function (text) {
-        try { return text ? JSON.parse(text) : {}; }
-        catch (e) {
-          return { ok: false, error: 'API non-JSON HTTP ' + res.status + ': ' + String(text).slice(0, 100) };
-        }
-      });
-    }).catch(function (e) {
-      return { ok: false, error: 'network: ' + String(e.message || e) };
-    }).then(function (j) {
-      if (j && j.error) toast(j.error);
-      return j || { ok: false, error: 'empty' };
-    });
-  }
+<!-- S16-20 -->
+<div class="win" id="w-notes"><div class="hd"><b>Quick Notes</b><button type="button" data-x="notes">X</button></div><div class="bd"><textarea id="nt-ed" placeholder="Sticky note..."></textarea><div class="tb"><button type="button" class="b" id="nt-save">Save</button><button type="button" class="b" id="nt-load">Load</button></div></div></div>
 
-  var WINS = {
-    explorer: 'win-explorer', notepad: 'win-notepad', term: 'win-term', ide: 'win-ide',
-    kernel: 'win-kernel', office: 'win-office', store: 'win-store', browser: 'win-browser',
-    settings: 'win-settings', studio: 'win-studio', calc: 'win-calc',
-    journal: 'win-journal', tasks: 'win-tasks', themes: 'win-themes', share: 'win-share'
-  };
+<div class="win" id="w-weather"><div class="hd"><b>Weather</b><button type="button" data-x="weather">X</button></div><div class="bd"><div class="form"><input id="wx-city" value="Colombo"/><button type="button" class="b" id="wx-go">Get weather</button></div><div class="scroll" id="wx-out" class="muted">Open-Meteo free API</div></div></div>
 
-  function openWin(name) {
-    var id = WINS[name];
-    if (!id) return;
-    var el = document.getElementById(id);
-    if (!el) return;
-    el.classList.add('open', 'focused');
-    document.querySelectorAll('.window').forEach(function (w) {
-      if (w !== el) w.classList.remove('focused');
-    });
-    if (name === 'explorer') refreshList();
-    if (name === 'term') setTimeout(function () { document.getElementById('term-input').focus(); }, 40);
-    if (name === 'ide') ideLoadTree();
-    if (name === 'kernel') kernelRefresh();
-    if (name === 'store') renderStore();
-    if (name === 'office') officeEnsure();
-    if (name === 'studio') studioLoad();
-    if (name === 'journal') journalLoad();
-    if (name === 'tasks') tasksLoad();
-    if (name === 'calc' && window.buildCalc) buildCalc();
-  }
+<div class="win" id="w-clock"><div class="hd"><b>Clock</b><button type="button" data-x="clock">X</button></div><div class="bd"><div class="scroll" style="text-align:center"><div id="ck-big" style="font-size:36px;color:var(--gold2);margin:20px 0">--:--:--</div><input id="ck-alarm" class="line" placeholder="Alarm note e.g. 14:30 call" style="width:100%;padding:10px;margin:8px 0;background:#0e0b09;border:1px solid var(--border);border-radius:8px;color:var(--text)"/><button type="button" class="b" id="ck-save">Save alarm note</button><p class="muted" id="ck-st"></p></div></div></div>
 
-  function closeWin(name) {
-    var el = document.getElementById(WINS[name]);
-    if (el) el.classList.remove('open', 'focused');
-  }
+<div class="win" id="w-contacts"><div class="hd"><b>Contacts</b><button type="button" data-x="contacts">X</button></div><div class="bd"><div class="form"><input id="ct-name" placeholder="Name"/><input id="ct-phone" placeholder="Phone / note"/><button type="button" class="b" id="ct-add">Add contact</button></div><div class="scroll" id="ct-list"></div><div class="tb"><button type="button" class="b" id="ct-save">Save</button></div></div></div>
 
-  /* Explorer / Notepad / Term / IDE — same as S4 fix */
-  var cwd = '/', npPath = null, termCwd = '/', idePath = null;
+<div class="win" id="w-dash"><div class="hd"><b>Dashboard</b><button type="button" data-x="dash">X</button></div><div class="bd"><div class="scroll" id="dash-out">Loading...</div><div class="tb"><button type="button" class="b" id="dash-ref">Refresh</button></div></div></div>
 
-  function baseName(p) {
-    var parts = String(p).split('/').filter(Boolean);
-    return parts.length ? parts[parts.length - 1] : p;
-  }
+<div class="win" id="w-store"><div class="hd"><b>App Store</b><button type="button" data-x="store">X</button></div><div class="bd"><div class="scroll" id="store-body"></div></div></div>
 
-  function refreshList() {
-    document.getElementById('exp-path').textContent = cwd;
-    var list = document.getElementById('exp-list');
-    list.innerHTML = '<div class="exp-row">Loading…</div>';
-    fsApi('list', cwd).then(function (j) {
-      list.innerHTML = '';
-      if (!j.ok) { list.innerHTML = '<div class="exp-row">' + (j.error || 'error') + '</div>'; return; }
-      if (cwd !== '/') {
-        var up = document.createElement('div');
-        up.className = 'exp-row';
-        up.textContent = '📁 ..';
-        up.onclick = goUp;
-        list.appendChild(up);
-      }
-      (j.entries || []).forEach(function (e) {
-        var row = document.createElement('div');
-        row.className = 'exp-row';
-        row.innerHTML = (e.type === 'dir' ? '📁 ' : '📄 ') + baseName(e.path) +
-          (e.type === 'file' ? '<span class="meta">' + (e.size || 0) + 'b</span>' : '');
-        row.onclick = function () {
-          if (e.type === 'dir') { cwd = e.path; refreshList(); }
-          else openFile(e.path);
-        };
-        list.appendChild(row);
-      });
-    });
-  }
-  function goUp() {
-    if (cwd === '/') return;
-    var parts = cwd.split('/').filter(Boolean); parts.pop();
-    cwd = parts.length ? '/' + parts.join('/') : '/';
-    refreshList();
-  }
-  function openFile(path) {
-    fsApi('read', path).then(function (j) {
-      if (!j.ok) return;
-      npPath = path;
-      document.getElementById('np-path').textContent = path;
-      document.getElementById('np-editor').value = j.content || '';
-      openWin('notepad');
-    });
-  }
+<div id="taskbar">
+<button type="button" class="tbtn" data-o="explorer">📁</button>
+<button type="button" class="tbtn" data-o="term">⌨</button>
+<button type="button" class="tbtn" data-o="studio">🎬</button>
+<button type="button" class="tbtn" data-o="tasks">✅</button>
+<button type="button" class="tbtn" data-o="journal">📔</button>
+<button type="button" class="tbtn" data-o="dash">📊</button>
+<button type="button" class="tbtn" data-o="weather">🌤</button>
+<button type="button" class="tbtn" data-o="settings">⚙</button>
+<span style="color:var(--gold);font-size:11px;font-weight:700;margin-left:4px">PASIYA OS</span>
+<span id="clock" style="margin-left:auto;color:var(--muted);font-size:11px"></span>
+</div>
+<div id="toast"></div>
 
-  function termPrompt() {
-    document.getElementById('term-prompt').textContent = 'founder@pasiyaos:' + termCwd + '$';
-  }
-  function termPrint(text, cls) {
-    var out = document.getElementById('term-out');
-    var line = document.createElement('div');
-    if (cls) line.className = cls;
-    line.textContent = text;
-    out.appendChild(line);
-    out.scrollTop = out.scrollHeight;
-  }
-  function termRun(line) {
-    line = String(line || '').trim();
-    if (!line) return;
-    termPrint('founder@pasiyaos:' + termCwd + '$ ' + line, 'cmd');
-    fsApi('shell', '/', undefined, { cwd: termCwd, line: line }).then(function (j) {
-      if (!j.ok) { termPrint(j.error || 'error', 'err'); return; }
-      if (j.cwd) termCwd = j.cwd;
-      termPrompt();
-      if (j.output === '__CLEAR__') { document.getElementById('term-out').innerHTML = ''; return; }
-      if (j.output) String(j.output).split('\n').forEach(function (ln) {
-        termPrint(ln, /not found|error|missing|failed/i.test(ln) ? 'err' : '');
-      });
-    });
-  }
+<script>
+(function(){
+'use strict';
+var API='/api/fs';
+var tg=window.Telegram&&window.Telegram.WebApp;
+if(tg){try{tg.ready();tg.expand()}catch(e){}}
 
-  function ideLoadTree() {
-    var tree = document.getElementById('ide-tree');
-    tree.innerHTML = '…';
-    fsApi('mkdir', '/Projects').then(function () { return fsApi('list', '/Projects'); }).then(function (j) {
-      tree.innerHTML = '';
-      if (!j.ok) { tree.textContent = j.error || 'error'; return; }
-      var n = 0;
-      (j.entries || []).forEach(function (e) {
-        if (e.type !== 'file') return;
-        n++;
-        var row = document.createElement('div');
-        row.className = 'ide-file';
-        row.textContent = baseName(e.path);
-        row.onclick = function () { ideOpen(e.path); };
-        tree.appendChild(row);
-      });
-      if (!n) tree.innerHTML = '<div class="ide-file">No files</div>';
-    });
-  }
-  function ideOpen(path) {
-    fsApi('read', path).then(function (j) {
-      if (!j.ok) return;
-      idePath = path;
-      document.getElementById('ide-tab').textContent = path;
-      document.getElementById('ide-fallback').value = j.content || '';
-      openWin('ide');
-      ideLoadTree();
-    });
-  }
-  function ideSave() {
-    if (!idePath) {
-      var name = prompt('File in /Projects', 'index.html');
-      if (!name) return;
-      idePath = '/Projects/' + String(name).replace(/^\/+/, '');
-    }
-    if (idePath.indexOf('/Projects/') !== 0) idePath = '/Projects/' + idePath.replace(/^\/+/, '');
-    var val = document.getElementById('ide-fallback').value;
-    fsApi('write', idePath, val).then(function (j) {
-      if (j && j.ok) {
-        document.getElementById('ide-tab').textContent = idePath + ' · saved';
-        toast('Saved ' + idePath + ' (' + (j.size || 0) + 'b)');
-        ideLoadTree();
-      }
-    });
-  }
+function toast(m){var el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(window.__t);window.__t=setTimeout(function(){el.classList.remove('show')},2500)}
+function initData(){return(tg&&tg.initData)?tg.initData:''}
+function fsApi(action,path,content,extra){
+  var body={action:action,path:path||'/',initData:initData()};
+  if(extra)for(var k in extra)if(Object.prototype.hasOwnProperty.call(extra,k))body[k]=extra[k];
+  if(content!==undefined)body.content=content;
+  return fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.text().then(function(t){try{return t?JSON.parse(t):{}}catch(e){return{ok:false,error:'non-JSON '+r.status+': '+String(t).slice(0,80)}}})})
+    .catch(function(e){return{ok:false,error:String(e.message||e)}})
+    .then(function(j){if(j&&j.error)toast(j.error);return j||{ok:false}});
+}
 
-  /* STEP 5 Kernel */
-  function kernelRefresh() {
-    var body = document.getElementById('kernel-body');
-    body.innerHTML = 'Loading…';
-    Promise.all([fsApi('df', '/'), fsApi('list', '/'), fsApi('seed', '/')]).then(function (arr) {
-      var df = arr[0], ls = arr[1];
-      var used = df.ok ? df.used : 0;
-      var max = df.ok ? df.max : 1;
-      var pct = Math.min(100, Math.round((used / max) * 100));
-      var dirs = (ls.ok ? ls.entries : []) || [];
-      body.innerHTML =
-        '<div class="k-card"><h4>Disk (pasiya_fs)</h4>' +
-        '<div class="muted">' + used + ' / ' + max + ' bytes (' + pct + '%)</div>' +
-        '<div class="bar" style="margin-top:8px"><i style="width:' + pct + '%"></i></div></div>' +
-        '<div class="k-card"><h4>Root entries</h4><div class="muted">' +
-        (dirs.map(function (e) { return baseName(e.path); }).join(', ') || '(empty)') +
-        '</div></div>' +
-        '<div class="k-card"><h4>Services</h4><div class="muted">API /api/fs · Telegram bot · Supabase · Vercel</div></div>' +
-        '<div class="k-card"><h4>Apps</h4><div class="muted">Explorer · Notepad · Terminal · IDE · Office · Browser · Store</div></div>';
-    });
-  }
+var APPS=[
+  ['explorer','📁','Explorer'],['notepad','📝','Notepad'],['term','⌨','Terminal'],['ide','💻','IDE'],
+  ['kernel','🧠','Kernel'],['office','📄','Office'],['browser','🌐','Browser'],['studio','🎬','Studio'],
+  ['calc','🔢','Calc'],['journal','📔','Journal'],['tasks','✅','Tasks'],['themes','🎨','Themes'],
+  ['share','📦','Share'],['notes','📌','Notes'],['weather','🌤','Weather'],['clock','🕐','Clock'],
+  ['contacts','👤','Contacts'],['dash','📊','Dash'],['store','🏪','Store'],['settings','⚙','Settings']
+];
 
-  /* STEP 6 Office */
-  var ofPath = '/Documents/Office/notes.txt';
-  function officeEnsure() {
-    document.getElementById('of-path').textContent = ofPath;
-    fsApi('mkdir', '/Documents/Office').then(function () {
-      return fsApi('read', ofPath);
-    }).then(function (j) {
-      if (j.ok) document.getElementById('of-editor').value = j.content || '';
-    });
-  }
-  function officeSave() {
-    var val = document.getElementById('of-editor').value;
-    fsApi('mkdir', '/Documents/Office').then(function () {
-      return fsApi('write', ofPath, val);
-    }).then(function (j) {
-      if (j.ok) toast('Office saved ' + ofPath + ' (' + j.size + 'b)');
-    });
-  }
+var icons=document.getElementById('icons');
+APPS.forEach(function(a){
+  var d=document.createElement('div');d.className='icon';d.id='icon-'+a[0];
+  d.innerHTML='<div class="ic">'+a[1]+'</div><span>'+a[2]+'</span>';
+  d.onclick=function(){openWin(a[0])};
+  icons.appendChild(d);
+});
 
-  /* STEP 7 Store */
-  var APPS = [
-    { id: 'explorer', ic: '📁', name: 'Explorer', desc: 'File manager' },
-    { id: 'notepad', ic: '📝', name: 'Notepad', desc: 'Quick text' },
-    { id: 'term', ic: '⌨', name: 'Terminal', desc: 'VFS shell' },
-    { id: 'ide', ic: '💻', name: 'IDE', desc: '/Projects editor' },
-    { id: 'kernel', ic: '🧠', name: 'Kernel', desc: 'Disk & status' },
-    { id: 'office', ic: '📄', name: 'Office', desc: 'Documents' },
-    { id: 'browser', ic: '🌐', name: 'Browser', desc: 'HTTPS text view' },
-    { id: 'studio', ic: '🎬', name: 'Studio', desc: 'Media' },
-    { id: 'calc', ic: '🔢', name: 'Calc', desc: 'Math' },
-    { id: 'journal', ic: '📔', name: 'Journal', desc: 'Daily' },
-    { id: 'tasks', ic: '✅', name: 'Tasks', desc: 'Todo' },
-    { id: 'themes', ic: '🎨', name: 'Themes', desc: 'Look' },
-    { id: 'share', ic: '📦', name: 'Share', desc: 'Export' },
-    { id: 'settings', ic: '⚙', name: 'Settings', desc: 'Clipboard & about' }
-  ];
-  function renderStore() {
-    var el = document.getElementById('store-body');
-    el.innerHTML = '';
-    APPS.forEach(function (a) {
-      var d = document.createElement('div');
-      d.className = 'store-item';
-      d.innerHTML = '<div class="ic">' + a.ic + '</div><div><b>' + a.name + '</b><span>' + a.desc + '</span></div>';
-      d.onclick = function () { openWin(a.id); };
-      el.appendChild(d);
-    });
-  }
+function openWin(n){
+  var el=document.getElementById('w-'+n);
+  if(!el){toast('No window '+n);return}
+  el.classList.add('open','foc');
+  document.querySelectorAll('.win').forEach(function(w){if(w!==el)w.classList.remove('foc')});
+  if(n==='explorer')refreshList();
+  if(n==='kernel')kernel();
+  if(n==='studio')studioLoad();
+  if(n==='journal')journalLoad();
+  if(n==='tasks')tasksLoad();
+  if(n==='calc')buildCalc();
+  if(n==='office')officeLoad();
+  if(n==='notes')notesLoad();
+  if(n==='contacts')contactsLoad();
+  if(n==='dash')dashLoad();
+  if(n==='store')renderStore();
+  if(n==='clock')tickClock();
+  if(n==='term')setTimeout(function(){document.getElementById('term-in').focus()},50);
+  toast(n+' open');
+}
+function closeWin(n){var el=document.getElementById('w-'+n);if(el)el.classList.remove('open','foc')}
+document.querySelectorAll('[data-x]').forEach(function(b){b.onclick=function(){closeWin(b.getAttribute('data-x'))}});
+document.querySelectorAll('[data-o]').forEach(function(b){b.onclick=function(){openWin(b.getAttribute('data-o'))}});
 
-  /* STEP 8 Browser */
-  function browserGo() {
-    var url = document.getElementById('br-url').value.trim();
-    if (!url) return;
-    if (!/^https:\/\//i.test(url)) url = 'https://' + url;
-    document.getElementById('br-url').value = url;
-    document.getElementById('br-view').textContent = 'Loading…';
-    fsApi('httpget', '/', undefined, { url: url }).then(function (j) {
-      if (!j.ok) {
-        document.getElementById('br-view').textContent = j.error || 'fail';
-        return;
-      }
-      var text = j.text || '';
-      // strip tags lightly for readability
-      text = text.replace(/<script[\s\S]*?<\/script>/gi, ' ')
-        .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      document.getElementById('br-view').textContent =
-        'HTTP ' + j.status + ' · ' + (j.contentType || '') + '\n\n' + text.slice(0, 12000);
-    });
-  }
+var cwd='/',npPath=null,termCwd='/',idePath='/Projects/main.js',ofPath='/Documents/Office/notes.txt';
+var ST='/Documents/Studio/board.json',TK='/Documents/Tasks/todo.json',CT='/Documents/contacts.json';
+var calcExpr='',calcHist=[],tasks=[],contacts=[],shareText='';
 
+function bn(p){var a=String(p).split('/').filter(Boolean);return a.length?a[a.length-1]:p}
 
-  var ST_PATH = '/Documents/Studio/board.json';
-  var TK_PATH = '/Documents/Tasks/todo.json';
-  var calcExpr = '';
-  var calcHistory = [];
-  var taskItems = [];
-  var shareText = '';
-
-  function studioLoad() {
-    var list = document.getElementById('st-list');
-    if (!list) return;
-    list.textContent = 'Loading...';
-    fsApi('mkdir', '/Documents/Studio').then(function () {
-      return fsApi('read', ST_PATH);
-    }).then(function (j) {
-      var items = [];
-      if (j.ok && j.content) {
-        try { items = JSON.parse(j.content); } catch (e) { items = []; }
-      }
-      if (!Array.isArray(items)) items = [];
-      window.__studioItems = items;
-      list.innerHTML = '';
-      if (!items.length) {
-        list.innerHTML = '<div class="muted">No media yet</div>';
-        return;
-      }
-      items.forEach(function (it, idx) {
-        var d = document.createElement('div');
-        d.className = 'st-item';
-        var t = document.createElement('div');
-        t.style.fontSize = '11px';
-        t.style.color = 'var(--gold2)';
-        t.textContent = '#' + (idx + 1);
-        d.appendChild(t);
-        if (it.url) {
-          var img = document.createElement('img');
-          img.src = String(it.url);
-          img.alt = '';
-          img.loading = 'lazy';
-          img.onerror = function () { img.style.display = 'none'; };
-          d.appendChild(img);
-        }
-        var c = document.createElement('div');
-        c.className = 'muted';
-        c.style.fontSize = '12px';
-        c.textContent = it.cap || it.url || '';
-        d.appendChild(c);
-        var rm = document.createElement('button');
-        rm.type = 'button';
-        rm.className = 'btn';
-        rm.textContent = 'Remove';
-        rm.onclick = function () {
-          var arr = window.__studioItems || [];
-          arr.splice(idx, 1);
-          studioSave(arr);
-        };
-        d.appendChild(rm);
-        list.appendChild(d);
-      });
-    });
-  }
-  function studioSave(items) {
-    window.__studioItems = items || [];
-    return fsApi('mkdir', '/Documents/Studio').then(function () {
-      return fsApi('write', ST_PATH, JSON.stringify(window.__studioItems, null, 2));
-    }).then(function (j) {
-      if (j.ok) { toast('Studio saved'); studioLoad(); }
-      return j;
-    });
-  }
-  function calcSet(v) {
-    var el = document.getElementById('calc-display');
-    if (el) el.value = v;
-  }
-  function calcPress(key) {
-    if (key === 'C') { calcExpr = ''; calcSet('0'); return; }
-    if (key === '=') {
-      try {
-        var safe = calcExpr.replace(/[^0-9+\-*/().]/g, '');
-        var r = Function('"use strict";return (' + safe + ')')();
-        calcHistory.push(calcExpr + ' = ' + r);
-        calcExpr = String(r);
-        calcSet(calcExpr);
-      } catch (e) { calcSet('Error'); calcExpr = ''; }
-      return;
-    }
-    if (calcExpr === '0' && key !== '.') calcExpr = key;
-    else calcExpr += key;
-    calcSet(calcExpr);
-  }
-  function buildCalc() {
-    var g = document.getElementById('calc-grid');
-    if (!g || g.childNodes.length) return;
-    var keys = ['7','8','9','/','4','5','6','*','1','2','3','-','0','.','=','+','C'];
-    keys.forEach(function (k) {
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'btn';
-      b.textContent = k;
-      b.onclick = function () { calcPress(k); };
-      g.appendChild(b);
-    });
-  }
-  function journalPath() {
-    var d = new Date();
-    var m = String(d.getMonth() + 1).padStart(2, '0');
-    var day = String(d.getDate()).padStart(2, '0');
-    return '/Documents/Journal/' + d.getFullYear() + '-' + m + '-' + day + '.txt';
-  }
-  function journalLoad() {
-    var p = journalPath();
-    var el = document.getElementById('jn-path');
-    if (el) el.textContent = p;
-    fsApi('mkdir', '/Documents/Journal').then(function () {
-      return fsApi('read', p);
-    }).then(function (j) {
-      var ed = document.getElementById('jn-editor');
-      if (ed) ed.value = j.ok ? (j.content || '') : '';
-    });
-  }
-  function tasksRender() {
-    var list = document.getElementById('tk-list');
-    if (!list) return;
-    list.innerHTML = '';
-    taskItems.forEach(function (t, i) {
-      var d = document.createElement('div');
-      d.className = 'k-card';
-      var lab = document.createElement('label');
-      lab.style.display = 'flex';
-      lab.style.gap = '8px';
-      var cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.checked = !!t.done;
-      cb.onchange = function () { taskItems[i].done = cb.checked; };
-      var sp = document.createElement('span');
-      sp.textContent = t.text || '';
-      lab.appendChild(cb);
-      lab.appendChild(sp);
-      d.appendChild(lab);
+function refreshList(){
+  document.getElementById('exp-path').textContent=cwd;
+  var list=document.getElementById('exp-list');list.textContent='Loading...';
+  fsApi('list',cwd).then(function(j){
+    list.innerHTML='';
+    if(!j.ok){list.textContent=j.error||'err';return}
+    if(cwd!=='/'){var u=document.createElement('div');u.className='item';u.textContent='📁 ..';u.onclick=function(){var p=cwd.split('/').filter(Boolean);p.pop();cwd=p.length?'/'+p.join('/'):'/';refreshList()};list.appendChild(u)}
+    (j.entries||[]).forEach(function(e){
+      var d=document.createElement('div');d.className='item';
+      d.textContent=(e.type==='dir'?'📁 ':'📄 ')+bn(e.path)+(e.type==='file'?' ('+e.size+'b)':'');
+      d.onclick=function(){if(e.type==='dir'){cwd=e.path;refreshList()}else{npPath=e.path;fsApi('read',e.path).then(function(r){if(r.ok){document.getElementById('np-path').textContent=e.path;document.getElementById('np-ed').value=r.content||'';openWin('notepad')}})}};
       list.appendChild(d);
     });
-  }
-  function tasksLoad() {
-    fsApi('mkdir', '/Documents/Tasks').then(function () {
-      return fsApi('read', TK_PATH);
-    }).then(function (j) {
-      taskItems = [];
-      if (j.ok && j.content) {
-        try { taskItems = JSON.parse(j.content); } catch (e) { taskItems = []; }
-      }
-      if (!Array.isArray(taskItems)) taskItems = [];
-      tasksRender();
+  });
+}
+var side=document.getElementById('exp-side');
+['/','/Documents','/Projects','/Desktop','/.Trash'].forEach(function(p){
+  var d=document.createElement('div');d.textContent=p==='/'?'This PC':bn(p);d.onclick=function(){cwd=p;refreshList()};side.appendChild(d);
+});
+document.getElementById('exp-up').onclick=function(){var p=cwd.split('/').filter(Boolean);p.pop();cwd=p.length?'/'+p.join('/'):'/';refreshList()};
+document.getElementById('exp-ref').onclick=refreshList;
+document.getElementById('exp-nd').onclick=function(){var n=prompt('Folder');if(!n)return;fsApi('mkdir',(cwd==='/'?'':cwd)+'/'+n.replace(/^\//,'')).then(function(j){if(j.ok)refreshList()})};
+document.getElementById('exp-nf').onclick=function(){var n=prompt('File','note.txt');if(!n)return;var p=(cwd==='/'?'':cwd)+'/'+n.replace(/^\//,'');fsApi('write',p,'').then(function(j){if(j.ok)refreshList()})};
+document.getElementById('np-save').onclick=function(){if(!npPath){npPath=prompt('Path','/Documents/note.txt');if(!npPath)return}fsApi('write',npPath,document.getElementById('np-ed').value).then(function(j){if(j.ok)toast('Saved')})};
+
+function termPrint(t,c){var o=document.getElementById('term-out');var d=document.createElement('div');if(c)d.className=c;d.textContent=t;o.appendChild(d);o.scrollTop=o.scrollHeight}
+document.getElementById('term-form').onsubmit=function(e){
+  e.preventDefault();var line=document.getElementById('term-in').value.trim();document.getElementById('term-in').value='';
+  if(!line)return;termPrint('$ '+line,'cmd');
+  fsApi('shell','/',undefined,{cwd:termCwd,line:line}).then(function(j){
+    if(!j.ok){termPrint(j.error||'err','err');return}
+    if(j.cwd)termCwd=j.cwd;
+    document.getElementById('term-pr').textContent=termCwd+'$';
+    if(j.output==='__CLEAR__'){document.getElementById('term-out').innerHTML='';return}
+    if(j.output)String(j.output).split('\n').forEach(function(l){termPrint(l,/error|fail|not found/i.test(l)?'err':'')});
+  });
+};
+
+document.getElementById('ide-save').onclick=function(){
+  if(!idePath)idePath='/Projects/main.js';
+  fsApi('mkdir','/Projects').then(function(){return fsApi('write',idePath,document.getElementById('ide-ed').value)})
+    .then(function(j){if(j.ok)toast('IDE saved')});
+};
+document.getElementById('ide-new').onclick=function(){var n=prompt('File','app.js');if(!n)return;idePath='/Projects/'+n.replace(/^\//,'');document.getElementById('ide-path').textContent=idePath;document.getElementById('ide-ed').value=''};
+
+function kernel(){
+  Promise.all([fsApi('df','/'),fsApi('list','/')]).then(function(a){
+    var df=a[0],ls=a[1],u=df.ok?df.used:0,m=df.ok?df.max:1,p=Math.min(100,Math.round(u/m*100));
+    document.getElementById('k-body').innerHTML='<div class="card"><h4>Disk</h4>'+u+' / '+m+' ('+p+'%)<div class="bar"><i style="width:'+p+'%"></i></div></div><div class="card"><h4>Root</h4 class="muted">'+(ls.ok?(ls.entries||[]).map(function(e){return bn(e.path)}).join(', '):'')+'</div>';
+  });
+}
+document.getElementById('k-ref').onclick=kernel;
+
+function officeLoad(){document.getElementById('of-path').textContent=ofPath;fsApi('mkdir','/Documents/Office').then(function(){return fsApi('read',ofPath)}).then(function(j){if(j.ok)document.getElementById('of-ed').value=j.content||''})}
+document.getElementById('of-save').onclick=function(){fsApi('mkdir','/Documents/Office').then(function(){return fsApi('write',ofPath,document.getElementById('of-ed').value)}).then(function(j){if(j.ok)toast('Office saved')})};
+document.getElementById('of-load').onclick=officeLoad;
+
+document.getElementById('br-go').onclick=function(){
+  var url=document.getElementById('br-url').value.trim();if(!/^https:\/\//i.test(url))url='https://'+url;
+  document.getElementById('br-view').textContent='Loading...';
+  fsApi('httpget','/',undefined,{url:url}).then(function(j){
+    if(!j.ok){document.getElementById('br-view').textContent=j.error||'fail';return}
+    var t=String(j.text||'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+    document.getElementById('br-view').textContent='HTTP '+j.status+'\n\n'+t.slice(0,10000);
+  });
+};
+document.getElementById('br-save').onclick=function(){fsApi('write','/Documents/browser-save.txt',document.getElementById('br-view').textContent||'').then(function(j){if(j.ok)toast('Saved')})};
+
+/* Studio — form always in .form, never wiped */
+function studioLoad(){
+  var list=document.getElementById('st-list');list.textContent='Loading...';
+  fsApi('mkdir','/Documents/Studio').then(function(){return fsApi('read',ST)}).then(function(j){
+    var items=[];if(j.ok&&j.content){try{items=JSON.parse(j.content)}catch(e){}}
+    if(!Array.isArray(items))items=[];
+    window.__st=items;list.innerHTML='';
+    if(!items.length){list.innerHTML='<div class="muted">No media yet — use fields above</div>';return}
+    items.forEach(function(it,idx){
+      var d=document.createElement('div');d.className='card';
+      var t=document.createElement('div');t.style.color='var(--gold2)';t.style.fontSize='11px';t.textContent='#'+(idx+1)+' '+(it.cap||'');d.appendChild(t);
+      if(it.url){var img=document.createElement('img');img.src=String(it.url);img.alt='';img.style.maxWidth='100%';img.style.maxHeight='100px';img.onerror=function(){img.remove()};d.appendChild(img)}
+      var u=document.createElement('div');u.className='muted';u.textContent=it.url||'';d.appendChild(u);
+      var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';rm.onclick=function(){var a=window.__st||[];a.splice(idx,1);studioSave(a)};d.appendChild(rm);
+      list.appendChild(d);
     });
-  }
-  function tasksSave() {
-    return fsApi('mkdir', '/Documents/Tasks').then(function () {
-      return fsApi('write', TK_PATH, JSON.stringify(taskItems, null, 2));
-    }).then(function (j) {
-      if (j.ok) toast('Tasks saved');
-      return j;
-    });
-  }
-  function applyTheme(name) {
-    var root = document.documentElement;
-    if (name === 'crimson') {
-      root.style.setProperty('--gold', '#e85d4c');
-      root.style.setProperty('--gold2', '#ff8a7a');
-      root.style.setProperty('--border', '#4a2018');
-    } else if (name === 'matrix') {
-      root.style.setProperty('--gold', '#33ff66');
-      root.style.setProperty('--gold2', '#99ffbb');
-      root.style.setProperty('--border', '#1a3a20');
-      root.style.setProperty('--text', '#c8ffd0');
-    } else {
-      root.style.setProperty('--gold', '#c9a227');
-      root.style.setProperty('--gold2', '#e8c547');
-      root.style.setProperty('--border', '#3a2e1a');
-      root.style.setProperty('--text', '#f3e6c8');
-    }
-    var st = document.getElementById('th-status');
-    if (st) st.textContent = 'Current: ' + name;
-    fsApi('write', '/Documents/theme.txt', name);
-  }
-  function shareBuild() {
-    var outEl = document.getElementById('sh-out');
-    if (outEl) outEl.textContent = 'Building...';
-    var paths = ['/Documents', '/Projects', '/Documents/Studio', '/Documents/Journal', '/Documents/Tasks'];
-    var out = '=== PASIYAOS SHARE ===\n' + new Date().toISOString() + '\n\n';
-    var i = 0;
-    function next() {
-      if (i >= paths.length) {
-        shareText = out;
-        if (outEl) outEl.textContent = out.slice(0, 8000);
-        toast('Export ready');
-        return;
-      }
-      var p = paths[i++];
-      fsApi('tree', p).then(function (j) {
-        out += '--- ' + p + ' ---\n' + (j.ok ? j.tree : (j.error || '')) + '\n\n';
-        next();
-      });
-    }
-    next();
-  }
+  });
+}
+function studioSave(items){
+  window.__st=items||[];
+  return fsApi('mkdir','/Documents/Studio').then(function(){return fsApi('write',ST,JSON.stringify(window.__st,null,2))})
+    .then(function(j){if(j.ok){toast('Studio saved ('+j.size+'b)');studioLoad()}return j});
+}
+document.getElementById('st-add').onclick=function(){
+  var url=document.getElementById('st-url').value.trim();
+  var cap=document.getElementById('st-cap').value.trim();
+  if(!url){toast('URL required');return}
+  if(!/^https?:\/\//i.test(url))url='https://'+url;
+  var a=window.__st||[];a.unshift({url:url,cap:cap,ts:Date.now()});
+  document.getElementById('st-url').value='';document.getElementById('st-cap').value='';
+  studioSave(a);
+};
+document.getElementById('st-reload').onclick=studioLoad;
+document.getElementById('st-clear').onclick=function(){if(confirm('Clear board?'))studioSave([])};
+document.getElementById('st-path').onclick=function(){toast(ST)};
 
+function buildCalc(){
+  var g=document.getElementById('calc-g');if(g.childNodes.length)return;
+  ['7','8','9','/','4','5','6','*','1','2','3','-','0','.','=','+','C'].forEach(function(k){
+    var b=document.createElement('button');b.type='button';b.className='b';b.textContent=k;
+    b.onclick=function(){
+      if(k==='C'){calcExpr='';document.getElementById('calc-disp').value='0';return}
+      if(k==='='){try{var s=calcExpr.replace(/[^0-9+\-*/().]/g,'');var r=Function('return('+s+')')();calcHist.push(calcExpr+'='+r);calcExpr=String(r);document.getElementById('calc-disp').value=calcExpr}catch(e){document.getElementById('calc-disp').value='Error';calcExpr=''}return}
+      calcExpr=(calcExpr==='0'&&k!=='.')?k:calcExpr+k;document.getElementById('calc-disp').value=calcExpr;
+    };
+    g.appendChild(b);
+  });
+}
+document.getElementById('calc-hist').onclick=function(){fsApi('write','/Documents/calc-history.txt',calcHist.join('\n')||'').then(function(j){if(j.ok)toast('History saved')})};
 
-  /* Bind */
-  function bind() {
-    document.getElementById('icon-explorer').onclick = function () { openWin('explorer'); };
-    document.getElementById('icon-notepad').onclick = function () { openWin('notepad'); };
-    document.getElementById('icon-term').onclick = function () { openWin('term'); };
-    document.getElementById('icon-ide').onclick = function () { openWin('ide'); };
-    document.getElementById('icon-kernel').onclick = function () { openWin('kernel'); };
-    document.getElementById('icon-office').onclick = function () { openWin('office'); };
-    document.getElementById('icon-store').onclick = function () { openWin('store'); };
-    document.getElementById('icon-browser').onclick = function () { openWin('browser'); };
-    document.getElementById('icon-settings').onclick = function () { openWin('settings'); };
+function jPath(){var d=new Date();return '/Documents/Journal/'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.txt'}
+function journalLoad(){var p=jPath();document.getElementById('jn-path').textContent=p;fsApi('mkdir','/Documents/Journal').then(function(){return fsApi('read',p)}).then(function(j){document.getElementById('jn-ed').value=j.ok?(j.content||''):''})}
+document.getElementById('jn-save').onclick=function(){var p=jPath();fsApi('mkdir','/Documents/Journal').then(function(){return fsApi('write',p,document.getElementById('jn-ed').value)}).then(function(j){if(j.ok)toast('Journal saved')})};
+document.getElementById('jn-load').onclick=journalLoad;
 
-    document.querySelectorAll('[data-open]').forEach(function (b) {
-      b.onclick = function () { openWin(b.getAttribute('data-open')); };
-    });
-    document.querySelectorAll('[data-close]').forEach(function (b) {
-      b.onclick = function () { closeWin(b.getAttribute('data-close')); };
-    });
+function tasksRender(){
+  var list=document.getElementById('tk-list');list.innerHTML='';
+  tasks.forEach(function(t,i){
+    var d=document.createElement('div');d.className='card';
+    var lab=document.createElement('label');lab.style.display='flex';lab.style.gap='8px';
+    var cb=document.createElement('input');cb.type='checkbox';cb.checked=!!t.done;cb.onchange=function(){tasks[i].done=cb.checked};
+    var sp=document.createElement('span');sp.textContent=t.text||'';
+    lab.appendChild(cb);lab.appendChild(sp);d.appendChild(lab);list.appendChild(d);
+  });
+  if(!tasks.length)list.innerHTML='<div class="muted">No tasks — add above</div>';
+}
+function tasksLoad(){fsApi('mkdir','/Documents/Tasks').then(function(){return fsApi('read',TK)}).then(function(j){tasks=[];if(j.ok&&j.content){try{tasks=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(tasks))tasks=[];tasksRender()})}
+document.getElementById('tk-add').onclick=function(){var t=document.getElementById('tk-in').value.trim();if(!t)return;tasks.push({text:t,done:false});document.getElementById('tk-in').value='';tasksRender()};
+document.getElementById('tk-save').onclick=function(){fsApi('mkdir','/Documents/Tasks').then(function(){return fsApi('write',TK,JSON.stringify(tasks,null,2))}).then(function(j){if(j.ok)toast('Tasks saved')})};
 
-    document.getElementById('btn-up').onclick = goUp;
-    document.getElementById('btn-refresh').onclick = refreshList;
-    document.getElementById('btn-new-folder').onclick = function () {
-      var name = prompt('Folder name');
-      if (!name) return;
-      var p = (cwd === '/' ? '' : cwd) + '/' + name.replace(/^\/+/, '');
-      fsApi('mkdir', p).then(function (j) { if (j.ok) refreshList(); });
-    };
-    document.getElementById('btn-new-file').onclick = function () {
-      var name = prompt('File name', 'notes.txt');
-      if (!name) return;
-      var p = (cwd === '/' ? '' : cwd) + '/' + name.replace(/^\/+/, '');
-      fsApi('write', p, '').then(function (j) { if (j.ok) { refreshList(); openFile(p); } });
-    };
-    document.getElementById('btn-save').onclick = function () {
-      if (!npPath) {
-        var name = prompt('Save as', '/Documents/untitled.txt');
-        if (!name) return;
-        npPath = name;
-      }
-      fsApi('write', npPath, document.getElementById('np-editor').value).then(function (j) {
-        if (j.ok) toast('Saved ' + npPath);
-      });
-    };
-    document.getElementById('btn-np-docs').onclick = function () { cwd = '/Documents'; openWin('explorer'); };
+function applyTheme(n){
+  var r=document.documentElement;
+  if(n==='crimson'){r.style.setProperty('--gold','#e85d4c');r.style.setProperty('--gold2','#ff8a7a');r.style.setProperty('--border','#4a2018')}
+  else if(n==='matrix'){r.style.setProperty('--gold','#33ff66');r.style.setProperty('--gold2','#99ffbb');r.style.setProperty('--border','#1a3a20');r.style.setProperty('--text','#c8ffd0')}
+  else{r.style.setProperty('--gold','#c9a227');r.style.setProperty('--gold2','#e8c547');r.style.setProperty('--border','#3a2e1a');r.style.setProperty('--text','#f3e6c8')}
+  document.getElementById('th-st').textContent='Current: '+n;fsApi('write','/Documents/theme.txt',n);
+}
+document.getElementById('th-gold').onclick=function(){applyTheme('gold')};
+document.getElementById('th-crimson').onclick=function(){applyTheme('crimson')};
+document.getElementById('th-matrix').onclick=function(){applyTheme('matrix')};
 
-    document.getElementById('term-form').onsubmit = function (e) {
-      e.preventDefault();
-      var input = document.getElementById('term-input');
-      var v = input.value; input.value = '';
-      termRun(v);
-    };
+document.getElementById('sh-build').onclick=function(){
+  document.getElementById('sh-out').textContent='Building...';
+  var paths=['/Documents','/Projects','/Documents/Studio','/Documents/Journal','/Documents/Tasks'];
+  var out='=== SHARE ===\n'+new Date().toISOString()+'\n\n',i=0;
+  function next(){if(i>=paths.length){shareText=out;document.getElementById('sh-out').textContent=out.slice(0,8000);toast('Ready');return}var p=paths[i++];fsApi('tree',p).then(function(j){out+='--- '+p+' ---\n'+(j.ok?j.tree:(j.error||''))+'\n\n';next()})}
+  next();
+};
+document.getElementById('sh-save').onclick=function(){fsApi('write','/Documents/share-export.txt',shareText||document.getElementById('sh-out').textContent||'').then(function(j){if(j.ok)toast('Export saved')})};
+document.getElementById('clip-save').onclick=function(){fsApi('write','/Documents/clipboard.txt',document.getElementById('clip').value||'').then(function(j){if(j.ok)toast('Clipboard saved')})};
 
-    document.getElementById('ide-save').onclick = ideSave;
-    document.getElementById('ide-refresh').onclick = ideLoadTree;
-    document.getElementById('ide-new').onclick = function () {
-      var name = prompt('New file', 'app.js');
-      if (!name) return;
-      var p = '/Projects/' + name.replace(/^\/+/, '');
-      fsApi('write', p, '').then(function (j) { if (j.ok) ideOpen(p); });
-    };
-    document.getElementById('ide-preview').onclick = function () {
-      if (!idePath || !/\.html?$/i.test(idePath)) { toast('Open .html first'); return; }
-      var w = window.open('', '_blank');
-      if (w) { w.document.write(document.getElementById('ide-fallback').value); w.document.close(); }
-    };
+/* S16 Notes */
+function notesLoad(){fsApi('read','/Documents/quick-note.txt').then(function(j){document.getElementById('nt-ed').value=j.ok?(j.content||''):''})}
+document.getElementById('nt-save').onclick=function(){fsApi('write','/Documents/quick-note.txt',document.getElementById('nt-ed').value).then(function(j){if(j.ok)toast('Note saved')})};
+document.getElementById('nt-load').onclick=notesLoad;
 
-    document.getElementById('k-refresh').onclick = kernelRefresh;
-    document.getElementById('k-seed').onclick = function () {
-      fsApi('seed', '/').then(function (j) { toast(j.ok ? 'Seeded' : (j.error || 'fail')); kernelRefresh(); });
-    };
+/* S17 Weather Open-Meteo */
+document.getElementById('wx-go').onclick=function(){
+  var city=document.getElementById('wx-city').value.trim()||'Colombo';
+  document.getElementById('wx-out').textContent='Loading...';
+  fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(city)+'&count=1')
+    .then(function(r){return r.json()}).then(function(g){
+      if(!g.results||!g.results[0]){document.getElementById('wx-out').textContent='City not found';return}
+      var lat=g.results[0].latitude,lon=g.results[0].longitude,name=g.results[0].name;
+      return fetch('https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lon+'&current_weather=true')
+        .then(function(r){return r.json()}).then(function(w){
+          var c=w.current_weather||{};
+          var txt=name+'\nTemp: '+c.temperature+'°C\nWind: '+c.windspeed+' km/h\nCode: '+c.weathercode+'\nTime: '+c.time;
+          document.getElementById('wx-out').textContent=txt;
+          fsApi('write','/Documents/weather-last.txt',txt);
+        });
+    }).catch(function(e){document.getElementById('wx-out').textContent=String(e.message||e)});
+};
 
-    document.getElementById('of-save').onclick = officeSave;
-    document.getElementById('of-load').onclick = officeEnsure;
-    document.getElementById('of-csv').onclick = function () {
-      ofPath = '/Documents/Office/sheet.csv';
-      document.getElementById('of-path').textContent = ofPath;
-      document.getElementById('of-editor').value = 'name,value\nalpha,1\nbeta,2\n';
-      toast('CSV template');
-    };
-    document.getElementById('of-export').onclick = function () {
-      toast('Path: ' + ofPath + ' — use /fs cat ' + ofPath);
-    };
+/* S18 Clock */
+function tickClock(){var d=new Date();document.getElementById('ck-big').textContent=d.toLocaleTimeString()}
+setInterval(function(){document.getElementById('clock').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});if(document.getElementById('w-clock').classList.contains('open'))tickClock()},1000);
+document.getElementById('ck-save').onclick=function(){
+  var note=document.getElementById('ck-alarm').value.trim();
+  fsApi('write','/Documents/alarm-note.txt',note).then(function(j){if(j.ok){document.getElementById('ck-st').textContent='Saved: '+note;toast('Alarm note saved')}});
+};
 
-    document.getElementById('br-go').onclick = browserGo;
-    document.getElementById('br-hn').onclick = function () {
-      document.getElementById('br-url').value = 'https://news.ycombinator.com';
-      browserGo();
-    };
-    document.getElementById('br-wiki').onclick = function () {
-      document.getElementById('br-url').value = 'https://en.wikipedia.org/wiki/Sri_Lanka';
-      browserGo();
-    };
-    document.getElementById('br-save').onclick = function () {
-      var text = document.getElementById('br-view').textContent || '';
-      var p = '/Documents/browser-save.txt';
-      fsApi('write', p, text).then(function (j) {
-        if (j.ok) toast('Saved ' + p);
-      });
-    };
+/* S19 Contacts */
+function contactsRender(){
+  var list=document.getElementById('ct-list');list.innerHTML='';
+  contacts.forEach(function(c,i){
+    var d=document.createElement('div');d.className='card';
+    d.innerHTML='<b>'+String(c.name||'').replace(/</g,'')+'</b><div class="muted">'+String(c.phone||'')+'</div>';
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(){contacts.splice(i,1);contactsRender()};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!contacts.length)list.innerHTML='<div class="muted">No contacts</div>';
+}
+function contactsLoad(){fsApi('read',CT).then(function(j){contacts=[];if(j.ok&&j.content){try{contacts=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(contacts))contacts=[];contactsRender()})}
+document.getElementById('ct-add').onclick=function(){
+  var n=document.getElementById('ct-name').value.trim();
+  var p=document.getElementById('ct-phone').value.trim();
+  if(!n){toast('Name required');return}
+  contacts.push({name:n,phone:p});document.getElementById('ct-name').value='';document.getElementById('ct-phone').value='';contactsRender();
+};
+document.getElementById('ct-save').onclick=function(){fsApi('write',CT,JSON.stringify(contacts,null,2)).then(function(j){if(j.ok)toast('Contacts saved')})};
 
-    document.getElementById('clip-save').onclick = function () {
-      var t = document.getElementById('clip-text').value || '';
-      fsApi('write', '/Documents/clipboard.txt', t).then(function (j) {
-        if (j.ok) toast('Clipboard saved');
-      });
-    };
+/* S20 Dashboard */
+function dashLoad(){
+  document.getElementById('dash-out').textContent='Loading...';
+  Promise.all([fsApi('df','/'),fsApi('list','/Documents'),fsApi('read','/Documents/theme.txt'),fsApi('read',TK)]).then(function(a){
+    var df=a[0],docs=a[1],th=a[2],tk=a[3];
+    var tc=0;if(tk.ok&&tk.content){try{tc=(JSON.parse(tk.content)||[]).length}catch(e){}}
+    var html='<div class="card"><h4>Disk</h4>'+(df.ok?df.used+'/'+df.max+'b':'?')+'</div>';
+    html+='<div class="card"><h4>Documents</h4>'+(docs.ok?(docs.entries||[]).length+' items':'?')+'</div>';
+    html+='<div class="card"><h4>Theme</h4>'+(th.ok?th.content:'gold')+'</div>';
+    html+='<div class="card"><h4>Tasks</h4>'+tc+' items</div>';
+    html+='<div class="card"><h4>Apps</h4>'+APPS.length+' installed</div>';
+    document.getElementById('dash-out').innerHTML=html;
+  });
+}
+document.getElementById('dash-ref').onclick=dashLoad;
 
+function renderStore(){
+  var el=document.getElementById('store-body');el.innerHTML='';
+  APPS.forEach(function(a){
+    var d=document.createElement('div');d.className='item';
+    d.innerHTML='<span style="font-size:20px">'+a[1]+'</span><div><b style="color:var(--gold2)">'+a[2]+'</b></div>';
+    d.onclick=function(){openWin(a[0])};el.appendChild(d);
+  });
+}
 
-    var extraApps = ['studio', 'calc', 'journal', 'tasks', 'themes', 'share'];
-    extraApps.forEach(function (n) {
-      var ic = document.getElementById('icon-' + n);
-      if (ic) ic.onclick = function () { openWin(n); };
-      var xc = document.getElementById('x-' + n);
-      if (xc) xc.onclick = function () { closeWin(n); };
-    });
-    var stAdd = document.getElementById('st-add');
-    if (stAdd) stAdd.onclick = function () {
-      var url = document.getElementById('st-url').value.trim();
-      var cap = document.getElementById('st-cap').value.trim();
-      if (!url) { toast('URL required'); return; }
-      if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
-      var arr = window.__studioItems || [];
-      arr.unshift({ url: url, cap: cap, ts: Date.now() });
-      document.getElementById('st-url').value = '';
-      document.getElementById('st-cap').value = '';
-      studioSave(arr);
-    };
-    var stRel = document.getElementById('st-reload');
-    if (stRel) stRel.onclick = studioLoad;
-    var stClr = document.getElementById('st-clear');
-    if (stClr) stClr.onclick = function () { if (confirm('Clear?')) studioSave([]); };
-    var stPath = document.getElementById('st-path');
-    if (stPath) stPath.onclick = function () { toast(ST_PATH); };
-    buildCalc();
-    var ch = document.getElementById('calc-hist');
-    if (ch) ch.onclick = function () {
-      fsApi('write', '/Documents/calc-history.txt', calcHistory.join('\n') || '(empty)').then(function (j) {
-        if (j.ok) toast('History saved');
-      });
-    };
-    var jnS = document.getElementById('jn-save');
-    if (jnS) jnS.onclick = function () {
-      var p = journalPath();
-      fsApi('mkdir', '/Documents/Journal').then(function () {
-        return fsApi('write', p, document.getElementById('jn-editor').value);
-      }).then(function (j) { if (j.ok) toast('Journal saved'); });
-    };
-    var jnL = document.getElementById('jn-load');
-    if (jnL) jnL.onclick = journalLoad;
-    var tkA = document.getElementById('tk-add');
-    if (tkA) tkA.onclick = function () {
-      var t = document.getElementById('tk-input').value.trim();
-      if (!t) return;
-      taskItems.push({ text: t, done: false });
-      document.getElementById('tk-input').value = '';
-      tasksRender();
-    };
-    var tkS = document.getElementById('tk-save');
-    if (tkS) tkS.onclick = tasksSave;
-    var tg = document.getElementById('th-gold');
-    if (tg) tg.onclick = function () { applyTheme('gold'); };
-    var tc = document.getElementById('th-crimson');
-    if (tc) tc.onclick = function () { applyTheme('crimson'); };
-    var tm = document.getElementById('th-matrix');
-    if (tm) tm.onclick = function () { applyTheme('matrix'); };
-    var sb = document.getElementById('sh-build');
-    if (sb) sb.onclick = shareBuild;
-    var ss = document.getElementById('sh-save');
-    if (ss) ss.onclick = function () {
-      fsApi('write', '/Documents/share-export.txt', shareText || document.getElementById('sh-out').textContent || '')
-        .then(function (j) { if (j.ok) toast('Export saved'); });
-    };
-
-    var shortcuts = ['/', '/Desktop', '/Documents', '/Downloads', '/Pictures', '/Projects', '/.Trash'];
-    var side = document.getElementById('exp-side');
-    side.innerHTML = '';
-    shortcuts.forEach(function (p) {
-      var d = document.createElement('div');
-      d.textContent = p === '/' ? 'This PC' : baseName(p);
-      d.onclick = function () { cwd = p; refreshList(); };
-      side.appendChild(d);
-    });
-  }
-
-  function tick() {
-    document.getElementById('clock').textContent =
-      new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-
-  try {
-    bind();
-    termPrompt();
-    termPrint('PasiyaOS S5–S9 — type help', '');
-    tick();
-    setInterval(tick, 15000);
-    fsApi('seed', '/').then(function () { toast('Desktop S5–S9 ready'); });
-  } catch (e) {
-    toast('JS: ' + (e.message || e));
-  }
+fsApi('seed','/').then(function(){toast('PasiyaOS ready — tap icons')});
+fsApi('read','/Documents/theme.txt').then(function(j){if(j.ok&&j.content)applyTheme(String(j.content).trim())});
+termPrint('PasiyaOS terminal — type help','');
 })();
-  </script>
+</script>
 </body>
 </html>
