@@ -185,7 +185,7 @@ export default async function handler(req, res) {
     json(res, 200, {
       ok: true,
       service: 'pasiya-fs',
-      version: 'S5-S9',
+      version: 'S26-rss',
       hasBotToken: Boolean(BOT_TOKEN),
       hasAdmin: Boolean(ADMIN_ID),
     });
