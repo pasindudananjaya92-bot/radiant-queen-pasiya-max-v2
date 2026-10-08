@@ -97,6 +97,17 @@ button.b:active{border-color:var(--gold)}
 
 <div class="win" id="w-dash"><div class="hd"><b>Dashboard</b><button type="button" data-x="dash">X</button></div><div class="bd"><div class="scroll" id="dash-out">Loading...</div><div class="tb"><button type="button" class="b" id="dash-ref">Refresh</button></div></div></div>
 
+
+<div class="win" id="w-vault"><div class="hd"><b>Vault</b><button type="button" data-x="vault">X</button></div><div class="bd"><div class="form"><input id="v-title" placeholder="Label e.g. GitHub"/><input id="v-secret" placeholder="Secret / password note"/><button type="button" class="b" id="v-add">Add entry</button></div><div class="scroll" id="v-list"></div><div class="tb"><button type="button" class="b" id="v-save">Save vault</button></div></div></div>
+
+<div class="win" id="w-kanban"><div class="hd"><b>Kanban</b><button type="button" data-x="kanban">X</button></div><div class="bd"><div class="form"><input id="kb-in" placeholder="New card..."/><div class="row"><button type="button" class="b" id="kb-todo">+ Todo</button><button type="button" class="b" id="kb-doing">+ Doing</button><button type="button" class="b" id="kb-done">+ Done</button></div></div><div class="scroll" id="kb-board"></div><div class="tb"><button type="button" class="b" id="kb-save">Save board</button></div></div></div>
+
+<div class="win" id="w-rss"><div class="hd"><b>RSS</b><button type="button" data-x="rss">X</button></div><div class="bd"><div class="form"><input id="rss-url" value="https://hnrss.org/frontpage" placeholder="Feed URL"/><button type="button" class="b" id="rss-go">Fetch</button></div><div class="scroll muted" id="rss-out">Enter feed URL</div><div class="tb"><button type="button" class="b" id="rss-save">Save items</button></div></div></div>
+
+<div class="win" id="w-pomodoro"><div class="hd"><b>Focus Timer</b><button type="button" data-x="pomodoro">X</button></div><div class="bd"><div class="scroll" style="text-align:center"><div id="pm-disp" style="font-size:42px;color:var(--gold2);margin:24px 0">25:00</div><div class="row" style="justify-content:center"><button type="button" class="b" id="pm-25">25m</button><button type="button" class="b" id="pm-5">5m</button><button type="button" class="b" id="pm-start">Start</button><button type="button" class="b" id="pm-stop">Stop</button></div><p class="muted" id="pm-st">Ready</p></div><div class="tb"><button type="button" class="b" id="pm-log">Log session</button></div></div></div>
+
+<div class="win" id="w-search"><div class="hd"><b>Search FS</b><button type="button" data-x="search">X</button></div><div class="bd"><div class="form"><input id="se-q" placeholder="Keyword..."/><button type="button" class="b" id="se-go">Search</button></div><div class="scroll muted" id="se-out">Search file names under /Documents and /Projects</div></div></div>
+
 <div class="win" id="w-store"><div class="hd"><b>App Store</b><button type="button" data-x="store">X</button></div><div class="bd"><div class="scroll" id="store-body"></div></div></div>
 
 <div id="taskbar">
@@ -106,6 +117,9 @@ button.b:active{border-color:var(--gold)}
 <button type="button" class="tbtn" data-o="tasks">✅</button>
 <button type="button" class="tbtn" data-o="journal">📔</button>
 <button type="button" class="tbtn" data-o="dash">📊</button>
+<button type="button" class="tbtn" data-o="vault">🔐</button>
+<button type="button" class="tbtn" data-o="kanban">📋</button>
+<button type="button" class="tbtn" data-o="search">🔍</button>
 <button type="button" class="tbtn" data-o="weather">🌤</button>
 <button type="button" class="tbtn" data-o="settings">⚙</button>
 <span style="color:var(--gold);font-size:11px;font-weight:700;margin-left:4px">PASIYA OS</span>
@@ -137,7 +151,9 @@ var APPS=[
   ['kernel','🧠','Kernel'],['office','📄','Office'],['browser','🌐','Browser'],['studio','🎬','Studio'],
   ['calc','🔢','Calc'],['journal','📔','Journal'],['tasks','✅','Tasks'],['themes','🎨','Themes'],
   ['share','📦','Share'],['notes','📌','Notes'],['weather','🌤','Weather'],['clock','🕐','Clock'],
-  ['contacts','👤','Contacts'],['dash','📊','Dash'],['store','🏪','Store'],['settings','⚙','Settings']
+  ['contacts','👤','Contacts'],['dash','📊','Dash'],['vault','🔐','Vault'],['kanban','📋','Kanban'],
+  ['rss','📡','RSS'],['pomodoro','⏱','Focus'],['search','🔍','Search'],
+  ['store','🏪','Store'],['settings','⚙','Settings']
 ];
 
 var icons=document.getElementById('icons');
@@ -164,6 +180,10 @@ function openWin(n){
   if(n==='contacts')contactsLoad();
   if(n==='dash')dashLoad();
   if(n==='store')renderStore();
+  if(n==='vault')vaultLoad();
+  if(n==='kanban')kanbanLoad();
+  if(n==='pomodoro')pmRender();
+  if(n==='search'){document.getElementById('se-out').textContent='Enter keyword';}
   if(n==='clock')tickClock();
   if(n==='term')setTimeout(function(){document.getElementById('term-in').focus()},50);
   toast(n+' open');
@@ -414,7 +434,146 @@ function renderStore(){
   });
 }
 
-fsApi('seed','/').then(function(){toast('PasiyaOS ready — tap icons')});
+
+/* STEP 21 Vault */
+var VA='/Documents/vault.json';
+var vaultItems=[];
+function vaultRender(){
+  var list=document.getElementById('v-list');if(!list)return;list.innerHTML='';
+  vaultItems.forEach(function(it,i){
+    var d=document.createElement('div');d.className='card';
+    d.innerHTML='<b>'+String(it.title||'').replace(/</g,'')+'</b><div class="muted">'+(it.secret? '•••••••• (tap reveal)':'')+'</div>';
+    d.onclick=function(){toast(String(it.secret||'').slice(0,80));};
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(e){e.stopPropagation();vaultItems.splice(i,1);vaultRender();};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!vaultItems.length)list.innerHTML='<div class="muted">No secrets — phone-only notes (not military crypto)</div>';
+}
+function vaultLoad(){
+  fsApi('read',VA).then(function(j){vaultItems=[];if(j.ok&&j.content){try{vaultItems=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(vaultItems))vaultItems=[];vaultRender()});
+}
+var vAdd=document.getElementById('v-add');
+if(vAdd)vAdd.onclick=function(){
+  var t=document.getElementById('v-title').value.trim();
+  var s=document.getElementById('v-secret').value.trim();
+  if(!t){toast('Label required');return}
+  vaultItems.push({title:t,secret:s,ts:Date.now()});
+  document.getElementById('v-title').value='';document.getElementById('v-secret').value='';vaultRender();
+};
+var vSave=document.getElementById('v-save');
+if(vSave)vSave.onclick=function(){fsApi('write',VA,JSON.stringify(vaultItems,null,2)).then(function(j){if(j.ok)toast('Vault saved')})};
+
+/* STEP 22 Kanban */
+var KB='/Documents/kanban.json';
+var kb={todo:[],doing:[],done:[]};
+function kanbanRender(){
+  var el=document.getElementById('kb-board');if(!el)return;el.innerHTML='';
+  ['todo','doing','done'].forEach(function(col){
+    var c=document.createElement('div');c.className='card';
+    c.innerHTML='<h4>'+col.toUpperCase()+'</h4>';
+    (kb[col]||[]).forEach(function(card,i){
+      var row=document.createElement('div');row.className='item';row.textContent=card;
+      row.onclick=function(){
+        // cycle columns
+        kb[col].splice(i,1);
+        var next=col==='todo'?'doing':(col==='doing'?'done':'todo');
+        kb[next].push(card);kanbanRender();
+      };
+      c.appendChild(row);
+    });
+    el.appendChild(c);
+  });
+}
+function kanbanLoad(){
+  fsApi('read',KB).then(function(j){
+    kb={todo:[],doing:[],done:[]};
+    if(j.ok&&j.content){try{var o=JSON.parse(j.content);kb.todo=o.todo||[];kb.doing=o.doing||[];kb.done=o.done||[]}catch(e){}}
+    kanbanRender();
+  });
+}
+function kbAdd(col){
+  var t=document.getElementById('kb-in').value.trim();if(!t)return;
+  kb[col]=kb[col]||[];kb[col].push(t);document.getElementById('kb-in').value='';kanbanRender();
+}
+var kbt=document.getElementById('kb-todo');if(kbt)kbt.onclick=function(){kbAdd('todo')};
+var kbd=document.getElementById('kb-doing');if(kbd)kbd.onclick=function(){kbAdd('doing')};
+var kbe=document.getElementById('kb-done');if(kbe)kbe.onclick=function(){kbAdd('done')};
+var kbs=document.getElementById('kb-save');if(kbs)kbs.onclick=function(){fsApi('write',KB,JSON.stringify(kb,null,2)).then(function(j){if(j.ok)toast('Kanban saved')})};
+
+/* STEP 23 RSS */
+var lastRss='';
+var rssGo=document.getElementById('rss-go');
+if(rssGo)rssGo.onclick=function(){
+  var url=document.getElementById('rss-url').value.trim();
+  if(!url)return;
+  document.getElementById('rss-out').textContent='Loading...';
+  // Use allorigins free CORS proxy for browser fetch
+  var proxy='https://api.allorigins.win/raw?url='+encodeURIComponent(url);
+  fetch(proxy).then(function(r){return r.text()}).then(function(xml){
+    var titles=[];
+    var re=/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/gi;
+    var m,n=0;
+    while((m=re.exec(xml))&&n<15){var t=m[1].replace(/<[^>]+>/g,'').trim();if(t&&t.toLowerCase().indexOf('rss')<0){titles.push((n+1)+'. '+t);n++}}
+    lastRss=titles.join('\n')||'No titles parsed';
+    document.getElementById('rss-out').textContent=lastRss;
+  }).catch(function(e){document.getElementById('rss-out').textContent=String(e.message||e)});
+};
+var rssSave=document.getElementById('rss-save');
+if(rssSave)rssSave.onclick=function(){fsApi('write','/Documents/rss-last.txt',lastRss||document.getElementById('rss-out').textContent||'').then(function(j){if(j.ok)toast('RSS saved')})};
+
+/* STEP 24 Pomodoro */
+var pmLeft=25*60,pmTimer=null;
+function pmRender(){
+  var m=Math.floor(pmLeft/60),s=pmLeft%60;
+  var el=document.getElementById('pm-disp');
+  if(el)el.textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+var pm25=document.getElementById('pm-25');if(pm25)pm25.onclick=function(){pmLeft=25*60;pmRender();document.getElementById('pm-st').textContent='25 min focus'};
+var pm5=document.getElementById('pm-5');if(pm5)pm5.onclick=function(){pmLeft=5*60;pmRender();document.getElementById('pm-st').textContent='5 min break'};
+var pmStart=document.getElementById('pm-start');
+if(pmStart)pmStart.onclick=function(){
+  if(pmTimer)return;
+  document.getElementById('pm-st').textContent='Running...';
+  pmTimer=setInterval(function(){
+    pmLeft--;pmRender();
+    if(pmLeft<=0){clearInterval(pmTimer);pmTimer=null;document.getElementById('pm-st').textContent='Done!';toast('Focus session complete');pmLeft=25*60}
+  },1000);
+};
+var pmStop=document.getElementById('pm-stop');
+if(pmStop)pmStop.onclick=function(){if(pmTimer){clearInterval(pmTimer);pmTimer=null}document.getElementById('pm-st').textContent='Stopped'};
+var pmLog=document.getElementById('pm-log');
+if(pmLog)pmLog.onclick=function(){
+  var line=new Date().toISOString()+' focus session\n';
+  fsApi('read','/Documents/pomodoro-log.txt').then(function(j){
+    var prev=j.ok?(j.content||''):'';
+    return fsApi('write','/Documents/pomodoro-log.txt',prev+line);
+  }).then(function(j){if(j.ok)toast('Logged')});
+};
+
+/* STEP 25 Search FS */
+var seGo=document.getElementById('se-go');
+if(seGo)seGo.onclick=function(){
+  var q=document.getElementById('se-q').value.trim().toLowerCase();
+  if(!q){toast('Enter keyword');return}
+  document.getElementById('se-out').textContent='Searching...';
+  var roots=['/Documents','/Projects'],hits=[],pending=roots.length;
+  roots.forEach(function(root){
+    fsApi('tree',root,undefined,{depth:5}).then(function(j){
+      var tree=j.ok?String(j.tree||''):'';
+      tree.split('\n').forEach(function(line){
+        if(line.toLowerCase().indexOf(q)>=0)hits.push(line.trim());
+      });
+      pending--;
+      if(pending<=0){
+        document.getElementById('se-out').textContent=hits.length?hits.slice(0,40).join('\n'):'No matches for '+q;
+      }
+    });
+  });
+};
+
+
+fsApi('seed','/').then(function(){toast('PasiyaOS S21-25 ready')});
 fsApi('read','/Documents/theme.txt').then(function(j){if(j.ok&&j.content)applyTheme(String(j.content).trim())});
 termPrint('PasiyaOS terminal — type help','');
 })();
