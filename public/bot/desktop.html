@@ -141,6 +141,17 @@ button.b:active{border-color:var(--gold)}
 
 <div class="win" id="w-syscheck"><div class="hd"><b>SysCheck</b><button type="button" data-x="syscheck">X</button></div><div class="bd"><div class="scroll" id="sy-out">Run check...</div><div class="tb"><button type="button" class="b" id="sy-run">Run checks</button><button type="button" class="b" id="sy-save">Save report</button></div></div></div>
 
+
+<div class="win" id="w-draw"><div class="hd"><b>Draw</b><button type="button" data-x="draw">X</button></div><div class="bd"><div class="form"><canvas id="dw-cv" width="320" height="200" style="width:100%;background:#111;border:1px solid var(--border);border-radius:8px;touch-action:none"></canvas><div class="row"><button type="button" class="b" id="dw-clear">Clear</button><button type="button" class="b" id="dw-save">Save strokes</button></div></div><div class="scroll muted" id="dw-st">Draw with finger/mouse</div></div></div>
+
+<div class="win" id="w-music"><div class="hd"><b>Music</b><button type="button" data-x="music">X</button></div><div class="bd"><div class="form"><input id="mu-url" placeholder="https://... audio URL (mp3)"/><input id="mu-title" placeholder="Title"/><button type="button" class="b" id="mu-add">Add track</button></div><div class="scroll" id="mu-list"></div><div class="tb"><button type="button" class="b" id="mu-save">Save playlist</button></div></div></div>
+
+<div class="win" id="w-quiz"><div class="hd"><b>Quiz</b><button type="button" data-x="quiz">X</button></div><div class="bd"><div class="scroll" id="qz-out"></div><div class="tb"><button type="button" class="b" id="qz-next">Next question</button><button type="button" class="b" id="qz-save">Save score</button></div></div></div>
+
+<div class="win" id="w-countdown"><div class="hd"><b>Countdown</b><button type="button" data-x="countdown">X</button></div><div class="bd"><div class="form"><input id="cd-min" type="number" value="5" placeholder="Minutes"/><div class="row"><button type="button" class="b" id="cd-start">Start</button><button type="button" class="b" id="cd-stop">Stop</button></div></div><div class="scroll" style="text-align:center"><div id="cd-disp" style="font-size:40px;color:var(--gold2);margin:20px">05:00</div><p class="muted" id="cd-st">Ready</p></div></div></div>
+
+<div class="win" id="w-wiki"><div class="hd"><b>Wiki</b><button type="button" data-x="wiki">X</button></div><div class="bd"><div class="form"><input id="wk-q" placeholder="Search Wikipedia"/><button type="button" class="b" id="wk-go">Search</button></div><div class="scroll muted" id="wk-out">Summary via Wikipedia API</div><div class="tb"><button type="button" class="b" id="wk-save">Save</button></div></div></div>
+
 <div class="win" id="w-store"><div class="hd"><b>App Store</b><button type="button" data-x="store">X</button></div><div class="bd"><div class="scroll" id="store-body"></div></div></div>
 
 <div id="taskbar">
@@ -192,6 +203,8 @@ var APPS=[
   ['expenses','💰','Expenses'],['launcher','🚀','Launcher'],
   ['stickies','🟨','Stickies'],['notify','🔔','Notify'],['dict','📖','Dict'],
   ['cheats','📜','Cheats'],['syscheck','🛡','SysCheck'],
+  ['draw','✏','Draw'],['music','🎵','Music'],['quiz','❓','Quiz'],
+  ['countdown','⏳','Countdown'],['wiki','📚','Wiki'],
   ['store','🏪','Store'],['settings','⚙','Settings']
 ];
 
@@ -235,6 +248,10 @@ function openWin(n){
   if(n==='notify')ntfLoad();
   if(n==='cheats')chRender();
   if(n==='syscheck'){document.getElementById('sy-out').textContent='Press Run checks';}
+  if(n==='draw')dwInit();
+  if(n==='music')muLoad();
+  if(n==='quiz')qzShow();
+  if(n==='wiki'){document.getElementById('wk-out').textContent='Search a topic';}
   if(n==='clock')tickClock();
   if(n==='term')setTimeout(function(){document.getElementById('term-in').focus()},50);
   toast(n+' open');
@@ -965,20 +982,21 @@ var dictGo=document.getElementById('dict-go');
 if(dictGo)dictGo.onclick=function(){
   var q=document.getElementById('dict-q').value.trim();
   if(!q){toast('Enter word');return}
-  document.getElementById('dict-out').textContent='Loading...';
-  fetch('https://api.dictionaryapi.dev/api/v2/entries/en/'+encodeURIComponent(q))
-    .then(function(r){return r.json()})
-    .then(function(data){
-      if(!Array.isArray(data)){lastDict=data.title||'Not found';document.getElementById('dict-out').textContent=lastDict;return}
-      var lines=[q.toUpperCase()];
-      data[0].meanings&&data[0].meanings.forEach(function(m){
-        lines.push('['+m.partOfSpeech+']');
-        (m.definitions||[]).slice(0,2).forEach(function(d){lines.push('• '+d.definition)});
-      });
-      lastDict=lines.join('\n');
-      document.getElementById('dict-out').textContent=lastDict;
-    })
-    .catch(function(e){document.getElementById('dict-out').textContent=String(e.message||e)});
+  document.getElementById('dict-out').textContent='Loading via /api/fs...';
+  var url='https://api.dictionaryapi.dev/api/v2/entries/en/'+encodeURIComponent(q);
+  fsApi('httpget','/',undefined,{url:url}).then(function(j){
+    if(!j.ok){document.getElementById('dict-out').textContent=j.error||'fail';return}
+    var data;
+    try{data=JSON.parse(j.text||'[]')}catch(e){document.getElementById('dict-out').textContent='Bad JSON';return}
+    if(!Array.isArray(data)){lastDict=(data&&data.title)||'Not found';document.getElementById('dict-out').textContent=lastDict;return}
+    var lines=[q.toUpperCase()];
+    data[0].meanings&&data[0].meanings.forEach(function(m){
+      lines.push('['+m.partOfSpeech+']');
+      (m.definitions||[]).slice(0,3).forEach(function(d){lines.push('• '+d.definition)});
+    });
+    lastDict=lines.join('\n');
+    document.getElementById('dict-out').textContent=lastDict;
+  });
 };
 var dictSave=document.getElementById('dict-save');
 if(dictSave)dictSave.onclick=function(){fsApi('write','/Documents/dict-last.txt',lastDict||document.getElementById('dict-out').textContent||'').then(function(j){if(j.ok)toast('Dict saved')})};
@@ -1033,7 +1051,131 @@ var sySave=document.getElementById('sy-save');
 if(sySave)sySave.onclick=function(){fsApi('write','/Documents/syscheck.txt',lastSy||document.getElementById('sy-out').textContent||'').then(function(j){if(j.ok)toast('Report saved')})};
 
 
-fsApi('seed','/').then(function(){toast('PasiyaOS S21-40 ready')});
+
+/* STEP 41 Draw */
+var dwDrawing=false,dwPts=[];
+function dwInit(){
+  var cv=document.getElementById('dw-cv');if(!cv)return;
+  var ctx=cv.getContext('2d');
+  ctx.strokeStyle='#e8c547';ctx.lineWidth=2;ctx.lineCap='round';
+  function pos(e){
+    var r=cv.getBoundingClientRect();
+    var x,y;
+    if(e.touches&&e.touches[0]){x=e.touches[0].clientX-r.left;y=e.touches[0].clientY-r.top}
+    else{x=e.clientX-r.left;y=e.clientY-r.top}
+    return{x:x*(cv.width/r.width),y:y*(cv.height/r.height)};
+  }
+  function start(e){e.preventDefault();dwDrawing=true;var p=pos(e);dwPts.push(['M',p.x,p.y]);ctx.beginPath();ctx.moveTo(p.x,p.y)}
+  function move(e){if(!dwDrawing)return;e.preventDefault();var p=pos(e);dwPts.push(['L',p.x,p.y]);ctx.lineTo(p.x,p.y);ctx.stroke()}
+  function end(e){dwDrawing=false}
+  cv.onmousedown=start;cv.onmousemove=move;cv.onmouseup=end;cv.onmouseleave=end;
+  cv.ontouchstart=start;cv.ontouchmove=move;cv.ontouchend=end;
+}
+var dwClear=document.getElementById('dw-clear');
+if(dwClear)dwClear.onclick=function(){
+  var cv=document.getElementById('dw-cv');var ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,cv.width,cv.height);dwPts=[];document.getElementById('dw-st').textContent='Cleared';
+};
+var dwSave=document.getElementById('dw-save');
+if(dwSave)dwSave.onclick=function(){
+  fsApi('write','/Documents/draw-strokes.json',JSON.stringify(dwPts)).then(function(j){
+    if(j.ok){document.getElementById('dw-st').textContent='Saved '+dwPts.length+' points';toast('Draw saved')}
+  });
+};
+
+/* STEP 42 Music playlist */
+var MU='/Documents/playlist.json';
+var tracks=[];
+function muRender(){
+  var list=document.getElementById('mu-list');if(!list)return;list.innerHTML='';
+  tracks.forEach(function(t,i){
+    var d=document.createElement('div');d.className='card';
+    d.innerHTML='<b>'+String(t.title||'track').replace(/</g,'')+'</b><div class="muted">'+String(t.url||'')+'</div>';
+    if(t.url){var a=document.createElement('audio');a.controls=true;a.src=t.url;a.style.width='100%';a.style.marginTop='6px';d.appendChild(a)}
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(){tracks.splice(i,1);muRender()};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!tracks.length)list.innerHTML='<div class="muted">Add mp3/https audio URL</div>';
+}
+function muLoad(){fsApi('read',MU).then(function(j){tracks=[];if(j.ok&&j.content){try{tracks=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(tracks))tracks=[];muRender()})}
+var muAdd=document.getElementById('mu-add');
+if(muAdd)muAdd.onclick=function(){
+  var u=document.getElementById('mu-url').value.trim();
+  var t=document.getElementById('mu-title').value.trim()||u;
+  if(!u){toast('URL required');return}
+  tracks.unshift({title:t,url:u});document.getElementById('mu-url').value='';document.getElementById('mu-title').value='';muRender();
+};
+var muSave=document.getElementById('mu-save');
+if(muSave)muSave.onclick=function(){fsApi('write',MU,JSON.stringify(tracks,null,2)).then(function(j){if(j.ok)toast('Playlist saved')})};
+
+/* STEP 43 Quiz */
+var qzScore=0,qzI=0;
+var QZ=[
+  {q:'Capital of Sri Lanka?',a:'Sri Jayawardenepura Kotte'},
+  {q:'2+2?',a:'4'},
+  {q:'HTTP success code?',a:'200'},
+  {q:'PasiyaOS disk table?',a:'pasiya_fs'},
+  {q:'Telegram Mini App API?',a:'WebApp'}
+];
+function qzShow(){
+  if(qzI>=QZ.length)qzI=0;
+  var item=QZ[qzI];
+  document.getElementById('qz-out').innerHTML='<div class="card"><h4>Q'+(qzI+1)+'</h4><p>'+item.q+'</p><input id="qz-ans" class="line" placeholder="Your answer" style="width:100%;padding:10px;margin-top:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"/><button type="button" class="b" id="qz-check" style="margin-top:8px">Check</button><p class="muted" id="qz-fb"></p><p class="muted">Score: '+qzScore+'</p></div>';
+  document.getElementById('qz-check').onclick=function(){
+    var a=(document.getElementById('qz-ans').value||'').trim().toLowerCase();
+    var ok=a&&item.a.toLowerCase().indexOf(a)>=0||a===item.a.toLowerCase();
+    if(ok){qzScore++;document.getElementById('qz-fb').textContent='Correct!'}
+    else document.getElementById('qz-fb').textContent='Answer: '+item.a;
+  };
+}
+var qzNext=document.getElementById('qz-next');
+if(qzNext)qzNext.onclick=function(){qzI++;qzShow()};
+var qzSave=document.getElementById('qz-save');
+if(qzSave)qzSave.onclick=function(){fsApi('write','/Documents/quiz-score.txt','score='+qzScore+' at '+new Date().toISOString()).then(function(j){if(j.ok)toast('Score saved')})};
+
+/* STEP 44 Countdown */
+var cdLeft=5*60,cdTimer=null;
+function cdRender(){
+  var m=Math.floor(cdLeft/60),s=cdLeft%60;
+  document.getElementById('cd-disp').textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+var cdStart=document.getElementById('cd-start');
+if(cdStart)cdStart.onclick=function(){
+  var mins=Number(document.getElementById('cd-min').value)||5;
+  cdLeft=Math.max(1,mins)*60;cdRender();
+  if(cdTimer)clearInterval(cdTimer);
+  document.getElementById('cd-st').textContent='Running...';
+  cdTimer=setInterval(function(){
+    cdLeft--;cdRender();
+    if(cdLeft<=0){clearInterval(cdTimer);cdTimer=null;document.getElementById('cd-st').textContent='Done!';toast('Countdown finished')}
+  },1000);
+};
+var cdStop=document.getElementById('cd-stop');
+if(cdStop)cdStop.onclick=function(){if(cdTimer)clearInterval(cdTimer);cdTimer=null;document.getElementById('cd-st').textContent='Stopped'};
+
+/* STEP 45 Wiki summary via httpget */
+var lastWiki='';
+var wkGo=document.getElementById('wk-go');
+if(wkGo)wkGo.onclick=function(){
+  var q=document.getElementById('wk-q').value.trim();
+  if(!q)return;
+  document.getElementById('wk-out').textContent='Loading...';
+  var api='https://en.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(q.replace(/ /g,'_'));
+  fsApi('httpget','/',undefined,{url:api}).then(function(j){
+    if(!j.ok){document.getElementById('wk-out').textContent=j.error||'fail';return}
+    try{
+      var d=JSON.parse(j.text||'{}');
+      lastWiki=(d.title||q)+'\n\n'+(d.extract||d.detail||'No summary');
+      document.getElementById('wk-out').textContent=lastWiki;
+    }catch(e){document.getElementById('wk-out').textContent='Parse error'}
+  });
+};
+var wkSave=document.getElementById('wk-save');
+if(wkSave)wkSave.onclick=function(){fsApi('write','/Documents/wiki-last.txt',lastWiki||document.getElementById('wk-out').textContent||'').then(function(j){if(j.ok)toast('Wiki saved')})};
+
+
+fsApi('seed','/').then(function(){toast('PasiyaOS S21-45 ready')});
 fsApi('read','/Documents/theme.txt').then(function(j){if(j.ok&&j.content)applyTheme(String(j.content).trim())});
 termPrint('PasiyaOS terminal — type help','');
 })();
