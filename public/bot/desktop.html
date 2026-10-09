@@ -108,6 +108,17 @@ button.b:active{border-color:var(--gold)}
 
 <div class="win" id="w-search"><div class="hd"><b>Search FS</b><button type="button" data-x="search">X</button></div><div class="bd"><div class="form"><input id="se-q" placeholder="Keyword..."/><button type="button" class="b" id="se-go">Search</button></div><div class="scroll muted" id="se-out">Search file names under /Documents and /Projects</div></div></div>
 
+
+<div class="win" id="w-bookmarks"><div class="hd"><b>Bookmarks</b><button type="button" data-x="bookmarks">X</button></div><div class="bd"><div class="form"><input id="bm-title" placeholder="Title"/><input id="bm-url" placeholder="https://..."/><button type="button" class="b" id="bm-add">Add</button></div><div class="scroll" id="bm-list"></div><div class="tb"><button type="button" class="b" id="bm-save">Save</button></div></div></div>
+
+<div class="win" id="w-colors"><div class="hd"><b>Colors</b><button type="button" data-x="colors">X</button></div><div class="bd"><div class="form"><input id="cl-hex" value="#c9a227" placeholder="#hex"/><input id="cl-name" placeholder="Name"/><button type="button" class="b" id="cl-add">Add swatch</button></div><div class="scroll" id="cl-list"></div><div class="tb"><button type="button" class="b" id="cl-save">Save palette</button></div></div></div>
+
+<div class="win" id="w-units"><div class="hd"><b>Units</b><button type="button" data-x="units">X</button></div><div class="bd"><div class="form"><input id="un-val" type="number" value="10" placeholder="Value"/><select id="un-from" class="line" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"><option value="km">km</option><option value="mi">mi</option><option value="m">m</option><option value="ft">ft</option><option value="kg">kg</option><option value="lb">lb</option><option value="c">°C</option><option value="f">°F</option></select><select id="un-to" class="line" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"><option value="mi">mi</option><option value="km">km</option><option value="ft">ft</option><option value="m">m</option><option value="lb">lb</option><option value="kg">kg</option><option value="f">°F</option><option value="c">°C</option></select><button type="button" class="b" id="un-go">Convert</button></div><div class="scroll" id="un-out" class="muted">Result</div></div></div>
+
+<div class="win" id="w-random"><div class="hd"><b>Random</b><button type="button" data-x="random">X</button></div><div class="bd"><div class="form"><div class="row"><button type="button" class="b" id="rn-pass">Password</button><button type="button" class="b" id="rn-uuid">UUID</button><button type="button" class="b" id="rn-dice">Dice</button><button type="button" class="b" id="rn-num">1-100</button></div></div><div class="scroll" id="rn-out" style="font-size:18px;color:var(--gold2)">Tap a button</div><div class="tb"><button type="button" class="b" id="rn-save">Save last</button></div></div></div>
+
+<div class="win" id="w-backup"><div class="hd"><b>Backup</b><button type="button" data-x="backup">X</button></div><div class="bd"><div class="scroll muted" id="bk-out">Build a text backup of key JSON files</div><div class="tb"><button type="button" class="b" id="bk-build">Build backup</button><button type="button" class="b" id="bk-save">Save to FS</button></div></div></div>
+
 <div class="win" id="w-store"><div class="hd"><b>App Store</b><button type="button" data-x="store">X</button></div><div class="bd"><div class="scroll" id="store-body"></div></div></div>
 
 <div id="taskbar">
@@ -153,6 +164,8 @@ var APPS=[
   ['share','📦','Share'],['notes','📌','Notes'],['weather','🌤','Weather'],['clock','🕐','Clock'],
   ['contacts','👤','Contacts'],['dash','📊','Dash'],['vault','🔐','Vault'],['kanban','📋','Kanban'],
   ['rss','📡','RSS'],['pomodoro','⏱','Focus'],['search','🔍','Search'],
+  ['bookmarks','🔖','Bookmarks'],['colors','🎨','Colors'],['units','📐','Units'],
+  ['random','🎲','Random'],['backup','💾','Backup'],
   ['store','🏪','Store'],['settings','⚙','Settings']
 ];
 
@@ -184,6 +197,9 @@ function openWin(n){
   if(n==='kanban')kanbanLoad();
   if(n==='pomodoro')pmRender();
   if(n==='search'){document.getElementById('se-out').textContent='Enter keyword';}
+  if(n==='bookmarks')bmLoad();
+  if(n==='colors')clLoad();
+  if(n==='backup'){document.getElementById('bk-out').textContent='Press Build backup';}
   if(n==='clock')tickClock();
   if(n==='term')setTimeout(function(){document.getElementById('term-in').focus()},50);
   toast(n+' open');
@@ -507,17 +523,39 @@ var rssGo=document.getElementById('rss-go');
 if(rssGo)rssGo.onclick=function(){
   var url=document.getElementById('rss-url').value.trim();
   if(!url)return;
-  document.getElementById('rss-out').textContent='Loading...';
-  // Use allorigins free CORS proxy for browser fetch
-  var proxy='https://api.allorigins.win/raw?url='+encodeURIComponent(url);
-  fetch(proxy).then(function(r){return r.text()}).then(function(xml){
+  if(!/^https?:\/\//i.test(url))url='https://'+url;
+  document.getElementById('rss-out').textContent='Loading via /api/fs...';
+  // Server-side fetch (no CORS) — action httpget on api/fs.js
+  fsApi('httpget','/',undefined,{url:url}).then(function(j){
+    if(!j.ok){
+      document.getElementById('rss-out').textContent=j.error||'fetch failed';
+      return;
+    }
+    var xml=String(j.text||'');
     var titles=[];
     var re=/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/gi;
     var m,n=0;
-    while((m=re.exec(xml))&&n<15){var t=m[1].replace(/<[^>]+>/g,'').trim();if(t&&t.toLowerCase().indexOf('rss')<0){titles.push((n+1)+'. '+t);n++}}
-    lastRss=titles.join('\n')||'No titles parsed';
+    while((m=re.exec(xml))&&n<20){
+      var t=m[1].replace(/<[^>]+>/g,'').trim();
+      if(!t)continue;
+      var low=t.toLowerCase();
+      if(low==='rss'||low.indexOf('rss feed')>=0||low==='hacker news')continue;
+      n++;
+      titles.push(n+'. '+t);
+    }
+    // also try <item> link pairs
+    if(titles.length<3){
+      var items=xml.match(/<item[\s\S]*?<\/item>/gi)||[];
+      titles=[];
+      items.slice(0,15).forEach(function(it,i){
+        var tm=it.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/i);
+        var t=tm?tm[1].replace(/<[^>]+>/g,'').trim():'(no title)';
+        titles.push((i+1)+'. '+t);
+      });
+    }
+    lastRss=titles.join('\n')||('HTTP '+(j.status||'')+' — no items parsed\n'+xml.slice(0,400));
     document.getElementById('rss-out').textContent=lastRss;
-  }).catch(function(e){document.getElementById('rss-out').textContent=String(e.message||e)});
+  });
 };
 var rssSave=document.getElementById('rss-save');
 if(rssSave)rssSave.onclick=function(){fsApi('write','/Documents/rss-last.txt',lastRss||document.getElementById('rss-out').textContent||'').then(function(j){if(j.ok)toast('RSS saved')})};
@@ -573,7 +611,130 @@ if(seGo)seGo.onclick=function(){
 };
 
 
-fsApi('seed','/').then(function(){toast('PasiyaOS S21-25 ready')});
+
+/* STEP 26 Bookmarks */
+var BM='/Documents/bookmarks.json';
+var bms=[];
+function bmRender(){
+  var list=document.getElementById('bm-list');if(!list)return;list.innerHTML='';
+  bms.forEach(function(it,i){
+    var d=document.createElement('div');d.className='card';
+    d.innerHTML='<b>'+String(it.title||'').replace(/</g,'')+'</b><div class="muted">'+String(it.url||'')+'</div>';
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(){bms.splice(i,1);bmRender()};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!bms.length)list.innerHTML='<div class="muted">No bookmarks</div>';
+}
+function bmLoad(){fsApi('read',BM).then(function(j){bms=[];if(j.ok&&j.content){try{bms=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(bms))bms=[];bmRender()})}
+var bmAdd=document.getElementById('bm-add');
+if(bmAdd)bmAdd.onclick=function(){
+  var t=document.getElementById('bm-title').value.trim();
+  var u=document.getElementById('bm-url').value.trim();
+  if(!u){toast('URL required');return}
+  if(!t)t=u;
+  bms.unshift({title:t,url:u,ts:Date.now()});
+  document.getElementById('bm-title').value='';document.getElementById('bm-url').value='';bmRender();
+};
+var bmSave=document.getElementById('bm-save');
+if(bmSave)bmSave.onclick=function(){fsApi('write',BM,JSON.stringify(bms,null,2)).then(function(j){if(j.ok)toast('Bookmarks saved')})};
+
+/* STEP 27 Colors */
+var CL='/Documents/palette.json';
+var cols=[];
+function clRender(){
+  var list=document.getElementById('cl-list');if(!list)return;list.innerHTML='';
+  cols.forEach(function(it,i){
+    var d=document.createElement('div');d.className='card';d.style.borderLeft='6px solid '+(it.hex||'#ccc');
+    d.innerHTML='<b>'+String(it.name||it.hex)+'</b> <span class="muted">'+it.hex+'</span>';
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(){cols.splice(i,1);clRender()};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!cols.length)list.innerHTML='<div class="muted">No swatches</div>';
+}
+function clLoad(){fsApi('read',CL).then(function(j){cols=[];if(j.ok&&j.content){try{cols=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(cols))cols=[];clRender()})}
+var clAdd=document.getElementById('cl-add');
+if(clAdd)clAdd.onclick=function(){
+  var hex=document.getElementById('cl-hex').value.trim()||'#c9a227';
+  var name=document.getElementById('cl-name').value.trim()||hex;
+  cols.unshift({hex:hex,name:name});clRender();
+};
+var clSave=document.getElementById('cl-save');
+if(clSave)clSave.onclick=function(){fsApi('write',CL,JSON.stringify(cols,null,2)).then(function(j){if(j.ok)toast('Palette saved')})};
+
+/* STEP 28 Units */
+function convertUnits(v,frm,to){
+  var n=Number(v);if(isNaN(n))return 'Invalid number';
+  // normalize to SI-ish
+  var map={
+    km:function(x){return x*1000},m:function(x){return x},mi:function(x){return x*1609.344},ft:function(x){return x*0.3048},
+    kg:function(x){return x},lb:function(x){return x*0.45359237}
+  };
+  var inv={
+    km:function(m){return m/1000},m:function(m){return m},mi:function(m){return m/1609.344},ft:function(m){return m/0.3048},
+    kg:function(k){return k},lb:function(k){return k/0.45359237}
+  };
+  if(frm==='c'&&to==='f')return (n*9/5+32).toFixed(2)+' °F';
+  if(frm==='f'&&to==='c')return ((n-32)*5/9).toFixed(2)+' °C';
+  if(frm==='c'&&to==='c')return n+' °C';
+  if(frm==='f'&&to==='f')return n+' °F';
+  if((frm==='c'||frm==='f')||(to==='c'||to==='f'))return 'Use °C↔°F pair';
+  if(!map[frm]||!inv[to])return 'Unsupported pair';
+  var base=map[frm](n);
+  return inv[to](base).toFixed(6)+' '+to;
+}
+var unGo=document.getElementById('un-go');
+if(unGo)unGo.onclick=function(){
+  var v=document.getElementById('un-val').value;
+  var f=document.getElementById('un-from').value;
+  var t=document.getElementById('un-to').value;
+  document.getElementById('un-out').textContent=v+' '+f+' = '+convertUnits(v,f,t);
+};
+
+/* STEP 29 Random */
+var lastRn='';
+function setRn(t){lastRn=t;document.getElementById('rn-out').textContent=t}
+var rnP=document.getElementById('rn-pass');
+if(rnP)rnP.onclick=function(){
+  var chars='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+  var s='';for(var i=0;i<16;i++)s+=chars[Math.floor(Math.random()*chars.length)];
+  setRn(s);
+};
+var rnU=document.getElementById('rn-uuid');
+if(rnU)rnU.onclick=function(){
+  setRn('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){var r=Math.random()*16|0;return(c==='x'?r:(r&0x3|0x8)).toString(16)}));
+};
+var rnD=document.getElementById('rn-dice');
+if(rnD)rnD.onclick=function(){setRn('Dice: '+(1+Math.floor(Math.random()*6)))};
+var rnN=document.getElementById('rn-num');
+if(rnN)rnN.onclick=function(){setRn(String(1+Math.floor(Math.random()*100)))};
+var rnS=document.getElementById('rn-save');
+if(rnS)rnS.onclick=function(){fsApi('write','/Documents/random-last.txt',lastRn||'').then(function(j){if(j.ok)toast('Saved')})};
+
+/* STEP 30 Backup */
+var backupText='';
+var bkBuild=document.getElementById('bk-build');
+if(bkBuild)bkBuild.onclick=function(){
+  document.getElementById('bk-out').textContent='Building...';
+  var files=['/Documents/vault.json','/Documents/kanban.json','/Documents/tasks/todo.json','/Documents/Tasks/todo.json','/Documents/bookmarks.json','/Documents/palette.json','/Documents/contacts.json','/Documents/theme.txt','/Documents/Studio/board.json'];
+  var out='=== PASIYAOS BACKUP ===\n'+new Date().toISOString()+'\n\n';
+  var i=0;
+  function next(){
+    if(i>=files.length){backupText=out;document.getElementById('bk-out').textContent=out.slice(0,12000);toast('Backup ready');return}
+    var p=files[i++];
+    fsApi('read',p).then(function(j){
+      out+='--- '+p+' ---\n'+(j.ok?String(j.content||'').slice(0,4000):(j.error||'missing'))+'\n\n';
+      next();
+    });
+  }
+  next();
+};
+var bkSave=document.getElementById('bk-save');
+if(bkSave)bkSave.onclick=function(){fsApi('write','/Documents/backup-export.txt',backupText||document.getElementById('bk-out').textContent||'').then(function(j){if(j.ok)toast('Backup file saved')})};
+
+
+fsApi('seed','/').then(function(){toast('PasiyaOS S21-30 ready')});
 fsApi('read','/Documents/theme.txt').then(function(j){if(j.ok&&j.content)applyTheme(String(j.content).trim())});
 termPrint('PasiyaOS terminal — type help','');
 })();
