@@ -113,11 +113,22 @@ button.b:active{border-color:var(--gold)}
 
 <div class="win" id="w-colors"><div class="hd"><b>Colors</b><button type="button" data-x="colors">X</button></div><div class="bd"><div class="form"><input id="cl-hex" value="#c9a227" placeholder="#hex"/><input id="cl-name" placeholder="Name"/><button type="button" class="b" id="cl-add">Add swatch</button></div><div class="scroll" id="cl-list"></div><div class="tb"><button type="button" class="b" id="cl-save">Save palette</button></div></div></div>
 
-<div class="win" id="w-units"><div class="hd"><b>Units</b><button type="button" data-x="units">X</button></div><div class="bd"><div class="form"><input id="un-val" type="number" value="10" placeholder="Value"/><select id="un-from" class="line" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"><option value="km">km</option><option value="mi">mi</option><option value="m">m</option><option value="ft">ft</option><option value="kg">kg</option><option value="lb">lb</option><option value="c">°C</option><option value="f">°F</option></select><select id="un-to" class="line" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"><option value="mi">mi</option><option value="km">km</option><option value="ft">ft</option><option value="m">m</option><option value="lb">lb</option><option value="kg">kg</option><option value="f">°F</option><option value="c">°C</option></select><button type="button" class="b" id="un-go">Convert</button></div><div class="scroll" id="un-out" class="muted">Result</div></div></div>
+<div class="win" id="w-units"><div class="hd"><b>Units</b><button type="button" data-x="units">X</button></div><div class="bd"><div class="form"><input id="un-val" type="number" value="10" placeholder="Value"/><select id="un-from" class="line" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"><option value="km">km</option><option value="mi">mi</option><option value="m">m</option><option value="ft">ft</option><option value="kg">kg</option><option value="lb">lb</option><option value="c">°C</option><option value="f">°F</option></select><select id="un-to" class="line" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"><option value="mi">mi</option><option value="km">km</option><option value="ft">ft</option><option value="m">m</option><option value="lb">lb</option><option value="kg">kg</option><option value="f">°F</option><option value="c">°C</option></select><div class="row"><button type="button" class="b" id="un-go">Convert</button><button type="button" class="b" id="un-save">Save</button></div></div><div class="scroll" id="un-out" class="muted">Result</div></div></div>
 
 <div class="win" id="w-random"><div class="hd"><b>Random</b><button type="button" data-x="random">X</button></div><div class="bd"><div class="form"><div class="row"><button type="button" class="b" id="rn-pass">Password</button><button type="button" class="b" id="rn-uuid">UUID</button><button type="button" class="b" id="rn-dice">Dice</button><button type="button" class="b" id="rn-num">1-100</button></div></div><div class="scroll" id="rn-out" style="font-size:18px;color:var(--gold2)">Tap a button</div><div class="tb"><button type="button" class="b" id="rn-save">Save last</button></div></div></div>
 
 <div class="win" id="w-backup"><div class="hd"><b>Backup</b><button type="button" data-x="backup">X</button></div><div class="bd"><div class="scroll muted" id="bk-out">Build a text backup of key JSON files</div><div class="tb"><button type="button" class="b" id="bk-build">Build backup</button><button type="button" class="b" id="bk-save">Save to FS</button></div></div></div>
+
+
+<div class="win" id="w-snippets"><div class="hd"><b>Snippets</b><button type="button" data-x="snippets">X</button></div><div class="bd"><div class="form"><input id="sn-title" placeholder="Title"/><textarea id="sn-body" rows="3" placeholder="Code or text snippet" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:monospace"></textarea><button type="button" class="b" id="sn-add">Add snippet</button></div><div class="scroll" id="sn-list"></div><div class="tb"><button type="button" class="b" id="sn-save">Save all</button></div></div></div>
+
+<div class="win" id="w-habits"><div class="hd"><b>Habits</b><button type="button" data-x="habits">X</button></div><div class="bd"><div class="form"><input id="hb-in" placeholder="Habit name e.g. Water"/><button type="button" class="b" id="hb-add">Add habit</button></div><div class="scroll" id="hb-list"></div><div class="tb"><button type="button" class="b" id="hb-save">Save</button></div></div></div>
+
+<div class="win" id="w-world"><div class="hd"><b>World Clock</b><button type="button" data-x="world">X</button></div><div class="bd"><div class="scroll" id="wd-out"></div><div class="tb"><button type="button" class="b" id="wd-ref">Refresh</button></div></div></div>
+
+<div class="win" id="w-expenses"><div class="hd"><b>Expenses</b><button type="button" data-x="expenses">X</button></div><div class="bd"><div class="form"><input id="ex-item" placeholder="Item"/><input id="ex-amt" type="number" placeholder="Amount"/><button type="button" class="b" id="ex-add">Add</button></div><div class="scroll" id="ex-list"></div><div class="tb"><button type="button" class="b" id="ex-save">Save</button><button type="button" class="b" id="ex-total">Total</button></div></div></div>
+
+<div class="win" id="w-launcher"><div class="hd"><b>Launcher</b><button type="button" data-x="launcher">X</button></div><div class="bd"><div class="form"><input id="ln-q" placeholder="Type app name..."/><button type="button" class="b" id="ln-go">Open</button></div><div class="scroll" id="ln-list"></div></div></div>
 
 <div class="win" id="w-store"><div class="hd"><b>App Store</b><button type="button" data-x="store">X</button></div><div class="bd"><div class="scroll" id="store-body"></div></div></div>
 
@@ -166,6 +177,8 @@ var APPS=[
   ['rss','📡','RSS'],['pomodoro','⏱','Focus'],['search','🔍','Search'],
   ['bookmarks','🔖','Bookmarks'],['colors','🎨','Colors'],['units','📐','Units'],
   ['random','🎲','Random'],['backup','💾','Backup'],
+  ['snippets','📎','Snippets'],['habits','🔥','Habits'],['world','🌍','World'],
+  ['expenses','💰','Expenses'],['launcher','🚀','Launcher'],
   ['store','🏪','Store'],['settings','⚙','Settings']
 ];
 
@@ -200,6 +213,11 @@ function openWin(n){
   if(n==='bookmarks')bmLoad();
   if(n==='colors')clLoad();
   if(n==='backup'){document.getElementById('bk-out').textContent='Press Build backup';}
+  if(n==='snippets')snLoad();
+  if(n==='habits')hbLoad();
+  if(n==='world')wdRefresh();
+  if(n==='expenses')exLoad();
+  if(n==='launcher')lnRender();
   if(n==='clock')tickClock();
   if(n==='term')setTimeout(function(){document.getElementById('term-in').focus()},50);
   toast(n+' open');
@@ -684,12 +702,20 @@ function convertUnits(v,frm,to){
   var base=map[frm](n);
   return inv[to](base).toFixed(6)+' '+to;
 }
+var lastUnit='';
 var unGo=document.getElementById('un-go');
 if(unGo)unGo.onclick=function(){
   var v=document.getElementById('un-val').value;
   var f=document.getElementById('un-from').value;
   var t=document.getElementById('un-to').value;
-  document.getElementById('un-out').textContent=v+' '+f+' = '+convertUnits(v,f,t);
+  lastUnit=v+' '+f+' = '+convertUnits(v,f,t);
+  document.getElementById('un-out').textContent=lastUnit;
+};
+var unSave=document.getElementById('un-save');
+if(unSave)unSave.onclick=function(){
+  var line=lastUnit||document.getElementById('un-out').textContent||'';
+  if(!line||line==='Result'){toast('Convert first');return}
+  fsApi('write','/Documents/units-last.txt',line+'\n').then(function(j){if(j.ok)toast('Saved units-last.txt')});
 };
 
 /* STEP 29 Random */
@@ -734,7 +760,139 @@ var bkSave=document.getElementById('bk-save');
 if(bkSave)bkSave.onclick=function(){fsApi('write','/Documents/backup-export.txt',backupText||document.getElementById('bk-out').textContent||'').then(function(j){if(j.ok)toast('Backup file saved')})};
 
 
-fsApi('seed','/').then(function(){toast('PasiyaOS S21-30 ready')});
+
+/* STEP 31 Snippets */
+var SN='/Documents/snippets.json';
+var snippets=[];
+function snRender(){
+  var list=document.getElementById('sn-list');if(!list)return;list.innerHTML='';
+  snippets.forEach(function(it,i){
+    var d=document.createElement('div');d.className='card';
+    d.innerHTML='<b>'+String(it.title||'').replace(/</g,'')+'</b><pre class="muted" style="white-space:pre-wrap;font-size:11px">'+String(it.body||'').replace(/</g,'&lt;').slice(0,300)+'</pre>';
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(){snippets.splice(i,1);snRender()};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!snippets.length)list.innerHTML='<div class="muted">No snippets</div>';
+}
+function snLoad(){fsApi('read',SN).then(function(j){snippets=[];if(j.ok&&j.content){try{snippets=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(snippets))snippets=[];snRender()})}
+var snAdd=document.getElementById('sn-add');
+if(snAdd)snAdd.onclick=function(){
+  var t=document.getElementById('sn-title').value.trim();
+  var b=document.getElementById('sn-body').value;
+  if(!t&&!b){toast('Empty');return}
+  snippets.unshift({title:t||'untitled',body:b,ts:Date.now()});
+  document.getElementById('sn-title').value='';document.getElementById('sn-body').value='';snRender();
+};
+var snSave=document.getElementById('sn-save');
+if(snSave)snSave.onclick=function(){fsApi('write',SN,JSON.stringify(snippets,null,2)).then(function(j){if(j.ok)toast('Snippets saved')})};
+
+/* STEP 32 Habits */
+var HB='/Documents/habits.json';
+var habits=[];
+function hbRender(){
+  var list=document.getElementById('hb-list');if(!list)return;list.innerHTML='';
+  habits.forEach(function(h,i){
+    var d=document.createElement('div');d.className='card';
+    var lab=document.createElement('label');lab.style.display='flex';lab.style.gap='8px';lab.style.alignItems='center';
+    var cb=document.createElement('input');cb.type='checkbox';cb.checked=!!h.doneToday;
+    cb.onchange=function(){habits[i].doneToday=cb.checked;if(cb.checked)habits[i].streak=(habits[i].streak||0)+1};
+    var sp=document.createElement('span');sp.textContent=(h.name||'')+'  · streak '+(h.streak||0);
+    lab.appendChild(cb);lab.appendChild(sp);d.appendChild(lab);
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(){habits.splice(i,1);hbRender()};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!habits.length)list.innerHTML='<div class="muted">No habits</div>';
+}
+function hbLoad(){fsApi('read',HB).then(function(j){habits=[];if(j.ok&&j.content){try{habits=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(habits))habits=[];hbRender()})}
+var hbAdd=document.getElementById('hb-add');
+if(hbAdd)hbAdd.onclick=function(){
+  var n=document.getElementById('hb-in').value.trim();if(!n)return;
+  habits.push({name:n,doneToday:false,streak:0});document.getElementById('hb-in').value='';hbRender();
+};
+var hbSave=document.getElementById('hb-save');
+if(hbSave)hbSave.onclick=function(){fsApi('write',HB,JSON.stringify(habits,null,2)).then(function(j){if(j.ok)toast('Habits saved')})};
+
+/* STEP 33 World clock */
+function wdRefresh(){
+  var zones=[
+    {n:'Colombo',tz:'Asia/Colombo'},
+    {n:'UTC',tz:'UTC'},
+    {n:'London',tz:'Europe/London'},
+    {n:'New York',tz:'America/New_York'},
+    {n:'Tokyo',tz:'Asia/Tokyo'},
+    {n:'Dubai',tz:'Asia/Dubai'}
+  ];
+  var now=new Date();
+  var html='';
+  zones.forEach(function(z){
+    var t=now.toLocaleString('en-GB',{timeZone:z.tz,hour:'2-digit',minute:'2-digit',second:'2-digit',weekday:'short'});
+    html+='<div class="card"><h4>'+z.n+'</h4><div style="font-size:18px;color:var(--gold2)">'+t+'</div></div>';
+  });
+  document.getElementById('wd-out').innerHTML=html;
+}
+var wdRef=document.getElementById('wd-ref');
+if(wdRef)wdRef.onclick=wdRefresh;
+
+/* STEP 34 Expenses */
+var EX='/Documents/expenses.json';
+var expenses=[];
+function exRender(){
+  var list=document.getElementById('ex-list');if(!list)return;list.innerHTML='';
+  var total=0;
+  expenses.forEach(function(e,i){
+    total+=Number(e.amt)||0;
+    var d=document.createElement('div');d.className='card';
+    d.innerHTML='<b>'+String(e.item||'').replace(/</g,'')+'</b> <span class="muted">'+e.amt+'</span>';
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(){expenses.splice(i,1);exRender()};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!expenses.length)list.innerHTML='<div class="muted">No expenses</div>';
+  else{
+    var t=document.createElement('div');t.className='muted';t.textContent='Sum visible: '+total;list.appendChild(t);
+  }
+}
+function exLoad(){fsApi('read',EX).then(function(j){expenses=[];if(j.ok&&j.content){try{expenses=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(expenses))expenses=[];exRender()})}
+var exAdd=document.getElementById('ex-add');
+if(exAdd)exAdd.onclick=function(){
+  var item=document.getElementById('ex-item').value.trim();
+  var amt=document.getElementById('ex-amt').value;
+  if(!item){toast('Item required');return}
+  expenses.unshift({item:item,amt:Number(amt)||0,ts:Date.now()});
+  document.getElementById('ex-item').value='';document.getElementById('ex-amt').value='';exRender();
+};
+var exSave=document.getElementById('ex-save');
+if(exSave)exSave.onclick=function(){fsApi('write',EX,JSON.stringify(expenses,null,2)).then(function(j){if(j.ok)toast('Expenses saved')})};
+var exTot=document.getElementById('ex-total');
+if(exTot)exTot.onclick=function(){
+  var t=expenses.reduce(function(s,e){return s+(Number(e.amt)||0)},0);
+  toast('Total: '+t);
+};
+
+/* STEP 35 Launcher */
+function lnRender(){
+  var q=(document.getElementById('ln-q').value||'').toLowerCase();
+  var list=document.getElementById('ln-list');if(!list)return;list.innerHTML='';
+  APPS.forEach(function(a){
+    if(q&&a[2].toLowerCase().indexOf(q)<0&&a[0].indexOf(q)<0)return;
+    var d=document.createElement('div');d.className='item';
+    d.innerHTML='<span style="font-size:18px">'+a[1]+'</span><b style="color:var(--gold2)">'+a[2]+'</b>';
+    d.onclick=function(){openWin(a[0])};list.appendChild(d);
+  });
+}
+var lnGo=document.getElementById('ln-go');
+if(lnGo)lnGo.onclick=function(){
+  var q=(document.getElementById('ln-q').value||'').toLowerCase().trim();
+  var hit=APPS.find(function(a){return a[0]===q||a[2].toLowerCase()===q||a[2].toLowerCase().indexOf(q)===0});
+  if(hit)openWin(hit[0]);else{lnRender();toast('Pick from list')}
+};
+var lnQ=document.getElementById('ln-q');
+if(lnQ)lnQ.oninput=lnRender;
+
+
+fsApi('seed','/').then(function(){toast('PasiyaOS S21-35 ready')});
 fsApi('read','/Documents/theme.txt').then(function(j){if(j.ok&&j.content)applyTheme(String(j.content).trim())});
 termPrint('PasiyaOS terminal — type help','');
 })();
