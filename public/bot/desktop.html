@@ -130,6 +130,17 @@ button.b:active{border-color:var(--gold)}
 
 <div class="win" id="w-launcher"><div class="hd"><b>Launcher</b><button type="button" data-x="launcher">X</button></div><div class="bd"><div class="form"><input id="ln-q" placeholder="Type app name..."/><button type="button" class="b" id="ln-go">Open</button></div><div class="scroll" id="ln-list"></div></div></div>
 
+
+<div class="win" id="w-stickies"><div class="hd"><b>Stickies</b><button type="button" data-x="stickies">X</button></div><div class="bd"><div class="form"><textarea id="stc-in" rows="3" placeholder="New sticky note..." style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"></textarea><button type="button" class="b" id="stc-add">Add sticky</button></div><div class="scroll" id="stc-list"></div><div class="tb"><button type="button" class="b" id="stc-save">Save board</button></div></div></div>
+
+<div class="win" id="w-notify"><div class="hd"><b>Notify</b><button type="button" data-x="notify">X</button></div><div class="bd"><div class="form"><input id="ntf-in" placeholder="Reminder text"/><button type="button" class="b" id="ntf-add">Add</button></div><div class="scroll" id="ntf-list"></div><div class="tb"><button type="button" class="b" id="ntf-save">Save</button><button type="button" class="b" id="ntf-clear">Clear done</button></div></div></div>
+
+<div class="win" id="w-dict"><div class="hd"><b>Dictionary</b><button type="button" data-x="dict">X</button></div><div class="bd"><div class="form"><input id="dict-q" placeholder="English word"/><button type="button" class="b" id="dict-go">Define</button></div><div class="scroll muted" id="dict-out">Free Dictionary API</div><div class="tb"><button type="button" class="b" id="dict-save">Save result</button></div></div></div>
+
+<div class="win" id="w-cheats"><div class="hd"><b>Bot Cheats</b><button type="button" data-x="cheats">X</button></div><div class="bd"><div class="scroll" id="ch-out"></div><div class="tb"><button type="button" class="b" id="ch-save">Save list</button></div></div></div>
+
+<div class="win" id="w-syscheck"><div class="hd"><b>SysCheck</b><button type="button" data-x="syscheck">X</button></div><div class="bd"><div class="scroll" id="sy-out">Run check...</div><div class="tb"><button type="button" class="b" id="sy-run">Run checks</button><button type="button" class="b" id="sy-save">Save report</button></div></div></div>
+
 <div class="win" id="w-store"><div class="hd"><b>App Store</b><button type="button" data-x="store">X</button></div><div class="bd"><div class="scroll" id="store-body"></div></div></div>
 
 <div id="taskbar">
@@ -179,6 +190,8 @@ var APPS=[
   ['random','🎲','Random'],['backup','💾','Backup'],
   ['snippets','📎','Snippets'],['habits','🔥','Habits'],['world','🌍','World'],
   ['expenses','💰','Expenses'],['launcher','🚀','Launcher'],
+  ['stickies','🟨','Stickies'],['notify','🔔','Notify'],['dict','📖','Dict'],
+  ['cheats','📜','Cheats'],['syscheck','🛡','SysCheck'],
   ['store','🏪','Store'],['settings','⚙','Settings']
 ];
 
@@ -218,6 +231,10 @@ function openWin(n){
   if(n==='world')wdRefresh();
   if(n==='expenses')exLoad();
   if(n==='launcher')lnRender();
+  if(n==='stickies')stcLoad();
+  if(n==='notify')ntfLoad();
+  if(n==='cheats')chRender();
+  if(n==='syscheck'){document.getElementById('sy-out').textContent='Press Run checks';}
   if(n==='clock')tickClock();
   if(n==='term')setTimeout(function(){document.getElementById('term-in').focus()},50);
   toast(n+' open');
@@ -892,7 +909,131 @@ var lnQ=document.getElementById('ln-q');
 if(lnQ)lnQ.oninput=lnRender;
 
 
-fsApi('seed','/').then(function(){toast('PasiyaOS S21-35 ready')});
+
+/* STEP 36 Stickies */
+var STC='/Documents/stickies.json';
+var stickies=[];
+function stcRender(){
+  var list=document.getElementById('stc-list');if(!list)return;list.innerHTML='';
+  stickies.forEach(function(s,i){
+    var d=document.createElement('div');d.className='card';d.style.background='#2a2410';
+    d.innerHTML='<div style="white-space:pre-wrap">'+String(s.text||'').replace(/</g,'&lt;')+'</div>';
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(){stickies.splice(i,1);stcRender()};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!stickies.length)list.innerHTML='<div class="muted">No stickies</div>';
+}
+function stcLoad(){fsApi('read',STC).then(function(j){stickies=[];if(j.ok&&j.content){try{stickies=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(stickies))stickies=[];stcRender()})}
+var stcAdd=document.getElementById('stc-add');
+if(stcAdd)stcAdd.onclick=function(){
+  var t=document.getElementById('stc-in').value.trim();if(!t)return;
+  stickies.unshift({text:t,ts:Date.now()});document.getElementById('stc-in').value='';stcRender();
+};
+var stcSave=document.getElementById('stc-save');
+if(stcSave)stcSave.onclick=function(){fsApi('write',STC,JSON.stringify(stickies,null,2)).then(function(j){if(j.ok)toast('Stickies saved')})};
+
+/* STEP 37 Notify */
+var NTF='/Documents/notifications.json';
+var notifs=[];
+function ntfRender(){
+  var list=document.getElementById('ntf-list');if(!list)return;list.innerHTML='';
+  notifs.forEach(function(n,i){
+    var d=document.createElement('div');d.className='card';
+    var lab=document.createElement('label');lab.style.display='flex';lab.style.gap='8px';
+    var cb=document.createElement('input');cb.type='checkbox';cb.checked=!!n.done;
+    cb.onchange=function(){notifs[i].done=cb.checked};
+    var sp=document.createElement('span');sp.textContent=n.text||'';
+    lab.appendChild(cb);lab.appendChild(sp);d.appendChild(lab);list.appendChild(d);
+  });
+  if(!notifs.length)list.innerHTML='<div class="muted">No reminders</div>';
+}
+function ntfLoad(){fsApi('read',NTF).then(function(j){notifs=[];if(j.ok&&j.content){try{notifs=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(notifs))notifs=[];ntfRender()})}
+var ntfAdd=document.getElementById('ntf-add');
+if(ntfAdd)ntfAdd.onclick=function(){
+  var t=document.getElementById('ntf-in').value.trim();if(!t)return;
+  notifs.unshift({text:t,done:false,ts:Date.now()});document.getElementById('ntf-in').value='';ntfRender();
+};
+var ntfSave=document.getElementById('ntf-save');
+if(ntfSave)ntfSave.onclick=function(){fsApi('write',NTF,JSON.stringify(notifs,null,2)).then(function(j){if(j.ok)toast('Notify saved')})};
+var ntfClr=document.getElementById('ntf-clear');
+if(ntfClr)ntfClr.onclick=function(){notifs=notifs.filter(function(n){return !n.done});ntfRender();toast('Cleared done')};
+
+/* STEP 38 Dictionary — free dictionaryapi.dev */
+var lastDict='';
+var dictGo=document.getElementById('dict-go');
+if(dictGo)dictGo.onclick=function(){
+  var q=document.getElementById('dict-q').value.trim();
+  if(!q){toast('Enter word');return}
+  document.getElementById('dict-out').textContent='Loading...';
+  fetch('https://api.dictionaryapi.dev/api/v2/entries/en/'+encodeURIComponent(q))
+    .then(function(r){return r.json()})
+    .then(function(data){
+      if(!Array.isArray(data)){lastDict=data.title||'Not found';document.getElementById('dict-out').textContent=lastDict;return}
+      var lines=[q.toUpperCase()];
+      data[0].meanings&&data[0].meanings.forEach(function(m){
+        lines.push('['+m.partOfSpeech+']');
+        (m.definitions||[]).slice(0,2).forEach(function(d){lines.push('• '+d.definition)});
+      });
+      lastDict=lines.join('\n');
+      document.getElementById('dict-out').textContent=lastDict;
+    })
+    .catch(function(e){document.getElementById('dict-out').textContent=String(e.message||e)});
+};
+var dictSave=document.getElementById('dict-save');
+if(dictSave)dictSave.onclick=function(){fsApi('write','/Documents/dict-last.txt',lastDict||document.getElementById('dict-out').textContent||'').then(function(j){if(j.ok)toast('Dict saved')})};
+
+/* STEP 39 Bot cheatsheet */
+function chRender(){
+  var cmds=[
+    '/start /version /menu /desktop','/fs ls|cat|write|tree','/ask /imagine /daily',
+    '/git status /vercel deploys /supa tables','/ops status /ops doctor',
+    '/remember /recall /track','/morningdigest /oracle','Open Mini App: Queen Studio'
+  ];
+  document.getElementById('ch-out').innerHTML=cmds.map(function(c){return '<div class="card">'+c+'</div>'}).join('');
+}
+var chSave=document.getElementById('ch-save');
+if(chSave)chSave.onclick=function(){
+  var t=document.getElementById('ch-out').innerText||'';
+  fsApi('write','/Documents/bot-cheats.txt',t).then(function(j){if(j.ok)toast('Cheats saved')});
+};
+
+/* STEP 40 SysCheck */
+var lastSy='';
+var syRun=document.getElementById('sy-run');
+if(syRun)syRun.onclick=function(){
+  document.getElementById('sy-out').textContent='Running...';
+  var checks=[
+    ['API seed',function(){return fsApi('seed','/')}],
+    ['Disk quota',function(){return fsApi('df','/')}],
+    ['Documents',function(){return fsApi('list','/Documents')}],
+    ['Projects',function(){return fsApi('list','/Projects')}]
+  ];
+  var lines=['PasiyaOS SysCheck '+new Date().toISOString()],i=0;
+  function next(){
+    if(i>=checks.length){
+      lines.push('Apps installed: '+APPS.length);
+      lines.push('initData: '+(initData()?'yes':'no — open from Telegram'));
+      lastSy=lines.join('\n');
+      document.getElementById('sy-out').textContent=lastSy;
+      toast('SysCheck done');
+      return;
+    }
+    var c=checks[i++];
+    c[1]().then(function(j){
+      lines.push(c[0]+': '+(j.ok?'OK':'FAIL '+(j.error||'')));
+      if(c[0]==='Disk quota'&&j.ok)lines.push('  used '+j.used+' / '+j.max);
+      if((c[0]==='Documents'||c[0]==='Projects')&&j.ok)lines.push('  entries '+(j.entries||[]).length);
+      next();
+    });
+  }
+  next();
+};
+var sySave=document.getElementById('sy-save');
+if(sySave)sySave.onclick=function(){fsApi('write','/Documents/syscheck.txt',lastSy||document.getElementById('sy-out').textContent||'').then(function(j){if(j.ok)toast('Report saved')})};
+
+
+fsApi('seed','/').then(function(){toast('PasiyaOS S21-40 ready')});
 fsApi('read','/Documents/theme.txt').then(function(j){if(j.ok&&j.content)applyTheme(String(j.content).trim())});
 termPrint('PasiyaOS terminal — type help','');
 })();
