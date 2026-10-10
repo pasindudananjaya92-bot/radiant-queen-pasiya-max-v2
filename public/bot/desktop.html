@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<meta name="pasiya-desktop-version" content="S56fix"/>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
 <title>PasiyaOS</title>
@@ -224,36 +228,67 @@ function fsApi(action,path,content,extra){
 }
 
 var APPS=[
+  /* core */
   ['explorer','📁','Explorer'],['notepad','📝','Notepad'],['term','⌨','Terminal'],['ide','💻','IDE'],
   ['kernel','🧠','Kernel'],['office','📄','Office'],['browser','🌐','Browser'],['studio','🎬','Studio'],
-  ['calc','🔢','Calc'],['journal','📔','Journal'],['tasks','✅','Tasks'],['themes','🎨','Themes'],
-  ['share','📦','Share'],['notes','📌','Notes'],['weather','🌤','Weather'],['clock','🕐','Clock'],
-  ['contacts','👤','Contacts'],['dash','📊','Dash'],['vault','🔐','Vault'],['kanban','📋','Kanban'],
-  ['rss','📡','RSS'],['pomodoro','⏱','Focus'],['search','🔍','Search'],
-  ['bookmarks','🔖','Bookmarks'],['colors','🎨','Colors'],['units','📐','Units'],
-  ['random','🎲','Random'],['backup','💾','Backup'],
-  ['snippets','📎','Snippets'],['habits','🔥','Habits'],['world','🌍','World'],
-  ['expenses','💰','Expenses'],['launcher','🚀','Launcher'],
-  ['stickies','🟨','Stickies'],['notify','🔔','Notify'],['dict','📖','Dict'],
-  ['cheats','📜','Cheats'],['syscheck','🛡','SysCheck'],
+  /* NEW S56 — pinned near top so visible without long scroll */
+  ['outline','📋','Outline'],['coins','🪙','Coins'],['morse','📡','Morse'],
+  ['baseconv','🔢','Bases'],['ipinfo','🌍','IP Info'],
+  /* recent toolkit */
+  ['regex','🔤','Regex'],['diff','≠','Diff'],['csv','▤','CSV'],
+  ['lorem','¶','Lorem'],['stopwatch','⏱','Stopwatch'],
+  ['markdown','📝','Markdown'],['json','{}','JSON'],['base64','64','Base64'],
+  ['hash','#','Hash'],['aboutos','👑','AboutOS'],
   ['draw','✏','Draw'],['music','🎵','Music'],['quiz','❓','Quiz'],
   ['countdown','⏳','Countdown'],['wiki','📚','Wiki'],
-  ['markdown','📝','Markdown'],['json','{;}','JSON'],['base64','64','Base64'],
-  ['hash','#','Hash'],['aboutos','👑','AboutOS'],
-  ['regex','.*','Regex'],['diff','≠','Diff'],['csv','▤','CSV'],
-  ['lorem','¶','Lorem'],['stopwatch','⏱','Stopwatch'],
-  ['outline','🗂','Outline'],['coins','🪙','Coins'],['morse','·−','Morse'],
-  ['baseconv','0x','Bases'],['ipinfo','IP','IP Info'],
+  ['stickies','🟨','Stickies'],['notify','🔔','Notify'],['dict','📖','Dict'],
+  ['cheats','📜','Cheats'],['syscheck','🛡','SysCheck'],
+  ['snippets','📎','Snippets'],['habits','🔥','Habits'],['world','🌐','World'],
+  ['expenses','💰','Expenses'],['launcher','🚀','Launcher'],
+  ['bookmarks','🔖','Bookmarks'],['colors','🎨','Colors'],['units','📐','Units'],
+  ['random','🎲','Random'],['backup','💾','Backup'],
+  ['vault','🔐','Vault'],['kanban','📌','Kanban'],['rss','📰','RSS'],
+  ['pomodoro','☕','Focus'],['search','🔍','Search'],
+  ['calc','🔢','Calc'],['journal','📔','Journal'],['tasks','✅','Tasks'],['themes','🎨','Themes'],
+  ['share','📦','Share'],['notes','📌','Notes'],['weather','🌤','Weather'],['clock','🕐','Clock'],
+  ['contacts','👤','Contacts'],['dash','📊','Dash'],
   ['store','🏪','Store'],['settings','⚙','Settings']
 ];
 
 var icons=document.getElementById('icons');
-APPS.forEach(function(a){
-  var d=document.createElement('div');d.className='icon';d.id='icon-'+a[0];
-  d.innerHTML='<div class="ic">'+a[1]+'</div><span>'+a[2]+'</span>';
-  d.onclick=function(){openWin(a[0])};
-  icons.appendChild(d);
-});
+function paintIcons(filter){
+  if(!icons)return;
+  var q=(filter||'').toLowerCase().trim();
+  icons.innerHTML='';
+  /* filter bar */
+  var bar=document.createElement('div');
+  bar.style.cssText='width:100%;padding:6px 8px 10px;box-sizing:border-box;position:sticky;top:0;background:rgba(10,7,6,0.92);z-index:5';
+  var inp=document.createElement('input');
+  inp.id='icon-filter';
+  inp.placeholder='Search apps… (try outline, coins, morse)';
+  inp.value=filter||'';
+  inp.style.cssText='width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:#120e0c;color:var(--text);font-size:14px;box-sizing:border-box';
+  inp.oninput=function(){paintIcons(inp.value)};
+  bar.appendChild(inp);
+  icons.appendChild(bar);
+  var count=0;
+  APPS.forEach(function(a){
+    if(q && a[0].toLowerCase().indexOf(q)<0 && a[2].toLowerCase().indexOf(q)<0)return;
+    var d=document.createElement('div');d.className='icon';d.id='icon-'+a[0];
+    d.innerHTML='<div class="ic">'+a[1]+'</div><span>'+a[2]+'</span>';
+    d.onclick=function(){openWin(a[0])};
+    icons.appendChild(d);
+    count++;
+  });
+  if(!count){
+    var empty=document.createElement('div');
+    empty.className='muted';
+    empty.style.padding='20px';
+    empty.textContent='No apps match';
+    icons.appendChild(empty);
+  }
+}
+paintIcons('');
 
 function openWin(n){
   var el=document.getElementById('w-'+n);
@@ -1543,7 +1578,7 @@ var ipSave=document.getElementById('ip-save');
 if(ipSave)ipSave.onclick=function(){fsApi('write','/Documents/ip-last.txt',lastIp||document.getElementById('ip-out').textContent||'').then(function(j){if(j.ok)toast('IP info saved')})};
 
 
-fsApi('seed','/').then(function(){toast('PasiyaOS S56-60 ready')});
+fsApi('seed','/').then(function(){toast('PasiyaOS S56fix · '+APPS.length+' apps')});
 fsApi('read','/Documents/theme.txt').then(function(j){if(j.ok&&j.content)applyTheme(String(j.content).trim())});
 termPrint('PasiyaOS terminal — type help','');
 })();
