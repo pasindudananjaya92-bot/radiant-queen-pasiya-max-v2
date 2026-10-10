@@ -152,6 +152,17 @@ button.b:active{border-color:var(--gold)}
 
 <div class="win" id="w-wiki"><div class="hd"><b>Wiki</b><button type="button" data-x="wiki">X</button></div><div class="bd"><div class="form"><input id="wk-q" placeholder="Search Wikipedia"/><button type="button" class="b" id="wk-go">Search</button></div><div class="scroll muted" id="wk-out">Summary via Wikipedia API</div><div class="tb"><button type="button" class="b" id="wk-save">Save</button></div></div></div>
 
+
+<div class="win" id="w-markdown"><div class="hd"><b>Markdown</b><button type="button" data-x="markdown">X</button></div><div class="bd"><div class="form"><textarea id="md-in" rows="5" placeholder="# Hello&#10;**bold**" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:monospace"></textarea><div class="row"><button type="button" class="b" id="md-prev">Preview</button><button type="button" class="b" id="md-save">Save MD</button></div></div><div class="scroll" id="md-out" class="muted">Preview</div></div></div>
+
+<div class="win" id="w-json"><div class="hd"><b>JSON</b><button type="button" data-x="json">X</button></div><div class="bd"><div class="form"><textarea id="js-in" rows="5" placeholder='{"a":1}' style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:monospace"></textarea><div class="row"><button type="button" class="b" id="js-fmt">Format</button><button type="button" class="b" id="js-min">Minify</button><button type="button" class="b" id="js-save">Save</button></div></div><div class="scroll muted" id="js-out">Result</div></div></div>
+
+<div class="win" id="w-base64"><div class="hd"><b>Base64</b><button type="button" data-x="base64">X</button></div><div class="bd"><div class="form"><textarea id="b64-in" rows="4" placeholder="Text..." style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"></textarea><div class="row"><button type="button" class="b" id="b64-enc">Encode</button><button type="button" class="b" id="b64-dec">Decode</button><button type="button" class="b" id="b64-save">Save</button></div></div><div class="scroll muted" id="b64-out">Result</div></div></div>
+
+<div class="win" id="w-hash"><div class="hd"><b>Hash</b><button type="button" data-x="hash">X</button></div><div class="bd"><div class="form"><textarea id="hs-in" rows="3" placeholder="Text to hash" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"></textarea><div class="row"><button type="button" class="b" id="hs-go">SHA-256</button><button type="button" class="b" id="hs-save">Save</button></div></div><div class="scroll muted" id="hs-out">Uses Web Crypto</div></div></div>
+
+<div class="win" id="w-aboutos"><div class="hd"><b>About OS</b><button type="button" data-x="aboutos">X</button></div><div class="bd"><div class="scroll" id="ab-out"></div><div class="tb"><button type="button" class="b" id="ab-inv">App inventory</button><button type="button" class="b" id="ab-save">Save report</button></div></div></div>
+
 <div class="win" id="w-store"><div class="hd"><b>App Store</b><button type="button" data-x="store">X</button></div><div class="bd"><div class="scroll" id="store-body"></div></div></div>
 
 <div id="taskbar">
@@ -205,6 +216,8 @@ var APPS=[
   ['cheats','📜','Cheats'],['syscheck','🛡','SysCheck'],
   ['draw','✏','Draw'],['music','🎵','Music'],['quiz','❓','Quiz'],
   ['countdown','⏳','Countdown'],['wiki','📚','Wiki'],
+  ['markdown','📝','Markdown'],['json','{;}','JSON'],['base64','64','Base64'],
+  ['hash','#','Hash'],['aboutos','👑','AboutOS'],
   ['store','🏪','Store'],['settings','⚙','Settings']
 ];
 
@@ -252,6 +265,7 @@ function openWin(n){
   if(n==='music')muLoad();
   if(n==='quiz')qzShow();
   if(n==='wiki'){document.getElementById('wk-out').textContent='Search a topic';}
+  if(n==='aboutos')abRender();
   if(n==='clock')tickClock();
   if(n==='term')setTimeout(function(){document.getElementById('term-in').focus()},50);
   toast(n+' open');
@@ -1175,7 +1189,96 @@ var wkSave=document.getElementById('wk-save');
 if(wkSave)wkSave.onclick=function(){fsApi('write','/Documents/wiki-last.txt',lastWiki||document.getElementById('wk-out').textContent||'').then(function(j){if(j.ok)toast('Wiki saved')})};
 
 
-fsApi('seed','/').then(function(){toast('PasiyaOS S21-45 ready')});
+
+/* STEP 46 Markdown (lightweight) */
+function mdEscape(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function mdRender(src){
+  var lines=String(src||'').split('\n'), out=[];
+  lines.forEach(function(line){
+    if(/^### /.test(line))out.push('<h4>'+mdEscape(line.slice(4))+'</h4>');
+    else if(/^## /.test(line))out.push('<h3 style="color:var(--gold2)">'+mdEscape(line.slice(3))+'</h3>');
+    else if(/^# /.test(line))out.push('<h2 style="color:var(--gold2)">'+mdEscape(line.slice(2))+'</h2>');
+    else if(/^[-*] /.test(line))out.push('<div>• '+mdEscape(line.slice(2))+'</div>');
+    else if(!line.trim())out.push('<br/>');
+    else{
+      var t=mdEscape(line);
+      t=t.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\*(.+?)\*/g,'<i>$1</i>').replace(/`(.+?)`/g,'<code>$1</code>');
+      out.push('<div>'+t+'</div>');
+    }
+  });
+  return out.join('');
+}
+var mdPrev=document.getElementById('md-prev');
+if(mdPrev)mdPrev.onclick=function(){document.getElementById('md-out').innerHTML=mdRender(document.getElementById('md-in').value)};
+var mdSave=document.getElementById('md-save');
+if(mdSave)mdSave.onclick=function(){fsApi('write','/Documents/markdown-last.md',document.getElementById('md-in').value||'').then(function(j){if(j.ok)toast('Markdown saved')})};
+
+/* STEP 47 JSON tools */
+var lastJson='';
+var jsFmt=document.getElementById('js-fmt');
+if(jsFmt)jsFmt.onclick=function(){
+  try{var o=JSON.parse(document.getElementById('js-in').value);lastJson=JSON.stringify(o,null,2);document.getElementById('js-out').textContent=lastJson;document.getElementById('js-in').value=lastJson}
+  catch(e){document.getElementById('js-out').textContent='Invalid JSON: '+e.message}
+};
+var jsMin=document.getElementById('js-min');
+if(jsMin)jsMin.onclick=function(){
+  try{var o=JSON.parse(document.getElementById('js-in').value);lastJson=JSON.stringify(o);document.getElementById('js-out').textContent=lastJson;document.getElementById('js-in').value=lastJson}
+  catch(e){document.getElementById('js-out').textContent='Invalid JSON: '+e.message}
+};
+var jsSave=document.getElementById('js-save');
+if(jsSave)jsSave.onclick=function(){fsApi('write','/Documents/json-last.txt',lastJson||document.getElementById('js-in').value||'').then(function(j){if(j.ok)toast('JSON saved')})};
+
+/* STEP 48 Base64 */
+var lastB64='';
+var b64Enc=document.getElementById('b64-enc');
+if(b64Enc)b64Enc.onclick=function(){
+  try{lastB64=btoa(unescape(encodeURIComponent(document.getElementById('b64-in').value||'')));document.getElementById('b64-out').textContent=lastB64}
+  catch(e){document.getElementById('b64-out').textContent='Encode error'}
+};
+var b64Dec=document.getElementById('b64-dec');
+if(b64Dec)b64Dec.onclick=function(){
+  try{lastB64=decodeURIComponent(escape(atob(document.getElementById('b64-in').value||'')));document.getElementById('b64-out').textContent=lastB64}
+  catch(e){document.getElementById('b64-out').textContent='Decode error'}
+};
+var b64Save=document.getElementById('b64-save');
+if(b64Save)b64Save.onclick=function(){fsApi('write','/Documents/base64-last.txt',lastB64||document.getElementById('b64-out').textContent||'').then(function(j){if(j.ok)toast('Base64 saved')})};
+
+/* STEP 49 Hash SHA-256 */
+var lastHash='';
+var hsGo=document.getElementById('hs-go');
+if(hsGo)hsGo.onclick=function(){
+  var text=document.getElementById('hs-in').value||'';
+  if(!window.crypto||!crypto.subtle){document.getElementById('hs-out').textContent='Web Crypto unavailable';return}
+  var data=new TextEncoder().encode(text);
+  crypto.subtle.digest('SHA-256',data).then(function(buf){
+    var arr=Array.from(new Uint8Array(buf));
+    lastHash=arr.map(function(b){return b.toString(16).padStart(2,'0')}).join('');
+    document.getElementById('hs-out').textContent=lastHash;
+  }).catch(function(e){document.getElementById('hs-out').textContent=String(e.message||e)});
+};
+var hsSave=document.getElementById('hs-save');
+if(hsSave)hsSave.onclick=function(){fsApi('write','/Documents/hash-last.txt',lastHash||'').then(function(j){if(j.ok)toast('Hash saved')})};
+
+/* STEP 50 About OS + inventory */
+function abRender(){
+  var el=document.getElementById('ab-out');if(!el)return;
+  el.innerHTML='<div class="card"><h4>PasiyaOS</h4><div class="muted">Radiant Queen · Desktop S1–S50<br/>Kernel: pasiya_fs · API: /api/fs<br/>Host: Vercel · DB: Supabase</div></div>'+
+    '<div class="card"><h4>Apps</h4><div class="muted">'+APPS.length+' installed</div></div>'+
+    '<div class="card"><h4>Brand</h4><div class="muted">RADIANT QUEEN · PASIYA MAX</div></div>';
+}
+var abInv=document.getElementById('ab-inv');
+if(abInv)abInv.onclick=function(){
+  var lines=APPS.map(function(a,i){return (i+1)+'. '+a[1]+' '+a[2]+' ('+a[0]+')'});
+  document.getElementById('ab-out').innerHTML='<div class="card"><pre style="white-space:pre-wrap;font-size:11px">'+lines.join('\n')+'</pre></div>';
+};
+var abSave=document.getElementById('ab-save');
+if(abSave)abSave.onclick=function(){
+  var lines=['PasiyaOS inventory '+new Date().toISOString(),'Apps: '+APPS.length,''].concat(APPS.map(function(a){return a[0]+'\t'+a[2]}));
+  fsApi('write','/Documents/os-inventory.txt',lines.join('\n')).then(function(j){if(j.ok)toast('Inventory saved')});
+};
+
+
+fsApi('seed','/').then(function(){toast('PasiyaOS S1-50 milestone')});
 fsApi('read','/Documents/theme.txt').then(function(j){if(j.ok&&j.content)applyTheme(String(j.content).trim())});
 termPrint('PasiyaOS terminal — type help','');
 })();
