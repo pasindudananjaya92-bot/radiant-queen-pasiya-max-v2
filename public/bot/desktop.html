@@ -174,6 +174,17 @@ button.b:active{border-color:var(--gold)}
 
 <div class="win" id="w-stopwatch"><div class="hd"><b>Stopwatch</b><button type="button" data-x="stopwatch">X</button></div><div class="bd"><div class="scroll" style="text-align:center"><div id="sw-disp" style="font-size:40px;color:var(--gold2);margin:20px">00:00.0</div><div class="row" style="justify-content:center"><button type="button" class="b" id="sw-start">Start</button><button type="button" class="b" id="sw-lap">Lap</button><button type="button" class="b" id="sw-stop">Stop</button><button type="button" class="b" id="sw-reset">Reset</button></div><div id="sw-laps" class="muted" style="margin-top:12px;text-align:left"></div></div><div class="tb"><button type="button" class="b" id="sw-save">Save laps</button></div></div></div>
 
+
+<div class="win" id="w-outline"><div class="hd"><b>Outline</b><button type="button" data-x="outline">X</button></div><div class="bd"><div class="form"><input id="ol-in" placeholder="New bullet (use indent with spaces)"/><button type="button" class="b" id="ol-add">Add line</button></div><div class="scroll" id="ol-list"></div><div class="tb"><button type="button" class="b" id="ol-save">Save outline</button></div></div></div>
+
+<div class="win" id="w-coins"><div class="hd"><b>Coins</b><button type="button" data-x="coins">X</button></div><div class="bd"><div class="form"><input id="cn-ids" value="bitcoin,ethereum,solana" placeholder="ids comma-separated"/><button type="button" class="b" id="cn-go">Fetch prices</button></div><div class="scroll muted" id="cn-out">CoinGecko free API</div><div class="tb"><button type="button" class="b" id="cn-save">Save</button></div></div></div>
+
+<div class="win" id="w-morse"><div class="hd"><b>Morse</b><button type="button" data-x="morse">X</button></div><div class="bd"><div class="form"><textarea id="mo-in" rows="3" placeholder="Text or morse" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"></textarea><div class="row"><button type="button" class="b" id="mo-enc">To Morse</button><button type="button" class="b" id="mo-dec">From Morse</button><button type="button" class="b" id="mo-save">Save</button></div></div><div class="scroll muted" id="mo-out">Result</div></div></div>
+
+<div class="win" id="w-baseconv"><div class="hd"><b>Bases</b><button type="button" data-x="baseconv">X</button></div><div class="bd"><div class="form"><input id="bc-val" placeholder="Number e.g. 255 or FF"/><select id="bc-from" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"><option value="10">Decimal</option><option value="2">Binary</option><option value="16">Hex</option><option value="8">Octal</option></select><button type="button" class="b" id="bc-go">Convert all</button></div><div class="scroll muted" id="bc-out">DEC / BIN / HEX / OCT</div><div class="tb"><button type="button" class="b" id="bc-save">Save</button></div></div></div>
+
+<div class="win" id="w-ipinfo"><div class="hd"><b>IP Info</b><button type="button" data-x="ipinfo">X</button></div><div class="bd"><div class="form"><button type="button" class="b" id="ip-go">Lookup my IP</button></div><div class="scroll muted" id="ip-out">Uses ipify + ipapi (httpget)</div><div class="tb"><button type="button" class="b" id="ip-save">Save</button></div></div></div>
+
 <div class="win" id="w-store"><div class="hd"><b>App Store</b><button type="button" data-x="store">X</button></div><div class="bd"><div class="scroll" id="store-body"></div></div></div>
 
 <div id="taskbar">
@@ -231,6 +242,8 @@ var APPS=[
   ['hash','#','Hash'],['aboutos','👑','AboutOS'],
   ['regex','.*','Regex'],['diff','≠','Diff'],['csv','▤','CSV'],
   ['lorem','¶','Lorem'],['stopwatch','⏱','Stopwatch'],
+  ['outline','🗂','Outline'],['coins','🪙','Coins'],['morse','·−','Morse'],
+  ['baseconv','0x','Bases'],['ipinfo','IP','IP Info'],
   ['store','🏪','Store'],['settings','⚙','Settings']
 ];
 
@@ -280,6 +293,7 @@ function openWin(n){
   if(n==='wiki'){document.getElementById('wk-out').textContent='Search a topic';}
   if(n==='aboutos')abRender();
   if(n==='stopwatch')swRender();
+  if(n==='outline')olLoad();
   if(n==='clock')tickClock();
   if(n==='term')setTimeout(function(){document.getElementById('term-in').focus()},50);
   toast(n+' open');
@@ -1415,7 +1429,121 @@ if(swSave)swSave.onclick=function(){
 };
 
 
-fsApi('seed','/').then(function(){toast('PasiyaOS S51-55 ready')});
+
+/* STEP 56 Outline */
+var OL='/Documents/outline.json';
+var outline=[];
+function olRender(){
+  var list=document.getElementById('ol-list');if(!list)return;list.innerHTML='';
+  outline.forEach(function(line,i){
+    var d=document.createElement('div');d.className='card';
+    d.style.paddingLeft=(8+(line.indent||0)*16)+'px';
+    d.textContent=(line.indent? '• ':'● ')+(line.text||'');
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(){outline.splice(i,1);olRender()};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!outline.length)list.innerHTML='<div class="muted">Add outline lines</div>';
+}
+function olLoad(){fsApi('read',OL).then(function(j){outline=[];if(j.ok&&j.content){try{outline=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(outline))outline=[];olRender()})}
+var olAdd=document.getElementById('ol-add');
+if(olAdd)olAdd.onclick=function(){
+  var raw=document.getElementById('ol-in').value||'';
+  var m=raw.match(/^( *)(.*)$/);
+  var indent=m?Math.min(6,Math.floor((m[1]||'').length/2)):0;
+  var text=m?m[2].trim():raw.trim();
+  if(!text)return;
+  outline.push({text:text,indent:indent});
+  document.getElementById('ol-in').value='';olRender();
+};
+var olSave=document.getElementById('ol-save');
+if(olSave)olSave.onclick=function(){fsApi('write',OL,JSON.stringify(outline,null,2)).then(function(j){if(j.ok)toast('Outline saved')})};
+
+/* STEP 57 Coins — CoinGecko free */
+var lastCoins='';
+var cnGo=document.getElementById('cn-go');
+if(cnGo)cnGo.onclick=function(){
+  var ids=(document.getElementById('cn-ids').value||'bitcoin').replace(/\s+/g,'');
+  document.getElementById('cn-out').textContent='Loading...';
+  var url='https://api.coingecko.com/api/v3/simple/price?ids='+encodeURIComponent(ids)+'&vs_currencies=usd&include_24hr_change=true';
+  fsApi('httpget','/',undefined,{url:url}).then(function(j){
+    if(!j.ok){document.getElementById('cn-out').textContent=j.error||'fail';return}
+    try{
+      var data=JSON.parse(j.text||'{}');
+      var lines=[];
+      Object.keys(data).forEach(function(k){
+        var o=data[k];
+        lines.push(k+': $'+(o.usd!=null?o.usd:'?')+'  (24h '+(o.usd_24h_change!=null?o.usd_24h_change.toFixed(2)+'%':'n/a')+')');
+      });
+      lastCoins=lines.join('\n')||'No data';
+      document.getElementById('cn-out').textContent=lastCoins;
+    }catch(e){document.getElementById('cn-out').textContent='Parse error'}
+  });
+};
+var cnSave=document.getElementById('cn-save');
+if(cnSave)cnSave.onclick=function(){fsApi('write','/Documents/coins-last.txt',lastCoins||document.getElementById('cn-out').textContent||'').then(function(j){if(j.ok)toast('Coins saved')})};
+
+/* STEP 58 Morse */
+var MORSE={A:'.-',B:'-...',C:'-.-.',D:'-..',E:'.',F:'..-.',G:'--.',H:'....',I:'..',J:'.---',K:'-.-',L:'.-..',M:'--',N:'-.',O:'---',P:'.--.',Q:'--.-',R:'.-.',S:'...',T:'-',U:'..-',V:'...-',W:'.--',X:'-..-',Y:'-.--',Z:'--..','0':'-----','1':'.----','2':'..---','3':'...--','4':'....-','5':'.....','6':'-....','7':'--...','8':'---..','9':'----.', ' ':'/'};
+var REV={};Object.keys(MORSE).forEach(function(k){REV[MORSE[k]]=k});
+var lastMo='';
+var moEnc=document.getElementById('mo-enc');
+if(moEnc)moEnc.onclick=function(){
+  var t=(document.getElementById('mo-in').value||'').toUpperCase();
+  lastMo=t.split('').map(function(c){return MORSE[c]||c}).join(' ');
+  document.getElementById('mo-out').textContent=lastMo;
+};
+var moDec=document.getElementById('mo-dec');
+if(moDec)moDec.onclick=function(){
+  var t=(document.getElementById('mo-in').value||'').trim().split(/\s+/);
+  lastMo=t.map(function(c){return REV[c]||c}).join('');
+  document.getElementById('mo-out').textContent=lastMo;
+};
+var moSave=document.getElementById('mo-save');
+if(moSave)moSave.onclick=function(){fsApi('write','/Documents/morse-last.txt',lastMo||document.getElementById('mo-out').textContent||'').then(function(j){if(j.ok)toast('Morse saved')})};
+
+/* STEP 59 Base converter */
+var lastBc='';
+var bcGo=document.getElementById('bc-go');
+if(bcGo)bcGo.onclick=function(){
+  var raw=(document.getElementById('bc-val').value||'').trim();
+  var from=Number(document.getElementById('bc-from').value)||10;
+  try{
+    var n=parseInt(raw,from);
+    if(isNaN(n)){document.getElementById('bc-out').textContent='Invalid';return}
+    lastBc='DEC: '+n+'\nBIN: '+n.toString(2)+'\nHEX: '+n.toString(16).toUpperCase()+'\nOCT: '+n.toString(8);
+    document.getElementById('bc-out').textContent=lastBc;
+  }catch(e){document.getElementById('bc-out').textContent=String(e.message||e)}
+};
+var bcSave=document.getElementById('bc-save');
+if(bcSave)bcSave.onclick=function(){fsApi('write','/Documents/bases-last.txt',lastBc||'').then(function(j){if(j.ok)toast('Bases saved')})};
+
+/* STEP 60 IP Info */
+var lastIp='';
+var ipGo=document.getElementById('ip-go');
+if(ipGo)ipGo.onclick=function(){
+  document.getElementById('ip-out').textContent='Loading...';
+  fsApi('httpget','/',undefined,{url:'https://api.ipify.org?format=json'}).then(function(j){
+    if(!j.ok){document.getElementById('ip-out').textContent=j.error||'fail';return}
+    var ip='';
+    try{ip=JSON.parse(j.text||'{}').ip||''}catch(e){}
+    if(!ip){document.getElementById('ip-out').textContent='No IP';return}
+    var url2='https://ipapi.co/'+ip+'/json/';
+    return fsApi('httpget','/',undefined,{url:url2}).then(function(j2){
+      if(!j2.ok){lastIp='IP: '+ip+'\n(geo lookup failed)';document.getElementById('ip-out').textContent=lastIp;return}
+      try{
+        var d=JSON.parse(j2.text||'{}');
+        lastIp=['IP: '+(d.ip||ip),'City: '+(d.city||'?'),'Region: '+(d.region||'?'),'Country: '+(d.country_name||d.country||'?'),'Org: '+(d.org||'?'),'Timezone: '+(d.timezone||'?')].join('\n');
+        document.getElementById('ip-out').textContent=lastIp;
+      }catch(e){lastIp='IP: '+ip;document.getElementById('ip-out').textContent=lastIp}
+    });
+  });
+};
+var ipSave=document.getElementById('ip-save');
+if(ipSave)ipSave.onclick=function(){fsApi('write','/Documents/ip-last.txt',lastIp||document.getElementById('ip-out').textContent||'').then(function(j){if(j.ok)toast('IP info saved')})};
+
+
+fsApi('seed','/').then(function(){toast('PasiyaOS S56-60 ready')});
 fsApi('read','/Documents/theme.txt').then(function(j){if(j.ok&&j.content)applyTheme(String(j.content).trim())});
 termPrint('PasiyaOS terminal — type help','');
 })();
