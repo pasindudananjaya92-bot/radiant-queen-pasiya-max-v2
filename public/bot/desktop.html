@@ -163,6 +163,17 @@ button.b:active{border-color:var(--gold)}
 
 <div class="win" id="w-aboutos"><div class="hd"><b>About OS</b><button type="button" data-x="aboutos">X</button></div><div class="bd"><div class="scroll" id="ab-out"></div><div class="tb"><button type="button" class="b" id="ab-inv">App inventory</button><button type="button" class="b" id="ab-save">Save report</button></div></div></div>
 
+
+<div class="win" id="w-regex"><div class="hd"><b>Regex</b><button type="button" data-x="regex">X</button></div><div class="bd"><div class="form"><input id="rx-pat" placeholder="Pattern e.g. \\w+"/><input id="rx-flags" placeholder="Flags e.g. gi" value="g"/><textarea id="rx-text" rows="4" placeholder="Test text..." style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:monospace"></textarea><button type="button" class="b" id="rx-go">Test</button></div><div class="scroll muted" id="rx-out">Matches</div><div class="tb"><button type="button" class="b" id="rx-save">Save result</button></div></div></div>
+
+<div class="win" id="w-diff"><div class="hd"><b>Diff</b><button type="button" data-x="diff">X</button></div><div class="bd"><div class="form"><textarea id="df-a" rows="3" placeholder="Text A" style="width:100%;padding:10px;margin-bottom:6px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:monospace"></textarea><textarea id="df-b" rows="3" placeholder="Text B" style="width:100%;padding:10px;margin-bottom:6px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:monospace"></textarea><button type="button" class="b" id="df-go">Compare</button></div><div class="scroll muted" id="df-out">Line diff</div><div class="tb"><button type="button" class="b" id="df-save">Save</button></div></div></div>
+
+<div class="win" id="w-csv"><div class="hd"><b>CSV</b><button type="button" data-x="csv">X</button></div><div class="bd"><div class="form"><textarea id="cv-in" rows="5" placeholder="name,age&#10;Ada,30" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:monospace"></textarea><button type="button" class="b" id="cv-go">Render table</button></div><div class="scroll" id="cv-out" class="muted">Table</div><div class="tb"><button type="button" class="b" id="cv-save">Save CSV</button></div></div></div>
+
+<div class="win" id="w-lorem"><div class="hd"><b>Lorem</b><button type="button" data-x="lorem">X</button></div><div class="bd"><div class="form"><input id="lo-n" type="number" value="3" placeholder="Paragraphs"/><div class="row"><button type="button" class="b" id="lo-go">Generate</button><button type="button" class="b" id="lo-save">Save</button></div></div><div class="scroll muted" id="lo-out">Placeholder text</div></div></div>
+
+<div class="win" id="w-stopwatch"><div class="hd"><b>Stopwatch</b><button type="button" data-x="stopwatch">X</button></div><div class="bd"><div class="scroll" style="text-align:center"><div id="sw-disp" style="font-size:40px;color:var(--gold2);margin:20px">00:00.0</div><div class="row" style="justify-content:center"><button type="button" class="b" id="sw-start">Start</button><button type="button" class="b" id="sw-lap">Lap</button><button type="button" class="b" id="sw-stop">Stop</button><button type="button" class="b" id="sw-reset">Reset</button></div><div id="sw-laps" class="muted" style="margin-top:12px;text-align:left"></div></div><div class="tb"><button type="button" class="b" id="sw-save">Save laps</button></div></div></div>
+
 <div class="win" id="w-store"><div class="hd"><b>App Store</b><button type="button" data-x="store">X</button></div><div class="bd"><div class="scroll" id="store-body"></div></div></div>
 
 <div id="taskbar">
@@ -218,6 +229,8 @@ var APPS=[
   ['countdown','⏳','Countdown'],['wiki','📚','Wiki'],
   ['markdown','📝','Markdown'],['json','{;}','JSON'],['base64','64','Base64'],
   ['hash','#','Hash'],['aboutos','👑','AboutOS'],
+  ['regex','.*','Regex'],['diff','≠','Diff'],['csv','▤','CSV'],
+  ['lorem','¶','Lorem'],['stopwatch','⏱','Stopwatch'],
   ['store','🏪','Store'],['settings','⚙','Settings']
 ];
 
@@ -266,6 +279,7 @@ function openWin(n){
   if(n==='quiz')qzShow();
   if(n==='wiki'){document.getElementById('wk-out').textContent='Search a topic';}
   if(n==='aboutos')abRender();
+  if(n==='stopwatch')swRender();
   if(n==='clock')tickClock();
   if(n==='term')setTimeout(function(){document.getElementById('term-in').focus()},50);
   toast(n+' open');
@@ -1278,7 +1292,130 @@ if(abSave)abSave.onclick=function(){
 };
 
 
-fsApi('seed','/').then(function(){toast('PasiyaOS S1-50 milestone')});
+
+/* STEP 51 Regex */
+var lastRx='';
+var rxGo=document.getElementById('rx-go');
+if(rxGo)rxGo.onclick=function(){
+  var pat=document.getElementById('rx-pat').value;
+  var flags=document.getElementById('rx-flags').value||'';
+  var text=document.getElementById('rx-text').value||'';
+  try{
+    var re=new RegExp(pat,flags);
+    var matches=[],m;
+    if(flags.indexOf('g')>=0){while((m=re.exec(text))!==null){matches.push('['+m.index+'] '+m[0]);if(m[0]==='')re.lastIndex++}}
+    else{m=re.exec(text);if(m)matches.push('['+m.index+'] '+m[0])}
+    lastRx=matches.length?matches.join('\n'):'No matches';
+    document.getElementById('rx-out').textContent=lastRx;
+  }catch(e){document.getElementById('rx-out').textContent='Error: '+e.message}
+};
+var rxSave=document.getElementById('rx-save');
+if(rxSave)rxSave.onclick=function(){fsApi('write','/Documents/regex-last.txt',lastRx||document.getElementById('rx-out').textContent||'').then(function(j){if(j.ok)toast('Regex saved')})};
+
+/* STEP 52 Diff */
+var lastDiff='';
+var dfGo=document.getElementById('df-go');
+if(dfGo)dfGo.onclick=function(){
+  var a=(document.getElementById('df-a').value||'').split('\n');
+  var b=(document.getElementById('df-b').value||'').split('\n');
+  var max=Math.max(a.length,b.length),lines=[];
+  for(var i=0;i<max;i++){
+    var la=a[i],lb=b[i];
+    if(la===undefined)lines.push('+ '+lb);
+    else if(lb===undefined)lines.push('- '+la);
+    else if(la===lb)lines.push('  '+la);
+    else{lines.push('- '+la);lines.push('+ '+lb)}
+  }
+  lastDiff=lines.join('\n')||'(empty)';
+  document.getElementById('df-out').textContent=lastDiff;
+};
+var dfSave=document.getElementById('df-save');
+if(dfSave)dfSave.onclick=function(){fsApi('write','/Documents/diff-last.txt',lastDiff||'').then(function(j){if(j.ok)toast('Diff saved')})};
+
+/* STEP 53 CSV */
+var lastCsv='';
+var cvGo=document.getElementById('cv-go');
+if(cvGo)cvGo.onclick=function(){
+  var raw=document.getElementById('cv-in').value||'';
+  lastCsv=raw;
+  var rows=raw.trim().split(/\r?\n/).filter(Boolean).map(function(line){
+    return line.split(',').map(function(c){return c.trim()});
+  });
+  if(!rows.length){document.getElementById('cv-out').textContent='Empty';return}
+  var h='<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  rows.forEach(function(r,ri){
+    h+='<tr>';
+    r.forEach(function(c){
+      var tag=ri===0?'th':'td';
+      h+='<'+tag+' style="border:1px solid var(--border);padding:6px;text-align:left">'+(String(c).replace(/</g,'&lt;'))+'</'+tag+'>';
+    });
+    h+='</tr>';
+  });
+  h+='</table>';
+  document.getElementById('cv-out').innerHTML=h;
+};
+var cvSave=document.getElementById('cv-save');
+if(cvSave)cvSave.onclick=function(){fsApi('write','/Documents/csv-last.csv',lastCsv||document.getElementById('cv-in').value||'').then(function(j){if(j.ok)toast('CSV saved')})};
+
+/* STEP 54 Lorem */
+var LOREM='Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.';
+var lastLo='';
+var loGo=document.getElementById('lo-go');
+if(loGo)loGo.onclick=function(){
+  var n=Math.max(1,Math.min(20,Number(document.getElementById('lo-n').value)||3));
+  var parts=[];
+  for(var i=0;i<n;i++)parts.push(LOREM);
+  lastLo=parts.join('\n\n');
+  document.getElementById('lo-out').textContent=lastLo;
+};
+var loSave=document.getElementById('lo-save');
+if(loSave)loSave.onclick=function(){fsApi('write','/Documents/lorem-last.txt',lastLo||document.getElementById('lo-out').textContent||'').then(function(j){if(j.ok)toast('Lorem saved')})};
+
+/* STEP 55 Stopwatch */
+var swT0=0,swAcc=0,swTimer=null,swLaps=[];
+function swRender(){
+  var ms=swAcc;
+  if(swTimer)ms=swAcc+(Date.now()-swT0);
+  var t=Math.floor(ms/1000),dec=Math.floor((ms%1000)/100);
+  var m=Math.floor(t/60),s=t%60;
+  var el=document.getElementById('sw-disp');
+  if(el)el.textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')+'.'+dec;
+}
+var swStart=document.getElementById('sw-start');
+if(swStart)swStart.onclick=function(){
+  if(swTimer)return;
+  swT0=Date.now();
+  swTimer=setInterval(swRender,100);
+};
+var swStop=document.getElementById('sw-stop');
+if(swStop)swStop.onclick=function(){
+  if(!swTimer)return;
+  swAcc+=(Date.now()-swT0);
+  clearInterval(swTimer);swTimer=null;swRender();
+};
+var swReset=document.getElementById('sw-reset');
+if(swReset)swReset.onclick=function(){
+  if(swTimer){clearInterval(swTimer);swTimer=null}
+  swAcc=0;swLaps=[];swRender();
+  document.getElementById('sw-laps').textContent='';
+};
+var swLap=document.getElementById('sw-lap');
+if(swLap)swLap.onclick=function(){
+  var ms=swAcc+(swTimer?Date.now()-swT0:0);
+  swLaps.push(ms);
+  var t=Math.floor(ms/1000),m=Math.floor(t/60),s=t%60;
+  document.getElementById('sw-laps').textContent=swLaps.map(function(x,i){
+    var tt=Math.floor(x/1000);return 'Lap '+(i+1)+': '+String(Math.floor(tt/60)).padStart(2,'0')+':'+String(tt%60).padStart(2,'0');
+  }).join('\n');
+};
+var swSave=document.getElementById('sw-save');
+if(swSave)swSave.onclick=function(){
+  var body=(document.getElementById('sw-laps').textContent||'')+'\nfinal='+(document.getElementById('sw-disp').textContent||'');
+  fsApi('write','/Documents/stopwatch-last.txt',body).then(function(j){if(j.ok)toast('Laps saved')});
+};
+
+
+fsApi('seed','/').then(function(){toast('PasiyaOS S51-55 ready')});
 fsApi('read','/Documents/theme.txt').then(function(j){if(j.ok&&j.content)applyTheme(String(j.content).trim())});
 termPrint('PasiyaOS terminal — type help','');
 })();
