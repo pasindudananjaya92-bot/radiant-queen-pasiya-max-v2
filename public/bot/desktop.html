@@ -179,7 +179,7 @@ button.b:active{border-color:var(--gold)}
 <div class="win" id="w-stopwatch"><div class="hd"><b>Stopwatch</b><button type="button" data-x="stopwatch">X</button></div><div class="bd"><div class="scroll" style="text-align:center"><div id="sw-disp" style="font-size:40px;color:var(--gold2);margin:20px">00:00.0</div><div class="row" style="justify-content:center"><button type="button" class="b" id="sw-start">Start</button><button type="button" class="b" id="sw-lap">Lap</button><button type="button" class="b" id="sw-stop">Stop</button><button type="button" class="b" id="sw-reset">Reset</button></div><div id="sw-laps" class="muted" style="margin-top:12px;text-align:left"></div></div><div class="tb"><button type="button" class="b" id="sw-save">Save laps</button></div></div></div>
 
 
-<div class="win" id="w-outline"><div class="hd"><b>Outline</b><button type="button" data-x="outline">X</button></div><div class="bd"><div class="form"><input id="ol-in" placeholder="New bullet (use indent with spaces)"/><button type="button" class="b" id="ol-add">Add line</button></div><div class="scroll" id="ol-list"></div><div class="tb"><button type="button" class="b" id="ol-save">Save outline</button></div></div></div>
+<div class="win" id="w-outline"><div class="hd"><b>Outline</b><button type="button" data-x="outline">X</button></div><div class="bd"><div class="form"><textarea id="ol-in" rows="4" placeholder="One line per bullet. Indent with 2 spaces or Tab.&#10;Main Topic&#10;  Sub Topic 1&#10;  Sub Topic 2" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:monospace"></textarea><div class="row"><button type="button" class="b" id="ol-add">Add lines</button><button type="button" class="b" id="ol-clear">Clear list</button></div></div><div class="scroll" id="ol-list"></div><div class="tb"><button type="button" class="b" id="ol-save">Save outline</button></div></div></div>
 
 <div class="win" id="w-coins"><div class="hd"><b>Coins</b><button type="button" data-x="coins">X</button></div><div class="bd"><div class="form"><input id="cn-ids" value="bitcoin,ethereum,solana" placeholder="ids comma-separated"/><button type="button" class="b" id="cn-go">Fetch prices</button></div><div class="scroll muted" id="cn-out">CoinGecko free API</div><div class="tb"><button type="button" class="b" id="cn-save">Save</button></div></div></div>
 
@@ -188,6 +188,17 @@ button.b:active{border-color:var(--gold)}
 <div class="win" id="w-baseconv"><div class="hd"><b>Bases</b><button type="button" data-x="baseconv">X</button></div><div class="bd"><div class="form"><input id="bc-val" placeholder="Number e.g. 255 or FF"/><select id="bc-from" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"><option value="10">Decimal</option><option value="2">Binary</option><option value="16">Hex</option><option value="8">Octal</option></select><button type="button" class="b" id="bc-go">Convert all</button></div><div class="scroll muted" id="bc-out">DEC / BIN / HEX / OCT</div><div class="tb"><button type="button" class="b" id="bc-save">Save</button></div></div></div>
 
 <div class="win" id="w-ipinfo"><div class="hd"><b>IP Info</b><button type="button" data-x="ipinfo">X</button></div><div class="bd"><div class="form"><button type="button" class="b" id="ip-go">Lookup my IP</button></div><div class="scroll muted" id="ip-out">Uses ipify + ipapi (httpget)</div><div class="tb"><button type="button" class="b" id="ip-save">Save</button></div></div></div>
+
+
+<div class="win" id="w-translate"><div class="hd"><b>Translate</b><button type="button" data-x="translate">X</button></div><div class="bd"><div class="form"><textarea id="tr-in" rows="3" placeholder="Text to translate..." style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"></textarea><div class="row"><select id="tr-from" style="flex:1;padding:10px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"><option value="en">EN</option><option value="si">SI</option><option value="ta">TA</option><option value="auto">Auto</option></select><select id="tr-to" style="flex:1;padding:10px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"><option value="si">SI</option><option value="en">EN</option><option value="ta">TA</option></select></div><button type="button" class="b" id="tr-go" style="margin-top:8px">Translate</button></div><div class="scroll muted" id="tr-out">MyMemory free API</div><div class="tb"><button type="button" class="b" id="tr-save">Save</button></div></div></div>
+
+<div class="win" id="w-qr"><div class="hd"><b>QR</b><button type="button" data-x="qr">X</button></div><div class="bd"><div class="form"><input id="qr-in" placeholder="Text or URL"/><button type="button" class="b" id="qr-go">Generate</button></div><div class="scroll" id="qr-out" style="text-align:center" class="muted">QR image</div><div class="tb"><button type="button" class="b" id="qr-save">Save text</button></div></div></div>
+
+<div class="win" id="w-planner"><div class="hd"><b>Planner</b><button type="button" data-x="planner">X</button></div><div class="bd"><div class="form"><input id="pl-date" type="date"/><input id="pl-item" placeholder="Task for day"/><button type="button" class="b" id="pl-add">Add</button></div><div class="scroll" id="pl-list"></div><div class="tb"><button type="button" class="b" id="pl-save">Save day</button></div></div></div>
+
+<div class="win" id="w-palette2"><div class="hd"><b>Palette+</b><button type="button" data-x="palette2">X</button></div><div class="bd"><div class="form"><input id="pp-hex" value="#c9a227" placeholder="#hex"/><button type="button" class="b" id="pp-go">Harmony</button></div><div class="scroll" id="pp-out"></div><div class="tb"><button type="button" class="b" id="pp-save">Save palette</button></div></div></div>
+
+<div class="win" id="w-findfs"><div class="hd"><b>FindFS</b><button type="button" data-x="findfs">X</button></div><div class="bd"><div class="form"><input id="ff-q" placeholder="Search filename or content keyword"/><button type="button" class="b" id="ff-go">Search</button></div><div class="scroll muted" id="ff-out">Deep search Documents + Projects</div><div class="tb"><button type="button" class="b" id="ff-save">Save results</button></div></div></div>
 
 <div class="win" id="w-store"><div class="hd"><b>App Store</b><button type="button" data-x="store">X</button></div><div class="bd"><div class="scroll" id="store-body"></div></div></div>
 
@@ -252,6 +263,8 @@ var APPS=[
   ['calc','🔢','Calc'],['journal','📔','Journal'],['tasks','✅','Tasks'],['themes','🎨','Themes'],
   ['share','📦','Share'],['notes','📌','Notes'],['weather','🌤','Weather'],['clock','🕐','Clock'],
   ['contacts','👤','Contacts'],['dash','📊','Dash'],
+  ['translate','🔤','Translate'],['qr','▢','QR'],['planner','📅','Planner'],
+  ['palette2','🎨','Palette'],['findfs','🔎','FindFS'],
   ['store','🏪','Store'],['settings','⚙','Settings']
 ];
 
@@ -329,6 +342,8 @@ function openWin(n){
   if(n==='aboutos')abRender();
   if(n==='stopwatch')swRender();
   if(n==='outline')olLoad();
+  if(n==='planner')plLoad();
+  if(n==='findfs'){document.getElementById('ff-out').textContent='Enter keyword'};
   if(n==='clock')tickClock();
   if(n==='term')setTimeout(function(){document.getElementById('term-in').focus()},50);
   toast(n+' open');
@@ -1465,34 +1480,52 @@ if(swSave)swSave.onclick=function(){
 
 
 
-/* STEP 56 Outline */
+/* STEP 56 Outline — multi-line + indent */
 var OL='/Documents/outline.json';
 var outline=[];
+function olParseLine(raw){
+  var line=String(raw||'').replace(/\t/g,'  ');
+  // strip bullet markers after indent
+  var m=line.match(/^( *)(.*)$/);
+  if(!m)return null;
+  var spaces=m[1].length;
+  var text=m[2].replace(/^[-*•]\s*/,'').trim();
+  if(!text)return null;
+  var indent=Math.min(6, Math.floor(spaces/2));
+  return {text:text, indent:indent};
+}
 function olRender(){
   var list=document.getElementById('ol-list');if(!list)return;list.innerHTML='';
   outline.forEach(function(line,i){
     var d=document.createElement('div');d.className='card';
     d.style.paddingLeft=(8+(line.indent||0)*16)+'px';
-    d.textContent=(line.indent? '• ':'● ')+(line.text||'');
+    var prefix=(line.indent? '– ':'● ');
+    d.innerHTML='<span>'+prefix+String(line.text||'').replace(/</g,'&lt;')+'</span> <span class="muted">indent='+(line.indent||0)+'</span>';
     var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
     rm.onclick=function(){outline.splice(i,1);olRender()};
     d.appendChild(rm);list.appendChild(d);
   });
-  if(!outline.length)list.innerHTML='<div class="muted">Add outline lines</div>';
+  if(!outline.length)list.innerHTML='<div class="muted">Paste multi-line outline, then Add lines</div>';
 }
 function olLoad(){fsApi('read',OL).then(function(j){outline=[];if(j.ok&&j.content){try{outline=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(outline))outline=[];olRender()})}
 var olAdd=document.getElementById('ol-add');
 if(olAdd)olAdd.onclick=function(){
   var raw=document.getElementById('ol-in').value||'';
-  var m=raw.match(/^( *)(.*)$/);
-  var indent=m?Math.min(6,Math.floor((m[1]||'').length/2)):0;
-  var text=m?m[2].trim():raw.trim();
-  if(!text)return;
-  outline.push({text:text,indent:indent});
-  document.getElementById('ol-in').value='';olRender();
+  var lines=raw.split(/\r?\n/);
+  var added=0;
+  lines.forEach(function(ln){
+    var item=olParseLine(ln);
+    if(item){outline.push(item);added++}
+  });
+  if(!added){toast('No lines parsed');return}
+  document.getElementById('ol-in').value='';
+  olRender();
+  toast('Added '+added+' lines');
 };
+var olClear=document.getElementById('ol-clear');
+if(olClear)olClear.onclick=function(){outline=[];olRender()};
 var olSave=document.getElementById('ol-save');
-if(olSave)olSave.onclick=function(){fsApi('write',OL,JSON.stringify(outline,null,2)).then(function(j){if(j.ok)toast('Outline saved')})};
+if(olSave)olSave.onclick=function(){fsApi('write',OL,JSON.stringify(outline,null,2)).then(function(j){if(j.ok)toast('Outline saved ('+outline.length+')')})};
 
 /* STEP 57 Coins — CoinGecko free */
 var lastCoins='';
@@ -1578,7 +1611,131 @@ var ipSave=document.getElementById('ip-save');
 if(ipSave)ipSave.onclick=function(){fsApi('write','/Documents/ip-last.txt',lastIp||document.getElementById('ip-out').textContent||'').then(function(j){if(j.ok)toast('IP info saved')})};
 
 
-fsApi('seed','/').then(function(){toast('PasiyaOS S56fix · '+APPS.length+' apps')});
+
+/* STEP 61 Translate — MyMemory free */
+var lastTr='';
+var trGo=document.getElementById('tr-go');
+if(trGo)trGo.onclick=function(){
+  var text=(document.getElementById('tr-in').value||'').trim();
+  if(!text){toast('Enter text');return}
+  var fr=document.getElementById('tr-from').value||'en';
+  var to=document.getElementById('tr-to').value||'si';
+  document.getElementById('tr-out').textContent='Translating...';
+  var langpair=fr+'|'+to;
+  var url='https://api.mymemory.translated.net/get?q='+encodeURIComponent(text.slice(0,500))+'&langpair='+encodeURIComponent(langpair);
+  fsApi('httpget','/',undefined,{url:url}).then(function(j){
+    if(!j.ok){document.getElementById('tr-out').textContent=j.error||'fail';return}
+    try{
+      var d=JSON.parse(j.text||'{}');
+      lastTr=(d.responseData&&d.responseData.translatedText)||JSON.stringify(d);
+      document.getElementById('tr-out').textContent=lastTr;
+    }catch(e){document.getElementById('tr-out').textContent='Parse error'}
+  });
+};
+var trSave=document.getElementById('tr-save');
+if(trSave)trSave.onclick=function(){fsApi('write','/Documents/translate-last.txt',lastTr||document.getElementById('tr-out').textContent||'').then(function(j){if(j.ok)toast('Saved')})};
+
+/* STEP 62 QR — image via qrserver free */
+var lastQr='';
+var qrGo=document.getElementById('qr-go');
+if(qrGo)qrGo.onclick=function(){
+  var t=(document.getElementById('qr-in').value||'').trim();
+  if(!t){toast('Enter text');return}
+  lastQr=t;
+  var url='https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='+encodeURIComponent(t);
+  document.getElementById('qr-out').innerHTML='<img src="'+url+'" alt="QR" style="max-width:200px;border-radius:8px;background:#fff;padding:8px"/><div class="muted" style="margin-top:8px">'+String(t).replace(/</g,'&lt;')+'</div>';
+};
+var qrSave=document.getElementById('qr-save');
+if(qrSave)qrSave.onclick=function(){fsApi('write','/Documents/qr-last.txt',lastQr||document.getElementById('qr-in').value||'').then(function(j){if(j.ok)toast('QR text saved')})};
+
+/* STEP 63 Planner */
+var PL='/Documents/planner.json';
+var plan={};
+function plKey(){var d=document.getElementById('pl-date').value;return d||new Date().toISOString().slice(0,10)}
+function plRender(){
+  var k=plKey();
+  var items=plan[k]||[];
+  var list=document.getElementById('pl-list');if(!list)return;list.innerHTML='<div class="muted">'+k+'</div>';
+  items.forEach(function(it,i){
+    var d=document.createElement('div');d.className='card';d.textContent=it;
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(){plan[k].splice(i,1);plRender()};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!items.length)list.innerHTML+='<div class="muted">No tasks for this day</div>';
+}
+function plLoad(){
+  var inp=document.getElementById('pl-date');
+  if(inp&&!inp.value)inp.value=new Date().toISOString().slice(0,10);
+  fsApi('read',PL).then(function(j){plan={};if(j.ok&&j.content){try{plan=JSON.parse(j.content)}catch(e){}}if(typeof plan!=='object'||!plan)plan={};plRender()});
+}
+var plAdd=document.getElementById('pl-add');
+if(plAdd)plAdd.onclick=function(){
+  var t=(document.getElementById('pl-item').value||'').trim();if(!t)return;
+  var k=plKey();plan[k]=plan[k]||[];plan[k].push(t);
+  document.getElementById('pl-item').value='';plRender();
+};
+var plDate=document.getElementById('pl-date');
+if(plDate)plDate.onchange=plRender;
+var plSave=document.getElementById('pl-save');
+if(plSave)plSave.onclick=function(){fsApi('write',PL,JSON.stringify(plan,null,2)).then(function(j){if(j.ok)toast('Planner saved')})};
+
+/* STEP 64 Palette harmony */
+function hexToRgb(hex){
+  hex=hex.replace('#','');
+  if(hex.length===3)hex=hex.split('').map(function(c){return c+c}).join('');
+  var n=parseInt(hex,16);return {r:(n>>16)&255,g:(n>>8)&255,b:n&255};
+}
+function rgbToHex(r,g,b){
+  return '#'+[r,g,b].map(function(x){return Math.max(0,Math.min(255,x|0)).toString(16).padStart(2,'0')}).join('');
+}
+var lastPal='';
+var ppGo=document.getElementById('pp-go');
+if(ppGo)ppGo.onclick=function(){
+  var hex=(document.getElementById('pp-hex').value||'#c9a227').trim();
+  if(hex[0]!=='#')hex='#'+hex;
+  try{
+    var c=hexToRgb(hex);
+    var comp=rgbToHex(255-c.r,255-c.g,255-c.b);
+    var light=rgbToHex(c.r+40,c.g+40,c.b+40);
+    var dark=rgbToHex(c.r-40,c.g-40,c.b-40);
+    var colors=[hex,comp,light,dark];
+    lastPal=colors.join('\n');
+    document.getElementById('pp-out').innerHTML=colors.map(function(h){
+      return '<div class="card" style="border-left:12px solid '+h+'"><b>'+h+'</b></div>';
+    }).join('');
+  }catch(e){document.getElementById('pp-out').textContent='Bad hex'}
+};
+var ppSave=document.getElementById('pp-save');
+if(ppSave)ppSave.onclick=function(){fsApi('write','/Documents/palette-harmony.txt',lastPal||'').then(function(j){if(j.ok)toast('Palette saved')})};
+
+/* STEP 65 FindFS deep */
+var lastFf='';
+var ffGo=document.getElementById('ff-go');
+if(ffGo)ffGo.onclick=function(){
+  var q=(document.getElementById('ff-q').value||'').trim().toLowerCase();
+  if(!q){toast('Enter keyword');return}
+  document.getElementById('ff-out').textContent='Searching...';
+  var roots=['/Documents','/Projects'],hits=[],pending=roots.length;
+  roots.forEach(function(root){
+    fsApi('tree',root,undefined,{depth:6}).then(function(j){
+      var tree=j.ok?String(j.tree||''):'';
+      tree.split('\n').forEach(function(line){
+        if(line.toLowerCase().indexOf(q)>=0)hits.push(line.trim());
+      });
+      pending--;
+      if(pending<=0){
+        lastFf=hits.length?hits.slice(0,50).join('\n'):'No matches for '+q;
+        document.getElementById('ff-out').textContent=lastFf;
+      }
+    });
+  });
+};
+var ffSave=document.getElementById('ff-save');
+if(ffSave)ffSave.onclick=function(){fsApi('write','/Documents/findfs-last.txt',lastFf||'').then(function(j){if(j.ok)toast('Results saved')})};
+
+
+fsApi('seed','/').then(function(){toast('PasiyaOS S61 · '+APPS.length+' apps')});
 fsApi('read','/Documents/theme.txt').then(function(j){if(j.ok&&j.content)applyTheme(String(j.content).trim())});
 termPrint('PasiyaOS terminal — type help','');
 })();
