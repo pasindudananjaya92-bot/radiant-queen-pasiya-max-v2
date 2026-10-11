@@ -179,12 +179,16 @@
     setTimeout(function(){el.classList.remove('show')},2200);
   }
   function fsApi(action,path,content,extra){
-    var body=Object.assign({action:action,path:path||'/',content:content},extra||{});
+    var id=initData();
+    var body=Object.assign({action:action,path:path||'/',content:content,initData:id},extra||{});
     return fetch('/api/fs',{
       method:'POST',
-      headers:{'Content-Type':'application/json','X-Telegram-Init-Data':initData()},
+      headers:{'Content-Type':'application/json','X-Telegram-Init-Data':id},
       body:JSON.stringify(body)
-    }).then(function(r){return r.json().catch(function(){return {ok:false,error:'bad json'}})}).catch(function(e){return {ok:false,error:String(e.message||e)}});
+    }).then(function(r){return r.json().catch(function(){return {ok:false,error:'bad json'}})}).then(function(j){
+      if(j && j.ok===false && j.error){ /* surface auth errors */ }
+      return j;
+    }).catch(function(e){return {ok:false,error:String(e.message||e)}});
   }
 
   /* App catalog — maps to desktop.html?open=ID (reuses all 70 apps) */
@@ -292,9 +296,10 @@
   /* Notes */
   document.getElementById('note-save').onclick=function(){
     var t=document.getElementById('note-in').value||'';
+    if(!initData()){toast('Open via Telegram /phone (not browser)');document.getElementById('note-st').textContent='No Telegram auth';return}
     fsApi('write','/Documents/phone-note.txt',t).then(function(j){
       document.getElementById('note-st').textContent=j.ok?'Saved /Documents/phone-note.txt':(j.error||'fail');
-      if(j.ok)toast('Note saved');
+      if(j.ok)toast('Note saved'); else toast('Save failed: '+(j.error||''));
     });
   };
 
@@ -326,8 +331,9 @@
     ctRender();
   };
   document.getElementById('ct-save').onclick=function(){
+    if(!initData()){toast('Open via Telegram /phone (not browser)');return}
     fsApi('write','/Documents/phone-contacts.json',JSON.stringify(contacts,null,2)).then(function(j){
-      if(j.ok)toast('Contacts saved');
+      if(j.ok)toast('Contacts saved'); else toast('Save failed: '+(j.error||''));
     });
   };
 
@@ -337,7 +343,11 @@
   };
 
   ctLoad();
-  toast('PasiyaPhone 1 · shared FS');
+  if(!initData()){
+    toast('⚠️ Open from Telegram bot (/phone) — browser cannot save');
+  } else {
+    toast('PasiyaPhone · Telegram auth OK');
+  }
 })();
 </script>
 </body>
