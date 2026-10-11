@@ -4,17 +4,18 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
-<meta name="pasiya-phone-version" content="Phone-1"/>
+<meta name="pasiya-phone-version" content="Phone-2"/>
 <title>PasiyaPhone</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
   :root{
-    --bg:#000;--card:rgba(28,28,30,0.92);--text:#f5f5f7;--muted:#8e8e93;
+    --bg:#000;--card:rgba(28,28,30,.92);--text:#f5f5f7;--muted:#8e8e93;
     --blue:#0a84ff;--green:#30d158;--ios:#1c1c1e;--sep:#38383a;
     --safe-top:env(safe-area-inset-top,0px);--safe-bot:env(safe-area-inset-bottom,0px);
+    --bright:1;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0;height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;background:var(--bg);color:var(--text)}
+  html,body{margin:0;height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;background:#000;color:var(--text)}
   body{
     background:
       radial-gradient(120% 80% at 20% 0%, #3a1c71 0%, transparent 50%),
@@ -22,120 +23,203 @@
       radial-gradient(80% 60% at 50% 100%, #ffaf7b 0%, transparent 40%),
       #0a0a0c;
   }
+  #bright-veil{position:fixed;inset:0;background:#000;pointer-events:none;z-index:200;opacity:calc(1 - var(--bright));transition:opacity .15s}
   #status{
     position:fixed;top:0;left:0;right:0;z-index:50;
     padding:calc(6px + var(--safe-top)) 18px 6px;
     display:flex;justify-content:space-between;align-items:center;
-    font-size:13px;font-weight:600;pointer-events:none;
+    font-size:13px;font-weight:600;
   }
   #status .right{display:flex;gap:6px;align-items:center;font-size:12px}
+  #status .pill{cursor:pointer;padding:2px 6px;border-radius:8px;background:rgba(255,255,255,.08)}
   #home{
-    position:fixed;inset:0;padding:calc(42px + var(--safe-top)) 18px calc(100px + var(--safe-bot));
-    overflow:auto;
+    position:fixed;inset:0;padding:calc(42px + var(--safe-top)) 18px calc(110px + var(--safe-bot));
+    overflow:auto;transition:filter .2s;
   }
-  .page-title{text-align:center;font-size:11px;letter-spacing:.08em;color:rgba(255,255,255,.7);margin:4px 0 12px;text-transform:uppercase}
-  .grid{
-    display:grid;grid-template-columns:repeat(4,1fr);gap:18px 10px;max-width:430px;margin:0 auto;
-  }
-  .app{
-    display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;user-select:none;
-  }
+  .page-title{text-align:center;font-size:11px;letter-spacing:.08em;color:rgba(255,255,255,.7);margin:4px 0 10px;text-transform:uppercase}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px 10px;max-width:430px;margin:0 auto}
+  .app{display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;user-select:none;position:relative}
   .app .ic{
     width:60px;height:60px;border-radius:14px;display:flex;align-items:center;justify-content:center;
     font-size:28px;background:var(--card);box-shadow:0 8px 24px rgba(0,0,0,.25);
     border:1px solid rgba(255,255,255,.08);
   }
-  .app span{font-size:11px;color:var(--text);text-align:center;max-width:72px;line-height:1.15;text-shadow:0 1px 2px rgba(0,0,0,.5)}
-  .app:active .ic{transform:scale(.92);opacity:.9}
-  .section{max-width:430px;margin:18px auto 8px;font-size:13px;font-weight:600;color:rgba(255,255,255,.75)}
-  #dock-wrap{
-    position:fixed;left:12px;right:12px;bottom:calc(12px + var(--safe-bot));z-index:40;
-  }
+  .app span{font-size:11px;text-align:center;max-width:72px;line-height:1.15;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+  .app:active .ic{transform:scale(.92)}
+  .app .badge{position:absolute;top:-2px;right:8px;background:#ff3b30;color:#fff;font-size:10px;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px}
+  .section{max-width:430px;margin:16px auto 8px;font-size:13px;font-weight:600;color:rgba(255,255,255,.75)}
+  #dock-wrap{position:fixed;left:12px;right:12px;bottom:calc(12px + var(--safe-bot));z-index:40}
   #dock{
-    max-width:430px;margin:0 auto;padding:10px 14px;
-    display:flex;justify-content:space-around;align-items:center;
+    max-width:430px;margin:0 auto;padding:10px 14px;display:flex;justify-content:space-around;align-items:center;
     background:rgba(40,40,45,.55);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
-    border-radius:28px;border:1px solid rgba(255,255,255,.12);
-    box-shadow:0 12px 40px rgba(0,0,0,.35);
+    border-radius:28px;border:1px solid rgba(255,255,255,.12);box-shadow:0 12px 40px rgba(0,0,0,.35);
   }
-  #dock .app .ic{width:54px;height:54px;border-radius:14px}
+  #dock .app .ic{width:54px;height:54px}
   #dock .app span{display:none}
   #toast{
-    position:fixed;left:50%;bottom:calc(110px + var(--safe-bot));transform:translateX(-50%);
-    background:rgba(0,0,0,.8);color:#fff;padding:10px 16px;border-radius:20px;font-size:13px;
-    opacity:0;transition:opacity .25s;z-index:60;pointer-events:none;max-width:90%;text-align:center;
+    position:fixed;left:50%;bottom:calc(120px + var(--safe-bot));transform:translateX(-50%);
+    background:rgba(0,0,0,.82);color:#fff;padding:10px 16px;border-radius:20px;font-size:13px;
+    opacity:0;transition:opacity .25s;z-index:90;pointer-events:none;max-width:90%;text-align:center;
   }
   #toast.show{opacity:1}
-  /* fullscreen panels */
+  .search{
+    max-width:430px;margin:0 auto 12px;padding:10px 14px;border-radius:12px;border:0;
+    background:rgba(255,255,255,.14);color:#fff;width:100%;font-size:15px;display:block;
+  }
+  .search::placeholder{color:rgba(255,255,255,.55)}
   .panel{
-    position:fixed;inset:0;z-index:30;background:#000;display:none;flex-direction:column;
-    padding-top:var(--safe-top);
+    position:fixed;inset:0;z-index:55;background:#000;display:none;flex-direction:column;padding-top:var(--safe-top);
   }
   .panel.open{display:flex}
   .panel .nav{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:10px 14px;border-bottom:1px solid var(--sep);background:var(--ios);
+    display:flex;align-items:center;justify-content:space-between;padding:10px 14px;
+    border-bottom:1px solid var(--sep);background:var(--ios);
   }
   .panel .nav b{font-size:16px}
-  .panel .nav button{
-    background:none;border:0;color:var(--blue);font-size:16px;font-weight:500;cursor:pointer;
-  }
+  .panel .nav button{background:none;border:0;color:var(--blue);font-size:16px;font-weight:500;cursor:pointer}
   .panel .body{flex:1;overflow:auto;padding:14px}
-  .card{
-    background:var(--card);border-radius:14px;padding:14px;margin-bottom:10px;
-    border:1px solid rgba(255,255,255,.06);
-  }
+  .card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:10px;border:1px solid rgba(255,255,255,.06)}
   input,textarea{
     width:100%;padding:12px 14px;border-radius:12px;border:0;background:#2c2c2e;color:var(--text);
     font-size:16px;margin-bottom:10px;
   }
-  .btn{
-    display:inline-block;padding:12px 18px;border-radius:12px;border:0;background:var(--blue);
-    color:#fff;font-size:15px;font-weight:600;cursor:pointer;margin:4px 4px 4px 0;
-  }
+  .btn{display:inline-block;padding:12px 18px;border-radius:12px;border:0;background:var(--blue);color:#fff;font-size:15px;font-weight:600;cursor:pointer;margin:4px 4px 4px 0}
   .btn.secondary{background:#3a3a3c}
   .muted{color:var(--muted);font-size:13px}
-  .search{
-    max-width:430px;margin:0 auto 14px;padding:10px 14px;border-radius:12px;border:0;
-    background:rgba(255,255,255,.14);color:#fff;width:100%;font-size:15px;
+
+  /* Lock screen */
+  #lock{
+    position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
+    background:
+      radial-gradient(100% 80% at 50% 0%, #5b2c6f 0%, transparent 55%),
+      linear-gradient(180deg,#0b1020 0%,#1a1030 50%,#000 100%);
+    padding-bottom:calc(40px + var(--safe-bot));
+    transition:transform .35s ease, opacity .35s ease;
   }
-  .search::placeholder{color:rgba(255,255,255,.55)}
+  #lock.unlocked{transform:translateY(-110%);opacity:0;pointer-events:none}
+  #lock .big-time{font-size:72px;font-weight:200;letter-spacing:-2px;line-height:1;margin-top:auto}
+  #lock .date{font-size:18px;opacity:.9;margin:6px 0 24px}
+  #lock .notifs{width:min(360px,90%);margin:0 auto 24px}
+  #lock .ncard{background:rgba(40,40,45,.55);backdrop-filter:blur(16px);border-radius:16px;padding:12px 14px;margin-bottom:8px;border:1px solid rgba(255,255,255,.1);font-size:13px}
+  #lock .unlock-hint{font-size:13px;opacity:.7;margin-bottom:8px}
+  #lock .swipe{width:140px;height:5px;border-radius:3px;background:rgba(255,255,255,.35);margin-bottom:8px}
+  #lock .unlock-btn{
+    border:0;background:rgba(255,255,255,.15);color:#fff;padding:12px 28px;border-radius:22px;font-size:15px;cursor:pointer;
+  }
+
+  /* Control Center */
+  #cc-backdrop{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.35);display:none}
+  #cc-backdrop.open{display:block}
+  #cc{
+    position:fixed;top:calc(8px + var(--safe-top));right:12px;left:12px;z-index:85;max-width:400px;margin:0 auto;
+    background:rgba(30,30,35,.72);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);
+    border-radius:24px;border:1px solid rgba(255,255,255,.12);padding:16px;display:none;
+    box-shadow:0 20px 50px rgba(0,0,0,.4);
+  }
+  #cc.open{display:block}
+  .cc-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .cc-tile{
+    background:rgba(50,50,55,.7);border-radius:18px;padding:14px;min-height:84px;
+    display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;border:1px solid rgba(255,255,255,.06);
+  }
+  .cc-tile.on{background:rgba(10,132,255,.55)}
+  .cc-tile .t{font-size:13px;font-weight:600}
+  .cc-tile .s{font-size:11px;opacity:.75}
+  .cc-bright{margin-top:12px}
+  .cc-bright input[type=range]{width:100%}
+  .cc-row{display:flex;gap:10px;margin-top:10px}
+  .cc-row .cc-tile{flex:1;min-height:64px}
+
+  /* Folder overlay */
+  #folder-view{
+    position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.55);backdrop-filter:blur(18px);
+    display:none;align-items:center;justify-content:center;padding:24px;
+  }
+  #folder-view.open{display:flex}
+  #folder-box{
+    width:min(340px,100%);background:rgba(40,40,45,.85);border-radius:24px;padding:16px;
+    border:1px solid rgba(255,255,255,.12);
+  }
+  #folder-box h3{margin:0 0 12px;text-align:center;font-weight:600}
 </style>
 </head>
 <body>
+<div id="bright-veil"></div>
+
+<!-- LOCK SCREEN -->
+<div id="lock">
+  <div style="flex:1"></div>
+  <div class="big-time" id="lock-time">--:--</div>
+  <div class="date" id="lock-date">—</div>
+  <div class="notifs" id="lock-notifs"></div>
+  <div class="unlock-hint">Swipe up or tap Unlock</div>
+  <div class="swipe" id="lock-swipe"></div>
+  <button type="button" class="unlock-btn" id="lock-btn">Unlock</button>
+</div>
+
 <div id="status">
   <span id="st-time">--:--</span>
-  <span class="right"><span id="st-net">PasiyaLTE</span><span>🔋</span></span>
+  <span class="right">
+    <span class="pill" id="st-cc" title="Control Center">▲ CC</span>
+    <span id="st-net">PasiyaLTE</span>
+    <span id="st-bat">🔋</span>
+  </span>
 </div>
 
 <div id="home">
   <div class="page-title">PasiyaPhone</div>
-  <input class="search" id="search" placeholder="Search apps" />
+  <input class="search" id="search" placeholder="Search apps & folders"/>
   <div class="section">Favorites</div>
   <div class="grid" id="fav-grid"></div>
+  <div class="section">Folders</div>
+  <div class="grid" id="folder-grid"></div>
   <div class="section">All Apps</div>
   <div class="grid" id="all-grid"></div>
 </div>
 
-<div id="dock-wrap">
-  <div id="dock"></div>
-</div>
-
+<div id="dock-wrap"><div id="dock"></div></div>
 <div id="toast"></div>
 
-<!-- native phone panels -->
+<!-- Control Center -->
+<div id="cc-backdrop"></div>
+<div id="cc">
+  <div class="cc-grid">
+    <div class="cc-tile" id="cc-wifi" data-k="wifi"><div class="t">Wi‑Fi</div><div class="s" id="cc-wifi-s">On</div></div>
+    <div class="cc-tile" id="cc-bt" data-k="bt"><div class="t">Bluetooth</div><div class="s" id="cc-bt-s">On</div></div>
+    <div class="cc-tile" id="cc-air" data-k="air"><div class="t">Airplane</div><div class="s" id="cc-air-s">Off</div></div>
+    <div class="cc-tile" id="cc-focus" data-k="focus"><div class="t">Focus</div><div class="s" id="cc-focus-s">Off</div></div>
+  </div>
+  <div class="cc-bright">
+    <div class="muted" style="margin-bottom:6px">Brightness</div>
+    <input type="range" id="cc-bright" min="30" max="100" value="100"/>
+  </div>
+  <div class="cc-row">
+    <div class="cc-tile" id="cc-lock" style="text-align:center"><div class="t">🔒 Lock</div></div>
+    <div class="cc-tile" id="cc-haptic" data-k="haptic"><div class="t">Haptics</div><div class="s" id="cc-haptic-s">On</div></div>
+  </div>
+</div>
+
+<!-- Folder popup -->
+<div id="folder-view">
+  <div id="folder-box">
+    <h3 id="folder-title">Folder</h3>
+    <div class="grid" id="folder-apps"></div>
+    <div style="text-align:center;margin-top:12px"><button type="button" class="btn secondary" id="folder-close">Close</button></div>
+  </div>
+</div>
+
+<!-- Native panels -->
 <div class="panel" id="p-about">
   <div class="nav"><button type="button" data-close="about">Close</button><b>About</b><span style="width:52px"></span></div>
   <div class="body">
     <div class="card">
       <h2 style="margin:0 0 8px">PasiyaPhone</h2>
-      <p class="muted">iOS-style shell for Radiant Queen · PasiyaOS</p>
-      <p>Version: Phone-1</p>
-      <p>Filesystem: pasiya_fs (shared with Desktop)</p>
-      <p>Apps: 70+ via Desktop bridge</p>
+      <p class="muted">Phase 2 · Lock · Control Center · Folders · Haptics</p>
+      <p>Shared FS with Desktop (pasiya_fs)</p>
     </div>
-    <button type="button" class="btn" id="btn-desktop">Open full Desktop OS</button>
+    <button type="button" class="btn" id="btn-desktop">Open Desktop OS</button>
     <button type="button" class="btn secondary" id="btn-seed">Seed FS</button>
+    <button type="button" class="btn secondary" id="btn-lock">Lock Screen</button>
   </div>
 </div>
 
@@ -144,7 +228,7 @@
   <div class="body">
     <textarea id="note-in" rows="5" placeholder="Quick note..."></textarea>
     <button type="button" class="btn" id="note-save">Save to FS</button>
-    <div class="card muted" id="note-st">Saves to /Documents/phone-note.txt</div>
+    <div class="card muted" id="note-st">/Documents/phone-note.txt</div>
   </div>
 </div>
 
@@ -173,6 +257,18 @@
   function initData(){
     try{return(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.initData)||''}catch(e){return ''}
   }
+  function haptic(type){
+    if(CC.haptic===false)return;
+    try{
+      var h=window.Telegram&&Telegram.WebApp&&Telegram.WebApp.HapticFeedback;
+      if(!h)return;
+      if(type==='success')h.notificationOccurred('success');
+      else if(type==='error')h.notificationOccurred('error');
+      else if(type==='warning')h.notificationOccurred('warning');
+      else if(type==='medium')h.impactOccurred('medium');
+      else h.impactOccurred('light');
+    }catch(e){}
+  }
   function toast(m){
     var el=document.getElementById('toast');
     el.textContent=m;el.classList.add('show');
@@ -185,13 +281,119 @@
       method:'POST',
       headers:{'Content-Type':'application/json','X-Telegram-Init-Data':id},
       body:JSON.stringify(body)
-    }).then(function(r){return r.json().catch(function(){return {ok:false,error:'bad json'}})}).then(function(j){
-      if(j && j.ok===false && j.error){ /* surface auth errors */ }
-      return j;
-    }).catch(function(e){return {ok:false,error:String(e.message||e)}});
+    }).then(function(r){return r.json().catch(function(){return {ok:false,error:'bad json'}})})
+      .catch(function(e){return {ok:false,error:String(e.message||e)}});
   }
 
-  /* App catalog — maps to desktop.html?open=ID (reuses all 70 apps) */
+  /* —— Control Center state —— */
+  var CC={wifi:true,bt:true,air:false,focus:false,haptic:true,bright:100};
+  try{
+    var saved=JSON.parse(localStorage.getItem('pasiya_cc')||'{}');
+    Object.assign(CC,saved);
+  }catch(e){}
+  function saveCC(){
+    try{localStorage.setItem('pasiya_cc',JSON.stringify(CC))}catch(e){}
+    // also persist brightness-ish state to FS (best-effort)
+    if(initData()){
+      fsApi('write','/Documents/phone-cc.json',JSON.stringify(CC,null,2));
+    }
+  }
+  function applyBright(){
+    var v=Math.max(0.3, (CC.bright||100)/100);
+    document.documentElement.style.setProperty('--bright', String(v));
+  }
+  function paintCC(){
+    function tile(id,on,labelOn,labelOff){
+      var el=document.getElementById(id);
+      if(!el)return;
+      if(on)el.classList.add('on');else el.classList.remove('on');
+      var s=el.querySelector('.s');
+      if(s)s.textContent=on?(labelOn||'On'):(labelOff||'Off');
+    }
+    tile('cc-wifi',CC.wifi);
+    tile('cc-bt',CC.bt);
+    tile('cc-air',CC.air);
+    tile('cc-focus',CC.focus);
+    tile('cc-haptic',CC.haptic);
+    document.getElementById('cc-bright').value=CC.bright||100;
+    document.getElementById('st-net').textContent=CC.air?'Airplane':(CC.wifi?'PasiyaWi‑Fi':'LTE');
+    applyBright();
+  }
+  function toggleCC(k){
+    CC[k]=!CC[k];
+    if(k==='air'&&CC.air){CC.wifi=false;CC.bt=false}
+    haptic('light');
+    paintCC();saveCC();
+  }
+  document.getElementById('cc-wifi').onclick=function(){toggleCC('wifi')};
+  document.getElementById('cc-bt').onclick=function(){toggleCC('bt')};
+  document.getElementById('cc-air').onclick=function(){toggleCC('air')};
+  document.getElementById('cc-focus').onclick=function(){toggleCC('focus')};
+  document.getElementById('cc-haptic').onclick=function(){toggleCC('haptic')};
+  document.getElementById('cc-bright').oninput=function(){
+    CC.bright=Number(this.value)||100;applyBright();
+  };
+  document.getElementById('cc-bright').onchange=function(){saveCC();haptic('light')};
+  document.getElementById('cc-lock').onclick=function(){closeCC();lockNow();haptic('medium')};
+
+  function openCC(){document.getElementById('cc').classList.add('open');document.getElementById('cc-backdrop').classList.add('open');paintCC();haptic('light')}
+  function closeCC(){document.getElementById('cc').classList.remove('open');document.getElementById('cc-backdrop').classList.remove('open')}
+  document.getElementById('st-cc').onclick=function(e){e.stopPropagation();openCC()};
+  document.getElementById('cc-backdrop').onclick=closeCC;
+  // swipe down from top status area
+  var touchStartY=0;
+  document.getElementById('status').addEventListener('touchstart',function(e){touchStartY=e.touches[0].clientY},{passive:true});
+  document.getElementById('status').addEventListener('touchend',function(e){
+    var y=e.changedTouches[0].clientY;
+    if(y-touchStartY>24)openCC();
+  },{passive:true});
+
+  /* —— Lock screen —— */
+  function lockNow(){
+    document.getElementById('lock').classList.remove('unlocked');
+    loadLockNotifs();
+    haptic('medium');
+  }
+  function unlock(){
+    document.getElementById('lock').classList.add('unlocked');
+    haptic('success');
+    toast('Unlocked');
+  }
+  document.getElementById('lock-btn').onclick=unlock;
+  // swipe up on lock
+  var lsY=0;
+  document.getElementById('lock').addEventListener('touchstart',function(e){lsY=e.touches[0].clientY},{passive:true});
+  document.getElementById('lock').addEventListener('touchend',function(e){
+    var y=e.changedTouches[0].clientY;
+    if(lsY-y>40)unlock();
+  },{passive:true});
+  document.getElementById('lock').addEventListener('click',function(e){
+    if(e.target.id==='lock-btn')return;
+  });
+
+  function loadLockNotifs(){
+    var box=document.getElementById('lock-notifs');
+    box.innerHTML='<div class="ncard muted">Loading…</div>';
+    if(!initData()){
+      box.innerHTML='<div class="ncard">PasiyaPhone · Phase 2</div><div class="ncard muted">Open from Telegram for live notifs</div>';
+      return;
+    }
+    fsApi('read','/Documents/notifications.json').then(function(j){
+      var items=[];
+      if(j.ok&&j.content){try{items=JSON.parse(j.content)}catch(e){}}
+      if(!Array.isArray(items))items=[];
+      items=items.filter(function(n){return !n.done}).slice(0,3);
+      if(!items.length){
+        box.innerHTML='<div class="ncard">No notifications</div>';
+        return;
+      }
+      box.innerHTML=items.map(function(n){
+        return '<div class="ncard"><b>Reminder</b><div class="muted">'+String(n.text||'').replace(/</g,'&lt;')+'</div></div>';
+      }).join('');
+    });
+  }
+
+  /* —— App catalog —— */
   var FAV=[
     ['phone','📞','Phone','native:contacts'],
     ['notes','📝','Notes','native:notes'],
@@ -224,31 +426,33 @@
     ['desktop','🖥️','Desktop','native:desktop'],
     ['about','ℹ️','About','native:about']
   ];
+  var FOLDERS=[
+    {id:'productivity',name:'Productivity',icon:'📁',apps:['planner','notes','office','clip','tasks']},
+    {id:'tools',name:'Tools',icon:'🛠',apps:['calc','translate','qr','dict','bases']},
+    {id:'system',name:'System',icon:'⚙️',apps:['diag','exportall','hotkeys','cats','syscheck']}
+  ];
 
-  function deskUrl(appId){
-    return '/bot/desktop.html?open='+encodeURIComponent(appId);
-  }
+  function deskUrl(appId){return '/bot/desktop.html?open='+encodeURIComponent(appId)}
   function openTarget(target){
+    haptic('light');
     if(!target)return;
     if(target==='native:desktop'){location.href='/bot/desktop.html';return}
     if(target==='native:about'){openPanel('about');return}
     if(target==='native:notes'){openPanel('notes');return}
     if(target==='native:contacts'){openPanel('contacts');return}
-    if(target.indexOf('desk:')===0){
-      location.href=deskUrl(target.slice(5));
-      return;
-    }
+    if(target.indexOf('desk:')===0){location.href=deskUrl(target.slice(5));return}
   }
   function openPanel(name){
     document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('open')});
     var el=document.getElementById('p-'+name);
     if(el)el.classList.add('open');
+    haptic('light');
   }
   function closePanels(){
     document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('open')});
   }
   document.querySelectorAll('[data-close]').forEach(function(b){
-    b.onclick=function(){closePanels()};
+    b.onclick=function(){closePanels();haptic('light')};
   });
 
   function makeApp(item){
@@ -258,14 +462,49 @@
     d.onclick=function(){openTarget(item[3])};
     return d;
   }
+  function makeFolder(f){
+    var d=document.createElement('div');
+    d.className='app';
+    d.innerHTML='<div class="ic">'+f.icon+'</div><span>'+f.name+'</span>';
+    d.onclick=function(){openFolder(f)};
+    return d;
+  }
+  function openFolder(f){
+    haptic('medium');
+    document.getElementById('folder-title').textContent=f.name;
+    var grid=document.getElementById('folder-apps');
+    grid.innerHTML='';
+    var catalog=FAV.concat(ALL);
+    f.apps.forEach(function(id){
+      var hit=catalog.find(function(a){return a[0]===id||(a[3]&&a[3].indexOf(id)>=0)});
+      // also allow desk ids
+      if(!hit){
+        hit=[id,'📦',id,'desk:'+id];
+      }
+      grid.appendChild(makeApp(hit[3]?hit:[id,hit[1],hit[2],'desk:'+id]));
+    });
+    document.getElementById('folder-view').classList.add('open');
+  }
+  document.getElementById('folder-close').onclick=function(){
+    document.getElementById('folder-view').classList.remove('open');haptic('light');
+  };
+  document.getElementById('folder-view').onclick=function(e){
+    if(e.target.id==='folder-view')document.getElementById('folder-view').classList.remove('open');
+  };
+
   function paint(filter){
     var q=(filter||'').toLowerCase().trim();
     var fav=document.getElementById('fav-grid');
     var all=document.getElementById('all-grid');
-    fav.innerHTML='';all.innerHTML='';
+    var fg=document.getElementById('folder-grid');
+    fav.innerHTML='';all.innerHTML='';fg.innerHTML='';
     FAV.forEach(function(a){
       if(q&&a[2].toLowerCase().indexOf(q)<0&&a[0].indexOf(q)<0)return;
       fav.appendChild(makeApp(a));
+    });
+    FOLDERS.forEach(function(f){
+      if(q&&f.name.toLowerCase().indexOf(q)<0&&f.id.indexOf(q)<0)return;
+      fg.appendChild(makeFolder(f));
     });
     ALL.forEach(function(a){
       if(q&&a[2].toLowerCase().indexOf(q)<0&&a[0].indexOf(q)<0)return;
@@ -275,7 +514,6 @@
   document.getElementById('search').oninput=function(){paint(this.value)};
   paint('');
 
-  /* Dock */
   var DOCK=[
     ['phone','📞','Phone','native:contacts'],
     ['safari','🧭','Safari','desk:browser'],
@@ -285,21 +523,22 @@
   var dock=document.getElementById('dock');
   DOCK.forEach(function(a){dock.appendChild(makeApp(a))});
 
-  /* Status time */
   function tick(){
     var n=new Date();
-    document.getElementById('st-time').textContent=
-      String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
+    var t=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
+    document.getElementById('st-time').textContent=t;
+    document.getElementById('lock-time').textContent=t;
+    document.getElementById('lock-date').textContent=n.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
   }
   tick();setInterval(tick,15000);
 
   /* Notes */
   document.getElementById('note-save').onclick=function(){
     var t=document.getElementById('note-in').value||'';
-    if(!initData()){toast('Open via Telegram /phone (not browser)');document.getElementById('note-st').textContent='No Telegram auth';return}
+    if(!initData()){toast('Open via Telegram /phone');return}
     fsApi('write','/Documents/phone-note.txt',t).then(function(j){
       document.getElementById('note-st').textContent=j.ok?'Saved /Documents/phone-note.txt':(j.error||'fail');
-      if(j.ok)toast('Note saved'); else toast('Save failed: '+(j.error||''));
+      if(j.ok){toast('Note saved');haptic('success')} else {toast(j.error||'fail');haptic('error')}
     });
   };
 
@@ -307,7 +546,7 @@
   var contacts=[];
   function ctRender(){
     var list=document.getElementById('ct-list');list.innerHTML='';
-    contacts.forEach(function(c,i){
+    contacts.forEach(function(c){
       var d=document.createElement('div');d.className='card';
       d.innerHTML='<b>'+String(c.name||'').replace(/</g,'')+'</b><div class="muted">'+String(c.phone||'')+'</div>';
       list.appendChild(d);
@@ -324,30 +563,30 @@
   document.getElementById('ct-add').onclick=function(){
     var name=document.getElementById('ct-name').value.trim();
     var phone=document.getElementById('ct-phone').value.trim();
-    if(!name){toast('Name required');return}
+    if(!name){toast('Name required');haptic('warning');return}
     contacts.unshift({name:name,phone:phone});
     document.getElementById('ct-name').value='';
     document.getElementById('ct-phone').value='';
-    ctRender();
+    ctRender();haptic('light');
   };
   document.getElementById('ct-save').onclick=function(){
-    if(!initData()){toast('Open via Telegram /phone (not browser)');return}
+    if(!initData()){toast('Open via Telegram /phone');return}
     fsApi('write','/Documents/phone-contacts.json',JSON.stringify(contacts,null,2)).then(function(j){
-      if(j.ok)toast('Contacts saved'); else toast('Save failed: '+(j.error||''));
+      if(j.ok){toast('Contacts saved');haptic('success')} else {toast(j.error||'fail');haptic('error')}
     });
   };
 
   document.getElementById('btn-desktop').onclick=function(){location.href='/bot/desktop.html'};
   document.getElementById('btn-seed').onclick=function(){
-    fsApi('seed','/').then(function(j){toast(j.ok?'FS seeded':'Seed failed')});
+    fsApi('seed','/').then(function(j){toast(j.ok?'FS seeded':'Seed failed');haptic(j.ok?'success':'error')});
   };
+  document.getElementById('btn-lock').onclick=function(){closePanels();lockNow()};
 
+  paintCC();
   ctLoad();
-  if(!initData()){
-    toast('⚠️ Open from Telegram bot (/phone) — browser cannot save');
-  } else {
-    toast('PasiyaPhone · Telegram auth OK');
-  }
+  loadLockNotifs();
+  if(!initData())toast('⚠️ Open via Telegram /phone for Save');
+  else toast('PasiyaPhone 2 · Lock · CC · Folders');
 })();
 </script>
 </body>
