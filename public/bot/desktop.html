@@ -4,7 +4,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
 <meta http-equiv="Pragma" content="no-cache"/>
 <meta http-equiv="Expires" content="0"/>
-<meta name="pasiya-desktop-version" content="S56fix"/>
+<meta name="pasiya-desktop-version" content="S66"/>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
 <title>PasiyaOS</title>
@@ -200,6 +200,17 @@ button.b:active{border-color:var(--gold)}
 
 <div class="win" id="w-findfs"><div class="hd"><b>FindFS</b><button type="button" data-x="findfs">X</button></div><div class="bd"><div class="form"><input id="ff-q" placeholder="Search filename or content keyword"/><button type="button" class="b" id="ff-go">Search</button></div><div class="scroll muted" id="ff-out">Deep search Documents + Projects</div><div class="tb"><button type="button" class="b" id="ff-save">Save results</button></div></div></div>
 
+
+<div class="win" id="w-cats"><div class="hd"><b>Categories</b><button type="button" data-x="cats">X</button></div><div class="bd"><div class="form"><div class="row" id="cat-btns" style="flex-wrap:wrap;gap:6px"></div></div><div class="scroll" id="cat-list"></div></div></div>
+
+<div class="win" id="w-hotkeys"><div class="hd"><b>Hotkeys</b><button type="button" data-x="hotkeys">X</button></div><div class="bd"><div class="scroll" id="hk-out"></div><div class="tb"><button type="button" class="b" id="hk-save">Save list</button></div></div></div>
+
+<div class="win" id="w-exportall"><div class="hd"><b>Export All</b><button type="button" data-x="exportall">X</button></div><div class="bd"><div class="scroll muted" id="exall-out">Build full text export of key Documents files</div><div class="tb"><button type="button" class="b" id="exall-go">Build</button><button type="button" class="b" id="exall-save">Save export</button></div></div></div>
+
+<div class="win" id="w-clip"><div class="hd"><b>Clip</b><button type="button" data-x="clip">X</button></div><div class="bd"><div class="form"><textarea id="clp-in" rows="3" placeholder="Paste or type a clip..." style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"></textarea><button type="button" class="b" id="clp-add">Add clip</button></div><div class="scroll" id="clp-list"></div><div class="tb"><button type="button" class="b" id="clp-save">Save clips</button></div></div></div>
+
+<div class="win" id="w-diag"><div class="hd"><b>Diag</b><button type="button" data-x="diag">X</button></div><div class="bd"><div class="scroll muted" id="dg-out">Run diagnostics</div><div class="tb"><button type="button" class="b" id="dg-run">Run</button><button type="button" class="b" id="dg-save">Save report</button></div></div></div>
+
 <div class="win" id="w-store"><div class="hd"><b>App Store</b><button type="button" data-x="store">X</button></div><div class="bd"><div class="scroll" id="store-body"></div></div></div>
 
 <div id="taskbar">
@@ -265,6 +276,8 @@ var APPS=[
   ['contacts','👤','Contacts'],['dash','📊','Dash'],
   ['translate','🔤','Translate'],['qr','▢','QR'],['planner','📅','Planner'],
   ['palette2','🎨','Palette'],['findfs','🔎','FindFS'],
+  ['cats','📂','Cats'],['hotkeys','⌨','Hotkeys'],['exportall','📤','Export'],
+  ['clip','📋','Clip'],['diag','🩺','Diag'],
   ['store','🏪','Store'],['settings','⚙','Settings']
 ];
 
@@ -344,6 +357,10 @@ function openWin(n){
   if(n==='outline')olLoad();
   if(n==='planner')plLoad();
   if(n==='findfs'){document.getElementById('ff-out').textContent='Enter keyword'};
+  if(n==='cats')catRender();
+  if(n==='hotkeys')hkRender();
+  if(n==='clip')clpLoad();
+  if(n==='diag'){document.getElementById('dg-out').textContent='Press Run'};
   if(n==='clock')tickClock();
   if(n==='term')setTimeout(function(){document.getElementById('term-in').focus()},50);
   toast(n+' open');
@@ -1735,7 +1752,164 @@ var ffSave=document.getElementById('ff-save');
 if(ffSave)ffSave.onclick=function(){fsApi('write','/Documents/findfs-last.txt',lastFf||'').then(function(j){if(j.ok)toast('Results saved')})};
 
 
-fsApi('seed','/').then(function(){toast('PasiyaOS S61 · '+APPS.length+' apps')});
+
+/* STEP 66 Categories */
+var CAT_MAP={
+  Core:['explorer','notepad','term','ide','kernel','settings'],
+  Office:['office','markdown','json','planner','snippets','journal','tasks'],
+  Tools:['regex','diff','csv','base64','hash','bases','morse','units','calc'],
+  Net:['browser','rss','wiki','translate','qr','coins','ipinfo','weather'],
+  Media:['studio','draw','music','palette2','colors'],
+  System:['syscheck','diag','exportall','backup','findfs','search','aboutos','hotkeys','cats']
+};
+function catRender(){
+  var btns=document.getElementById('cat-btns');var list=document.getElementById('cat-list');
+  if(!btns||!list)return;
+  btns.innerHTML='';
+  Object.keys(CAT_MAP).forEach(function(cat){
+    var b=document.createElement('button');b.type='button';b.className='b';b.textContent=cat;
+    b.onclick=function(){
+      list.innerHTML='<div class="muted">'+cat+'</div>';
+      CAT_MAP[cat].forEach(function(id){
+        var app=APPS.find(function(a){return a[0]===id});
+        if(!app)return;
+        var d=document.createElement('div');d.className='item';
+        d.innerHTML='<span style="font-size:18px">'+app[1]+'</span><b style="color:var(--gold2)">'+app[2]+'</b>';
+        d.onclick=function(){openWin(id)};
+        list.appendChild(d);
+      });
+    };
+    btns.appendChild(b);
+  });
+  list.innerHTML='<div class="muted">Pick a category</div>';
+}
+
+/* STEP 67 Hotkeys / shortcuts reference */
+function hkRender(){
+  var lines=[
+    'DESKTOP SHORTCUTS (reference)',
+    '• Search bar: filter apps by name',
+    '• Launcher app: type app id → Open',
+    '• Categories: group jump to tools',
+    '',
+    'BOT SHORTCUTS',
+    '• /desktop — open this OS',
+    '• /fs ls|cat|write|tree — filesystem',
+    '• /version /ops status — health',
+    '• /ghpath <file> — upload from bot',
+    '',
+    'EXAMPLES',
+    '• /fs cat /Documents/vault.json',
+    '• /fs write /Documents/note.txt | hello',
+    '• Outline indent: 2 spaces per level',
+    '• Translate EN→SI: Hello → ආයුබෝවන්',
+    '• Bases: 255 → HEX FF',
+    '',
+    'COMMON ERRORS → FIX',
+    '• Icons missing → search bar / S56fix pin / hard close Mini App',
+    '• Failed to fetch → use httpget apps (RSS, Dict, Wiki, Coins, IP, Translate)',
+    '• not found → check path case /Documents vs /documents',
+    '• Save no effect → open from Telegram (initData) not external browser',
+    '• Vercel 12 functions → keep api/cron consolidated',
+    '• Outline indent 0 → paste multi-line with 2 spaces'
+  ];
+  document.getElementById('hk-out').innerHTML=lines.map(function(l){return '<div class="card" style="font-size:12px">'+l.replace(/</g,'&lt;')+'</div>'}).join('');
+}
+var hkSave=document.getElementById('hk-save');
+if(hkSave)hkSave.onclick=function(){
+  var t=document.getElementById('hk-out').innerText||'';
+  fsApi('write','/Documents/hotkeys.txt',t).then(function(j){if(j.ok)toast('Hotkeys saved')});
+};
+
+/* STEP 68 Export All */
+var exportBlob='';
+var exallGo=document.getElementById('exall-go');
+if(exallGo)exallGo.onclick=function(){
+  document.getElementById('exall-out').textContent='Building...';
+  var files=['/Documents/vault.json','/Documents/kanban.json','/Documents/bookmarks.json','/Documents/planner.json',
+    '/Documents/outline.json','/Documents/snippets.json','/Documents/habits.json','/Documents/expenses.json',
+    '/Documents/stickies.json','/Documents/notifications.json','/Documents/playlist.json','/Documents/theme.txt',
+    '/Documents/os-inventory.txt','/Documents/syscheck.txt','/Documents/hotkeys.txt'];
+  var out='=== PASIYAOS FULL EXPORT ===\n'+new Date().toISOString()+'\nApps: '+APPS.length+'\n\n';
+  var i=0;
+  function next(){
+    if(i>=files.length){exportBlob=out;document.getElementById('exall-out').textContent=out.slice(0,14000);toast('Export ready');return}
+    var p=files[i++];
+    fsApi('read',p).then(function(j){
+      out+='----- '+p+' -----\n'+(j.ok?String(j.content||'').slice(0,3000):(j.error||'missing'))+'\n\n';
+      next();
+    });
+  }
+  next();
+};
+var exallSave=document.getElementById('exall-save');
+if(exallSave)exallSave.onclick=function(){fsApi('write','/Documents/full-export.txt',exportBlob||document.getElementById('exall-out').textContent||'').then(function(j){if(j.ok)toast('full-export.txt saved')})};
+
+/* STEP 69 Clip board history (manual) */
+var CLP='/Documents/clips.json';
+var clips=[];
+function clpRender(){
+  var list=document.getElementById('clp-list');if(!list)return;list.innerHTML='';
+  clips.forEach(function(c,i){
+    var d=document.createElement('div');d.className='card';
+    d.innerHTML='<div style="white-space:pre-wrap">'+String(c).replace(/</g,'&lt;')+'</div>';
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(){clips.splice(i,1);clpRender()};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!clips.length)list.innerHTML='<div class="muted">No clips</div>';
+}
+function clpLoad(){fsApi('read',CLP).then(function(j){clips=[];if(j.ok&&j.content){try{clips=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(clips))clips=[];clpRender()})}
+var clpAdd=document.getElementById('clp-add');
+if(clpAdd)clpAdd.onclick=function(){
+  var t=(document.getElementById('clp-in').value||'').trim();if(!t)return;
+  clips.unshift(t);document.getElementById('clp-in').value='';clpRender();
+};
+var clpSave=document.getElementById('clp-save');
+if(clpSave)clpSave.onclick=function(){fsApi('write',CLP,JSON.stringify(clips,null,2)).then(function(j){if(j.ok)toast('Clips saved')})};
+
+/* STEP 70 Diag — errors + health */
+var lastDg='';
+var dgRun=document.getElementById('dg-run');
+if(dgRun)dgRun.onclick=function(){
+  document.getElementById('dg-out').textContent='Running diagnostics...';
+  var lines=['PasiyaOS Diag '+new Date().toISOString(),'Apps: '+APPS.length,'UA: '+(navigator.userAgent||'').slice(0,80)];
+  var checks=[
+    ['seed',function(){return fsApi('seed','/')}],
+    ['df',function(){return fsApi('df','/')}],
+    ['list /Documents',function(){return fsApi('list','/Documents')}],
+    ['httpget ipify',function(){return fsApi('httpget','/',undefined,{url:'https://api.ipify.org?format=json'})}]
+  ];
+  var i=0;
+  function next(){
+    if(i>=checks.length){
+      lines.push('');
+      lines.push('ERROR GUIDE:');
+      lines.push('Failed to fetch → CORS; use httpget apps');
+      lines.push('not found → path/case');
+      lines.push('No window X → app id mismatch');
+      lines.push('initData missing → open via Telegram /desktop');
+      lastDg=lines.join('\n');
+      document.getElementById('dg-out').textContent=lastDg;
+      toast('Diag done');
+      return;
+    }
+    var c=checks[i++];
+    c[1]().then(function(j){
+      lines.push(c[0]+': '+(j.ok?'OK':'FAIL '+(j.error||'')));
+      if(c[0]==='df'&&j.ok)lines.push('  quota '+j.used+'/'+j.max);
+      if(c[0]==='list /Documents'&&j.ok)lines.push('  entries '+(j.entries||[]).length);
+      if(c[0]==='httpget ipify'&&j.ok)lines.push('  body '+(j.text||'').slice(0,40));
+      next();
+    });
+  }
+  next();
+};
+var dgSave=document.getElementById('dg-save');
+if(dgSave)dgSave.onclick=function(){fsApi('write','/Documents/diag-last.txt',lastDg||document.getElementById('dg-out').textContent||'').then(function(j){if(j.ok)toast('Diag saved')})};
+
+
+fsApi('seed','/').then(function(){toast('PasiyaOS S66 · '+APPS.length+' apps')});
 fsApi('read','/Documents/theme.txt').then(function(j){if(j.ok&&j.content)applyTheme(String(j.content).trim())});
 termPrint('PasiyaOS terminal — type help','');
 })();
