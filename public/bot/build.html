@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
+<meta name="pasiya-build" content="Build-1"/>
+<title>Pasiya Builder</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--bg:#0b0b0f;--card:#16161c;--text:#f4f4f5;--muted:#9ca3af;--gold:#c9a227;--blue:#3b82f6;--ok:#22c55e}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:16px;padding-bottom:40px}
+h1{font-size:20px;margin:0 0 4px}
+.sub{color:var(--muted);font-size:13px;margin-bottom:14px}
+.tabs{display:flex;gap:8px;margin-bottom:14px}
+.tabs button{flex:1;padding:10px;border:0;border-radius:10px;background:#222;color:var(--text);font-weight:600;cursor:pointer}
+.tabs button.on{background:var(--gold);color:#111}
+.card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px;border:1px solid #2a2a32}
+textarea,input{width:100%;padding:12px;border-radius:10px;border:1px solid #333;background:#0e0e12;color:var(--text);font-size:16px}
+button.b{background:var(--blue);color:#fff;border:0;border-radius:10px;padding:12px 16px;font-weight:600;cursor:pointer;margin:6px 6px 0 0}
+button.g{background:var(--gold);color:#111}
+button.s{background:#333}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.grid button{padding:12px 6px;border:0;border-radius:12px;background:#1c1c24;color:var(--text);font-size:12px;cursor:pointer}
+.log{font-family:ui-monospace,monospace;font-size:12px;white-space:pre-wrap;max-height:220px;overflow:auto;color:#d1d5db}
+.chip{display:inline-block;background:#222;border-radius:999px;padding:4px 10px;font-size:11px;margin:2px;color:var(--muted)}
+.ok{color:var(--ok)}.err{color:#f87171}
+</style>
+</head>
+<body>
+<h1>🏗️ Pasiya Builder</h1>
+<div class="sub">Auto = natural language · Manual = tap action · Chains with “and” / “සහ”</div>
+<div class="tabs">
+  <button type="button" class="on" id="tab-auto">Auto</button>
+  <button type="button" id="tab-manual">Manual</button>
+  <button type="button" id="tab-memory">Memory</button>
+</div>
+
+<div id="pane-auto">
+  <div class="card">
+    <textarea id="cmd" rows="3" placeholder="Examples:
+weather
+note Buy milk
+remind Call Amma
+calendar and note Meeting
+ෆෝටෝ එකක් ගන්න
+වෙදර් එක බලන්න"></textarea>
+    <button type="button" class="b g" id="run">▶ Run Build</button>
+    <button type="button" class="b s" id="run-chain">▶ Run chain</button>
+  </div>
+  <div class="card">
+    <b>Result</b>
+    <div class="log" id="out">Ready.</div>
+  </div>
+</div>
+
+<div id="pane-manual" style="display:none">
+  <div class="card"><div class="grid" id="manual-grid"></div></div>
+</div>
+
+<div id="pane-memory" style="display:none">
+  <div class="card">
+    <b>Context memory</b>
+    <div id="mem" class="log">—</div>
+    <button type="button" class="b s" id="mem-clear">Clear memory</button>
+  </div>
+  <div class="card">
+    <b>Scheduled (Phase-1 stub)</b>
+    <input id="sch-when" placeholder="ISO or tomorrow 06:00"/>
+    <input id="sch-cmd" placeholder="Command text"/>
+    <button type="button" class="b" id="sch-save">Save schedule draft</button>
+    <div class="log" id="sch-out"></div>
+  </div>
+</div>
+
+<div class="card">
+  <span class="chip">Phone</span><span class="chip">Desktop</span><span class="chip">FS</span><span class="chip">No new Vercel fn</span>
+  <div style="margin-top:8px">
+    <button type="button" class="b s" id="go-phone">📱 Phone</button>
+    <button type="button" class="b s" id="go-desk">🖥️ Desktop</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  try{if(window.Telegram&&Telegram.WebApp){Telegram.WebApp.ready();Telegram.WebApp.expand()}}catch(e){}
+  function initData(){try{return(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.initData)||''}catch(e){return ''}}
+  function fsApi(action,path,content,extra){
+    var id=initData();
+    var body=Object.assign({action:action,path:path||'/',content:content,initData:id},extra||{});
+    return fetch('/api/fs',{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':id},body:JSON.stringify(body)})
+      .then(function(r){return r.json().catch(function(){return{ok:false,error:'bad json'}})});
+  }
+  function log(m,cls){
+    var el=document.getElementById('out');
+    el.innerHTML=(cls?'<span class="'+cls+'">':'')+String(m)+(cls?'</span>':'')+'\n'+el.textContent;
+  }
+
+  // Inline intent rules (same as lib/buildIntent.js)
+  var RULES=[
+    {intent:'weather',re:/(weather|වෙදර්|කාලගුණ|temperature)/i,target:'desk:weather'},
+    {intent:'note',re:/(note|නෝට්|ලියන්න|memo)/i,target:'native:notes'},
+    {intent:'reminder',re:/(remind|ටාස්ක්|task|reminder|මතක්)/i,target:'native:reminders'},
+    {intent:'calendar',re:/(calendar|කැලෙන්ඩර්|event|planner)/i,target:'native:calendar'},
+    {intent:'photo',re:/(photo|ෆෝටෝ|camera|කැමරා|picture)/i,target:'native:camera'},
+    {intent:'photos',re:/(photos|ගැලරි|gallery)/i,target:'native:photos'},
+    {intent:'calc',re:/(calc|ගණන්|calculate|\d+\s*[\+\-\*x×\/÷])/i,target:'native:calc'},
+    {intent:'translate',re:/(translate|පරිවර්තන)/i,target:'desk:translate'},
+    {intent:'files',re:/(file|ෆයිල්|documents|explorer)/i,target:'desk:explorer'},
+    {intent:'health',re:/(health|සෞඛ්‍ය|fitness|rings)/i,target:'native:health'},
+    {intent:'mail',re:/(mail|email|ඊමේල්)/i,target:'native:mail'},
+    {intent:'drop',re:/(drop|airdrop|share\s+code)/i,target:'native:drop'},
+    {intent:'vault',re:/(vault|password|රහස්)/i,target:'desk:vault'},
+    {intent:'coins',re:/(bitcoin|crypto|coins)/i,target:'desk:coins'},
+    {intent:'wiki',re:/(wiki|wikipedia)/i,target:'desk:wiki'},
+    {intent:'settings',re:/(settings|සැකසුම්|wallpaper)/i,target:'native:settings'},
+    {intent:'desktop',re:/(desktop|ඩෙස්ක්ටොප්)/i,target:'native:desktop'},
+    {intent:'search',re:/(search|සොයන්න|find)/i,target:'desk:findfs'},
+    {intent:'diag',re:/(diag|syscheck)/i,target:'desk:diag'}
+  ];
+  function parseIntent(text){
+    var raw=String(text||'').trim();if(!raw)return{ok:false,steps:[]};
+    var parts=raw.split(/\s+(?:and|සහ|\+)\s+/i).map(function(s){return s.trim()}).filter(Boolean);
+    var steps=[];
+    parts.forEach(function(part){
+      var hit=null;
+      for(var i=0;i<RULES.length;i++){if(RULES[i].re.test(part)){hit={intent:RULES[i].intent,target:RULES[i].target,text:part};break}}
+      var nm=part.match(/^(?:note|නෝට්)\s+(.+)/i);
+      if(nm)hit={intent:'note_write',target:'native:notes',text:part,payload:nm[1]};
+      var rm=part.match(/^(?:remind(?:er)?|task|ටාස්ක්)\s+(.+)/i);
+      if(rm)hit={intent:'reminder_add',target:'native:reminders',text:part,payload:rm[1]};
+      if(!hit)hit={intent:'unknown',text:part};
+      steps.push(hit);
+    });
+    return{ok:true,steps:steps,raw:raw};
+  }
+
+  var mem=[];
+  try{mem=JSON.parse(localStorage.getItem('pasiya_build_mem')||'[]')}catch(e){}
+  function pushMem(entry){
+    mem.unshift(entry);if(mem.length>30)mem=mem.slice(0,30);
+    try{localStorage.setItem('pasiya_build_mem',JSON.stringify(mem))}catch(e){}
+    if(initData())fsApi('write','/Documents/build-memory.json',JSON.stringify(mem,null,2));
+    renderMem();
+  }
+  function renderMem(){
+    document.getElementById('mem').textContent=mem.length?mem.map(function(m,i){return (i+1)+'. '+m.raw+' → '+(m.intents||[]).join(', ')}).join('\n'):'Empty';
+  }
+  renderMem();
+
+  function openTarget(target){
+    if(target==='native:desktop'){location.href='/bot/desktop.html';return}
+    if(target==='native:notes'){location.href='/bot/phone.html';return} // phone opens; user uses notes — better deep links below
+    // Prefer phone deep tools via phone.html; desktop tools via desktop.html?open=
+    if(target.indexOf('desk:')===0){
+      location.href='/bot/desktop.html?open='+encodeURIComponent(target.slice(5));
+      return;
+    }
+    if(target.indexOf('native:')===0){
+      // phone hosts native panels — open phone (user continues); future: ?panel=
+      location.href='/bot/phone.html';
+      return;
+    }
+  }
+
+  async function execStep(step){
+    // Auto-write payloads to FS when possible
+    if(step.intent==='note_write'&&step.payload){
+      if(!initData())return{ok:false,msg:'Telegram auth required for FS write'};
+      var prev=await fsApi('read','/Documents/phone-note.txt');
+      var content=(prev.ok&&prev.content?prev.content+'\n':'')+step.payload;
+      var w=await fsApi('write','/Documents/phone-note.txt',content);
+      return{ok:!!w.ok,msg:w.ok?('Note written: '+step.payload):(w.error||'write fail'),open:'native:notes'};
+    }
+    if(step.intent==='reminder_add'&&step.payload){
+      if(!initData())return{ok:false,msg:'Telegram auth required'};
+      var r=await fsApi('read','/Documents/phone-reminders.json');
+      var list=[];if(r.ok&&r.content){try{list=JSON.parse(r.content)}catch(e){}}
+      if(!Array.isArray(list))list=[];
+      list.unshift({text:step.payload,done:false,ts:Date.now()});
+      var w=await fsApi('write','/Documents/phone-reminders.json',JSON.stringify(list,null,2));
+      await fsApi('write','/Documents/notifications.json',JSON.stringify(list.filter(function(x){return !x.done}),null,2));
+      return{ok:!!w.ok,msg:w.ok?('Reminder: '+step.payload):(w.error||'fail'),open:'native:reminders'};
+    }
+    if(step.intent==='unknown')return{ok:false,msg:'Unknown: "'+step.text+'" — try weather, note X, remind Y'};
+    return{ok:true,msg:'Open '+step.intent,open:step.target};
+  }
+
+  async function runBuild(text){
+    var parsed=parseIntent(text);
+    if(!parsed.steps.length){log('Empty command','err');return}
+    log('Parsed '+parsed.steps.length+' step(s)…');
+    var intents=[];
+    for(var i=0;i<parsed.steps.length;i++){
+      var step=parsed.steps[i];
+      intents.push(step.intent);
+      var res=await execStep(step);
+      log((res.ok?'✓ ':'✗ ')+res.msg, res.ok?'ok':'err');
+      if(res.open && i===parsed.steps.length-1){
+        // open last target
+        setTimeout(function(){openTarget(res.open)},400);
+      }
+    }
+    pushMem({raw:text,intents:intents,ts:Date.now()});
+    // build log on FS
+    if(initData()){
+      var line=new Date().toISOString()+' | '+text+' | '+intents.join('+')+'\n';
+      fsApi('read','/Documents/build-log.txt').then(function(j){
+        fsApi('write','/Documents/build-log.txt',(j.ok?j.content:'')+line);
+      });
+    }
+  }
+
+  document.getElementById('run').onclick=function(){runBuild(document.getElementById('cmd').value)};
+  document.getElementById('run-chain').onclick=function(){runBuild(document.getElementById('cmd').value)};
+
+  // Manual grid
+  var grid=document.getElementById('manual-grid');
+  RULES.forEach(function(r){
+    var b=document.createElement('button');b.type='button';b.textContent=r.intent;
+    b.onclick=function(){runBuild(r.intent)};
+    grid.appendChild(b);
+  });
+
+  // Tabs
+  function tab(name){
+    document.getElementById('pane-auto').style.display=name==='auto'?'block':'none';
+    document.getElementById('pane-manual').style.display=name==='manual'?'block':'none';
+    document.getElementById('pane-memory').style.display=name==='memory'?'block':'none';
+    ['auto','manual','memory'].forEach(function(t){
+      document.getElementById('tab-'+t).classList.toggle('on',t===name);
+    });
+  }
+  document.getElementById('tab-auto').onclick=function(){tab('auto')};
+  document.getElementById('tab-manual').onclick=function(){tab('manual')};
+  document.getElementById('tab-memory').onclick=function(){tab('memory')};
+  document.getElementById('mem-clear').onclick=function(){mem=[];localStorage.removeItem('pasiya_build_mem');renderMem()};
+
+  document.getElementById('sch-save').onclick=function(){
+    var when=document.getElementById('sch-when').value.trim();
+    var cmd=document.getElementById('sch-cmd').value.trim();
+    if(!cmd)return;
+    var item={when:when||'unspecified',cmd:cmd,ts:Date.now()};
+    fsApi('read','/Documents/build-schedule.json').then(function(j){
+      var list=[];if(j.ok&&j.content){try{list=JSON.parse(j.content)}catch(e){}}
+      if(!Array.isArray(list))list=[];list.unshift(item);
+      return fsApi('write','/Documents/build-schedule.json',JSON.stringify(list,null,2));
+    }).then(function(j){
+      document.getElementById('sch-out').textContent=j&&j.ok?'Saved schedule draft (cron wire = Phase 2)':'Need Telegram auth / FS';
+    });
+  };
+
+  document.getElementById('go-phone').onclick=function(){location.href='/bot/phone.html'};
+  document.getElementById('go-desk').onclick=function(){location.href='/bot/desktop.html'};
+})();
+</script>
+</body>
+</html>
