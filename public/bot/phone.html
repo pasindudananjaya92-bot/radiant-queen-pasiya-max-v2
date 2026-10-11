@@ -4,7 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
-<meta name="pasiya-phone-version" content="Phone-3"/>
+<meta name="pasiya-phone-version" content="Phone-4"/>
 <title>PasiyaPhone</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
@@ -119,11 +119,38 @@ input,textarea{width:100%;padding:12px 14px;border-radius:12px;border:0;backgrou
 .cam-bar{display:flex;align-items:center;justify-content:space-around;padding:16px;padding-bottom:calc(16px + var(--safe-bot));background:#000}
 .cam-shutter{width:72px;height:72px;border-radius:50%;border:4px solid #fff;background:rgba(255,255,255,.2);cursor:pointer}
 .cam-shutter:active{background:#fff}
+
+/* Phone-4 */
+#faceid{position:fixed;inset:0;z-index:110;background:rgba(0,0,0,.92);display:none;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+#faceid.open{display:flex}
+#faceid .ring{width:88px;height:88px;border-radius:50%;border:3px solid rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:40px;margin-bottom:16px;animation:pulse 1.2s ease infinite}
+@keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.06);opacity:.85}}
+#faceid .msg{font-size:16px;margin-bottom:20px;opacity:.9}
+.wp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.wp-item{aspect-ratio:9/16;border-radius:12px;border:2px solid transparent;cursor:pointer;background-size:cover;background-position:center}
+.wp-item.on{border-color:var(--blue)}
+.rings{display:flex;justify-content:center;gap:16px;margin:16px 0;flex-wrap:wrap}
+.ring-wrap{text-align:center}
+.ring-svg{width:88px;height:88px}
+.st-bar{height:8px;background:#333;border-radius:4px;overflow:hidden;margin:6px 0 12px}
+.st-bar>i{display:block;height:100%;background:var(--blue)}
+.settings-list .row{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--sep);cursor:pointer}
+.settings-list .row span{color:var(--muted);font-size:14px}
+
 </style>
 </head>
 <body>
 <div id="bright-veil"></div>
 <div id="flash-veil"></div>
+
+<div id="faceid">
+  <div class="ring">🙂</div>
+  <div class="msg" id="face-msg">Face ID</div>
+  <button type="button" class="unlock-btn" id="face-ok" style="border:0;background:var(--blue);color:#fff;padding:12px 28px;border-radius:22px;font-size:15px;cursor:pointer">Simulate Match</button>
+  <button type="button" class="btn secondary" id="face-pass" style="margin-top:10px">Use Passcode</button>
+  <input id="face-pin" type="password" inputmode="numeric" maxlength="6" placeholder="Passcode" style="display:none;max-width:200px;margin-top:12px;text-align:center"/>
+</div>
+
 
 <div id="lock">
   <div style="flex:1"></div>
@@ -223,10 +250,80 @@ input,textarea{width:100%;padding:12px 14px;border-radius:12px;border:0;backgrou
   </div>
 </div>
 
+
+<div class="panel" id="p-wallpaper">
+  <div class="nav"><button type="button" data-close="wallpaper">Close</button><b>Wallpaper</b><span style="width:52px"></span></div>
+  <div class="body">
+    <div class="card muted">Choose Home & Lock background</div>
+    <div class="wp-grid" id="wp-grid"></div>
+    <button type="button" class="btn" id="wp-save">Save wallpaper</button>
+  </div>
+</div>
+<div class="panel" id="p-mail">
+  <div class="nav"><button type="button" data-close="mail">Close</button><b>Mail</b><span style="width:52px"></span></div>
+  <div class="body">
+    <input id="mail-to" placeholder="To"/>
+    <input id="mail-sub" placeholder="Subject"/>
+    <textarea id="mail-body" rows="5" placeholder="Message..."></textarea>
+    <button type="button" class="btn" id="mail-send">Save draft to FS</button>
+    <div class="card muted" id="mail-st">Saves /Documents/phone-mail-drafts.json (no real SMTP on free tier)</div>
+    <div id="mail-list"></div>
+  </div>
+</div>
+<div class="panel" id="p-reminders">
+  <div class="nav"><button type="button" data-close="reminders">Close</button><b>Reminders</b><span style="width:52px"></span></div>
+  <div class="body">
+    <input id="rm-in" placeholder="New reminder"/>
+    <button type="button" class="btn" id="rm-add">Add</button>
+    <button type="button" class="btn secondary" id="rm-save">Save</button>
+    <div id="rm-list"></div>
+  </div>
+</div>
+<div class="panel" id="p-health">
+  <div class="nav"><button type="button" data-close="health">Close</button><b>Health</b><span style="width:52px"></span></div>
+  <div class="body">
+    <div class="card"><b>Activity Rings</b><div class="muted">Move · Exercise · Stand (daily goals)</div>
+      <div class="rings" id="health-rings"></div>
+    </div>
+    <div class="card">
+      <label class="muted">Move (kcal)</label>
+      <input id="h-move" type="number" value="320"/>
+      <label class="muted">Exercise (min)</label>
+      <input id="h-ex" type="number" value="22"/>
+      <label class="muted">Stand (hours)</label>
+      <input id="h-stand" type="number" value="8"/>
+      <button type="button" class="btn" id="h-save">Save rings</button>
+    </div>
+  </div>
+</div>
+<div class="panel" id="p-settings">
+  <div class="nav"><button type="button" data-close="settings">Close</button><b>Settings</b><span style="width:52px"></span></div>
+  <div class="body settings-list">
+    <div class="row" data-go="wallpaper"><b>Wallpaper</b><span>›</span></div>
+    <div class="row" data-go="face"><b>Face ID & Passcode</b><span id="set-face">On ›</span></div>
+    <div class="row" data-go="screentime"><b>Screen Time</b><span>›</span></div>
+    <div class="row" data-go="about"><b>General / About</b><span>›</span></div>
+    <div class="row" data-go="desktop"><b>Open Desktop OS</b><span>›</span></div>
+    <div class="card muted" style="margin-top:12px">PasiyaPhone 4 · founder FS · Telegram Mini App</div>
+  </div>
+</div>
+<div class="panel" id="p-screentime">
+  <div class="nav"><button type="button" data-close="screentime">Close</button><b>Screen Time</b><span style="width:52px"></span></div>
+  <div class="body">
+    <div class="card">
+      <b>Today</b>
+      <div class="muted" id="st-total">—</div>
+      <div class="st-bar"><i id="st-bar" style="width:40%"></i></div>
+      <div id="st-apps" class="muted">Tracking session time in this Mini App</div>
+    </div>
+    <button type="button" class="btn secondary" id="st-reset">Reset today</button>
+  </div>
+</div>
+
 <div class="panel" id="p-about">
   <div class="nav"><button type="button" data-close="about">Close</button><b>About</b><span style="width:52px"></span></div>
   <div class="body">
-    <div class="card"><h2 style="margin:0 0 8px">PasiyaPhone</h2><p class="muted">Phase 3 · Widgets · NC · Switcher · Camera</p><p>iPhone-class shell on Telegram · shared pasiya_fs</p></div>
+    <div class="card"><h2 style="margin:0 0 8px">PasiyaPhone</h2><p class="muted">Phase 4 · Wallpaper · Face ID · Mail · Reminders · Health · Settings</p><p>iPhone-class shell on Telegram · shared pasiya_fs</p></div>
     <button type="button" class="btn" id="btn-desktop">Open Desktop OS</button>
     <button type="button" class="btn secondary" id="btn-seed">Seed FS</button>
     <button type="button" class="btn secondary" id="btn-lock">Lock</button>
@@ -437,14 +534,14 @@ input,textarea{width:100%;padding:12px 14px;border-radius:12px;border:0;backgrou
     ['phone','📞','Phone','native:contacts'],['notes','📝','Notes','native:notes'],
     ['safari','🧭','Safari','desk:browser'],['music','🎵','Music','desk:music'],
     ['messages','💬','Messages','desk:clip'],['camera','📷','Camera','native:camera'],
-    ['settings','⚙️','Settings','native:about'],['wallet','🔐','Vault','desk:vault']
+    ['settings','⚙️','Settings','native:settings'],['wallet','🔐','Vault','desk:vault']
   ];
   var ALL=[
-    ['photos','🎬','Photos','desk:studio'],['mail','✉️','Mail','desk:notify'],
+    ['photos','🎬','Photos','desk:studio'],['mail','✉️','Mail','native:mail'],
     ['calendar','📅','Calendar','desk:planner'],['weather','🌤️','Weather','desk:weather'],
     ['clock','🕐','Clock','desk:clock'],['maps','🗺️','Maps','desk:world'],
-    ['reminders','✅','Reminders','desk:tasks'],['stocks','📈','Stocks','desk:coins'],
-    ['news','📰','News','desk:rss'],['health','🩺','Health','desk:diag'],
+    ['reminders','✅','Reminders','native:reminders'],['health','❤️','Health','native:health'],['stocks','📈','Stocks','desk:coins'],
+    ['news','📰','News','desk:rss'],['diag','🩺','Diag','desk:diag'],
     ['files','📁','Files','desk:explorer'],['translate','🔤','Translate','desk:translate'],
     ['books','📚','Books','desk:wiki'],['calc','🔢','Calc','desk:calc'],
     ['tips','💡','Tips','desk:hotkeys'],['appstore','🏪','Store','desk:store'],
@@ -585,9 +682,224 @@ input,textarea{width:100%;padding:12px 14px;border-radius:12px;border:0;backgrou
     var n=Date.now();if(n-lastTap<300)openSwitcher();lastTap=n;
   });
 
-  paintCC();ctLoad();loadLockNotifs();loadWeather();loadCal();
+  
+  /* ===== Phone-4: Wallpaper, Face ID, Mail, Reminders, Health, Settings, Screen Time ===== */
+  var WALLPAPERS=[
+    {id:'aurora',css:'radial-gradient(120% 80% at 20% 0%, #3a1c71 0%, transparent 50%),radial-gradient(100% 70% at 100% 30%, #d76d77 0%, transparent 45%),radial-gradient(80% 60% at 50% 100%, #ffaf7b 0%, transparent 40%),#0a0a0c'},
+    {id:'ocean',css:'linear-gradient(160deg,#0f2027,#203a43,#2c5364)'},
+    {id:'midnight',css:'linear-gradient(180deg,#0b0b12,#1a1a2e 40%,#16213e)'},
+    {id:'sunset',css:'linear-gradient(180deg,#ff6a00,#ee0979 50%,#1a0533)'},
+    {id:'forest',css:'linear-gradient(180deg,#134e4a,#065f46,#022c22)'},
+    {id:'gold',css:'linear-gradient(145deg,#1a1208,#3d2b1f 40%,#c9a227 160%)'}
+  ];
+  var phoneCfg={wallpaper:'aurora',faceId:true,passcode:'000000'};
+  try{Object.assign(phoneCfg,JSON.parse(localStorage.getItem('pasiya_phone_cfg')||'{}'))}catch(e){}
+  function savePhoneCfg(){
+    try{localStorage.setItem('pasiya_phone_cfg',JSON.stringify(phoneCfg))}catch(e){}
+    if(initData())fsApi('write','/Documents/phone-config.json',JSON.stringify(phoneCfg,null,2));
+  }
+  function applyWallpaper(){
+    var w=WALLPAPERS.find(function(x){return x.id===phoneCfg.wallpaper})||WALLPAPERS[0];
+    document.body.style.background=w.css;
+    var lock=document.getElementById('lock');
+    if(lock)lock.style.background=w.css;
+  }
+  function paintWpGrid(){
+    var g=document.getElementById('wp-grid');if(!g)return;g.innerHTML='';
+    WALLPAPERS.forEach(function(w){
+      var d=document.createElement('div');d.className='wp-item'+(phoneCfg.wallpaper===w.id?' on':'');
+      d.style.background=w.css;d.title=w.id;
+      d.onclick=function(){phoneCfg.wallpaper=w.id;paintWpGrid();applyWallpaper();haptic('light')};
+      g.appendChild(d);
+    });
+  }
+  var wpSave=document.getElementById('wp-save');
+  if(wpSave)wpSave.onclick=function(){savePhoneCfg();toast('Wallpaper saved');haptic('success')};
+
+  /* Face ID gate on unlock path */
+  var facePending=false;
+  function showFaceId(cb){
+    if(!phoneCfg.faceId){if(cb)cb();return}
+    facePending=cb||null;
+    document.getElementById('faceid').classList.add('open');
+    document.getElementById('face-msg').textContent='Face ID';
+    document.getElementById('face-pin').style.display='none';
+    document.getElementById('face-pin').value='';
+    haptic('medium');
+  }
+  function hideFaceId(){document.getElementById('faceid').classList.remove('open');facePending=null}
+  document.getElementById('face-ok').onclick=function(){
+    hideFaceId();haptic('success');toast('Face ID matched');
+    if(typeof facePending==='function')facePending();
+    else unlock();
+  };
+  document.getElementById('face-pass').onclick=function(){
+    document.getElementById('face-pin').style.display='block';
+    document.getElementById('face-msg').textContent='Enter Passcode';
+    document.getElementById('face-pin').focus();
+  };
+  document.getElementById('face-pin').onkeydown=function(e){
+    if(e.key!=='Enter')return;
+    if(this.value===String(phoneCfg.passcode||'000000')){
+      hideFaceId();haptic('success');
+      if(typeof facePending==='function')facePending();else unlock();
+    }else{toast('Wrong passcode');haptic('error');this.value=''}
+  };
+  // Override unlock button to use Face ID first when locked
+  document.getElementById('lock-btn').onclick=function(){
+    showFaceId(function(){document.getElementById('lock').classList.add('unlocked');haptic('success')});
+  };
+
+  /* Mail */
+  var drafts=[];
+  function mailRender(){
+    var list=document.getElementById('mail-list');if(!list)return;list.innerHTML='';
+    drafts.slice(0,10).forEach(function(d){
+      var el=document.createElement('div');el.className='card';
+      el.innerHTML='<b>'+String(d.sub||'(no subject)').replace(/</g,'')+'</b><div class="muted">To: '+String(d.to||'')+'</div>';
+      list.appendChild(el);
+    });
+  }
+  function mailLoad(){
+    fsApi('read','/Documents/phone-mail-drafts.json').then(function(j){
+      drafts=[];if(j.ok&&j.content){try{drafts=JSON.parse(j.content)}catch(e){}}
+      if(!Array.isArray(drafts))drafts=[];mailRender();
+    });
+  }
+  var mailSend=document.getElementById('mail-send');
+  if(mailSend)mailSend.onclick=function(){
+    if(!initData()){toast('Open via /phone');return}
+    var item={to:document.getElementById('mail-to').value.trim(),sub:document.getElementById('mail-sub').value.trim(),body:document.getElementById('mail-body').value,ts:Date.now()};
+    drafts.unshift(item);
+    fsApi('write','/Documents/phone-mail-drafts.json',JSON.stringify(drafts,null,2)).then(function(j){
+      document.getElementById('mail-st').textContent=j.ok?'Draft saved (no SMTP on free tier)':(j.error||'fail');
+      if(j.ok){toast('Draft saved');haptic('success');mailRender();document.getElementById('mail-body').value=''}
+    });
+  };
+
+  /* Reminders */
+  var reminders=[];
+  function rmRender(){
+    var list=document.getElementById('rm-list');if(!list)return;list.innerHTML='';
+    reminders.forEach(function(r,i){
+      var d=document.createElement('div');d.className='card';
+      var lab=document.createElement('label');lab.style.display='flex';lab.style.gap='8px';lab.style.alignItems='center';
+      var cb=document.createElement('input');cb.type='checkbox';cb.checked=!!r.done;
+      cb.onchange=function(){reminders[i].done=cb.checked};
+      var sp=document.createElement('span');sp.textContent=r.text||'';
+      lab.appendChild(cb);lab.appendChild(sp);d.appendChild(lab);list.appendChild(d);
+    });
+  }
+  function rmLoad(){
+    fsApi('read','/Documents/phone-reminders.json').then(function(j){
+      reminders=[];if(j.ok&&j.content){try{reminders=JSON.parse(j.content)}catch(e){}}
+      if(!Array.isArray(reminders))reminders=[];rmRender();
+    });
+  }
+  var rmAdd=document.getElementById('rm-add');
+  if(rmAdd)rmAdd.onclick=function(){
+    var t=document.getElementById('rm-in').value.trim();if(!t)return;
+    reminders.unshift({text:t,done:false,ts:Date.now()});document.getElementById('rm-in').value='';rmRender();haptic('light');
+  };
+  var rmSave=document.getElementById('rm-save');
+  if(rmSave)rmSave.onclick=function(){
+    if(!initData()){toast('Open via /phone');return}
+    fsApi('write','/Documents/phone-reminders.json',JSON.stringify(reminders,null,2)).then(function(j){
+      if(j.ok){toast('Reminders saved');haptic('success')}
+      // mirror incomplete into notifications for NC/lock
+      var notifs=reminders.filter(function(r){return !r.done}).map(function(r){return {text:r.text,done:false,ts:r.ts}});
+      fsApi('write','/Documents/notifications.json',JSON.stringify(notifs,null,2));
+    });
+  };
+
+  /* Health rings */
+  var health={move:320,exercise:22,stand:8,moveGoal:500,exGoal:30,standGoal:12};
+  function ringSvg(pct,color){
+    pct=Math.max(0,Math.min(1,pct));
+    var r=36,c=2*Math.PI*r,off=c*(1-pct);
+    return '<svg class="ring-svg" viewBox="0 0 88 88"><circle cx="44" cy="44" r="'+r+'" fill="none" stroke="#333" stroke-width="8"/><circle cx="44" cy="44" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="8" stroke-linecap="round" stroke-dasharray="'+c+'" stroke-dashoffset="'+off+'" transform="rotate(-90 44 44)"/></svg>';
+  }
+  function healthPaint(){
+    var el=document.getElementById('health-rings');if(!el)return;
+    el.innerHTML=
+      '<div class="ring-wrap">'+ringSvg(health.move/health.moveGoal,'#ff375f')+'<div class="muted">Move</div><b>'+health.move+'</b></div>'+
+      '<div class="ring-wrap">'+ringSvg(health.exercise/health.exGoal,'#30d158')+'<div class="muted">Exercise</div><b>'+health.exercise+'m</b></div>'+
+      '<div class="ring-wrap">'+ringSvg(health.stand/health.standGoal,'#64d2ff')+'<div class="muted">Stand</div><b>'+health.stand+'h</b></div>';
+    var m=document.getElementById('h-move'),e=document.getElementById('h-ex'),s=document.getElementById('h-stand');
+    if(m)m.value=health.move;if(e)e.value=health.exercise;if(s)s.value=health.stand;
+  }
+  function healthLoad(){
+    fsApi('read','/Documents/phone-health.json').then(function(j){
+      if(j.ok&&j.content){try{Object.assign(health,JSON.parse(j.content))}catch(e){}}
+      healthPaint();
+    });
+  }
+  var hSave=document.getElementById('h-save');
+  if(hSave)hSave.onclick=function(){
+    health.move=Number(document.getElementById('h-move').value)||0;
+    health.exercise=Number(document.getElementById('h-ex').value)||0;
+    health.stand=Number(document.getElementById('h-stand').value)||0;
+    healthPaint();
+    if(!initData()){toast('Open via /phone');return}
+    fsApi('write','/Documents/phone-health.json',JSON.stringify(health,null,2)).then(function(j){
+      if(j.ok){toast('Health saved');haptic('success')}
+    });
+  };
+
+  /* Screen Time */
+  var stKey='pasiya_st_'+new Date().toISOString().slice(0,10);
+  var st={start:Date.now(),acc:0,apps:{}};
+  try{var s0=JSON.parse(localStorage.getItem(stKey)||'{}');if(s0.acc!=null)st=s0}catch(e){}
+  if(!st.start)st.start=Date.now();
+  function stTick(){
+    st.acc=(st.acc||0)+5;
+    try{localStorage.setItem(stKey,JSON.stringify(st))}catch(e){}
+  }
+  setInterval(stTick,5000);
+  function stPaint(){
+    var mins=Math.round((st.acc||0)/60);
+    var el=document.getElementById('st-total');
+    if(el)el.textContent=mins+' minutes on PasiyaPhone today';
+    var bar=document.getElementById('st-bar');
+    if(bar)bar.style.width=Math.min(100,mins)+'%';
+    var apps=document.getElementById('st-apps');
+    if(apps)apps.textContent='Session tracking (client-side). Goal mock: 120 min.';
+  }
+  var stReset=document.getElementById('st-reset');
+  if(stReset)stReset.onclick=function(){st={start:Date.now(),acc:0,apps:{}};try{localStorage.setItem(stKey,JSON.stringify(st))}catch(e){}stPaint();toast('Reset');haptic('light')};
+
+  /* Settings rows */
+  document.querySelectorAll('#p-settings .row').forEach(function(row){
+    row.onclick=function(){
+      var go=row.getAttribute('data-go');
+      if(go==='wallpaper'){closePanels();openPanel('wallpaper');paintWpGrid()}
+      else if(go==='face'){phoneCfg.faceId=!phoneCfg.faceId;savePhoneCfg();document.getElementById('set-face').textContent=(phoneCfg.faceId?'On':'Off')+' ›';toast('Face ID '+(phoneCfg.faceId?'On':'Off'));haptic('light')}
+      else if(go==='screentime'){closePanels();openPanel('screentime');stPaint()}
+      else if(go==='about'){closePanels();openPanel('about')}
+      else if(go==='desktop'){location.href='/bot/desktop.html'}
+    };
+  });
+
+  /* Extend openTarget for native mail/reminders/health/settings */
+  var _openTarget=openTarget;
+  openTarget=function(target){
+    if(target==='native:mail'){openPanel('mail');pushRecent('Mail','native:mail','✉️');mailLoad();return}
+    if(target==='native:reminders'){openPanel('reminders');pushRecent('Reminders','native:reminders','✅');rmLoad();return}
+    if(target==='native:health'){openPanel('health');pushRecent('Health','native:health','❤️');healthLoad();return}
+    if(target==='native:settings'){openPanel('settings');pushRecent('Settings','native:settings','⚙️');return}
+    if(target==='native:wallpaper'){openPanel('wallpaper');paintWpGrid();return}
+    return _openTarget(target);
+  };
+
+  applyWallpaper();
+  paintWpGrid();
+  healthPaint();
+  stPaint();
+  if(document.getElementById('set-face'))document.getElementById('set-face').textContent=(phoneCfg.faceId?'On':'Off')+' ›';
+
+  paintCC();ctLoad();loadLockNotifs();loadWeather();loadCal();mailLoad();rmLoad();healthLoad();
   if(!initData())toast('⚠️ Open via Telegram /phone');
-  else toast('PasiyaPhone 3 · Widgets · NC · Camera');
+  else toast('PasiyaPhone 4 · Face ID · Health · Settings');
 })();
 </script>
 </body>
