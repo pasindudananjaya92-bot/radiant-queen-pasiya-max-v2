@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
-<meta name="pasiya-build" content="Build-1"/>
+<meta name="pasiya-build" content="Build-2"/>
 <title>Pasiya Builder</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
@@ -16,20 +16,20 @@ h1{font-size:20px;margin:0 0 4px}
 .tabs button{flex:1;padding:10px;border:0;border-radius:10px;background:#222;color:var(--text);font-weight:600;cursor:pointer}
 .tabs button.on{background:var(--gold);color:#111}
 .card{background:var(--card);border-radius:14px;padding:14px;margin-bottom:12px;border:1px solid #2a2a32}
-textarea,input{width:100%;padding:12px;border-radius:10px;border:1px solid #333;background:#0e0e12;color:var(--text);font-size:16px}
+textarea,input{width:100%;padding:12px;border-radius:10px;border:1px solid #333;background:#0e0e12;color:var(--text);font-size:16px;margin-top:6px}
 button.b{background:var(--blue);color:#fff;border:0;border-radius:10px;padding:12px 16px;font-weight:600;cursor:pointer;margin:6px 6px 0 0}
 button.g{background:var(--gold);color:#111}
 button.s{background:#333}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .grid button{padding:12px 6px;border:0;border-radius:12px;background:#1c1c24;color:var(--text);font-size:12px;cursor:pointer}
-.log{font-family:ui-monospace,monospace;font-size:12px;white-space:pre-wrap;max-height:220px;overflow:auto;color:#d1d5db}
+.log{font-family:ui-monospace,monospace;font-size:12px;white-space:pre-wrap;max-height:240px;overflow:auto;color:#d1d5db}
 .chip{display:inline-block;background:#222;border-radius:999px;padding:4px 10px;font-size:11px;margin:2px;color:var(--muted)}
 .ok{color:var(--ok)}.err{color:#f87171}
 </style>
 </head>
 <body>
 <h1>🏗️ Pasiya Builder</h1>
-<div class="sub">Auto = natural language · Manual = tap action · Chains with “and” / “සහ”</div>
+<div class="sub">Phase 2 · Auto-save note / remind / calendar · Chains · Memory</div>
 <div class="tabs">
   <button type="button" class="on" id="tab-auto">Auto</button>
   <button type="button" id="tab-manual">Manual</button>
@@ -42,16 +42,12 @@ button.s{background:#333}
 weather
 note Buy milk
 remind Call Amma
-calendar and note Meeting
-ෆෝටෝ එකක් ගන්න
-වෙදර් එක බලන්න"></textarea>
+calendar Meeting
+calendar and Meeting
+calendar Meeting and note Agenda"></textarea>
     <button type="button" class="b g" id="run">▶ Run Build</button>
-    <button type="button" class="b s" id="run-chain">▶ Run chain</button>
   </div>
-  <div class="card">
-    <b>Result</b>
-    <div class="log" id="out">Ready.</div>
-  </div>
+  <div class="card"><b>Result</b><div class="log" id="out">Ready.</div></div>
 </div>
 
 <div id="pane-manual" style="display:none">
@@ -65,16 +61,16 @@ calendar and note Meeting
     <button type="button" class="b s" id="mem-clear">Clear memory</button>
   </div>
   <div class="card">
-    <b>Scheduled (Phase-1 stub)</b>
-    <input id="sch-when" placeholder="ISO or tomorrow 06:00"/>
-    <input id="sch-cmd" placeholder="Command text"/>
-    <button type="button" class="b" id="sch-save">Save schedule draft</button>
+    <b>Schedule draft</b>
+    <input id="sch-when" placeholder="tomorrow 06:00"/>
+    <input id="sch-cmd" placeholder="Command"/>
+    <button type="button" class="b" id="sch-save">Save schedule</button>
     <div class="log" id="sch-out"></div>
   </div>
 </div>
 
 <div class="card">
-  <span class="chip">Phone</span><span class="chip">Desktop</span><span class="chip">FS</span><span class="chip">No new Vercel fn</span>
+  <span class="chip">Build-2</span><span class="chip">planner.json</span><span class="chip">reminders</span>
   <div style="margin-top:8px">
     <button type="button" class="b s" id="go-phone">📱 Phone</button>
     <button type="button" class="b s" id="go-desk">🖥️ Desktop</button>
@@ -89,49 +85,91 @@ calendar and note Meeting
     var id=initData();
     var body=Object.assign({action:action,path:path||'/',content:content,initData:id},extra||{});
     return fetch('/api/fs',{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':id},body:JSON.stringify(body)})
-      .then(function(r){return r.json().catch(function(){return{ok:false,error:'bad json'}})});
+      .then(function(r){return r.json().catch(function(){return{ok:false,error:'bad json'}})})
+      .catch(function(e){return{ok:false,error:String(e.message||e)}});
   }
   function log(m,cls){
     var el=document.getElementById('out');
     el.innerHTML=(cls?'<span class="'+cls+'">':'')+String(m)+(cls?'</span>':'')+'\n'+el.textContent;
   }
+  function todayKey(){
+    var n=new Date();
+    return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');
+  }
+  function strip(part, regs){
+    var t=String(part||'').trim();
+    regs.forEach(function(re){t=t.replace(re,'').trim()});
+    t=t.replace(/^(a|an|the|to|for|කරන්න|එකක්|එක)\s+/i,'').trim();
+    return t;
+  }
 
-  // Inline intent rules (same as lib/buildIntent.js)
   var RULES=[
-    {intent:'weather',re:/(weather|වෙදර්|කාලගුණ|temperature)/i,target:'desk:weather'},
-    {intent:'note',re:/(note|නෝට්|ලියන්න|memo)/i,target:'native:notes'},
+    {intent:'weather',re:/(weather|වෙදර්|කාලගුණ)/i,target:'desk:weather'},
+    {intent:'note',re:/(note|නෝට්|memo|ලියන්න)/i,target:'native:notes'},
     {intent:'reminder',re:/(remind|ටාස්ක්|task|reminder|මතක්)/i,target:'native:reminders'},
-    {intent:'calendar',re:/(calendar|කැලෙන්ඩර්|event|planner)/i,target:'native:calendar'},
-    {intent:'photo',re:/(photo|ෆෝටෝ|camera|කැමරා|picture)/i,target:'native:camera'},
+    {intent:'calendar',re:/(calendar|කැලෙන්ඩර්|event|planner|සිද්ධි)/i,target:'native:calendar'},
+    {intent:'photo',re:/(photo|ෆෝටෝ|camera|කැමරා)/i,target:'native:camera'},
     {intent:'photos',re:/(photos|ගැලරි|gallery)/i,target:'native:photos'},
-    {intent:'calc',re:/(calc|ගණන්|calculate|\d+\s*[\+\-\*x×\/÷])/i,target:'native:calc'},
+    {intent:'calc',re:/(calc|ගණන්|calculate)/i,target:'native:calc'},
     {intent:'translate',re:/(translate|පරිවර්තන)/i,target:'desk:translate'},
-    {intent:'files',re:/(file|ෆයිල්|documents|explorer)/i,target:'desk:explorer'},
-    {intent:'health',re:/(health|සෞඛ්‍ය|fitness|rings)/i,target:'native:health'},
-    {intent:'mail',re:/(mail|email|ඊමේල්)/i,target:'native:mail'},
-    {intent:'drop',re:/(drop|airdrop|share\s+code)/i,target:'native:drop'},
-    {intent:'vault',re:/(vault|password|රහස්)/i,target:'desk:vault'},
+    {intent:'files',re:/(file|ෆයිල්|explorer)/i,target:'desk:explorer'},
+    {intent:'health',re:/(health|සෞඛ්‍ය|fitness)/i,target:'native:health'},
+    {intent:'mail',re:/(mail|email)/i,target:'native:mail'},
+    {intent:'drop',re:/(drop|airdrop)/i,target:'native:drop'},
+    {intent:'vault',re:/(vault|password)/i,target:'desk:vault'},
     {intent:'coins',re:/(bitcoin|crypto|coins)/i,target:'desk:coins'},
     {intent:'wiki',re:/(wiki|wikipedia)/i,target:'desk:wiki'},
-    {intent:'settings',re:/(settings|සැකසුම්|wallpaper)/i,target:'native:settings'},
+    {intent:'settings',re:/(settings|සැකසුම්)/i,target:'native:settings'},
     {intent:'desktop',re:/(desktop|ඩෙස්ක්ටොප්)/i,target:'native:desktop'},
-    {intent:'search',re:/(search|සොයන්න|find)/i,target:'desk:findfs'},
+    {intent:'search',re:/(search|සොයන්න)/i,target:'desk:findfs'},
     {intent:'diag',re:/(diag|syscheck)/i,target:'desk:diag'}
   ];
+
   function parseIntent(text){
     var raw=String(text||'').trim();if(!raw)return{ok:false,steps:[]};
     var parts=raw.split(/\s+(?:and|සහ|\+)\s+/i).map(function(s){return s.trim()}).filter(Boolean);
     var steps=[];
     parts.forEach(function(part){
       var hit=null;
-      for(var i=0;i<RULES.length;i++){if(RULES[i].re.test(part)){hit={intent:RULES[i].intent,target:RULES[i].target,text:part};break}}
-      var nm=part.match(/^(?:note|නෝට්)\s+(.+)/i);
-      if(nm)hit={intent:'note_write',target:'native:notes',text:part,payload:nm[1]};
-      var rm=part.match(/^(?:remind(?:er)?|task|ටාස්ක්)\s+(.+)/i);
-      if(rm)hit={intent:'reminder_add',target:'native:reminders',text:part,payload:rm[1]};
+      var m=part.match(/^(?:note|නෝට්)\s+(.+)/i);
+      if(m)hit={intent:'note_write',target:'native:notes',text:part,payload:m[1].trim()};
+      if(!hit){m=part.match(/^(?:remind(?:er)?|task|ටාස්ක්|මතක්)\s+(.+)/i);if(m)hit={intent:'reminder_add',target:'native:reminders',text:part,payload:m[1].trim()}}
+      if(!hit){m=part.match(/^(?:calendar|event|planner|කැලෙන්ඩර්|සිද්ධි)\s+(.+)/i);if(m)hit={intent:'calendar_add',target:'native:calendar',text:part,payload:m[1].trim()}}
+      if(!hit){
+        for(var i=0;i<RULES.length;i++){
+          var r=RULES[i];
+          if(!r.re.test(part))continue;
+          if(r.intent==='calendar'){
+            var p=strip(part,[/^calendar\s*/i,/^event\s*/i,/^planner\s*/i,/^කැලෙන්ඩර්\s*/i,/^සිද්ධි\s*/i]);
+            if(p&&!/^(open|app|බලන්න)$/i.test(p))hit={intent:'calendar_add',target:r.target,text:part,payload:p};
+            else hit={intent:'calendar',target:r.target,text:part};
+          }else if(r.intent==='note'){
+            var pn=strip(part,[/^note\s*/i,/^නෝට්\s*/i,/^memo\s*/i,/^ලියන්න\s*/i]);
+            if(pn&&!/^(open|app|බලන්න)$/i.test(pn))hit={intent:'note_write',target:r.target,text:part,payload:pn};
+            else hit={intent:'note',target:r.target,text:part};
+          }else if(r.intent==='reminder'){
+            var pr=strip(part,[/^remind(?:er)?\s*/i,/^task\s*/i,/^ටාස්ක්\s*/i,/^මතක්\s*/i]);
+            if(pr&&!/^(open|app|බලන්න)$/i.test(pr))hit={intent:'reminder_add',target:r.target,text:part,payload:pr};
+            else hit={intent:'reminder',target:r.target,text:part};
+          }else hit={intent:r.intent,target:r.target,text:part};
+          break;
+        }
+      }
       if(!hit)hit={intent:'unknown',text:part};
       steps.push(hit);
     });
+    // chain context: "calendar and Meeting"
+    for(var j=1;j<steps.length;j++){
+      if(steps[j].intent!=='unknown')continue;
+      var prev=steps[j-1], t=steps[j].text;
+      if(!t||t.length>80)continue;
+      if(prev.intent==='calendar'||prev.intent==='calendar_add')
+        steps[j]={intent:'calendar_add',target:'native:calendar',text:t,payload:t};
+      else if(prev.intent==='note'||prev.intent==='note_write')
+        steps[j]={intent:'note_write',target:'native:notes',text:t,payload:t};
+      else if(prev.intent==='reminder'||prev.intent==='reminder_add')
+        steps[j]={intent:'reminder_add',target:'native:reminders',text:t,payload:t};
+    }
     return{ok:true,steps:steps,raw:raw};
   }
 
@@ -149,107 +187,135 @@ calendar and note Meeting
   renderMem();
 
   function openTarget(target){
+    if(!target)return;
     if(target==='native:desktop'){location.href='/bot/desktop.html';return}
-    if(target==='native:notes'){location.href='/bot/phone.html';return} // phone opens; user uses notes — better deep links below
-    // Prefer phone deep tools via phone.html; desktop tools via desktop.html?open=
     if(target.indexOf('desk:')===0){
       location.href='/bot/desktop.html?open='+encodeURIComponent(target.slice(5));
       return;
     }
+    // native panels live on phone
     if(target.indexOf('native:')===0){
-      // phone hosts native panels — open phone (user continues); future: ?panel=
       location.href='/bot/phone.html';
       return;
     }
   }
 
+  async function readJson(path, fallback){
+    var j=await fsApi('read',path);
+    if(!j.ok||!j.content)return fallback;
+    try{return JSON.parse(j.content)}catch(e){return fallback}
+  }
+  async function writeJson(path, obj){
+    return fsApi('write',path,JSON.stringify(obj,null,2));
+  }
+
   async function execStep(step){
-    // Auto-write payloads to FS when possible
-    if(step.intent==='note_write'&&step.payload){
-      if(!initData())return{ok:false,msg:'Telegram auth required for FS write'};
-      var prev=await fsApi('read','/Documents/phone-note.txt');
-      var content=(prev.ok&&prev.content?prev.content+'\n':'')+step.payload;
-      var w=await fsApi('write','/Documents/phone-note.txt',content);
-      return{ok:!!w.ok,msg:w.ok?('Note written: '+step.payload):(w.error||'write fail'),open:'native:notes'};
+    if(!initData() && (step.intent==='note_write'||step.intent==='reminder_add'||step.intent==='calendar_add')){
+      return{ok:false,msg:'Open Builder via Telegram /build (auth required)'};
     }
+
+    // NOTE write
+    if(step.intent==='note_write'&&step.payload){
+      var prev=await fsApi('read','/Documents/phone-note.txt');
+      var content=(prev.ok&&prev.content?String(prev.content).replace(/\s+$/,'')+'\n':'')+step.payload;
+      var w=await fsApi('write','/Documents/phone-note.txt',content);
+      return{ok:!!w.ok,msg:w.ok?('Note saved: '+step.payload):(w.error||'note fail'),open:null};
+    }
+
+    // REMINDER — phone-reminders.json + notifications.json (NOT notes)
     if(step.intent==='reminder_add'&&step.payload){
-      if(!initData())return{ok:false,msg:'Telegram auth required'};
-      var r=await fsApi('read','/Documents/phone-reminders.json');
-      var list=[];if(r.ok&&r.content){try{list=JSON.parse(r.content)}catch(e){}}
+      var list=await readJson('/Documents/phone-reminders.json',[]);
       if(!Array.isArray(list))list=[];
       list.unshift({text:step.payload,done:false,ts:Date.now()});
-      var w=await fsApi('write','/Documents/phone-reminders.json',JSON.stringify(list,null,2));
-      await fsApi('write','/Documents/notifications.json',JSON.stringify(list.filter(function(x){return !x.done}),null,2));
-      return{ok:!!w.ok,msg:w.ok?('Reminder: '+step.payload):(w.error||'fail'),open:'native:reminders'};
+      var w=await writeJson('/Documents/phone-reminders.json',list);
+      var notifs=list.filter(function(x){return !x.done}).map(function(x){return{text:x.text,done:false,ts:x.ts}});
+      await writeJson('/Documents/notifications.json',notifs);
+      return{ok:!!w.ok,msg:w.ok?('Reminder saved: '+step.payload):(w.error||'remind fail'),open:null};
     }
-    if(step.intent==='unknown')return{ok:false,msg:'Unknown: "'+step.text+'" — try weather, note X, remind Y'};
+
+    // CALENDAR — planner.json + phone-calendar.json for today
+    if(step.intent==='calendar_add'&&step.payload){
+      var key=todayKey();
+      var plan=await readJson('/Documents/planner.json',{});
+      if(!plan||typeof plan!=='object')plan={};
+      if(!Array.isArray(plan[key]))plan[key]=[];
+      if(plan[key].indexOf(step.payload)<0)plan[key].push(step.payload);
+      var w1=await writeJson('/Documents/planner.json',plan);
+      var cal=await readJson('/Documents/phone-calendar.json',{});
+      if(!cal||typeof cal!=='object')cal={};
+      if(!Array.isArray(cal[key]))cal[key]=[];
+      if(cal[key].indexOf(step.payload)<0)cal[key].push(step.payload);
+      var w2=await writeJson('/Documents/phone-calendar.json',cal);
+      var ok=w1.ok||w2.ok;
+      return{ok:!!ok,msg:ok?('Calendar '+key+': '+step.payload):(w1.error||w2.error||'calendar fail'),open:null};
+    }
+
+    if(step.intent==='unknown'){
+      return{ok:false,msg:'Unknown: "'+step.text+'" — try: calendar Meeting · note X · remind Y · weather'};
+    }
+
+    // open-only intents
     return{ok:true,msg:'Open '+step.intent,open:step.target};
   }
 
   async function runBuild(text){
     var parsed=parseIntent(text);
-    if(!parsed.steps.length){log('Empty command','err');return}
+    if(!parsed.steps.length){log('Empty','err');return}
     log('Parsed '+parsed.steps.length+' step(s)…');
     var intents=[];
+    var lastOpen=null;
     for(var i=0;i<parsed.steps.length;i++){
       var step=parsed.steps[i];
-      intents.push(step.intent);
+      intents.push(step.intent+(step.payload?(':'+step.payload):''));
       var res=await execStep(step);
       log((res.ok?'✓ ':'✗ ')+res.msg, res.ok?'ok':'err');
-      if(res.open && i===parsed.steps.length-1){
-        // open last target
-        setTimeout(function(){openTarget(res.open)},400);
-      }
+      if(res.open)lastOpen=res.open;
     }
     pushMem({raw:text,intents:intents,ts:Date.now()});
-    // build log on FS
     if(initData()){
-      var line=new Date().toISOString()+' | '+text+' | '+intents.join('+')+'\n';
+      var line=new Date().toISOString()+' | '+text+' | '+intents.join(' + ')+'\n';
       fsApi('read','/Documents/build-log.txt').then(function(j){
         fsApi('write','/Documents/build-log.txt',(j.ok?j.content:'')+line);
       });
     }
+    // only navigate for pure open intents (not after successful writes)
+    var onlyOpen=parsed.steps.every(function(s){return !s.payload&&s.intent!=='unknown'});
+    if(onlyOpen&&lastOpen)setTimeout(function(){openTarget(lastOpen)},300);
   }
 
   document.getElementById('run').onclick=function(){runBuild(document.getElementById('cmd').value)};
-  document.getElementById('run-chain').onclick=function(){runBuild(document.getElementById('cmd').value)};
-
-  // Manual grid
   var grid=document.getElementById('manual-grid');
   RULES.forEach(function(r){
     var b=document.createElement('button');b.type='button';b.textContent=r.intent;
-    b.onclick=function(){runBuild(r.intent)};
+    b.onclick=function(){
+      if(r.intent==='calendar')runBuild('calendar Meeting');
+      else if(r.intent==='note')runBuild('note Quick note');
+      else if(r.intent==='reminder')runBuild('remind Quick task');
+      else runBuild(r.intent);
+    };
     grid.appendChild(b);
   });
-
-  // Tabs
   function tab(name){
     document.getElementById('pane-auto').style.display=name==='auto'?'block':'none';
     document.getElementById('pane-manual').style.display=name==='manual'?'block':'none';
     document.getElementById('pane-memory').style.display=name==='memory'?'block':'none';
-    ['auto','manual','memory'].forEach(function(t){
-      document.getElementById('tab-'+t).classList.toggle('on',t===name);
-    });
+    ['auto','manual','memory'].forEach(function(t){document.getElementById('tab-'+t).classList.toggle('on',t===name)});
   }
   document.getElementById('tab-auto').onclick=function(){tab('auto')};
   document.getElementById('tab-manual').onclick=function(){tab('manual')};
   document.getElementById('tab-memory').onclick=function(){tab('memory')};
   document.getElementById('mem-clear').onclick=function(){mem=[];localStorage.removeItem('pasiya_build_mem');renderMem()};
-
   document.getElementById('sch-save').onclick=function(){
     var when=document.getElementById('sch-when').value.trim();
     var cmd=document.getElementById('sch-cmd').value.trim();
     if(!cmd)return;
-    var item={when:when||'unspecified',cmd:cmd,ts:Date.now()};
     fsApi('read','/Documents/build-schedule.json').then(function(j){
       var list=[];if(j.ok&&j.content){try{list=JSON.parse(j.content)}catch(e){}}
-      if(!Array.isArray(list))list=[];list.unshift(item);
+      if(!Array.isArray(list))list=[];
+      list.unshift({when:when||'unspecified',cmd:cmd,ts:Date.now()});
       return fsApi('write','/Documents/build-schedule.json',JSON.stringify(list,null,2));
-    }).then(function(j){
-      document.getElementById('sch-out').textContent=j&&j.ok?'Saved schedule draft (cron wire = Phase 2)':'Need Telegram auth / FS';
-    });
+    }).then(function(j){document.getElementById('sch-out').textContent=j&&j.ok?'Saved':'Need /build auth'});
   };
-
   document.getElementById('go-phone').onclick=function(){location.href='/bot/phone.html'};
   document.getElementById('go-desk').onclick=function(){location.href='/bot/desktop.html'};
 })();
