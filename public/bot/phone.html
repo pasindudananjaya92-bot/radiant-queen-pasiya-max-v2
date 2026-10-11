@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta name="pasiya-phone-version" content="Phone-1"/>
+<title>PasiyaPhone</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{
+    --bg:#000;--card:rgba(28,28,30,0.92);--text:#f5f5f7;--muted:#8e8e93;
+    --blue:#0a84ff;--green:#30d158;--ios:#1c1c1e;--sep:#38383a;
+    --safe-top:env(safe-area-inset-top,0px);--safe-bot:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;background:var(--bg);color:var(--text)}
+  body{
+    background:
+      radial-gradient(120% 80% at 20% 0%, #3a1c71 0%, transparent 50%),
+      radial-gradient(100% 70% at 100% 30%, #d76d77 0%, transparent 45%),
+      radial-gradient(80% 60% at 50% 100%, #ffaf7b 0%, transparent 40%),
+      #0a0a0c;
+  }
+  #status{
+    position:fixed;top:0;left:0;right:0;z-index:50;
+    padding:calc(6px + var(--safe-top)) 18px 6px;
+    display:flex;justify-content:space-between;align-items:center;
+    font-size:13px;font-weight:600;pointer-events:none;
+  }
+  #status .right{display:flex;gap:6px;align-items:center;font-size:12px}
+  #home{
+    position:fixed;inset:0;padding:calc(42px + var(--safe-top)) 18px calc(100px + var(--safe-bot));
+    overflow:auto;
+  }
+  .page-title{text-align:center;font-size:11px;letter-spacing:.08em;color:rgba(255,255,255,.7);margin:4px 0 12px;text-transform:uppercase}
+  .grid{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:18px 10px;max-width:430px;margin:0 auto;
+  }
+  .app{
+    display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;user-select:none;
+  }
+  .app .ic{
+    width:60px;height:60px;border-radius:14px;display:flex;align-items:center;justify-content:center;
+    font-size:28px;background:var(--card);box-shadow:0 8px 24px rgba(0,0,0,.25);
+    border:1px solid rgba(255,255,255,.08);
+  }
+  .app span{font-size:11px;color:var(--text);text-align:center;max-width:72px;line-height:1.15;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+  .app:active .ic{transform:scale(.92);opacity:.9}
+  .section{max-width:430px;margin:18px auto 8px;font-size:13px;font-weight:600;color:rgba(255,255,255,.75)}
+  #dock-wrap{
+    position:fixed;left:12px;right:12px;bottom:calc(12px + var(--safe-bot));z-index:40;
+  }
+  #dock{
+    max-width:430px;margin:0 auto;padding:10px 14px;
+    display:flex;justify-content:space-around;align-items:center;
+    background:rgba(40,40,45,.55);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+    border-radius:28px;border:1px solid rgba(255,255,255,.12);
+    box-shadow:0 12px 40px rgba(0,0,0,.35);
+  }
+  #dock .app .ic{width:54px;height:54px;border-radius:14px}
+  #dock .app span{display:none}
+  #toast{
+    position:fixed;left:50%;bottom:calc(110px + var(--safe-bot));transform:translateX(-50%);
+    background:rgba(0,0,0,.8);color:#fff;padding:10px 16px;border-radius:20px;font-size:13px;
+    opacity:0;transition:opacity .25s;z-index:60;pointer-events:none;max-width:90%;text-align:center;
+  }
+  #toast.show{opacity:1}
+  /* fullscreen panels */
+  .panel{
+    position:fixed;inset:0;z-index:30;background:#000;display:none;flex-direction:column;
+    padding-top:var(--safe-top);
+  }
+  .panel.open{display:flex}
+  .panel .nav{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 14px;border-bottom:1px solid var(--sep);background:var(--ios);
+  }
+  .panel .nav b{font-size:16px}
+  .panel .nav button{
+    background:none;border:0;color:var(--blue);font-size:16px;font-weight:500;cursor:pointer;
+  }
+  .panel .body{flex:1;overflow:auto;padding:14px}
+  .card{
+    background:var(--card);border-radius:14px;padding:14px;margin-bottom:10px;
+    border:1px solid rgba(255,255,255,.06);
+  }
+  input,textarea{
+    width:100%;padding:12px 14px;border-radius:12px;border:0;background:#2c2c2e;color:var(--text);
+    font-size:16px;margin-bottom:10px;
+  }
+  .btn{
+    display:inline-block;padding:12px 18px;border-radius:12px;border:0;background:var(--blue);
+    color:#fff;font-size:15px;font-weight:600;cursor:pointer;margin:4px 4px 4px 0;
+  }
+  .btn.secondary{background:#3a3a3c}
+  .muted{color:var(--muted);font-size:13px}
+  .search{
+    max-width:430px;margin:0 auto 14px;padding:10px 14px;border-radius:12px;border:0;
+    background:rgba(255,255,255,.14);color:#fff;width:100%;font-size:15px;
+  }
+  .search::placeholder{color:rgba(255,255,255,.55)}
+</style>
+</head>
+<body>
+<div id="status">
+  <span id="st-time">--:--</span>
+  <span class="right"><span id="st-net">PasiyaLTE</span><span>🔋</span></span>
+</div>
+
+<div id="home">
+  <div class="page-title">PasiyaPhone</div>
+  <input class="search" id="search" placeholder="Search apps" />
+  <div class="section">Favorites</div>
+  <div class="grid" id="fav-grid"></div>
+  <div class="section">All Apps</div>
+  <div class="grid" id="all-grid"></div>
+</div>
+
+<div id="dock-wrap">
+  <div id="dock"></div>
+</div>
+
+<div id="toast"></div>
+
+<!-- native phone panels -->
+<div class="panel" id="p-about">
+  <div class="nav"><button type="button" data-close="about">Close</button><b>About</b><span style="width:52px"></span></div>
+  <div class="body">
+    <div class="card">
+      <h2 style="margin:0 0 8px">PasiyaPhone</h2>
+      <p class="muted">iOS-style shell for Radiant Queen · PasiyaOS</p>
+      <p>Version: Phone-1</p>
+      <p>Filesystem: pasiya_fs (shared with Desktop)</p>
+      <p>Apps: 70+ via Desktop bridge</p>
+    </div>
+    <button type="button" class="btn" id="btn-desktop">Open full Desktop OS</button>
+    <button type="button" class="btn secondary" id="btn-seed">Seed FS</button>
+  </div>
+</div>
+
+<div class="panel" id="p-notes">
+  <div class="nav"><button type="button" data-close="notes">Close</button><b>Notes</b><span style="width:52px"></span></div>
+  <div class="body">
+    <textarea id="note-in" rows="5" placeholder="Quick note..."></textarea>
+    <button type="button" class="btn" id="note-save">Save to FS</button>
+    <div class="card muted" id="note-st">Saves to /Documents/phone-note.txt</div>
+  </div>
+</div>
+
+<div class="panel" id="p-contacts">
+  <div class="nav"><button type="button" data-close="contacts">Close</button><b>Contacts</b><span style="width:52px"></span></div>
+  <div class="body">
+    <input id="ct-name" placeholder="Name"/>
+    <input id="ct-phone" placeholder="Phone"/>
+    <button type="button" class="btn" id="ct-add">Add</button>
+    <button type="button" class="btn secondary" id="ct-save">Save list</button>
+    <div id="ct-list"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  try{
+    if(window.Telegram&&Telegram.WebApp){
+      Telegram.WebApp.ready();
+      Telegram.WebApp.expand();
+      if(Telegram.WebApp.setHeaderColor)Telegram.WebApp.setHeaderColor('#000000');
+      if(Telegram.WebApp.setBackgroundColor)Telegram.WebApp.setBackgroundColor('#000000');
+    }
+  }catch(e){}
+
+  function initData(){
+    try{return(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.initData)||''}catch(e){return ''}
+  }
+  function toast(m){
+    var el=document.getElementById('toast');
+    el.textContent=m;el.classList.add('show');
+    setTimeout(function(){el.classList.remove('show')},2200);
+  }
+  function fsApi(action,path,content,extra){
+    var body=Object.assign({action:action,path:path||'/',content:content},extra||{});
+    return fetch('/api/fs',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-Telegram-Init-Data':initData()},
+      body:JSON.stringify(body)
+    }).then(function(r){return r.json().catch(function(){return {ok:false,error:'bad json'}})}).catch(function(e){return {ok:false,error:String(e.message||e)}});
+  }
+
+  /* App catalog — maps to desktop.html?open=ID (reuses all 70 apps) */
+  var FAV=[
+    ['phone','📞','Phone','native:contacts'],
+    ['notes','📝','Notes','native:notes'],
+    ['safari','🧭','Safari','desk:browser'],
+    ['music','🎵','Music','desk:music'],
+    ['messages','💬','Messages','desk:clip'],
+    ['settings','⚙️','Settings','native:about'],
+    ['wallet','🔐','Vault','desk:vault'],
+    ['photos','🎬','Studio','desk:studio']
+  ];
+  var ALL=[
+    ['explorer','📁','Files','desk:explorer'],
+    ['term','⌨️','Terminal','desk:term'],
+    ['ide','💻','IDE','desk:ide'],
+    ['office','📄','Office','desk:office'],
+    ['calc','🔢','Calc','desk:calc'],
+    ['weather','🌤️','Weather','desk:weather'],
+    ['clock','🕐','Clock','desk:clock'],
+    ['translate','🔤','Translate','desk:translate'],
+    ['qr','▢','QR','desk:qr'],
+    ['planner','📅','Planner','desk:planner'],
+    ['coins','🪙','Coins','desk:coins'],
+    ['wiki','📚','Wiki','desk:wiki'],
+    ['dict','📖','Dict','desk:dict'],
+    ['map','🌍','World','desk:world'],
+    ['health','🩺','Diag','desk:diag'],
+    ['export','📤','Export','desk:exportall'],
+    ['hotkeys','⌨️','Hotkeys','desk:hotkeys'],
+    ['cats','📂','Cats','desk:cats'],
+    ['desktop','🖥️','Desktop','native:desktop'],
+    ['about','ℹ️','About','native:about']
+  ];
+
+  function deskUrl(appId){
+    return '/bot/desktop.html?open='+encodeURIComponent(appId);
+  }
+  function openTarget(target){
+    if(!target)return;
+    if(target==='native:desktop'){location.href='/bot/desktop.html';return}
+    if(target==='native:about'){openPanel('about');return}
+    if(target==='native:notes'){openPanel('notes');return}
+    if(target==='native:contacts'){openPanel('contacts');return}
+    if(target.indexOf('desk:')===0){
+      location.href=deskUrl(target.slice(5));
+      return;
+    }
+  }
+  function openPanel(name){
+    document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('open')});
+    var el=document.getElementById('p-'+name);
+    if(el)el.classList.add('open');
+  }
+  function closePanels(){
+    document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('open')});
+  }
+  document.querySelectorAll('[data-close]').forEach(function(b){
+    b.onclick=function(){closePanels()};
+  });
+
+  function makeApp(item){
+    var d=document.createElement('div');
+    d.className='app';
+    d.innerHTML='<div class="ic">'+item[1]+'</div><span>'+item[2]+'</span>';
+    d.onclick=function(){openTarget(item[3])};
+    return d;
+  }
+  function paint(filter){
+    var q=(filter||'').toLowerCase().trim();
+    var fav=document.getElementById('fav-grid');
+    var all=document.getElementById('all-grid');
+    fav.innerHTML='';all.innerHTML='';
+    FAV.forEach(function(a){
+      if(q&&a[2].toLowerCase().indexOf(q)<0&&a[0].indexOf(q)<0)return;
+      fav.appendChild(makeApp(a));
+    });
+    ALL.forEach(function(a){
+      if(q&&a[2].toLowerCase().indexOf(q)<0&&a[0].indexOf(q)<0)return;
+      all.appendChild(makeApp(a));
+    });
+  }
+  document.getElementById('search').oninput=function(){paint(this.value)};
+  paint('');
+
+  /* Dock */
+  var DOCK=[
+    ['phone','📞','Phone','native:contacts'],
+    ['safari','🧭','Safari','desk:browser'],
+    ['messages','💬','Msg','desk:clip'],
+    ['music','🎵','Music','desk:music']
+  ];
+  var dock=document.getElementById('dock');
+  DOCK.forEach(function(a){dock.appendChild(makeApp(a))});
+
+  /* Status time */
+  function tick(){
+    var n=new Date();
+    document.getElementById('st-time').textContent=
+      String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
+  }
+  tick();setInterval(tick,15000);
+
+  /* Notes */
+  document.getElementById('note-save').onclick=function(){
+    var t=document.getElementById('note-in').value||'';
+    fsApi('write','/Documents/phone-note.txt',t).then(function(j){
+      document.getElementById('note-st').textContent=j.ok?'Saved /Documents/phone-note.txt':(j.error||'fail');
+      if(j.ok)toast('Note saved');
+    });
+  };
+
+  /* Contacts */
+  var contacts=[];
+  function ctRender(){
+    var list=document.getElementById('ct-list');list.innerHTML='';
+    contacts.forEach(function(c,i){
+      var d=document.createElement('div');d.className='card';
+      d.innerHTML='<b>'+String(c.name||'').replace(/</g,'')+'</b><div class="muted">'+String(c.phone||'')+'</div>';
+      list.appendChild(d);
+    });
+  }
+  function ctLoad(){
+    fsApi('read','/Documents/phone-contacts.json').then(function(j){
+      contacts=[];
+      if(j.ok&&j.content){try{contacts=JSON.parse(j.content)}catch(e){}}
+      if(!Array.isArray(contacts))contacts=[];
+      ctRender();
+    });
+  }
+  document.getElementById('ct-add').onclick=function(){
+    var name=document.getElementById('ct-name').value.trim();
+    var phone=document.getElementById('ct-phone').value.trim();
+    if(!name){toast('Name required');return}
+    contacts.unshift({name:name,phone:phone});
+    document.getElementById('ct-name').value='';
+    document.getElementById('ct-phone').value='';
+    ctRender();
+  };
+  document.getElementById('ct-save').onclick=function(){
+    fsApi('write','/Documents/phone-contacts.json',JSON.stringify(contacts,null,2)).then(function(j){
+      if(j.ok)toast('Contacts saved');
+    });
+  };
+
+  document.getElementById('btn-desktop').onclick=function(){location.href='/bot/desktop.html'};
+  document.getElementById('btn-seed').onclick=function(){
+    fsApi('seed','/').then(function(j){toast(j.ok?'FS seeded':'Seed failed')});
+  };
+
+  ctLoad();
+  toast('PasiyaPhone 1 · shared FS');
+})();
+</script>
+</body>
+</html>
