@@ -14,7 +14,7 @@ const OS_FS_SECRET = String(process.env.OS_FS_SECRET || '').trim();
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-os-secret');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-os-secret, X-Telegram-Init-Data, x-telegram-init-data');
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
 }
 
@@ -41,7 +41,21 @@ function resolveUser(req, body) {
   if (OS_FS_SECRET && secret && secret === OS_FS_SECRET) {
     return { ok: true, userId: ADMIN_ID || 'founder', via: 'secret' };
   }
-  const v = validateInitData(body.initData || '', BOT_TOKEN);
+  // Accept initData from body OR Telegram WebApp header (phone + desktop)
+  const initData = String(
+    body.initData ||
+      req.headers['x-telegram-init-data'] ||
+      req.headers['X-Telegram-Init-Data'] ||
+      ''
+  ).trim();
+  if (!initData) {
+    return {
+      ok: false,
+      error:
+        'auth failed: open via Telegram Mini App (/phone or /desktop), not external browser',
+    };
+  }
+  const v = validateInitData(initData, BOT_TOKEN);
   if (!v.ok) return { ok: false, error: v.error || 'auth failed' };
   const uid = v.user && v.user.id != null ? String(v.user.id) : '';
   if (!uid) return { ok: false, error: 'no user in initData' };
@@ -185,7 +199,7 @@ export default async function handler(req, res) {
     json(res, 200, {
       ok: true,
       service: 'pasiya-fs',
-      version: 'S61',
+      version: 'Phone1-fix',
       hasBotToken: Boolean(BOT_TOKEN),
       hasAdmin: Boolean(ADMIN_ID),
     });
