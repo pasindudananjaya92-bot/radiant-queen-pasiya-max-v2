@@ -14896,6 +14896,35 @@ bot.command('commands', async (ctx) => {
   });
 
 
+  bot.command(['build', 'builder', 'robot'], async (ctx) => {
+    try {
+      const base = String(process.env.MINIAPP_URL || process.env.WEBAPP_URL || 'https://radiant-queen-pasiya-max-v2.vercel.app').replace(/\/$/, '');
+      const url = base + '/bot/build.html';
+      await ctx.reply(
+        '🏗️ Pasiya Builder Robot\n' +
+          'Auto: type what you need (SI/EN)\n' +
+          'Manual: tap actions\n' +
+          'Chains: use "and" / "සහ"\n' +
+          url,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '🏗️ Open Builder', web_app: { url } }],
+              [
+                { text: '📱 Phone', web_app: { url: base + '/bot/phone.html' } },
+                { text: '🖥️ Desktop', web_app: { url: base + '/bot/desktop.html' } },
+              ],
+            ],
+          },
+        }
+      );
+    } catch (err) {
+      await ctx.reply('build: ' + String(err?.message || err).slice(0, 120));
+    }
+  });
+
+
+
 
   // ——— Pack H: /diagnose + radar ———
   bot.command(['diagnose', 'radar', 'selfcheck'], async (ctx) => {
