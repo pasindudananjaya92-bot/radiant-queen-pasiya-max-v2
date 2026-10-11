@@ -14866,6 +14866,37 @@ bot.command('commands', async (ctx) => {
   });
 
 
+  bot.command(['phone', 'pasiyaphone', 'ios'], async (ctx) => {
+    try {
+      const base = String(process.env.MINIAPP_URL || process.env.WEBAPP_URL || 'https://radiant-queen-pasiya-max-v2.vercel.app').replace(/\/$/, '');
+      const url = base + '/bot/phone.html';
+      if (String(ctx.from.id) === String(ADMIN_ID)) {
+        try {
+          const fs = await import('../lib/pasiyaFs.js');
+          await fs.ensureUserSeed(String(ctx.from.id));
+        } catch (_) {}
+      }
+      await ctx.reply(
+        '📱 PasiyaPhone\n' +
+          'iOS-style shell · shared pasiya_fs with Desktop\n' +
+          'Open from this button (Telegram Mini App) so Save works.\n' +
+          url,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: '📱 Open PasiyaPhone', web_app: { url } }],
+              [{ text: '🖥️ Open Desktop', web_app: { url: base + '/bot/desktop.html' } }],
+            ],
+          },
+        }
+      );
+    } catch (err) {
+      await ctx.reply('phone: ' + String(err?.message || err).slice(0, 120));
+    }
+  });
+
+
+
   // ——— Pack H: /diagnose + radar ———
   bot.command(['diagnose', 'radar', 'selfcheck'], async (ctx) => {
     try {
