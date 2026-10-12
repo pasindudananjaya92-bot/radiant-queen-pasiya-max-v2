@@ -4,9 +4,11 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
-<meta name="pasiya-phone-version" content="Phone-5"/>
+<meta name="pasiya-phone-version" content="Phone-6"/>
 <title>PasiyaPhone</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 :root{
   --bg:#000;--card:rgba(28,28,30,.92);--text:#f5f5f7;--muted:#8e8e93;
@@ -164,6 +166,21 @@ input,textarea{width:100%;padding:12px 14px;border-radius:12px;border:0;backgrou
 .drop-box{border:2px dashed rgba(255,255,255,.2);border-radius:16px;padding:20px;text-align:center}
 .lib-alpha{font-size:12px;color:var(--muted);margin:10px 0 4px}
 
+
+/* Phone-6 */
+#map{width:100%;height:280px;border-radius:14px;background:#222}
+.standby{position:fixed;inset:0;z-index:130;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center;color:#fff}
+.standby.open{display:flex}
+.standby .t{font-size:96px;font-weight:200;letter-spacing:-3px}
+.standby .d{font-size:18px;opacity:.7;margin-top:8px}
+.wallet-card{border-radius:16px;padding:18px;margin-bottom:12px;min-height:100px;color:#fff;position:relative;overflow:hidden}
+.wallet-card .num{letter-spacing:2px;font-family:ui-monospace,monospace;margin-top:24px}
+.sc-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--sep)}
+#siri-orb{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#5b6cff,#c084fc,#22d3ee);margin:12px auto;animation:siri 1.5s ease infinite}
+@keyframes siri{0%,100%{transform:scale(1);filter:brightness(1)}50%{transform:scale(1.08);filter:brightness(1.15)}}
+.live-pill{position:fixed;top:calc(48px + var(--safe-top));left:50%;transform:translateX(-50%);z-index:121;background:#111;border:1px solid #333;border-radius:20px;padding:6px 14px;font-size:12px;display:none}
+.live-pill.show{display:block}
+
 </style>
 </head>
 <body>
@@ -179,6 +196,11 @@ input,textarea{width:100%;padding:12px 14px;border-radius:12px;border:0;backgrou
 </div>
 
 
+<div class="standby" id="standby">
+  <div class="t" id="sb-time">--:--</div>
+  <div class="d" id="sb-date">—</div>
+  <div class="muted" style="margin-top:24px" id="sb-bat">StandBy · tap to exit</div>
+</div>
 <div id="lock">
   <div style="flex:1"></div>
   <div class="big-time" id="lock-time">--:--</div>
@@ -188,6 +210,7 @@ input,textarea{width:100%;padding:12px 14px;border-radius:12px;border:0;backgrou
   <button type="button" class="unlock-btn" id="lock-btn">Unlock</button>
 </div>
 
+<div class="live-pill" id="live-pill">● Live</div>
 <div id="island" class="compact"><span class="ic">●</span><span id="island-text">PasiyaPhone</span></div>
 <div id="status">
   <span id="st-time">--:--</span>
@@ -279,6 +302,60 @@ input,textarea{width:100%;padding:12px 14px;border-radius:12px;border:0;backgrou
 </div>
 
 
+
+
+<div class="panel" id="p-maps">
+  <div class="nav"><button type="button" data-close="maps">Close</button><b>Maps</b><span style="width:52px"></span></div>
+  <div class="body">
+    <div id="map"></div>
+    <input id="map-q" placeholder="Search place (Nominatim)"/>
+    <button type="button" class="btn" id="map-search">Search</button>
+    <button type="button" class="btn secondary" id="map-me">My location</button>
+    <div class="card muted" id="map-st">OpenStreetMap · Leaflet · Nominatim (free)</div>
+  </div>
+</div>
+<div class="panel" id="p-findmy">
+  <div class="nav"><button type="button" data-close="findmy">Close</button><b>Find My</b><span style="width:52px"></span></div>
+  <div class="body">
+    <div class="card">
+      <b>This device</b>
+      <div class="muted" id="fm-loc">—</div>
+      <button type="button" class="btn" id="fm-ping">Locate</button>
+      <button type="button" class="btn secondary" id="fm-save">Save location</button>
+    </div>
+    <div class="card muted" id="fm-st">Uses browser geolocation + optional IP fallback via /api/fs httpget</div>
+  </div>
+</div>
+<div class="panel" id="p-wallet">
+  <div class="nav"><button type="button" data-close="wallet">Close</button><b>Wallet</b><span style="width:52px"></span></div>
+  <div class="body">
+    <div id="wallet-list"></div>
+    <input id="w-name" placeholder="Card name"/>
+    <input id="w-last4" placeholder="Last 4 digits" maxlength="4"/>
+    <button type="button" class="btn" id="w-add">Add card</button>
+    <button type="button" class="btn secondary" id="w-save">Save wallet</button>
+    <div class="card muted">UI only — no real payments (free tier safe)</div>
+  </div>
+</div>
+<div class="panel" id="p-shortcuts">
+  <div class="nav"><button type="button" data-close="shortcuts">Close</button><b>Shortcuts</b><span style="width:52px"></span></div>
+  <div class="body">
+    <div class="card muted">Automation recipes (JSON). Tap Run.</div>
+    <div id="sc-list"></div>
+    <button type="button" class="btn secondary" id="sc-seed">Seed defaults</button>
+    <button type="button" class="btn" id="sc-save">Save shortcuts</button>
+  </div>
+</div>
+<div class="panel" id="p-siri">
+  <div class="nav"><button type="button" data-close="siri">Close</button><b>PasiyaSiri</b><span style="width:52px"></span></div>
+  <div class="body" style="text-align:center">
+    <div id="siri-orb"></div>
+    <div class="muted" id="siri-st">Tap mic · local intent (Builder rules) · optional cloud later</div>
+    <button type="button" class="btn" id="siri-listen">🎤 Listen</button>
+    <button type="button" class="btn secondary" id="siri-builder">Open Builder</button>
+    <div class="card" id="siri-out" style="text-align:left;margin-top:12px">Say: weather, note …, remind …, calendar …</div>
+  </div>
+</div>
 
 <div class="panel" id="p-photos">
   <div class="nav"><button type="button" data-close="photos">Close</button><b>Photos</b><span style="width:52px"></span></div>
@@ -427,7 +504,7 @@ input,textarea{width:100%;padding:12px 14px;border-radius:12px;border:0;backgrou
 <div class="panel" id="p-about">
   <div class="nav"><button type="button" data-close="about">Close</button><b>About</b><span style="width:52px"></span></div>
   <div class="body">
-    <div class="card"><h2 style="margin:0 0 8px">PasiyaPhone</h2><p class="muted">Phase 5 · Dynamic Island · Photos · Calc · Calendar · PasiyaDrop · Spotlight</p><p>iPhone-class shell on Telegram · shared pasiya_fs</p></div>
+    <div class="card"><h2 style="margin:0 0 8px">PasiyaPhone</h2><p class="muted">Phase 6 · Maps · Find My · Wallet · Shortcuts · StandBy · Siri</p><p>iPhone-class shell on Telegram · shared pasiya_fs</p></div>
     <button type="button" class="btn" id="btn-desktop">Open Desktop OS</button>
     <button type="button" class="btn secondary" id="btn-seed">Seed FS</button>
     <button type="button" class="btn secondary" id="btn-lock">Lock</button>
@@ -638,7 +715,7 @@ input,textarea{width:100%;padding:12px 14px;border-radius:12px;border:0;backgrou
     ['phone','📞','Phone','native:contacts'],['notes','📝','Notes','native:notes'],
     ['safari','🧭','Safari','desk:browser'],['music','🎵','Music','desk:music'],
     ['messages','💬','Messages','desk:clip'],['camera','📷','Camera','native:camera'],
-    ['settings','⚙️','Settings','native:settings'],['photos','🖼️','Photos','native:photos'],['wallet','🔐','Vault','desk:vault']
+    ['settings','⚙️','Settings','native:settings'],['maps','🗺️','Maps','native:maps'],['findmy','📍','Find My','native:findmy'],['photos','🖼️','Photos','native:photos'],['walletui','💳','Wallet','native:wallet'],['vault','🔐','Vault','desk:vault']
   ];
   var ALL=[
     ['photos','🎬','Photos','desk:studio'],['mail','✉️','Mail','native:mail'],
@@ -649,7 +726,7 @@ input,textarea{width:100%;padding:12px 14px;border-radius:12px;border:0;backgrou
     ['files','📁','Files','desk:explorer'],['translate','🔤','Translate','desk:translate'],
     ['books','📚','Books','desk:wiki'],['calc','🔢','Calc','native:calc'],['calendar2','📅','Calendar','native:calendar'],['drop','📡','Drop','native:drop'],['library','📚','Library','native:library'],['voice','🎙','Voice','native:voice'],['compass','🧭','Compass','native:compass'],
     ['tips','💡','Tips','desk:hotkeys'],['appstore','🏪','Store','desk:store'],
-    ['desktop','🖥️','Desktop','native:desktop'],['about','ℹ️','About','native:about']
+    ['shortcuts','⚡','Shortcuts','native:shortcuts'],['siri','🟣','Siri','native:siri'],['builder','🏗️','Builder','native:builder'],['desktop','🖥️','Desktop','native:desktop'],['about','ℹ️','About','native:about']
   ];
   var FOLDERS=[
     {id:'productivity',name:'Productivity',icon:'📁',apps:['planner','notes','office','clip','tasks']},
@@ -1295,9 +1372,247 @@ input,textarea{width:100%;padding:12px 14px;border-radius:12px;border:0;backgrou
   // Spotlight already uses search — enhance placeholder
   var s=document.getElementById('search');if(s)s.placeholder='Spotlight — apps, library, calc…';
 
-  paintCC();ctLoad();loadLockNotifs();loadWeather();loadCal();mailLoad();rmLoad();healthLoad();phLoad();
+  
+  /* ===== Phone-6: Maps, Find My, Wallet, Shortcuts, StandBy, Siri ===== */
+  var mapObj=null, mapMarker=null;
+  function ensureMap(){
+    if(typeof L==='undefined'){document.getElementById('map-st').textContent='Leaflet failed to load';return}
+    if(mapObj){setTimeout(function(){mapObj.invalidateSize()},200);return}
+    mapObj=L.map('map').setView([6.9271,79.8612],12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OSM'}).addTo(mapObj);
+    mapMarker=L.marker([6.9271,79.8612]).addTo(mapObj);
+  }
+  document.getElementById('map-me')&&(document.getElementById('map-me').onclick=function(){
+    ensureMap();
+    if(!navigator.geolocation){document.getElementById('map-st').textContent='No geolocation';return}
+    navigator.geolocation.getCurrentPosition(function(pos){
+      var lat=pos.coords.latitude,lon=pos.coords.longitude;
+      mapObj.setView([lat,lon],15);
+      if(mapMarker)mapMarker.setLatLng([lat,lon]);else mapMarker=L.marker([lat,lon]).addTo(mapObj);
+      document.getElementById('map-st').textContent=lat.toFixed(5)+', '+lon.toFixed(5);
+      islandSet('Maps · Located',true);haptic('success');
+    },function(){document.getElementById('map-st').textContent='Location denied'});
+  });
+  document.getElementById('map-search')&&(document.getElementById('map-search').onclick=function(){
+    ensureMap();
+    var q=(document.getElementById('map-q').value||'').trim();
+    if(!q)return;
+    var url='https://nominatim.openstreetmap.org/search?format=json&q='+encodeURIComponent(q)+'&limit=1';
+    fsApi('httpget','/',undefined,{url:url}).then(function(j){
+      if(!j.ok){document.getElementById('map-st').textContent=j.error||'search fail';return}
+      try{
+        var arr=JSON.parse(j.text||'[]');
+        if(!arr.length){document.getElementById('map-st').textContent='No results';return}
+        var lat=parseFloat(arr[0].lat),lon=parseFloat(arr[0].lon);
+        mapObj.setView([lat,lon],14);
+        if(mapMarker)mapMarker.setLatLng([lat,lon]);else mapMarker=L.marker([lat,lon]).addTo(mapObj);
+        document.getElementById('map-st').textContent=arr[0].display_name|| (lat+', '+lon);
+        islandSet('Maps · Found',true);
+      }catch(e){document.getElementById('map-st').textContent='parse err'}
+    });
+  });
+
+  /* Find My */
+  function fmLocate(){
+    var el=document.getElementById('fm-loc');
+    if(navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(function(pos){
+        el.textContent=pos.coords.latitude.toFixed(5)+', '+pos.coords.longitude.toFixed(5)+' (±'+Math.round(pos.coords.accuracy)+'m)';
+        document.getElementById('fm-st').textContent='GPS fix';
+        islandSet('Find My · Located',true);haptic('success');
+      },function(){
+        // IP fallback
+        fsApi('httpget','/',undefined,{url:'https://ipapi.co/json/'}).then(function(j){
+          if(!j.ok){el.textContent='Unavailable';return}
+          try{
+            var d=JSON.parse(j.text||'{}');
+            el.textContent=(d.city||'')+', '+(d.country_name||'')+' · IP approx';
+            document.getElementById('fm-st').textContent=d.ip||'ipapi';
+          }catch(e){el.textContent='fail'}
+        });
+      });
+    }
+  }
+  document.getElementById('fm-ping')&&(document.getElementById('fm-ping').onclick=fmLocate);
+  document.getElementById('fm-save')&&(document.getElementById('fm-save').onclick=function(){
+    var t=document.getElementById('fm-loc').textContent||'';
+    if(!initData()){toast('Open via /phone');return}
+    fsApi('write','/Documents/phone-findmy.json',JSON.stringify({loc:t,ts:Date.now()},null,2)).then(function(j){
+      if(j.ok){toast('Location saved');haptic('success')}
+    });
+  });
+
+  /* Wallet */
+  var cards=[];
+  function walletRender(){
+    var list=document.getElementById('wallet-list');if(!list)return;list.innerHTML='';
+    var colors=['linear-gradient(135deg,#1e3a8a,#3b82f6)','linear-gradient(135deg,#831843,#ec4899)','linear-gradient(135deg,#14532d,#22c55e)','linear-gradient(135deg,#7c2d12,#f59e0b)'];
+    cards.forEach(function(c,i){
+      var d=document.createElement('div');d.className='wallet-card';d.style.background=colors[i%colors.length];
+      d.innerHTML='<b>'+String(c.name||'Card').replace(/</g,'')+'</b><div class="num">•••• •••• •••• '+String(c.last4||'0000')+'</div>';
+      list.appendChild(d);
+    });
+    if(!cards.length)list.innerHTML='<div class="muted">No cards</div>';
+  }
+  function walletLoad(){
+    fsApi('read','/Documents/phone-wallet.json').then(function(j){
+      cards=[];if(j.ok&&j.content){try{cards=JSON.parse(j.content)}catch(e){}}
+      if(!Array.isArray(cards))cards=[];walletRender();
+    });
+  }
+  document.getElementById('w-add')&&(document.getElementById('w-add').onclick=function(){
+    var name=document.getElementById('w-name').value.trim();
+    var last4=document.getElementById('w-last4').value.trim();
+    if(!name)return;
+    cards.unshift({name:name,last4:last4||'0000'});
+    document.getElementById('w-name').value='';document.getElementById('w-last4').value='';
+    walletRender();haptic('light');
+  });
+  document.getElementById('w-save')&&(document.getElementById('w-save').onclick=function(){
+    if(!initData()){toast('Open via /phone');return}
+    fsApi('write','/Documents/phone-wallet.json',JSON.stringify(cards,null,2)).then(function(j){
+      if(j.ok){toast('Wallet saved');islandSet('Wallet · Updated',true);haptic('success')}
+    });
+  });
+
+  /* Shortcuts */
+  var shortcuts=[];
+  function scDefaults(){
+    return [
+      {id:'dark',name:'Dark Mode On',action:'cc_dark_on'},
+      {id:'focus',name:'Focus Mode',action:'cc_focus_on'},
+      {id:'lock',name:'Lock Phone',action:'lock'},
+      {id:'weather',name:'Open Weather',action:'open:desk:weather'},
+      {id:'builder',name:'Open Builder',action:'open:builder'},
+      {id:'standby',name:'StandBy Mode',action:'standby'}
+    ];
+  }
+  function scRun(sc){
+    haptic('medium');
+    islandSet('Shortcut · '+sc.name,true);
+    liveShow(sc.name);
+    if(sc.action==='cc_dark_on'){CC.dark=true;paintCC();toast('Dark on')}
+    else if(sc.action==='cc_focus_on'){CC.focus=true;paintCC();toast('Focus on')}
+    else if(sc.action==='lock'){lockNow()}
+    else if(sc.action==='standby'){standbyEnter()}
+    else if(sc.action==='open:builder'){location.href='/bot/build.html'}
+    else if(sc.action.indexOf('open:desk:')===0){location.href='/bot/desktop.html?open='+sc.action.slice(10)}
+    else if(sc.action.indexOf('open:')===0){openTarget(sc.action.slice(5))}
+  }
+  function scRender(){
+    var list=document.getElementById('sc-list');if(!list)return;list.innerHTML='';
+    shortcuts.forEach(function(sc){
+      var d=document.createElement('div');d.className='sc-row';
+      d.innerHTML='<b>'+sc.name+'</b>';
+      var b=document.createElement('button');b.type='button';b.className='btn';b.textContent='Run';b.style.padding='8px 14px';
+      b.onclick=function(){scRun(sc)};
+      d.appendChild(b);list.appendChild(d);
+    });
+  }
+  function scLoad(){
+    fsApi('read','/Documents/phone-shortcuts.json').then(function(j){
+      shortcuts=[];if(j.ok&&j.content){try{shortcuts=JSON.parse(j.content)}catch(e){}}
+      if(!Array.isArray(shortcuts)||!shortcuts.length)shortcuts=scDefaults();
+      scRender();
+    });
+  }
+  document.getElementById('sc-seed')&&(document.getElementById('sc-seed').onclick=function(){shortcuts=scDefaults();scRender();haptic('light')});
+  document.getElementById('sc-save')&&(document.getElementById('sc-save').onclick=function(){
+    if(!initData()){toast('Open via /phone');return}
+    fsApi('write','/Documents/phone-shortcuts.json',JSON.stringify(shortcuts,null,2)).then(function(j){
+      if(j.ok)toast('Shortcuts saved');
+    });
+  });
+
+  /* StandBy + Live Activities */
+  function standbyEnter(){
+    document.getElementById('standby').classList.add('open');
+    islandSet('StandBy',true);haptic('medium');
+    try{
+      if(navigator.getBattery){
+        navigator.getBattery().then(function(b){
+          document.getElementById('sb-bat').textContent='Battery '+Math.round(b.level*100)+'% · StandBy · tap to exit';
+          if(b.level<0.2)document.getElementById('sb-bat').textContent+=' · Low';
+        });
+      }
+    }catch(e){}
+  }
+  function standbyExit(){document.getElementById('standby').classList.remove('open')}
+  document.getElementById('standby').onclick=standbyExit;
+  function liveShow(text){
+    var el=document.getElementById('live-pill');
+    el.textContent='● '+text;
+    el.classList.add('show');
+    setTimeout(function(){el.classList.remove('show')},4000);
+  }
+  // battery-triggered StandBy hint when charging (if API exists)
+  try{
+    if(navigator.getBattery){
+      navigator.getBattery().then(function(b){
+        b.addEventListener('chargingchange',function(){
+          if(b.charging){liveShow('Charging');islandSet('Charging · StandBy ready',true)}
+        });
+      });
+    }
+  }catch(e){}
+
+  // Update standby clock in tick - patch via extra interval
+  setInterval(function(){
+    var n=new Date();
+    var t=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
+    var sb=document.getElementById('sb-time');
+    if(sb)sb.textContent=t;
+    var sd=document.getElementById('sb-date');
+    if(sd)sd.textContent=n.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
+  },10000);
+
+  /* PasiyaSiri — local intent + open Builder for complex */
+  document.getElementById('siri-listen')&&(document.getElementById('siri-listen').onclick=function(){
+    var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    var out=document.getElementById('siri-out');
+    if(!SR){out.textContent='Speech API unavailable — type in Builder';return}
+    var rec=new SR();rec.lang='en-US';rec.interimResults=false;
+    document.getElementById('siri-st').textContent='Listening…';
+    islandSet('Siri · Listening',true);haptic('medium');
+    rec.onresult=function(e){
+      var t=(e.results[0]&&e.results[0][0]&&e.results[0][0].transcript)||'';
+      out.textContent='You: '+t;
+      document.getElementById('siri-st').textContent='Processing…';
+      // simple local routes
+      var low=t.toLowerCase();
+      if(/weather|temperature/.test(low)){openTarget('desk:weather');out.textContent+='\n→ Weather';}
+      else if(/note\s+(.+)/i.test(t)){location.href='/bot/build.html';out.textContent+='\n→ Builder (note)';}
+      else if(/remind|reminder|task/.test(low)){openTarget('native:reminders');out.textContent+='\n→ Reminders';}
+      else if(/map|where|location|find\s*my/.test(low)){openTarget('native:maps');out.textContent+='\n→ Maps';}
+      else if(/wallet|card/.test(low)){openTarget('native:wallet');out.textContent+='\n→ Wallet';}
+      else if(/stand\s*by|standby/.test(low)){standbyEnter();out.textContent+='\n→ StandBy';}
+      else {out.textContent+='\n→ Open Builder for full NLP';location.href='/bot/build.html'}
+      islandSet('Siri · Done',true);haptic('success');
+      document.getElementById('siri-st').textContent='Tap mic again';
+    };
+    rec.onerror=function(){document.getElementById('siri-st').textContent='Error — try Builder';haptic('error')};
+    try{rec.start()}catch(e){document.getElementById('siri-st').textContent='Start failed'}
+  });
+  document.getElementById('siri-builder')&&(document.getElementById('siri-builder').onclick=function(){location.href='/bot/build.html'});
+
+  /* Extend openTarget for new natives */
+  var ___ot=openTarget;
+  openTarget=function(target){
+    if(target==='native:maps'){openPanel('maps');pushRecent('Maps','native:maps','🗺️');setTimeout(ensureMap,300);return}
+    if(target==='native:findmy'){openPanel('findmy');pushRecent('Find My','native:findmy','📍');return}
+    if(target==='native:wallet'){openPanel('wallet');pushRecent('Wallet','native:wallet','💳');walletLoad();return}
+    if(target==='native:shortcuts'){openPanel('shortcuts');scLoad();return}
+    if(target==='native:siri'){openPanel('siri');return}
+    if(target==='native:builder'){location.href='/bot/build.html';return}
+    if(target==='native:standby'){standbyEnter();return}
+    return ___ot(target);
+  };
+
+  // Settings row shortcut for StandBy - if settings has room skip
+
+  paintCC();ctLoad();loadLockNotifs();loadWeather();loadCal();mailLoad();rmLoad();healthLoad();phLoad();walletLoad();scLoad();
   if(!initData())toast('⚠️ Open via Telegram /phone');
-  else toast('PasiyaPhone 5 · Island · Photos · Drop · Siri-ready');
+  else toast('PasiyaPhone 6 · Maps · Wallet · StandBy · Siri');
 })();
 </script>
 </body>
