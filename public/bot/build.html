@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
-<meta name="pasiya-build" content="Build-2"/>
+<meta name="pasiya-build" content="Build-3"/>
 <title>Pasiya Builder</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
@@ -29,7 +29,7 @@ button.s{background:#333}
 </head>
 <body>
 <h1>🏗️ Pasiya Builder</h1>
-<div class="sub">Phase 2 · Auto-save note / remind / calendar · Chains · Memory</div>
+<div class="sub">Phase 3 · Run chain · Voice · Preview · Auto-save</div>
 <div class="tabs">
   <button type="button" class="on" id="tab-auto">Auto</button>
   <button type="button" id="tab-manual">Manual</button>
@@ -46,6 +46,13 @@ calendar Meeting
 calendar and Meeting
 calendar Meeting and note Agenda"></textarea>
     <button type="button" class="b g" id="run">▶ Run Build</button>
+    <button type="button" class="b" id="run-chain">▶ Run chain</button>
+    <button type="button" class="b s" id="preview">👁 Preview</button>
+    <button type="button" class="b s" id="voice">🎤 Voice</button>
+  </div>
+  <div class="card" id="preview-box" style="display:none">
+    <b>Parsed steps</b>
+    <div class="log" id="preview-out">—</div>
   </div>
   <div class="card"><b>Result</b><div class="log" id="out">Ready.</div></div>
 </div>
@@ -70,7 +77,7 @@ calendar Meeting and note Agenda"></textarea>
 </div>
 
 <div class="card">
-  <span class="chip">Build-2</span><span class="chip">planner.json</span><span class="chip">reminders</span>
+  <span class="chip">Build-3</span><span class="chip">planner.json</span><span class="chip">reminders</span>
   <div style="margin-top:8px">
     <button type="button" class="b s" id="go-phone">📱 Phone</button>
     <button type="button" class="b s" id="go-desk">🖥️ Desktop</button>
@@ -316,6 +323,47 @@ calendar Meeting and note Agenda"></textarea>
       return fsApi('write','/Documents/build-schedule.json',JSON.stringify(list,null,2));
     }).then(function(j){document.getElementById('sch-out').textContent=j&&j.ok?'Saved':'Need /build auth'});
   };
+  
+  document.getElementById('run-chain').onclick=function(){
+    // Same engine as Run Build — chains already split on and/සහ
+    runBuild(document.getElementById('cmd').value);
+  };
+  document.getElementById('preview').onclick=function(){
+    var parsed=parseIntent(document.getElementById('cmd').value);
+    var box=document.getElementById('preview-box');
+    box.style.display='block';
+    if(!parsed.steps.length){document.getElementById('preview-out').textContent='Empty';return}
+    document.getElementById('preview-out').textContent=parsed.steps.map(function(s,i){
+      return (i+1)+'. '+s.intent+(s.payload?(' → "'+s.payload+'"'):'')+(s.target?(' ['+s.target+']'):'');
+    }).join('\n');
+  };
+  document.getElementById('voice').onclick=function(){
+    var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+    if(!SR){log('Voice not supported on this WebView — type instead','err');return}
+    var rec=new SR();
+    rec.lang='si-LK'; // try Sinhala first; user can retry
+    rec.interimResults=false;
+    rec.maxAlternatives=1;
+    log('Listening (si-LK)… speak now');
+    rec.onresult=function(e){
+      var t=(e.results[0]&&e.results[0][0]&&e.results[0][0].transcript)||'';
+      document.getElementById('cmd').value=t;
+      log('Heard: '+t,'ok');
+    };
+    rec.onerror=function(){
+      // fallback English
+      try{
+        var rec2=new SR();rec2.lang='en-US';rec2.onresult=function(e){
+          var t=(e.results[0]&&e.results[0][0]&&e.results[0][0].transcript)||'';
+          document.getElementById('cmd').value=t;log('Heard (en): '+t,'ok');
+        };
+        rec2.onerror=function(){log('Voice error','err')};
+        rec2.start();log('Retry listening (en-US)…');
+      }catch(err){log('Voice error','err')}
+    };
+    try{rec.start()}catch(e){log('Voice start failed','err')}
+  };
+
   document.getElementById('go-phone').onclick=function(){location.href='/bot/phone.html'};
   document.getElementById('go-desk').onclick=function(){location.href='/bot/desktop.html'};
 })();
