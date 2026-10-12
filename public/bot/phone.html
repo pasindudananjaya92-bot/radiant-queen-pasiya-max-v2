@@ -4,11 +4,12 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
-<meta name="pasiya-phone-version" content="Phone-6"/>
+<meta name="pasiya-phone-version" content="Phone-7-8"/>
 <title>PasiyaPhone</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
 :root{
   --bg:#000;--card:rgba(28,28,30,.92);--text:#f5f5f7;--muted:#8e8e93;
@@ -181,9 +182,50 @@ input,textarea{width:100%;padding:12px 14px;border-radius:12px;border:0;backgrou
 .live-pill{position:fixed;top:calc(48px + var(--safe-top));left:50%;transform:translateX(-50%);z-index:121;background:#111;border:1px solid #333;border-radius:20px;padding:6px 14px;font-size:12px;display:none}
 .live-pill.show{display:block}
 
+
+/* Phone 7-8 flagship */
+#aod{position:fixed;inset:0;z-index:105;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center;opacity:.35}
+#aod.open{display:flex}
+#aod .t{font-size:64px;font-weight:200;color:#fff}
+.action-btn{position:fixed;right:0;top:42%;width:6px;height:56px;background:linear-gradient(180deg,#8a8a8a,#5a5a5a);border-radius:4px 0 0 4px;z-index:125;cursor:pointer;box-shadow:-1px 0 4px rgba(0,0,0,.4)}
+.action-sheet{position:fixed;right:16px;top:38%;z-index:126;background:rgba(30,30,35,.92);backdrop-filter:blur(20px);border-radius:16px;padding:8px;display:none;border:1px solid rgba(255,255,255,.12)}
+.action-sheet.open{display:block}
+.action-sheet button{display:block;width:140px;text-align:left;background:none;border:0;color:#fff;padding:10px 12px;font-size:13px;cursor:pointer;border-radius:10px}
+.action-sheet button:active{background:rgba(255,255,255,.1)}
+.fold-wrap{display:flex;gap:8px}
+.fold-wrap .half{flex:1;min-width:0}
+body.fold-mode #home{max-width:100%}
+body.dex-hint::after{content:'DeX: open Desktop';position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#111;padding:8px 14px;border-radius:12px;font-size:12px;z-index:90}
+.journal-mood{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.journal-mood span{font-size:28px;cursor:pointer;opacity:.5}
+.journal-mood span.on{opacity:1;transform:scale(1.15)}
+#freeform{width:100%;height:280px;background:#111;border-radius:12px;touch-action:none}
+.sos-overlay{position:fixed;inset:0;z-index:140;background:#4a0000;display:none;flex-direction:column;align-items:center;justify-content:center;color:#fff}
+.sos-overlay.open{display:flex}
+.sos-overlay h1{font-size:42px;margin:0}
+.zoom-bar{display:flex;gap:8px;justify-content:center;margin:8px 0}
+.zoom-bar button{padding:8px 12px;border-radius:20px;border:0;background:#333;color:#fff}
+.zoom-bar button.on{background:var(--blue)}
+
 </style>
 </head>
 <body>
+
+<div class="action-btn" id="action-btn" title="Action Button"></div>
+<div class="action-sheet" id="action-sheet">
+  <button type="button" data-act="silent"> Silent</button>
+  <button type="button" data-act="focus"> Focus</button>
+  <button type="button" data-act="camera"> Camera</button>
+  <button type="button" data-act="siri"> Siri</button>
+  <button type="button" data-act="builder"> Builder</button>
+</div>
+<div id="aod"><div class="t" id="aod-time">--:--</div><div class="muted" id="aod-date">—</div></div>
+<div class="sos-overlay" id="sos">
+  <h1>SOS</h1>
+  <p class="muted">Emergency UI (simulated) · hold cancelled</p>
+  <button type="button" class="btn" id="sos-cancel" style="margin-top:20px">Cancel</button>
+</div>
+
 <div id="bright-veil"></div>
 <div id="flash-veil"></div>
 
@@ -303,6 +345,110 @@ input,textarea{width:100%;padding:12px 14px;border-radius:12px;border:0;backgrou
 
 
 
+
+
+<div class="panel" id="p-journal">
+  <div class="nav"><button type="button" data-close="journal">Close</button><b>Journal</b><span style="width:52px"></span></div>
+  <div class="body">
+    <div class="journal-mood" id="j-mood">
+      <span data-m="1">😢</span><span data-m="2">😐</span><span data-m="3">🙂</span><span data-m="4">😊</span><span data-m="5">🤩</span>
+    </div>
+    <textarea id="j-text" rows="4" placeholder="Today…"></textarea>
+    <button type="button" class="btn" id="j-save">Save entry</button>
+    <div id="j-list"></div>
+  </div>
+</div>
+<div class="panel" id="p-homekit">
+  <div class="nav"><button type="button" data-close="homekit">Close</button><b>Home</b><span style="width:52px"></span></div>
+  <div class="body">
+    <div class="card" id="hk-list"></div>
+    <button type="button" class="btn secondary" id="hk-seed">Seed devices</button>
+    <button type="button" class="btn" id="hk-save">Save</button>
+  </div>
+</div>
+<div class="panel" id="p-livetext">
+  <div class="nav"><button type="button" data-close="livetext">Close</button><b>Live Text</b><span style="width:52px"></span></div>
+  <div class="body">
+    <input type="file" id="lt-file" accept="image/*"/>
+    <button type="button" class="btn" id="lt-run">OCR Scan</button>
+    <div class="card" id="lt-out" class="muted">Tesseract.js · on-device</div>
+  </div>
+</div>
+<div class="panel" id="p-measure">
+  <div class="nav"><button type="button" data-close="measure">Close</button><b>Measure</b><span style="width:52px"></span></div>
+  <div class="body">
+    <div class="card" style="text-align:center">
+      <div style="font-size:40px" id="ms-read">—</div>
+      <div class="muted">Device motion proxy (not LiDAR)</div>
+    </div>
+    <button type="button" class="btn" id="ms-start">Start</button>
+  </div>
+</div>
+<div class="panel" id="p-freeform">
+  <div class="nav"><button type="button" data-close="freeform">Close</button><b>Freeform</b><span style="width:52px"></span></div>
+  <div class="body">
+    <canvas id="freeform" width="360" height="280"></canvas>
+    <button type="button" class="btn secondary" id="ff-clear">Clear</button>
+    <button type="button" class="btn" id="ff-save">Save strokes</button>
+  </div>
+</div>
+<div class="panel" id="p-game">
+  <div class="nav"><button type="button" data-close="game">Close</button><b>Game Center</b><span style="width:52px"></span></div>
+  <div class="body">
+    <div class="card"><b>Tap score</b><div class="big" id="gc-score">0</div>
+      <button type="button" class="btn" id="gc-tap">Tap!</button>
+      <button type="button" class="btn secondary" id="gc-save">Save score</button>
+    </div>
+  </div>
+</div>
+<div class="panel" id="p-record">
+  <div class="nav"><button type="button" data-close="record">Close</button><b>Screen Record</b><span style="width:52px"></span></div>
+  <div class="body">
+    <button type="button" class="btn" id="rec-start">Start capture</button>
+    <button type="button" class="btn secondary" id="rec-stop">Stop</button>
+    <div class="card muted" id="rec-st">getDisplayMedia · may be blocked in Telegram WebView</div>
+  </div>
+</div>
+<div class="panel" id="p-zoom">
+  <div class="nav"><button type="button" data-close="zoom">Close</button><b>Periscope Zoom</b><span style="width:52px"></span></div>
+  <div class="body">
+    <div class="zoom-bar" id="zoom-bar">
+      <button type="button" data-z="0.5">0.5x</button>
+      <button type="button" data-z="1" class="on">1x</button>
+      <button type="button" data-z="5">5x</button>
+      <button type="button" data-z="10">10x</button>
+      <button type="button" data-z="100">100x</button>
+    </div>
+    <div id="zoom-preview" style="height:240px;background:#111;border-radius:12px;overflow:hidden;display:flex;align-items:center;justify-content:center">
+      <video id="zoom-vid" playsinline autoplay style="width:100%;height:100%;object-fit:cover;transform:scale(1)"></video>
+    </div>
+    <div class="card muted">Digital zoom simulation · not optical 120x</div>
+  </div>
+</div>
+<div class="panel" id="p-checkin">
+  <div class="nav"><button type="button" data-close="checkin">Close</button><b>Check In / NameDrop</b><span style="width:52px"></span></div>
+  <div class="body">
+    <input id="ci-code" placeholder="Room code"/>
+    <input id="ci-name" placeholder="Your name"/>
+    <button type="button" class="btn" id="ci-share">Share contact to room</button>
+    <button type="button" class="btn secondary" id="ci-listen">Listen room</button>
+    <div class="card" id="ci-out" class="muted">Uses /Documents/drop/ like PasiyaDrop</div>
+  </div>
+</div>
+<div class="panel" id="p-flagship">
+  <div class="nav"><button type="button" data-close="flagship">Close</button><b>Flagship Lab</b><span style="width:52px"></span></div>
+  <div class="body">
+    <div class="card">
+      <button type="button" class="btn secondary" id="fg-aod">Toggle AOD</button>
+      <button type="button" class="btn secondary" id="fg-fold">Foldable split</button>
+      <button type="button" class="btn secondary" id="fg-dex">DeX → Desktop</button>
+      <button type="button" class="btn secondary" id="fg-sos">SOS UI</button>
+      <button type="button" class="btn secondary" id="fg-120">ProMotion 120Hz CSS</button>
+      <button type="button" class="btn secondary" id="fg-sat">Satellite mode UI</button>
+    </div>
+    <div class="card muted" id="fg-st">Simulated flagship UX · free stack limits apply</div>
+  </div>
+</div>
 
 <div class="panel" id="p-maps">
   <div class="nav"><button type="button" data-close="maps">Close</button><b>Maps</b><span style="width:52px"></span></div>
@@ -504,7 +650,7 @@ input,textarea{width:100%;padding:12px 14px;border-radius:12px;border:0;backgrou
 <div class="panel" id="p-about">
   <div class="nav"><button type="button" data-close="about">Close</button><b>About</b><span style="width:52px"></span></div>
   <div class="body">
-    <div class="card"><h2 style="margin:0 0 8px">PasiyaPhone</h2><p class="muted">Phase 6 · Maps · Find My · Wallet · Shortcuts · StandBy · Siri</p><p>iPhone-class shell on Telegram · shared pasiya_fs</p></div>
+    <div class="card"><h2 style="margin:0 0 8px">PasiyaPhone</h2><p class="muted">Phase 7–8 · Spotlight · AOD · Journal · Action · DeX · Fold · SOS</p><p>iPhone-class shell on Telegram · shared pasiya_fs</p></div>
     <button type="button" class="btn" id="btn-desktop">Open Desktop OS</button>
     <button type="button" class="btn secondary" id="btn-seed">Seed FS</button>
     <button type="button" class="btn secondary" id="btn-lock">Lock</button>
@@ -726,7 +872,7 @@ input,textarea{width:100%;padding:12px 14px;border-radius:12px;border:0;backgrou
     ['files','📁','Files','desk:explorer'],['translate','🔤','Translate','desk:translate'],
     ['books','📚','Books','desk:wiki'],['calc','🔢','Calc','native:calc'],['calendar2','📅','Calendar','native:calendar'],['drop','📡','Drop','native:drop'],['library','📚','Library','native:library'],['voice','🎙','Voice','native:voice'],['compass','🧭','Compass','native:compass'],
     ['tips','💡','Tips','desk:hotkeys'],['appstore','🏪','Store','desk:store'],
-    ['shortcuts','⚡','Shortcuts','native:shortcuts'],['siri','🟣','Siri','native:siri'],['builder','🏗️','Builder','native:builder'],['desktop','🖥️','Desktop','native:desktop'],['about','ℹ️','About','native:about']
+    ['journal','📓','Journal','native:journal'],['homekit','🏠','Home','native:homekit'],['livetext','🔤','Live Text','native:livetext'],['measure','📏','Measure','native:measure'],['freeform','🪟','Freeform','native:freeform'],['game','🎮','Games','native:game'],['record','⏺','Record','native:record'],['zoom','🔭','Zoom','native:zoom'],['checkin','🤝','Check In','native:checkin'],['flagship','🚀','Flagship','native:flagship'],['shortcuts','⚡','Shortcuts','native:shortcuts'],['siri','🟣','Siri','native:siri'],['builder','🏗️','Builder','native:builder'],['desktop','🖥️','Desktop','native:desktop'],['about','ℹ️','About','native:about']
   ];
   var FOLDERS=[
     {id:'productivity',name:'Productivity',icon:'📁',apps:['planner','notes','office','clip','tasks']},
@@ -1610,9 +1756,268 @@ input,textarea{width:100%;padding:12px 14px;border-radius:12px;border:0;backgrou
 
   // Settings row shortcut for StandBy - if settings has room skip
 
-  paintCC();ctLoad();loadLockNotifs();loadWeather();loadCal();mailLoad();rmLoad();healthLoad();phLoad();walletLoad();scLoad();
+  paintCC();ctLoad();loadLockNotifs();loadWeather();loadCal();mailLoad();rmLoad();healthLoad();phLoad();
+  /* ===== Phone 7-8 Flagship layer ===== */
+  var actionTimer=null, actionHold=false;
+  var ab=document.getElementById('action-btn');
+  var ash=document.getElementById('action-sheet');
+  if(ab){
+    ab.addEventListener('touchstart',function(e){e.preventDefault();actionHold=true;actionTimer=setTimeout(function(){ash.classList.add('open');haptic('medium')},400)},{passive:false});
+    ab.addEventListener('touchend',function(){actionHold=false;clearTimeout(actionTimer)});
+    ab.onclick=function(){ash.classList.toggle('open');haptic('light')};
+  }
+  document.querySelectorAll('#action-sheet [data-act]').forEach(function(b){
+    b.onclick=function(){
+      ash.classList.remove('open');
+      var a=b.getAttribute('data-act');
+      if(a==='silent'){toast('Silent mode (UI)');liveShow('Silent')}
+      else if(a==='focus'){CC.focus=true;paintCC();toast('Focus')}
+      else if(a==='camera'){openCamera()}
+      else if(a==='siri'){openPanel('siri')}
+      else if(a==='builder'){location.href='/bot/build.html'}
+      islandSet('Action · '+a,true);
+    };
+  });
+
+  /* AOD */
+  function aodToggle(){
+    var el=document.getElementById('aod');
+    el.classList.toggle('open');
+    if(el.classList.contains('open')){
+      document.getElementById('lock').classList.add('unlocked');
+    }
+  }
+  setInterval(function(){
+    var n=new Date();
+    var t=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
+    var ae=document.getElementById('aod-time');if(ae)ae.textContent=t;
+    var ad=document.getElementById('aod-date');if(ad)ad.textContent=n.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric'});
+  },15000);
+
+  /* Journal */
+  var journal=[], jMood=3;
+  document.querySelectorAll('#j-mood span').forEach(function(s){
+    s.onclick=function(){
+      document.querySelectorAll('#j-mood span').forEach(function(x){x.classList.remove('on')});
+      s.classList.add('on');jMood=Number(s.getAttribute('data-m'))||3;haptic('light');
+    };
+  });
+  function jRender(){
+    var list=document.getElementById('j-list');if(!list)return;list.innerHTML='';
+    journal.slice(0,20).forEach(function(e){
+      var d=document.createElement('div');d.className='card';
+      d.innerHTML='<b>'+(e.date||'')+'</b> mood:'+e.mood+'<div class="muted">'+String(e.text||'').replace(/</g,'&lt;').slice(0,120)+'</div>';
+      list.appendChild(d);
+    });
+  }
+  function jLoad(){
+    fsApi('read','/Documents/phone-journal.json').then(function(j){
+      journal=[];if(j.ok&&j.content){try{journal=JSON.parse(j.content)}catch(e){}}
+      if(!Array.isArray(journal))journal=[];jRender();
+    });
+  }
+  document.getElementById('j-save')&&(document.getElementById('j-save').onclick=function(){
+    var text=document.getElementById('j-text').value.trim();if(!text)return;
+    journal.unshift({date:new Date().toISOString().slice(0,10),mood:jMood,text:text,ts:Date.now()});
+    if(!initData()){toast('Auth');return}
+    fsApi('write','/Documents/phone-journal.json',JSON.stringify(journal.slice(0,100),null,2)).then(function(j){
+      if(j.ok){toast('Journal saved');jRender();document.getElementById('j-text').value='';islandSet('Journal · Saved',true);haptic('success')}
+    });
+  });
+
+  /* HomeKit fake */
+  var homeDev=[];
+  function hkDefaults(){return [
+    {id:'light1',name:'Living Light',type:'light',on:false},
+    {id:'ac',name:'AC',type:'ac',on:false,temp:24},
+    {id:'lock',name:'Door Lock',type:'lock',on:true}
+  ]}
+  function hkRender(){
+    var list=document.getElementById('hk-list');if(!list)return;list.innerHTML='';
+    homeDev.forEach(function(d,i){
+      var row=document.createElement('div');row.className='sc-row';
+      row.innerHTML='<b>'+d.name+'</b><span class="muted">'+(d.on?'ON':'OFF')+(d.temp?(' '+d.temp+'°'):'')+'</span>';
+      row.onclick=function(){homeDev[i].on=!homeDev[i].on;hkRender();haptic('light');islandSet('Home · '+d.name,true)};
+      list.appendChild(row);
+    });
+  }
+  function hkLoad(){
+    fsApi('read','/Documents/phone-home.json').then(function(j){
+      homeDev=[];if(j.ok&&j.content){try{homeDev=JSON.parse(j.content)}catch(e){}}
+      if(!Array.isArray(homeDev)||!homeDev.length)homeDev=hkDefaults();
+      hkRender();
+    });
+  }
+  document.getElementById('hk-seed')&&(document.getElementById('hk-seed').onclick=function(){homeDev=hkDefaults();hkRender()});
+  document.getElementById('hk-save')&&(document.getElementById('hk-save').onclick=function(){
+    if(!initData())return;
+    fsApi('write','/Documents/phone-home.json',JSON.stringify(homeDev,null,2)).then(function(j){if(j.ok)toast('Home saved')});
+  });
+
+  /* Live Text OCR */
+  document.getElementById('lt-run')&&(document.getElementById('lt-run').onclick=function(){
+    var f=document.getElementById('lt-file').files[0];
+    var out=document.getElementById('lt-out');
+    if(!f){out.textContent='Pick image';return}
+    if(typeof Tesseract==='undefined'){out.textContent='Tesseract not loaded';return}
+    out.textContent='Scanning…';
+    islandSet('Live Text · OCR',true);
+    Tesseract.recognize(f,'eng').then(function(res){
+      out.textContent=(res&&res.data&&res.data.text)||'No text';
+      haptic('success');
+    }).catch(function(e){out.textContent='OCR fail';haptic('error')});
+  });
+
+  /* Measure motion proxy */
+  document.getElementById('ms-start')&&(document.getElementById('ms-start').onclick=function(){
+    function h(e){
+      var a=e.accelerationIncludingGravity||e.acceleration||{};
+      var mag=Math.sqrt((a.x||0)*(a.x||0)+(a.y||0)*(a.y||0)+(a.z||0)*(a.z||0));
+      document.getElementById('ms-read').textContent=mag.toFixed(2)+' (g-proxy)';
+    }
+    if(window.DeviceMotionEvent&&DeviceMotionEvent.requestPermission){
+      DeviceMotionEvent.requestPermission().then(function(s){if(s==='granted')window.addEventListener('devicemotion',h)});
+    }else window.addEventListener('devicemotion',h);
+    toast('Measure listening');
+  });
+
+  /* Freeform canvas */
+  (function(){
+    var c=document.getElementById('freeform');if(!c)return;
+    var ctx=c.getContext('2d');ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.lineCap='round';
+    var draw=false,last=null,strokes=[];
+    function pos(e){
+      var r=c.getBoundingClientRect();
+      var t=e.touches?e.touches[0]:e;
+      return{x:(t.clientX-r.left)*(c.width/r.width),y:(t.clientY-r.top)*(c.height/r.height)};
+    }
+    function start(e){e.preventDefault();draw=true;last=pos(e)}
+    function move(e){if(!draw)return;e.preventDefault();var p=pos(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();strokes.push([last,p]);last=p}
+    function end(){draw=false}
+    c.addEventListener('mousedown',start);c.addEventListener('mousemove',move);window.addEventListener('mouseup',end);
+    c.addEventListener('touchstart',start,{passive:false});c.addEventListener('touchmove',move,{passive:false});c.addEventListener('touchend',end);
+    document.getElementById('ff-clear').onclick=function(){ctx.clearRect(0,0,c.width,c.height);strokes=[];haptic('light')};
+    document.getElementById('ff-save').onclick=function(){
+      if(!initData())return;
+      fsApi('write','/Documents/phone-freeform.json',JSON.stringify({n:strokes.length,ts:Date.now()})).then(function(j){if(j.ok)toast('Saved strokes meta')});
+    };
+  })();
+
+  /* Game center */
+  var gcScore=0;
+  document.getElementById('gc-tap')&&(document.getElementById('gc-tap').onclick=function(){gcScore++;document.getElementById('gc-score').textContent=gcScore;haptic('light')});
+  document.getElementById('gc-save')&&(document.getElementById('gc-save').onclick=function(){
+    if(!initData())return;
+    fsApi('write','/Documents/phone-gamecenter.json',JSON.stringify({score:gcScore,ts:Date.now()})).then(function(j){if(j.ok)toast('Score saved')});
+  });
+
+  /* Screen record */
+  var recStream=null, mediaRec2=null;
+  document.getElementById('rec-start')&&(document.getElementById('rec-start').onclick=function(){
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getDisplayMedia){
+      document.getElementById('rec-st').textContent='getDisplayMedia not available in this WebView';
+      return;
+    }
+    navigator.mediaDevices.getDisplayMedia({video:true}).then(function(stream){
+      recStream=stream;
+      document.getElementById('rec-st').textContent='Recording… (preview only, not uploaded)';
+      islandSet('Recording',true);liveShow('REC');
+      haptic('medium');
+    }).catch(function(){document.getElementById('rec-st').textContent='Permission denied / blocked'});
+  });
+  document.getElementById('rec-stop')&&(document.getElementById('rec-stop').onclick=function(){
+    if(recStream){recStream.getTracks().forEach(function(t){t.stop()});recStream=null}
+    document.getElementById('rec-st').textContent='Stopped';
+    islandSet('REC stopped',true);
+  });
+
+  /* Periscope zoom sim */
+  var zoomStream=null;
+  function zoomStart(){
+    if(!navigator.mediaDevices)return;
+    navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}}).then(function(s){
+      zoomStream=s;
+      var v=document.getElementById('zoom-vid');v.srcObject=s;
+    }).catch(function(){});
+  }
+  document.querySelectorAll('#zoom-bar button').forEach(function(b){
+    b.onclick=function(){
+      document.querySelectorAll('#zoom-bar button').forEach(function(x){x.classList.remove('on')});
+      b.classList.add('on');
+      var z=parseFloat(b.getAttribute('data-z'))||1;
+      var v=document.getElementById('zoom-vid');
+      v.style.transform='scale('+Math.min(z,8)+')'; // cap CSS scale
+      islandSet('Zoom '+z+'x',true);haptic('light');
+    };
+  });
+
+  /* Check In / NameDrop via drop FS */
+  document.getElementById('ci-share')&&(document.getElementById('ci-share').onclick=function(){
+    var code=(document.getElementById('ci-code').value||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,12);
+    var name=(document.getElementById('ci-name').value||'').trim();
+    if(!code||!name){toast('Code + name');return}
+    if(!initData())return;
+    var payload=JSON.stringify({type:'checkin',name:name,ts:Date.now()});
+    fsApi('mkdir','/Documents/drop').then(function(){
+      return fsApi('write','/Documents/drop/'+code+'.json',JSON.stringify({code:code,payload:payload,from:'checkin',ts:Date.now()}));
+    }).then(function(j){document.getElementById('ci-out').textContent=j.ok?'Shared to '+code:(j.error||'fail');if(j.ok)islandSet('NameDrop · Sent',true)});
+  });
+  document.getElementById('ci-listen')&&(document.getElementById('ci-listen').onclick=function(){
+    var code=(document.getElementById('ci-code').value||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,12);
+    fsApi('read','/Documents/drop/'+code+'.json').then(function(j){
+      document.getElementById('ci-out').textContent=j.ok?(j.content||''):(j.error||'empty');
+    });
+  });
+
+  /* Flagship lab */
+  document.getElementById('fg-aod')&&(document.getElementById('fg-aod').onclick=function(){aodToggle();haptic('light')});
+  document.getElementById('fg-fold')&&(document.getElementById('fg-fold').onclick=function(){
+    document.body.classList.toggle('fold-mode');
+    document.getElementById('fg-st').textContent=document.body.classList.contains('fold-mode')?'Foldable CSS mode ON':'Foldable OFF';
+    haptic('medium');
+  });
+  document.getElementById('fg-dex')&&(document.getElementById('fg-dex').onclick=function(){location.href='/bot/desktop.html'});
+  document.getElementById('fg-sos')&&(document.getElementById('fg-sos').onclick=function(){document.getElementById('sos').classList.add('open');haptic('warning')});
+  document.getElementById('sos-cancel')&&(document.getElementById('sos-cancel').onclick=function(){document.getElementById('sos').classList.remove('open')});
+  document.getElementById('fg-120')&&(document.getElementById('fg-120').onclick=function(){
+    document.documentElement.style.setProperty('scroll-behavior','smooth');
+    document.getElementById('fg-st').textContent='ProMotion: CSS smooth (not true 120Hz panel)';
+    toast('120Hz CSS hint');
+  });
+  document.getElementById('fg-sat')&&(document.getElementById('fg-sat').onclick=function(){
+    document.getElementById('st-net').textContent='Satellite';
+    islandSet('Satellite SOS UI',true);
+    document.getElementById('fg-st').textContent='Satellite connectivity — UI simulation only';
+    liveShow('SAT');
+  });
+
+  /* Spotlight already on home search — enhance to also filter folders */
+  // Vision tilt: subtle parallax on home
+  window.addEventListener('deviceorientation',function(e){
+    if(!e.gamma&&!e.beta)return;
+    var x=(e.gamma||0)/45,y=(e.beta||45)/90;
+    var home=document.getElementById('home');
+    if(home)home.style.transform='perspective(800px) rotateY('+(x*3)+'deg) rotateX('+(-y*2)+'deg)';
+  },true);
+
+  var ____ot=openTarget;
+  openTarget=function(target){
+    if(target==='native:journal'){openPanel('journal');jLoad();return}
+    if(target==='native:homekit'){openPanel('homekit');hkLoad();return}
+    if(target==='native:livetext'){openPanel('livetext');return}
+    if(target==='native:measure'){openPanel('measure');return}
+    if(target==='native:freeform'){openPanel('freeform');return}
+    if(target==='native:game'){openPanel('game');return}
+    if(target==='native:record'){openPanel('record');return}
+    if(target==='native:zoom'){openPanel('zoom');setTimeout(zoomStart,200);return}
+    if(target==='native:checkin'){openPanel('checkin');return}
+    if(target==='native:flagship'){openPanel('flagship');return}
+    return ____ot(target);
+  };
+
+  walletLoad();scLoad();jLoad();hkLoad();
   if(!initData())toast('⚠️ Open via Telegram /phone');
-  else toast('PasiyaPhone 6 · Maps · Wallet · StandBy · Siri');
+  else toast('PasiyaPhone 7–8 · Flagship Shell');
 })();
 </script>
 </body>
