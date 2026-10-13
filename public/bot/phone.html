@@ -4,7 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
-<meta name="pasiya-phone-version" content="Phone-9"/>
+<meta name="pasiya-phone-version" content="Phone-9-deeplink"/>
 <title>PasiyaPhone</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -2117,6 +2117,49 @@ body.fold-real #home,body.fold-real #dock-wrap,body.fold-real #status{display:no
   };
 
   walletLoad();scLoad();
+  
+  /* ===== Deep link: ?open=summarize|friends|memoji|pay|live|fold|... ===== */
+  function handleDeepLink(){
+    try{
+      var q=new URLSearchParams(location.search||'');
+      var open=(q.get('open')||q.get('panel')||'').toLowerCase().trim();
+      if(!open)return false;
+      // unlock so user is not stuck on lock screen
+      var lock=document.getElementById('lock');
+      if(lock)lock.classList.add('unlocked');
+      var map={
+        summarize:'native:summarize', summary:'native:summarize',
+        friends:'native:friends', friend:'native:friends',
+        memoji:'native:memoji',
+        pay:'native:wallet2', wallet2:'native:wallet2', wallet:'native:wallet',
+        live:'native:liveact', liveact:'native:liveact', timer:'native:liveact',
+        fold:'native:flagship', flagship:'native:flagship',
+        journal:'native:journal', homekit:'native:homekit', home:'native:homekit',
+        maps:'native:maps', findmy:'native:findmy',
+        camera:'native:camera', photos:'native:photos',
+        notes:'native:notes', mail:'native:mail', calendar:'native:calendar',
+        health:'native:health', settings:'native:settings',
+        siri:'native:siri', shortcuts:'native:shortcuts',
+        builder:'native:builder', calc:'native:calc',
+        compass:'native:compass', voice:'native:voice',
+        checkin:'native:checkin', game:'native:game',
+        freeform:'native:freeform', livetext:'native:livetext',
+        measure:'native:measure', record:'native:record', zoom:'native:zoom'
+      };
+      var target=map[open]||('native:'+open);
+      setTimeout(function(){
+        try{openTarget(target)}catch(e){}
+        if(open==='fold'){
+          try{if(typeof foldEnter==='function')foldEnter();else openTarget('native:flagship')}catch(e){}
+        }
+        islandSet('Open · '+open,true);
+      },350);
+      return true;
+    }catch(e){return false}
+  }
+  // run after core init
+  setTimeout(function(){handleDeepLink()},500);
+
   /* ===== Phone-9 Intelligence / Social / Live layer ===== */
   var liveTimer=null, liveLeft=0;
 
