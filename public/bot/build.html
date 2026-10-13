@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
-<meta name="pasiya-build" content="Build-3"/>
+<meta name="pasiya-build" content="Build-4"/>
 <title>Pasiya Builder</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
@@ -29,7 +29,7 @@ button.s{background:#333}
 </head>
 <body>
 <h1>🏗️ Pasiya Builder</h1>
-<div class="sub">Phase 3 · Run chain · Voice · Preview · Auto-save</div>
+<div class="sub">Phase 4 · + summarize · friends · fold intents</div>
 <div class="tabs">
   <button type="button" class="on" id="tab-auto">Auto</button>
   <button type="button" id="tab-manual">Manual</button>
@@ -129,7 +129,13 @@ calendar Meeting and note Agenda"></textarea>
     {intent:'settings',re:/(settings|සැකසුම්)/i,target:'native:settings'},
     {intent:'desktop',re:/(desktop|ඩෙස්ක්ටොප්)/i,target:'native:desktop'},
     {intent:'search',re:/(search|සොයන්න)/i,target:'desk:findfs'},
-    {intent:'diag',re:/(diag|syscheck)/i,target:'desk:diag'}
+    {intent:'diag',re:/(diag|syscheck)/i,target:'desk:diag'},
+    {intent:'summarize',re:/(summarize|සාරාංශ|summary)/i,target:'native:summarize'},
+    {intent:'friends',re:/(friends|find\s*my\s*friends|යාළු)/i,target:'native:friends'},
+    {intent:'memoji',re:/(memoji|emoji\s*face)/i,target:'native:memoji'},
+    {intent:'pay',re:/(pay\s*qr|wallet\s*pay|ගෙවීම)/i,target:'native:wallet2'},
+    {intent:'live',re:/(live\s*activity|timer\s*island)/i,target:'native:liveact'},
+    {intent:'fold',re:/(fold|dual\s*screen)/i,target:'native:flagship'}
   ];
 
   function parseIntent(text){
