@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
-<meta name="pasiya-build" content="Build-4"/>
+<meta name="pasiya-build" content="Build-4-fix"/>
 <title>Pasiya Builder</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
@@ -202,13 +202,26 @@ calendar Meeting and note Agenda"></textarea>
   function openTarget(target){
     if(!target)return;
     if(target==='native:desktop'){location.href='/bot/desktop.html';return}
+    if(target==='native:builder'){location.href='/bot/build.html';return}
     if(target.indexOf('desk:')===0){
       location.href='/bot/desktop.html?open='+encodeURIComponent(target.slice(5));
       return;
     }
-    // native panels live on phone
+    // native panels → phone deep link ?open=
     if(target.indexOf('native:')===0){
-      location.href='/bot/phone.html';
+      var panel=target.slice(7);
+      // map builder intent names to phone ?open= keys
+      var alias={
+        wallet2:'pay', liveact:'live', summarize:'summarize',
+        friends:'friends', memoji:'memoji', flagship:'fold',
+        notes:'notes', reminders:'reminders', calendar:'calendar',
+        camera:'camera', photos:'photos', health:'health',
+        settings:'settings', maps:'maps', findmy:'findmy',
+        siri:'siri', shortcuts:'shortcuts', journal:'journal',
+        homekit:'home', calc:'calc'
+      };
+      var key=alias[panel]||panel;
+      location.href='/bot/phone.html?open='+encodeURIComponent(key);
       return;
     }
   }
@@ -292,8 +305,12 @@ calendar Meeting and note Agenda"></textarea>
       });
     }
     // only navigate for pure open intents (not after successful writes)
+    // Always open last target for pure navigation intents (summarize/friends/memoji/...)
+    var navIntents={summarize:1,friends:1,memoji:1,pay:1,live:1,fold:1,weather:1,calendar:1,note:1,reminder:1,photos:1,photo:1,calc:1,settings:1,health:1,mail:1,drop:1,vault:1,coins:1,wiki:1,files:1,search:1,diag:1,translate:1,desktop:1};
+    var shouldNav=lastOpen&&parsed.steps.some(function(s){return navIntents[s.intent]&&!s.payload});
+    // also if all steps are open-only
     var onlyOpen=parsed.steps.every(function(s){return !s.payload&&s.intent!=='unknown'});
-    if(onlyOpen&&lastOpen)setTimeout(function(){openTarget(lastOpen)},300);
+    if((shouldNav||onlyOpen)&&lastOpen)setTimeout(function(){openTarget(lastOpen)},300);
   }
 
   document.getElementById('run').onclick=function(){runBuild(document.getElementById('cmd').value)};
