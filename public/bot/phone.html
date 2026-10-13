@@ -4,7 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
-<meta name="pasiya-phone-version" content="Phone-7-8"/>
+<meta name="pasiya-phone-version" content="Phone-9"/>
 <title>PasiyaPhone</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -207,6 +207,20 @@ body.dex-hint::after{content:'DeX: open Desktop';position:fixed;bottom:80px;left
 .zoom-bar button{padding:8px 12px;border-radius:20px;border:0;background:#333;color:#fff}
 .zoom-bar button.on{background:var(--blue)}
 
+
+/* Phone-9 */
+#island.live-timer{min-width:160px}
+#island.live-music{min-width:180px}
+.fold-screen{display:none;position:fixed;inset:0;z-index:70;background:#000;padding-top:var(--safe-top)}
+body.fold-real .fold-screen{display:flex;flex-direction:row}
+body.fold-real #home,body.fold-real #dock-wrap,body.fold-real #status{display:none !important}
+.fold-pane{flex:1;overflow:auto;border-right:1px solid #333;padding:12px}
+.fold-pane:last-child{border-right:0}
+.fold-pane h3{margin:0 0 10px;font-size:14px}
+.qr-box{background:#fff;color:#000;padding:12px;border-radius:12px;text-align:center;font-family:monospace;word-break:break-all}
+.memoji-face{width:120px;height:120px;border-radius:50%;margin:12px auto;display:flex;align-items:center;justify-content:center;font-size:64px;background:#222;border:3px solid #444}
+.friend-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#30d158;margin-right:6px}
+
 </style>
 </head>
 <body>
@@ -264,6 +278,23 @@ body.dex-hint::after{content:'DeX: open Desktop';position:fixed;bottom:80px;left
   </span>
 </div>
 
+<div class="fold-screen" id="fold-screen">
+  <div class="fold-pane">
+    <h3>Left · Apps</h3>
+    <div class="grid" id="fold-left"></div>
+    <button type="button" class="btn secondary" id="fold-exit" style="margin-top:12px">Exit Fold</button>
+  </div>
+  <div class="fold-pane">
+    <h3>Right · Quick</h3>
+    <div id="fold-right">
+      <div class="card"><b>Clock</b><div class="big" id="fold-clock">--:--</div></div>
+      <div class="card"><b>Notes</b><textarea id="fold-note" rows="4" placeholder="Quick note..."></textarea>
+        <button type="button" class="btn" id="fold-note-save">Save note</button></div>
+      <div class="card"><button type="button" class="btn" id="fold-open-maps">Maps</button>
+        <button type="button" class="btn secondary" id="fold-open-builder">Builder</button></div>
+    </div>
+  </div>
+</div>
 <div id="home">
   <div class="page-title">PasiyaPhone</div>
   <div class="widgets" id="widgets">
@@ -346,6 +377,76 @@ body.dex-hint::after{content:'DeX: open Desktop';position:fixed;bottom:80px;left
 
 
 
+
+
+<div class="panel" id="p-memoji">
+  <div class="nav"><button type="button" data-close="memoji">Close</button><b>Memoji</b><span style="width:52px"></span></div>
+  <div class="body" style="text-align:center">
+    <div class="memoji-face" id="mj-face">😀</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:12px 0">
+      <button type="button" class="btn secondary" data-mj="😀">😀</button>
+      <button type="button" class="btn secondary" data-mj="😎">😎</button>
+      <button type="button" class="btn secondary" data-mj="🥳">🥳</button>
+      <button type="button" class="btn secondary" data-mj="🤖">🤖</button>
+      <button type="button" class="btn secondary" data-mj="👑">👑</button>
+      <button type="button" class="btn secondary" data-mj="🦁">🦁</button>
+    </div>
+    <input id="mj-name" placeholder="Name"/>
+    <button type="button" class="btn" id="mj-save">Save Memoji</button>
+    <div class="card muted" id="mj-st">Local Memoji · Genmoji AI = optional Workers URL later</div>
+  </div>
+</div>
+<div class="panel" id="p-friends">
+  <div class="nav"><button type="button" data-close="friends">Close</button><b>Find My Friends</b><span style="width:52px"></span></div>
+  <div class="body">
+    <input id="ff-room" placeholder="Friends room code"/>
+    <input id="ff-name" placeholder="Your display name"/>
+    <button type="button" class="btn" id="ff-checkin">Check in here</button>
+    <button type="button" class="btn secondary" id="ff-refresh">Refresh friends</button>
+    <div id="ff-list" class="card muted">Uses shared FS room (free) · Realtime optional later</div>
+    <div id="ff-map" style="height:180px;border-radius:12px;margin-top:10px;background:#222"></div>
+  </div>
+</div>
+<div class="panel" id="p-wallet2">
+  <div class="nav"><button type="button" data-close="wallet2">Close</button><b>Wallet Pay</b><span style="width:52px"></span></div>
+  <div class="body">
+    <div class="qr-box" id="wq-qr">PASIYA-PAY</div>
+    <input id="wq-amt" placeholder="Amount" type="number"/>
+    <input id="wq-note" placeholder="Note"/>
+    <button type="button" class="btn" id="wq-gen">Generate pay code</button>
+    <button type="button" class="btn secondary" id="wq-hist">Save history</button>
+    <div id="wq-list" class="muted"></div>
+  </div>
+</div>
+<div class="panel" id="p-summarize">
+  <div class="nav"><button type="button" data-close="summarize">Close</button><b>Summarize</b><span style="width:52px"></span></div>
+  <div class="body">
+    <textarea id="sum-in" rows="6" placeholder="Paste notes / mail / article…"></textarea>
+    <button type="button" class="btn" id="sum-run">Summarize (local)</button>
+    <div class="card" id="sum-out" class="muted">Extractive summary · Workers AI optional</div>
+  </div>
+</div>
+<div class="panel" id="p-liveact">
+  <div class="nav"><button type="button" data-close="liveact">Close</button><b>Live Activities</b><span style="width:52px"></span></div>
+  <div class="body">
+    <button type="button" class="btn" id="la-timer">Start 5-min Timer on Island</button>
+    <button type="button" class="btn secondary" id="la-music">Music pill</button>
+    <button type="button" class="btn secondary" id="la-drop">Drop activity</button>
+    <button type="button" class="btn secondary" id="la-clear">Clear Island</button>
+    <div class="card muted">Dynamic Island Live Activities (client timers)</div>
+  </div>
+</div>
+<div class="panel" id="p-focus2">
+  <div class="nav"><button type="button" data-close="focus2">Close</button><b>Focus Filters</b><span style="width:52px"></span></div>
+  <div class="body">
+    <div class="card">
+      <label><input type="checkbox" id="fc-work"/> Work — hide social icons</label><br/>
+      <label><input type="checkbox" id="fc-sleep"/> Sleep — dim + AOD hint</label><br/>
+      <label><input type="checkbox" id="fc-personal"/> Personal</label>
+    </div>
+    <button type="button" class="btn" id="fc-apply">Apply Focus</button>
+  </div>
+</div>
 
 <div class="panel" id="p-journal">
   <div class="nav"><button type="button" data-close="journal">Close</button><b>Journal</b><span style="width:52px"></span></div>
@@ -650,7 +751,7 @@ body.dex-hint::after{content:'DeX: open Desktop';position:fixed;bottom:80px;left
 <div class="panel" id="p-about">
   <div class="nav"><button type="button" data-close="about">Close</button><b>About</b><span style="width:52px"></span></div>
   <div class="body">
-    <div class="card"><h2 style="margin:0 0 8px">PasiyaPhone</h2><p class="muted">Phase 7–8 · Spotlight · AOD · Journal · Action · DeX · Fold · SOS</p><p>iPhone-class shell on Telegram · shared pasiya_fs</p></div>
+    <div class="card"><h2 style="margin:0 0 8px">PasiyaPhone</h2><p class="muted">Phase 9 · Live Activities · Memoji · Friends · QR Wallet · Fold2 · Summarize</p><p>iPhone-class shell on Telegram · shared pasiya_fs</p></div>
     <button type="button" class="btn" id="btn-desktop">Open Desktop OS</button>
     <button type="button" class="btn secondary" id="btn-seed">Seed FS</button>
     <button type="button" class="btn secondary" id="btn-lock">Lock</button>
@@ -872,7 +973,7 @@ body.dex-hint::after{content:'DeX: open Desktop';position:fixed;bottom:80px;left
     ['files','📁','Files','desk:explorer'],['translate','🔤','Translate','desk:translate'],
     ['books','📚','Books','desk:wiki'],['calc','🔢','Calc','native:calc'],['calendar2','📅','Calendar','native:calendar'],['drop','📡','Drop','native:drop'],['library','📚','Library','native:library'],['voice','🎙','Voice','native:voice'],['compass','🧭','Compass','native:compass'],
     ['tips','💡','Tips','desk:hotkeys'],['appstore','🏪','Store','desk:store'],
-    ['journal','📓','Journal','native:journal'],['homekit','🏠','Home','native:homekit'],['livetext','🔤','Live Text','native:livetext'],['measure','📏','Measure','native:measure'],['freeform','🪟','Freeform','native:freeform'],['game','🎮','Games','native:game'],['record','⏺','Record','native:record'],['zoom','🔭','Zoom','native:zoom'],['checkin','🤝','Check In','native:checkin'],['flagship','🚀','Flagship','native:flagship'],['shortcuts','⚡','Shortcuts','native:shortcuts'],['siri','🟣','Siri','native:siri'],['builder','🏗️','Builder','native:builder'],['desktop','🖥️','Desktop','native:desktop'],['about','ℹ️','About','native:about']
+    ['memoji','😀','Memoji','native:memoji'],['friends','👥','Friends','native:friends'],['wallet2','💳','Pay','native:wallet2'],['summarize','✨','Summarize','native:summarize'],['liveact','🔴','Live','native:liveact'],['focus2','🌙','Focus+','native:focus2'],['journal','📓','Journal','native:journal'],['homekit','🏠','Home','native:homekit'],['livetext','🔤','Live Text','native:livetext'],['measure','📏','Measure','native:measure'],['freeform','🪟','Freeform','native:freeform'],['game','🎮','Games','native:game'],['record','⏺','Record','native:record'],['zoom','🔭','Zoom','native:zoom'],['checkin','🤝','Check In','native:checkin'],['flagship','🚀','Flagship','native:flagship'],['shortcuts','⚡','Shortcuts','native:shortcuts'],['siri','🟣','Siri','native:siri'],['builder','🏗️','Builder','native:builder'],['desktop','🖥️','Desktop','native:desktop'],['about','ℹ️','About','native:about']
   ];
   var FOLDERS=[
     {id:'productivity',name:'Productivity',icon:'📁',apps:['planner','notes','office','clip','tasks']},
@@ -2015,9 +2116,224 @@ body.dex-hint::after{content:'DeX: open Desktop';position:fixed;bottom:80px;left
     return ____ot(target);
   };
 
-  walletLoad();scLoad();jLoad();hkLoad();
+  walletLoad();scLoad();
+  /* ===== Phone-9 Intelligence / Social / Live layer ===== */
+  var liveTimer=null, liveLeft=0;
+
+  function islandLive(kind, text){
+    var el=document.getElementById('island');
+    if(!el)return;
+    el.classList.remove('live-timer','live-music','expanded','compact');
+    if(kind==='timer')el.classList.add('live-timer','expanded');
+    else if(kind==='music')el.classList.add('live-music','expanded');
+    else el.classList.add('expanded');
+    document.getElementById('island-text').textContent=text;
+    liveShow(text);
+  }
+
+  document.getElementById('la-timer')&&(document.getElementById('la-timer').onclick=function(){
+    liveLeft=5*60;
+    clearInterval(liveTimer);
+    liveTimer=setInterval(function(){
+      liveLeft--;
+      var m=Math.floor(liveLeft/60),s=liveLeft%60;
+      islandLive('timer','⏱ '+m+':'+String(s).padStart(2,'0'));
+      if(liveLeft<=0){clearInterval(liveTimer);islandSet('Timer done',true);haptic('success')}
+    },1000);
+    haptic('medium');
+  });
+  document.getElementById('la-music')&&(document.getElementById('la-music').onclick=function(){
+    islandLive('music','♫ PasiyaFM · Live');
+    haptic('light');
+  });
+  document.getElementById('la-drop')&&(document.getElementById('la-drop').onclick=function(){
+    islandLive('drop','📡 Drop nearby…');
+    haptic('light');
+  });
+  document.getElementById('la-clear')&&(document.getElementById('la-clear').onclick=function(){
+    clearInterval(liveTimer);
+    islandSet('PasiyaPhone',false);
+  });
+
+  /* Memoji */
+  var mjFace='😀';
+  document.querySelectorAll('[data-mj]').forEach(function(b){
+    b.onclick=function(){
+      mjFace=b.getAttribute('data-mj');
+      document.getElementById('mj-face').textContent=mjFace;
+      haptic('light');
+    };
+  });
+  document.getElementById('mj-save')&&(document.getElementById('mj-save').onclick=function(){
+    var name=(document.getElementById('mj-name').value||'Me').trim();
+    if(!initData()){toast('Auth');return}
+    var obj={face:mjFace,name:name,ts:Date.now()};
+    fsApi('write','/Documents/phone-memoji.json',JSON.stringify(obj,null,2)).then(function(j){
+      document.getElementById('mj-st').textContent=j.ok?'Saved '+name+' '+mjFace:(j.error||'fail');
+      if(j.ok){toast('Memoji saved');islandSet('Memoji · '+mjFace,true);haptic('success')}
+    });
+  });
+
+  /* Find My Friends — FS room list + optional mini map */
+  var friendsMap=null;
+  function ffEnsureMap(){
+    var el=document.getElementById('ff-map');
+    if(!el||typeof L==='undefined')return;
+    if(friendsMap){setTimeout(function(){friendsMap.invalidateSize()},200);return}
+    friendsMap=L.map('ff-map').setView([6.9271,79.8612],11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18}).addTo(friendsMap);
+  }
+  document.getElementById('ff-checkin')&&(document.getElementById('ff-checkin').onclick=function(){
+    var code=(document.getElementById('ff-room').value||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,12);
+    var name=(document.getElementById('ff-name').value||'Friend').trim();
+    if(!code){toast('Room code');return}
+    if(!initData())return;
+    function publish(lat,lon){
+      var path='/Documents/friends/'+code+'.json';
+      fsApi('mkdir','/Documents/friends').then(function(){
+        return fsApi('read',path);
+      }).then(function(j){
+        var list=[];if(j.ok&&j.content){try{list=JSON.parse(j.content)}catch(e){}}
+        if(!Array.isArray(list))list=[];
+        list=list.filter(function(x){return x.name!==name});
+        list.unshift({name:name,lat:lat,lon:lon,ts:Date.now()});
+        list=list.slice(0,20);
+        return fsApi('write',path,JSON.stringify(list,null,2));
+      }).then(function(j){
+        document.getElementById('ff-list').innerHTML=j.ok?('<span class="friend-dot"></span>Checked in as '+name):(j.error||'fail');
+        if(j.ok){islandSet('Friends · Checked in',true);haptic('success')}
+      });
+    }
+    if(navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(function(pos){
+        publish(pos.coords.latitude,pos.coords.longitude);
+      },function(){publish(6.9271,79.8612)});
+    }else publish(6.9271,79.8612);
+  });
+  document.getElementById('ff-refresh')&&(document.getElementById('ff-refresh').onclick=function(){
+    var code=(document.getElementById('ff-room').value||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,12);
+    if(!code)return;
+    ffEnsureMap();
+    fsApi('read','/Documents/friends/'+code+'.json').then(function(j){
+      var list=[];if(j.ok&&j.content){try{list=JSON.parse(j.content)}catch(e){}}
+      if(!Array.isArray(list))list=[];
+      document.getElementById('ff-list').innerHTML=list.length?list.map(function(f){
+        return '<div><span class="friend-dot"></span><b>'+String(f.name||'').replace(/</g,'')+'</b> <span class="muted">'+new Date(f.ts||0).toLocaleTimeString()+'</span></div>';
+      }).join(''):'No friends in room';
+      if(friendsMap&&list.length){
+        list.forEach(function(f){
+          if(f.lat!=null)L.marker([f.lat,f.lon]).addTo(friendsMap).bindPopup(String(f.name||''));
+        });
+        friendsMap.setView([list[0].lat||6.93,list[0].lon||79.86],12);
+      }
+    });
+  });
+
+  /* Wallet QR deepen */
+  var payHist=[];
+  document.getElementById('wq-gen')&&(document.getElementById('wq-gen').onclick=function(){
+    var amt=document.getElementById('wq-amt').value||'0';
+    var note=document.getElementById('wq-note').value||'';
+    var code='PASIYA|'+amt+'|'+(note||'pay')+'|'+Date.now().toString(36);
+    document.getElementById('wq-qr').textContent=code;
+    // visual QR via free API image
+    var img='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data='+encodeURIComponent(code);
+    document.getElementById('wq-qr').innerHTML='<img src="'+img+'" alt="qr" style="width:180px;height:180px"/><div style="margin-top:8px;font-size:11px">'+code+'</div>';
+    payHist.unshift({code:code,amt:amt,note:note,ts:Date.now()});
+    islandSet('Pay QR · '+amt,true);haptic('success');
+  });
+  document.getElementById('wq-hist')&&(document.getElementById('wq-hist').onclick=function(){
+    if(!initData())return;
+    fsApi('write','/Documents/phone-wallet-history.json',JSON.stringify(payHist.slice(0,50),null,2)).then(function(j){
+      if(j.ok){toast('Pay history saved');document.getElementById('wq-list').textContent=payHist.length+' items'}
+    });
+  });
+
+  /* Summarize local extractive */
+  document.getElementById('sum-run')&&(document.getElementById('sum-run').onclick=function(){
+    var t=(document.getElementById('sum-in').value||'').trim();
+    if(!t)return;
+    var sentences=t.replace(/\n+/g,'. ').split(/[.!?]+/).map(function(s){return s.trim()}).filter(Boolean);
+    // score by length + keyword density
+    var scored=sentences.map(function(s){
+      var score=s.length;
+      if(/\b(important|must|today|deadline|මතක්|වැදගත්)\b/i.test(s))score+=40;
+      return{s:s,score:score};
+    }).sort(function(a,b){return b.score-a.score});
+    var top=scored.slice(0,Math.min(3,scored.length)).map(function(x){return '• '+x.s});
+    var out=top.join('\n')||t.slice(0,200);
+    document.getElementById('sum-out').textContent=out;
+    if(initData()){
+      fsApi('write','/Documents/phone-summary-last.txt',out);
+    }
+    islandSet('Summarize · Done',true);haptic('success');
+  });
+
+  /* Focus filters */
+  document.getElementById('fc-apply')&&(document.getElementById('fc-apply').onclick=function(){
+    var work=document.getElementById('fc-work').checked;
+    var sleep=document.getElementById('fc-sleep').checked;
+    CC.focus=work||sleep;
+    if(sleep){CC.bright=40;applyBright();document.getElementById('aod').classList.add('open')}
+    paintCC();
+    // hide some home icons visually
+    if(work){
+      document.querySelectorAll('#all-grid .app span').forEach(function(sp){
+        if(/music|game|photos/i.test(sp.textContent||''))sp.parentElement.style.opacity='0.25';
+      });
+    }
+    fsApi('write','/Documents/phone-focus.json',JSON.stringify({work:work,sleep:sleep,ts:Date.now()}));
+    toast('Focus applied');islandSet('Focus',true);haptic('medium');
+  });
+
+  /* Real fold dual-pane */
+  function foldEnter(){
+    document.body.classList.add('fold-real');
+    var left=document.getElementById('fold-left');
+    if(left&&!left.childNodes.length){
+      FAV.concat(ALL).slice(0,12).forEach(function(a){left.appendChild(makeApp(a))});
+    }
+    islandSet('Fold · Dual',true);
+  }
+  function foldExit(){document.body.classList.remove('fold-real')}
+  var fgFold=document.getElementById('fg-fold');
+  if(fgFold){
+    fgFold.onclick=function(){
+      if(document.body.classList.contains('fold-real'))foldExit();
+      else foldEnter();
+      document.getElementById('fg-st').textContent=document.body.classList.contains('fold-real')?'Real dual-pane Fold ON':'Fold OFF';
+      haptic('medium');
+    };
+  }
+  document.getElementById('fold-exit')&&(document.getElementById('fold-exit').onclick=foldExit);
+  document.getElementById('fold-note-save')&&(document.getElementById('fold-note-save').onclick=function(){
+    var t=document.getElementById('fold-note').value||'';
+    if(!initData())return;
+    fsApi('write','/Documents/phone-note.txt',t).then(function(j){if(j.ok)toast('Fold note saved')});
+  });
+  document.getElementById('fold-open-maps')&&(document.getElementById('fold-open-maps').onclick=function(){foldExit();openTarget('native:maps')});
+  document.getElementById('fold-open-builder')&&(document.getElementById('fold-open-builder').onclick=function(){location.href='/bot/build.html'});
+  setInterval(function(){
+    var el=document.getElementById('fold-clock');
+    if(!el)return;
+    var n=new Date();
+    el.textContent=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
+  },15000);
+
+  var _____ot=openTarget;
+  openTarget=function(target){
+    if(target==='native:memoji'){openPanel('memoji');return}
+    if(target==='native:friends'){openPanel('friends');setTimeout(ffEnsureMap,300);return}
+    if(target==='native:wallet2'){openPanel('wallet2');return}
+    if(target==='native:summarize'){openPanel('summarize');return}
+    if(target==='native:liveact'){openPanel('liveact');return}
+    if(target==='native:focus2'){openPanel('focus2');return}
+    return _____ot(target);
+  };
+
+  jLoad();hkLoad();
   if(!initData())toast('⚠️ Open via Telegram /phone');
-  else toast('PasiyaPhone 7–8 · Flagship Shell');
+  else toast('PasiyaPhone 9 · Intelligence Layer');
 })();
 </script>
 </body>
