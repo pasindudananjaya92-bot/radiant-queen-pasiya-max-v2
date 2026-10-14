@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
-<meta name="pasiya-build" content="Build-4-fix"/>
+<meta name="pasiya-build" content="Build-4-fix2"/>
 <title>Pasiya Builder</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
@@ -111,31 +111,31 @@ calendar Meeting and note Agenda"></textarea>
   }
 
   var RULES=[
-    {intent:'weather',re:/(weather|වෙදර්|කාලගුණ)/i,target:'desk:weather'},
-    {intent:'note',re:/(note|නෝට්|memo|ලියන්න)/i,target:'native:notes'},
-    {intent:'reminder',re:/(remind|ටාස්ක්|task|reminder|මතක්)/i,target:'native:reminders'},
-    {intent:'calendar',re:/(calendar|කැලෙන්ඩර්|event|planner|සිද්ධි)/i,target:'native:calendar'},
-    {intent:'photo',re:/(photo|ෆෝටෝ|camera|කැමරා)/i,target:'native:camera'},
-    {intent:'photos',re:/(photos|ගැලරි|gallery)/i,target:'native:photos'},
-    {intent:'calc',re:/(calc|ගණන්|calculate)/i,target:'native:calc'},
-    {intent:'translate',re:/(translate|පරිවර්තන)/i,target:'desk:translate'},
-    {intent:'files',re:/(file|ෆයිල්|explorer)/i,target:'desk:explorer'},
-    {intent:'health',re:/(health|සෞඛ්‍ය|fitness)/i,target:'native:health'},
+    {intent:'summarize',re:/(summarize|summary|\u0dc3\u0dcf\u0dbb\u0dcf\u0d82\u0dc1)/i,target:'native:summarize'},
+    {intent:'friends',re:/(friends|find\s*my\s*friends)/i,target:'native:friends'},
+    {intent:'memoji',re:/(memoji|emoji\s*face)/i,target:'native:memoji'},
+    {intent:'pay',re:/(?:^|\s)(pay|wallet\s*pay)(?:\s|$)/i,target:'native:wallet2'},
+    {intent:'live',re:/(?:^|\s)(live|liveact|live\s*activity|timer\s*island)(?:\s|$)/i,target:'native:liveact'},
+    {intent:'fold',re:/(fold|dual\s*screen|flagship)/i,target:'native:flagship'},
+    {intent:'weather',re:/(weather|\u0dc0\u0dd9\u0daf\u0dbb\u0dca|\u0d9a\u0dcf\u0dbd\u0d9c\u0dd4\u0dab)/i,target:'desk:weather'},
+    {intent:'reminder',re:/(remind|task|reminder)/i,target:'native:reminders'},
+    {intent:'calendar',re:/(calendar|event|planner)/i,target:'native:calendar'},
+    {intent:'photo',re:/(photo|camera)/i,target:'native:camera'},
+    {intent:'photos',re:/(photos|gallery)/i,target:'native:photos'},
+    {intent:'calc',re:/(calc|calculate)/i,target:'native:calc'},
+    {intent:'translate',re:/(translate)/i,target:'desk:translate'},
+    {intent:'files',re:/(file|explorer)/i,target:'desk:explorer'},
+    {intent:'health',re:/(health|fitness)/i,target:'native:health'},
     {intent:'mail',re:/(mail|email)/i,target:'native:mail'},
     {intent:'drop',re:/(drop|airdrop)/i,target:'native:drop'},
     {intent:'vault',re:/(vault|password)/i,target:'desk:vault'},
     {intent:'coins',re:/(bitcoin|crypto|coins)/i,target:'desk:coins'},
     {intent:'wiki',re:/(wiki|wikipedia)/i,target:'desk:wiki'},
-    {intent:'settings',re:/(settings|සැකසුම්)/i,target:'native:settings'},
-    {intent:'desktop',re:/(desktop|ඩෙස්ක්ටොප්)/i,target:'native:desktop'},
-    {intent:'search',re:/(search|සොයන්න)/i,target:'desk:findfs'},
+    {intent:'settings',re:/(settings)/i,target:'native:settings'},
+    {intent:'desktop',re:/(desktop)/i,target:'native:desktop'},
+    {intent:'search',re:/(search)/i,target:'desk:findfs'},
     {intent:'diag',re:/(diag|syscheck)/i,target:'desk:diag'},
-    {intent:'summarize',re:/(summarize|සාරාංශ|summary)/i,target:'native:summarize'},
-    {intent:'friends',re:/(friends|find\s*my\s*friends|යාළු)/i,target:'native:friends'},
-    {intent:'memoji',re:/(memoji|emoji\s*face)/i,target:'native:memoji'},
-    {intent:'pay',re:/(pay\s*qr|wallet\s*pay|ගෙවීම)/i,target:'native:wallet2'},
-    {intent:'live',re:/(live\s*activity|timer\s*island)/i,target:'native:liveact'},
-    {intent:'fold',re:/(fold|dual\s*screen)/i,target:'native:flagship'}
+    {intent:'note',re:/(?:^|\s)(note)(?:\s|$)|^note\s+/i,target:'native:notes'}
   ];
 
   function parseIntent(text){
@@ -144,6 +144,14 @@ calendar Meeting and note Agenda"></textarea>
     var steps=[];
     parts.forEach(function(part){
       var hit=null;
+      // exact open intents FIRST (before note)
+      if(/^(?:summarize|summary)$/i.test(part)) hit={intent:'summarize',target:'native:summarize',text:part};
+      if(!hit && /^memoji$/i.test(part)) hit={intent:'memoji',target:'native:memoji',text:part};
+      if(!hit && /^(?:pay|wallet\s*pay)$/i.test(part)) hit={intent:'pay',target:'native:wallet2',text:part};
+      if(!hit && /^(?:live|liveact)$/i.test(part)) hit={intent:'live',target:'native:liveact',text:part};
+      if(!hit && /^friends$/i.test(part)) hit={intent:'friends',target:'native:friends',text:part};
+      if(!hit && /^fold$/i.test(part)) hit={intent:'fold',target:'native:flagship',text:part};
+
       var m=part.match(/^(?:note|නෝට්)\s+(.+)/i);
       if(m)hit={intent:'note_write',target:'native:notes',text:part,payload:m[1].trim()};
       if(!hit){m=part.match(/^(?:remind(?:er)?|task|ටාස්ක්|මතක්)\s+(.+)/i);if(m)hit={intent:'reminder_add',target:'native:reminders',text:part,payload:m[1].trim()}}
