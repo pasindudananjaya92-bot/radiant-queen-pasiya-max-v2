@@ -133,7 +133,27 @@ button.b:active{border-color:var(--gold)}
 
 <div class="win" id="w-share"><div class="hd"><b>Share</b><button type="button" data-x="share">X</button></div><div class="bd"><div class="scroll muted" id="sh-out">Build export</div><div class="tb"><button type="button" class="b" id="sh-build">Build</button><button type="button" class="b" id="sh-save">Save</button></div></div></div>
 
-<div class="win" id="w-settings"><div class="hd"><b>Settings</b><button type="button" data-x="settings">X</button></div><div class="bd"><div class="form"><textarea id="clip" rows="4" placeholder="Clipboard text"></textarea><button type="button" class="b" id="clip-save">Save clipboard.txt</button></div><div class="scroll muted">PasiyaOS S10–S20 · /api/fs</div></div></div>
+<div class="win" id="w-settings" style="max-width:96vw;width:420px;height:78vh"><div class="hd"><b>⚙ PASIYA MAX LAB</b><button type="button" data-x="settings">X</button></div><div class="bd" style="display:flex;flex-direction:column;padding:0">
+<div class="row" id="cc-tabs" style="flex-wrap:wrap;gap:4px;padding:8px;border-bottom:1px solid rgba(201,162,39,0.25)">
+<button type="button" class="b cc-tab" data-tab="sys">Core Matrix</button>
+<button type="button" class="b cc-tab" data-tab="ai">AI Forge</button>
+<button type="button" class="b cc-tab" data-tab="sec">Fortress</button>
+<button type="button" class="b cc-tab" data-tab="net">Hydra Net</button>
+<button type="button" class="b cc-tab" data-tab="nodes">Node Factory</button>
+<button type="button" class="b cc-tab" data-tab="ui">God UI</button>
+<button type="button" class="b cc-tab" data-tab="obs">Observatory</button>
+<button type="button" class="b cc-tab" data-tab="gene">Gene Robot</button>
+<button type="button" class="b cc-tab" data-tab="social">Social</button>
+<button type="button" class="b cc-tab" data-tab="fs">Storage</button>
+<button type="button" class="b cc-tab" data-tab="clip">Clip</button>
+</div>
+<div class="scroll" id="cc-panel" style="flex:1;padding:10px"></div>
+<div class="tb" style="padding:8px">
+<button type="button" class="b" id="cc-save">Save all</button>
+<button type="button" class="b" id="cc-export">Export JSON</button>
+<button type="button" class="b" id="cc-reload">Reload</button>
+</div>
+</div></div>
 
 <!-- S16-20 -->
 <div class="win" id="w-notes"><div class="hd"><b>Quick Notes</b><button type="button" data-x="notes">X</button></div><div class="bd"><textarea id="nt-ed" placeholder="Sticky note..."></textarea><div class="tb"><button type="button" class="b" id="nt-save">Save</button><button type="button" class="b" id="nt-load">Load</button></div></div></div>
@@ -325,7 +345,7 @@ var APPS=[
   ['palette2','🎨','Palette'],['findfs','🔎','FindFS'],
   ['cats','📂','Cats'],['hotkeys','⌨','Hotkeys'],['exportall','📤','Export'],
   ['clip','📋','Clip'],['diag','🩺','Diag'],
-  ['store','🏪','Store'],['settings','⚙','Settings']
+  ['store','🏪','Store'],['settings','⚙','Control']
 ];
 
 var icons=document.getElementById('icons');
@@ -2049,6 +2069,366 @@ if(dgRun)dgRun.onclick=function(){
 var dgSave=document.getElementById('dg-save');
 if(dgSave)dgSave.onclick=function(){fsApi('write','/Documents/diag-last.txt',lastDg||document.getElementById('dg-out').textContent||'').then(function(j){if(j.ok)toast('Diag saved')})};
 
+
+
+/* ——— CONTROL CENTER (Settings Lab) ——— */
+window.__cc = window.__cc || {
+  version: 2,
+  system: { hostname: 'PasiyaOS', locale: 'si-LK', theme: 'gold', haptics: true, reduceMotion: false, autoLockMin: 0, scheduler: 'balanced', memMode: 'standard', selfHeal: 'off', overclock: 5 },
+  network: { proxyHttpget: true, openExternal: true, proxyMode: 'httpget', ratePosture: 'smart', bookmarks: ['https://www.make.com','https://vercel.com','https://supabase.com','https://developers.facebook.com'] },
+  ai: { defaultModel: 'auto', temperature: 0.7, maxTokens: 2048, notes: '', reasoningDepth: 40, firewallLayers: 3, swarmSize: 3, memoryMix: 'long', promptDna: '' },
+  social: { queuePath: '/Documents/social/queue.json', autoWebhook: true, fbEnabled: false, defaultHashtags: '#AI #PasiyaMax' },
+  fs: { quotaWarn: 1500000, autoSeed: true, backupPath: '/Documents/backup-export.txt' },
+  security: { founderOnlyHeavy: true, requireInitData: true, sessionLabel: 'founder', lockMode: 'none', encProfile: 'std', ghost: 'off', destruct: 'off' },
+  ui: { themeEngine: 'gold', hapticProfile: 'light', anim: 'soft', gesture: 'basic' },
+  obs: { logLevel: 'info', retention: 'day' },
+  nodes: { chain: [] },
+  lab: { experimental: false, debugToasts: false, featureFlags: { browserPro: true, socialCon: true, makeDock: true } },
+  clipboard: ''
+};
+function ccPath(){ return '/Documents/os-settings.json'; }
+function ccPanel(){ return document.getElementById('cc-panel'); }
+function ccRender(tab){
+  var p = ccPanel(); if(!p) return;
+  var c = window.__cc;
+  tab = tab || 'sys';
+  window.__ccTab = tab;
+  function alt(html){ return '<div class="card" style="border-color:rgba(255,80,80,0.35)"><h4 style="color:#f88">Advanced alternatives</h4><div class="muted">'+html+'</div></div>'; }
+  function meta(power, risk){ return '<div class="muted">Power '+power+'/10 · Risk '+risk+'/10</div>'; }
+
+  if(tab==='sys'){
+    p.innerHTML =
+      '<div class="card"><h4>CORE MATRIX LAB</h4>'+meta(9,6)+
+      '<label class="muted">Scheduler profile</label><select id="cc-sched"><option value="balanced">Balanced</option><option value="quantum">Quantum Thread sim</option><option value="aggressive">Aggressive</option><option value="eco">Eco / heal</option></select>'+
+      '<label class="muted">Memory mode</label><select id="cc-mem"><option value="standard">Standard</option><option value="blackhole">Blackhole allocator sim</option><option value="pinned">Pinned hot cache</option></select>'+
+      '<label class="muted">Self-heal kernel</label><select id="cc-heal"><option value="off">Off</option><option value="soft">Soft recover</option><option value="hard">Hard reset FS seed</option></select>'+
+      '<label class="muted">Overclock bias (UI concurrency)</label><input id="cc-oc" type="range" min="1" max="10" value="'+(c.system.overclock||5)+'"/>'+
+      '<label class="muted">Hostname</label><input id="cc-host" value="'+(c.system.hostname||'PasiyaOS')+'"/>'+
+      '<label class="muted">Locale</label><input id="cc-locale" value="'+(c.system.locale||'si-LK')+'"/>'+
+      '<label class="muted">Theme</label><select id="cc-theme"><option value="gold">gold</option><option value="crimson">crimson</option><option value="matrix">matrix</option><option value="cyber">cyber</option></select>'+
+      '<label><input type="checkbox" id="cc-haptic"/> Haptics</label></div>'+
+      alt('A1 Quantum scheduler (priority queues in client)<br>A2 Memory blackhole = aggressive GC of window caches<br>A3 Self-heal = re-seed critical paths on error');
+    document.getElementById('cc-theme').value = c.system.theme||'gold';
+    document.getElementById('cc-sched').value = c.system.scheduler||'balanced';
+    document.getElementById('cc-mem').value = c.system.memMode||'standard';
+    document.getElementById('cc-heal').value = c.system.selfHeal||'off';
+    document.getElementById('cc-haptic').checked = !!c.system.haptics;
+  } else if(tab==='ai'){
+    p.innerHTML =
+      '<div class="card"><h4>AI BRAIN FORGE</h4>'+meta(10,7)+
+      '<label class="muted">Model router</label><select id="cc-model"><option value="auto">auto cascade</option><option value="groq">Groq primary</option><option value="gemini">Gemini primary</option><option value="swarm">Swarm vote (3)</option></select>'+
+      '<label class="muted">Reasoning depth 1–100</label><input id="cc-depth" type="range" min="1" max="100" value="'+(c.ai.reasoningDepth||40)+'"/>'+
+      '<label class="muted">Hallucination firewall layers</label><select id="cc-fw"><option value="1">1 factual check</option><option value="3">3 layered</option><option value="5">5 max</option></select>'+
+      '<label class="muted">Agent swarm size</label><input id="cc-swarm" type="number" min="1" max="100" value="'+(c.ai.swarmSize||3)+'"/>'+
+      '<label class="muted">Memory mix</label><select id="cc-memai"><option value="short">Short-term only</option><option value="long">+ Long-term FS</option><option value="vector">+ Vector (pgvector)</option><option value="graph">+ Graph links</option></select>'+
+      '<label class="muted">Prompt DNA (prefix)</label><textarea id="cc-dna" rows="3" style="width:100%">'+(c.ai.promptDna||'')+'</textarea>'+
+      '<label class="muted">Temperature</label><input id="cc-temp" type="number" step="0.1" min="0" max="2" value="'+(c.ai.temperature||0.7)+'"/>'+
+      '<p class="muted">API keys NEVER stored in Mini App — Vercel env only.</p></div>'+
+      alt('A1 Cascade: Groq→Gemini on fail<br>A2 Swarm: 3 agents majority answer<br>A3 Firewall-5: claim, source, policy, tone, length gates');
+    document.getElementById('cc-model').value = c.ai.defaultModel||'auto';
+    document.getElementById('cc-fw').value = String(c.ai.firewallLayers||3);
+    document.getElementById('cc-memai').value = c.ai.memoryMix||'long';
+  } else if(tab==='sec'){
+    p.innerHTML =
+      '<div class="card"><h4>SECURITY FORTRESS</h4>'+meta(10,9)+
+      '<label class="muted">Lock mode</label><select id="cc-lock"><option value="none">Open session</option><option value="pass">Passcode gate</option><option value="soul">Biometric soul lock sim</option></select>'+
+      '<label class="muted">Encryption profile</label><select id="cc-enc"><option value="std">Standard transport</option><option value="aes">AES-oriented vault files</option><option value="max">Max (vault + redact logs)</option></select>'+
+      '<label class="muted">Ghost mode</label><select id="cc-ghost"><option value="off">Off</option><option value="soft">Soft (hide previews)</option><option value="hard">Hard (minimal UI telemetry)</option></select>'+
+      '<label class="muted">Self-destruct</label><select id="cc-boom"><option value="off">Off</option><option value="session">Clear session prefs</option><option value="lab">Wipe /Documents/lab/*</option></select>'+
+      '<label><input type="checkbox" id="cc-founder"/> Founder-only heavy bot cmds</label><br>'+
+      '<label><input type="checkbox" id="cc-init"/> Require initData for FS writes</label>'+
+      '<label class="muted">Session label</label><input id="cc-sess" value="'+(c.security.sessionLabel||'founder')+'"/></div>'+
+      alt('A1 Soul lock = FaceID-style gate in phone shell<br>A2 Ghost = strip analytics writes<br>A3 Destruct lab = wipe lab JSON only (not whole FS)');
+    document.getElementById('cc-lock').value = c.security.lockMode||'none';
+    document.getElementById('cc-enc').value = c.security.encProfile||'std';
+    document.getElementById('cc-ghost').value = c.security.ghost||'off';
+    document.getElementById('cc-boom').value = c.security.destruct||'off';
+    document.getElementById('cc-founder').checked = !!c.security.founderOnlyHeavy;
+    document.getElementById('cc-init').checked = !!c.security.requireInitData;
+  } else if(tab==='net'){
+    p.innerHTML =
+      '<div class="card"><h4>NETWORK HYDRA</h4>'+meta(8,7)+
+      '<label class="muted">Proxy strategy</label><select id="cc-proxy-mode"><option value="direct">Direct</option><option value="httpget">Bot httpget proxy</option><option value="rotate">Rotate bookmark gateways</option></select>'+
+      '<label><input type="checkbox" id="cc-ext"/> External openLink allowed</label><br>'+
+      '<label class="muted">Rate posture</label><select id="cc-rate"><option value="strict">Strict</option><option value="smart">Smart throttle</option><option value="burst">Burst</option></select>'+
+      '<label class="muted">Bookmarks / gateways</label><textarea id="cc-bm" rows="5" style="width:100%">'+(c.network.bookmarks||[]).join('\\n')+'</textarea>'+
+      '<button type="button" class="b" id="cc-open-make">Open Make</button> '+
+      '<button type="button" class="b" id="cc-open-vercel">Open Vercel</button></div>'+
+      alt('A1 httpget = CORS-safe fetch via /api/fs<br>A2 Rotate = cycle bookmarks as research portals<br>A3 Smart throttle = client delay between heavy ops');
+    document.getElementById('cc-proxy-mode').value = c.network.proxyMode||'httpget';
+    document.getElementById('cc-ext').checked = !!c.network.openExternal;
+    document.getElementById('cc-rate').value = c.network.ratePosture||'smart';
+    var om=document.getElementById('cc-open-make'); if(om)om.onclick=function(){ if(typeof tgOpen==='function')tgOpen('https://www.make.com'); };
+    var ov=document.getElementById('cc-open-vercel'); if(ov)ov.onclick=function(){ if(typeof tgOpen==='function')tgOpen('https://vercel.com'); };
+  } else if(tab==='nodes'){
+    var nodes = (c.nodes && c.nodes.chain) ? c.nodes.chain : [];
+    var list = nodes.map(function(n,i){ return (i+1)+'. ['+n.type+'] '+(n.label||n.value||''); }).join('\\n') || '(empty chain)';
+    p.innerHTML =
+      '<div class="card"><h4>AUTOMATION NODE FACTORY</h4>'+meta(10,5)+
+      '<p class="muted">Mobile-safe node chain (Make-style logic without broken canvas). Max practical steps stored in FS.</p>'+
+      '<label class="muted">Add trigger</label><select id="cc-ntrig"><option value="telegram">Telegram message</option><option value="time">Time / cron hint</option><option value="webhook">Webhook</option><option value="file">File change</option><option value="ai">AI event</option></select>'+
+      '<label class="muted">Add action</label><select id="cc-nact"><option value="reply">Send Telegram reply</option><option value="ai">Call AI</option><option value="fs">Write FS</option><option value="http">HTTP get</option><option value="social">Social queue</option></select>'+
+      '<label class="muted">Logic</label><select id="cc-nlogic"><option value="if">IF/ELSE</option><option value="loop">Loop</option><option value="delay">Delay</option><option value="ai_decide">AI Decision</option></select>'+
+      '<input id="cc-nlabel" placeholder="Node label / param"/>'+
+      '<div class="row"><button type="button" class="b" id="cc-nadd-t">+ Trigger</button><button type="button" class="b" id="cc-nadd-a">+ Action</button><button type="button" class="b" id="cc-nadd-l">+ Logic</button><button type="button" class="b" id="cc-nclear">Clear</button></div>'+
+      '<pre id="cc-nlist" class="muted" style="white-space:pre-wrap">'+list+'</pre></div>'+
+      alt('A1 Chain JSON = portable blueprint<br>A2 Run later via bot /flow style<br>A3 Export to Make when desktop available');
+    function refreshList(){
+      var ch=(window.__cc.nodes&&window.__cc.nodes.chain)||[];
+      document.getElementById('cc-nlist').textContent = ch.map(function(n,i){return (i+1)+'. ['+n.type+'] '+(n.label||'');}).join('\\n')||'(empty)';
+    }
+    document.getElementById('cc-nadd-t').onclick=function(){
+      window.__cc.nodes=window.__cc.nodes||{chain:[]};
+      window.__cc.nodes.chain.push({type:'trigger:'+document.getElementById('cc-ntrig').value,label:document.getElementById('cc-nlabel').value||'trigger'});
+      refreshList();
+    };
+    document.getElementById('cc-nadd-a').onclick=function(){
+      window.__cc.nodes=window.__cc.nodes||{chain:[]};
+      window.__cc.nodes.chain.push({type:'action:'+document.getElementById('cc-nact').value,label:document.getElementById('cc-nlabel').value||'action'});
+      refreshList();
+    };
+    document.getElementById('cc-nadd-l').onclick=function(){
+      window.__cc.nodes=window.__cc.nodes||{chain:[]};
+      window.__cc.nodes.chain.push({type:'logic:'+document.getElementById('cc-nlogic').value,label:document.getElementById('cc-nlabel').value||'logic'});
+      refreshList();
+    };
+    document.getElementById('cc-nclear').onclick=function(){ window.__cc.nodes={chain:[]}; refreshList(); };
+  } else if(tab==='ui'){
+    p.innerHTML =
+      '<div class="card"><h4>TELEGRAM GOD UI</h4>'+meta(7,2)+
+      '<label class="muted">Theme engine</label><select id="cc-uitheme"><option value="gold">Gold glass</option><option value="cyber">Cyberpunk</option><option value="matrix">Matrix rain</option><option value="nasa">Mission control</option></select>'+
+      '<label class="muted">Haptic profile</label><select id="cc-hap"><option value="off">Off</option><option value="light">Light</option><option value="composer">Composer (pattern)</option></select>'+
+      '<label class="muted">Animation physics</label><select id="cc-anim"><option value="none">None</option><option value="soft">Soft</option><option value="spring">Spring</option></select>'+
+      '<label class="muted">Gesture pack</label><select id="cc-ges"><option value="basic">Basic</option><option value="lab">Lab swipes</option></select></div>'+
+      alt('A1 NASA = denser cards denser metrics<br>A2 Composer haptics = WebApp HapticFeedback patterns<br>A3 Lab swipes = open Control from edge');
+    document.getElementById('cc-uitheme').value = c.ui.themeEngine||'gold';
+    document.getElementById('cc-hap').value = c.ui.hapticProfile||'light';
+    document.getElementById('cc-anim').value = c.ui.anim||'soft';
+    document.getElementById('cc-ges').value = c.ui.gesture||'basic';
+  } else if(tab==='obs'){
+    p.innerHTML =
+      '<div class="card"><h4>DATA OBSERVATORY</h4>'+meta(8,3)+
+      '<label class="muted">Log volcano level</label><select id="cc-log"><option value="error">Errors only</option><option value="info">Info</option><option value="debug">Debug lava</option></select>'+
+      '<label class="muted">Black box retention</label><select id="cc-bb"><option value="session">Session</option><option value="day">1 day FS</option><option value="week">7 day FS</option></select>'+
+      '<button type="button" class="b" id="cc-snap">Snapshot system state</button>'+
+      '<pre id="cc-obsout" class="muted" style="white-space:pre-wrap">Ready.</pre></div>'+
+      alt('A1 Snapshot → /Documents/lab/snapshot-*.json<br>A2 Error time machine = load last snapshot<br>A3 Debug lava = verbose toasts');
+    document.getElementById('cc-log').value = c.obs.logLevel||'info';
+    document.getElementById('cc-bb').value = c.obs.retention||'day';
+    document.getElementById('cc-snap').onclick=function(){
+      var snap={ts:Date.now(),cc:window.__cc,apps:(typeof APPS!=='undefined'?APPS.length:0),ua:(navigator.userAgent||'').slice(0,120)};
+      var path='/Documents/lab/snapshot-'+Date.now()+'.json';
+      fsApi('mkdir','/Documents/lab').then(function(){return fsApi('write',path,JSON.stringify(snap,null,2));})
+        .then(function(j){ document.getElementById('cc-obsout').textContent=j&&j.ok?('Saved '+path):('fail'); toast(j&&j.ok?'Snapshot OK':'fail'); });
+    };
+  
+} else if(tab==='gene'){
+    p.innerHTML =
+      '<div class="card"><h4>GENOME BUILD ROBOT</h4><div class="muted">Power 10/10 · Risk 6/10 — search + mutate + save gene packs</div>'+
+      '<label class="muted">Search query (tech / bots / automation)</label>'+
+      '<input id="cc-gene-q" placeholder="e.g. telegram mini app automation 2026"/>'+
+      '<div class="row"><button type="button" class="b" id="cc-gene-search">Web search</button>'+
+      '<button type="button" class="b" id="cc-gene-mutate">Mutate into build plan</button>'+
+      '<button type="button" class="b" id="cc-gene-save">Save gene pack</button></div>'+
+      '<label class="muted">Gene library path</label><input id="cc-gene-path" value="/Documents/lab/genes/"/>'+
+      '<pre id="cc-gene-out" class="muted" style="white-space:pre-wrap;max-height:240px;overflow:auto">Search the open web via bot proxy, then mutate hits into a Pasiya build gene (steps + risks).</pre></div>'+
+      '<div class="card" style="border-color:rgba(255,80,80,0.35)"><h4 style="color:#f88">Alternatives</h4><div class="muted">'+
+      'A1 DuckDuckGo HTML scrape via httpget<br>A2 Mutate = local heuristic plan from titles<br>A3 Save pack = /Documents/lab/genes/*.json for later Node Factory</div></div>';
+    document.getElementById('cc-gene-search').onclick=function(){
+      var q=(document.getElementById('cc-gene-q').value||'').trim();
+      if(!q){toast('Enter query');return;}
+      var url='https://duckduckgo.com/html/?q='+encodeURIComponent(q);
+      document.getElementById('cc-gene-out').textContent='Searching...';
+      fsApi('httpget','/',undefined,{url:url}).then(function(j){
+        if(!j||!j.ok){document.getElementById('cc-gene-out').textContent=j&&j.error?j.error:'search fail';return;}
+        var t=String(j.text||'').replace(/<script[\\s\\S]*?<\\/script>/gi,' ');
+        var titles=[];
+        var re=/uddg=([^&"]+)/g; var m; var n=0;
+        while((m=re.exec(t)) && n<12){
+          try{ titles.push(decodeURIComponent(m[1])); n++; }catch(e){}
+        }
+        if(!titles.length){
+          // fallback strip tags
+          var plain=t.replace(/<[^>]+>/g,' ').replace(/\\s+/g,' ').trim();
+          titles=[plain.slice(0,500)];
+        }
+        window.__geneHits=titles;
+        document.getElementById('cc-gene-out').textContent=titles.map(function(u,i){return (i+1)+'. '+u;}).join('\\n');
+        toast('Hits: '+titles.length);
+      });
+    };
+    document.getElementById('cc-gene-mutate').onclick=function(){
+      var hits=window.__geneHits||[];
+      var q=(document.getElementById('cc-gene-q').value||'gene').trim();
+      var plan={
+        id:'gene-'+Date.now(),
+        query:q,
+        ts:Date.now(),
+        power:10,
+        risk:6,
+        sources:hits.slice(0,12),
+        buildSteps:[
+          {step:1,type:'research',label:'Ingest sources',detail:hits.slice(0,3)},
+          {step:2,type:'design',label:'Map to PasiyaOS modules',detail:['Control Center','Node Factory','Bot command']},
+          {step:3,type:'implement',label:'FS + Mini App panel',detail:['/Documents/lab/genes','desktop tab']},
+          {step:4,type:'wire',label:'Optional bot executor',detail:['/gene run','founder only']},
+          {step:5,type:'test',label:'Snapshot + rollback',detail:['Observatory snapshot']}
+        ],
+        nodeHints:[
+          {type:'trigger:telegram',label:'gene request'},
+          {type:'action:http',label:'search'},
+          {type:'logic:ai_decide',label:'rank sources'},
+          {type:'action:fs',label:'save gene pack'}
+        ]
+      };
+      window.__genePack=plan;
+      document.getElementById('cc-gene-out').textContent=JSON.stringify(plan,null,2);
+      toast('Mutated gene pack');
+    };
+    document.getElementById('cc-gene-save').onclick=function(){
+      var pack=window.__genePack;
+      if(!pack){toast('Mutate first');return;}
+      var dir=(document.getElementById('cc-gene-path').value||'/Documents/lab/genes/').replace(/\\/*$/,'');
+      var path=dir+'/'+pack.id+'.json';
+      fsApi('mkdir',dir).then(function(){return fsApi('write',path,JSON.stringify(pack,null,2));})
+        .then(function(j){ document.getElementById('cc-gene-out').textContent=(j&&j.ok)?('SAVED '+path+'\\n\\n'+JSON.stringify(pack,null,2)):'save fail'; toast(j&&j.ok?'Gene saved':'fail'); });
+    };
+} else if(tab==='social'){
+    p.innerHTML = '<div class="card"><h4>Social pipeline</h4>'+meta(6,4)+
+      '<label class="muted">Queue path</label><input id="cc-qpath" value="'+(c.social.queuePath||'/Documents/social/queue.json')+'"/>'+
+      '<label><input type="checkbox" id="cc-hook"/> Make webhook</label><br>'+
+      '<label><input type="checkbox" id="cc-fb"/> FB Graph path</label>'+
+      '<label class="muted">Hashtags</label><input id="cc-tags" value="'+(c.social.defaultHashtags||'')+'"/>'+
+      '<button type="button" class="b" id="cc-soc-open">Social Console</button></div>';
+    document.getElementById('cc-hook').checked=!!c.social.autoWebhook;
+    document.getElementById('cc-fb').checked=!!c.social.fbEnabled;
+    var so=document.getElementById('cc-soc-open'); if(so)so.onclick=function(){ if(typeof openWin==='function')openWin('socialcon'); };
+  } else if(tab==='fs'){
+    p.innerHTML = '<div class="card"><h4>Storage</h4>'+meta(5,2)+
+      '<label class="muted">Quota warn</label><input id="cc-quota" type="number" value="'+(c.fs.quotaWarn||1500000)+'"/>'+
+      '<label><input type="checkbox" id="cc-seed"/> Auto-seed</label>'+
+      '<button type="button" class="b" id="cc-df">df</button><pre id="cc-dfout" class="muted"></pre></div>';
+    document.getElementById('cc-seed').checked=!!c.fs.autoSeed;
+    document.getElementById('cc-df').onclick=function(){ fsApi('df','/').then(function(j){ document.getElementById('cc-dfout').textContent=JSON.stringify(j,null,2); }); };
+  } else if(tab==='clip'){
+    p.innerHTML = '<div class="card"><h4>Clipboard</h4><textarea id="clip" rows="6" style="width:100%">'+(c.clipboard||'')+'</textarea><button type="button" class="b" id="clip-save">Save clipboard.txt</button></div>';
+    document.getElementById('clip-save').onclick=function(){ var t=document.getElementById('clip').value||''; window.__cc.clipboard=t; fsApi('write','/Documents/clipboard.txt',t).then(function(j){if(j.ok)toast('saved')}); };
+  }
+}
+function ccCollect(){
+  var c=window.__cc; var tab=window.__ccTab||'sys';
+  try{
+    if(tab==='sys'){
+      c.system.hostname=(document.getElementById('cc-host')||{}).value||c.system.hostname;
+      c.system.locale=(document.getElementById('cc-locale')||{}).value||c.system.locale;
+      c.system.theme=(document.getElementById('cc-theme')||{}).value||c.system.theme;
+      c.system.haptics=!!(document.getElementById('cc-haptic')||{}).checked;
+      c.system.scheduler=(document.getElementById('cc-sched')||{}).value||c.system.scheduler;
+      c.system.memMode=(document.getElementById('cc-mem')||{}).value||c.system.memMode;
+      c.system.selfHeal=(document.getElementById('cc-heal')||{}).value||c.system.selfHeal;
+      c.system.overclock=parseInt((document.getElementById('cc-oc')||{}).value,10)||c.system.overclock;
+    } else if(tab==='ai'){
+      c.ai.defaultModel=(document.getElementById('cc-model')||{}).value||c.ai.defaultModel;
+      c.ai.temperature=parseFloat((document.getElementById('cc-temp')||{}).value)||c.ai.temperature;
+      c.ai.reasoningDepth=parseInt((document.getElementById('cc-depth')||{}).value,10)||c.ai.reasoningDepth;
+      c.ai.firewallLayers=parseInt((document.getElementById('cc-fw')||{}).value,10)||c.ai.firewallLayers;
+      c.ai.swarmSize=parseInt((document.getElementById('cc-swarm')||{}).value,10)||c.ai.swarmSize;
+      c.ai.memoryMix=(document.getElementById('cc-memai')||{}).value||c.ai.memoryMix;
+      c.ai.promptDna=(document.getElementById('cc-dna')||{}).value||'';
+    } else if(tab==='sec'){
+      c.security.lockMode=(document.getElementById('cc-lock')||{}).value||c.security.lockMode;
+      c.security.encProfile=(document.getElementById('cc-enc')||{}).value||c.security.encProfile;
+      c.security.ghost=(document.getElementById('cc-ghost')||{}).value||c.security.ghost;
+      c.security.destruct=(document.getElementById('cc-boom')||{}).value||c.security.destruct;
+      c.security.founderOnlyHeavy=!!(document.getElementById('cc-founder')||{}).checked;
+      c.security.requireInitData=!!(document.getElementById('cc-init')||{}).checked;
+      c.security.sessionLabel=(document.getElementById('cc-sess')||{}).value||'';
+    } else if(tab==='net'){
+      c.network.proxyMode=(document.getElementById('cc-proxy-mode')||{}).value||c.network.proxyMode;
+      c.network.openExternal=!!(document.getElementById('cc-ext')||{}).checked;
+      c.network.ratePosture=(document.getElementById('cc-rate')||{}).value||c.network.ratePosture;
+      var bm=(document.getElementById('cc-bm')||{}).value||'';
+      c.network.bookmarks=bm.split(/\\n/).map(function(s){return s.trim()}).filter(Boolean);
+    } else if(tab==='ui'){
+      c.ui=c.ui||{};
+      c.ui.themeEngine=(document.getElementById('cc-uitheme')||{}).value||c.ui.themeEngine;
+      c.ui.hapticProfile=(document.getElementById('cc-hap')||{}).value||c.ui.hapticProfile;
+      c.ui.anim=(document.getElementById('cc-anim')||{}).value||c.ui.anim;
+      c.ui.gesture=(document.getElementById('cc-ges')||{}).value||c.ui.gesture;
+    } else if(tab==='obs'){
+      c.obs=c.obs||{};
+      c.obs.logLevel=(document.getElementById('cc-log')||{}).value||c.obs.logLevel;
+      c.obs.retention=(document.getElementById('cc-bb')||{}).value||c.obs.retention;
+    } else if(tab==='social'){
+      c.social.queuePath=(document.getElementById('cc-qpath')||{}).value||c.social.queuePath;
+      c.social.autoWebhook=!!(document.getElementById('cc-hook')||{}).checked;
+      c.social.fbEnabled=!!(document.getElementById('cc-fb')||{}).checked;
+      c.social.defaultHashtags=(document.getElementById('cc-tags')||{}).value||'';
+    } else if(tab==='fs'){
+      c.fs.quotaWarn=parseInt((document.getElementById('cc-quota')||{}).value,10)||c.fs.quotaWarn;
+      c.fs.autoSeed=!!(document.getElementById('cc-seed')||{}).checked;
+    } else if(tab==='clip'){
+      c.clipboard=(document.getElementById('clip')||{}).value||'';
+    }
+  }catch(e){}
+  return c;
+}
+function ccSave(){
+  ccCollect();
+  var json=JSON.stringify(window.__cc,null,2);
+  return fsApi('write',ccPath(),json).then(function(j){
+    if(j&&j.ok){toast('Control Center saved'); return j;}
+    toast('Save failed');
+  });
+}
+function ccLoad(){
+  return fsApi('read',ccPath()).then(function(j){
+    if(j&&j.ok&&j.content){
+      try{
+        var o=JSON.parse(j.content);
+        window.__cc=Object.assign(window.__cc,o);
+        if(o.system) window.__cc.system=Object.assign(window.__cc.system,o.system);
+        if(o.network) window.__cc.network=Object.assign(window.__cc.network,o.network);
+        if(o.ai) window.__cc.ai=Object.assign(window.__cc.ai,o.ai);
+        if(o.social) window.__cc.social=Object.assign(window.__cc.social,o.social);
+        if(o.fs) window.__cc.fs=Object.assign(window.__cc.fs,o.fs);
+        if(o.security) window.__cc.security=Object.assign(window.__cc.security,o.security);
+        if(o.lab) window.__cc.lab=Object.assign(window.__cc.lab,o.lab);
+      }catch(e){}
+    }
+    ccRender(window.__ccTab||'sys');
+  });
+}
+(function(){
+  var tabs=document.getElementById('cc-tabs');
+  if(tabs){
+    tabs.addEventListener('click',function(ev){
+      var t=ev.target;
+      if(!t||!t.classList||!t.classList.contains('cc-tab'))return;
+      ccCollect();
+      ccRender(t.getAttribute('data-tab'));
+    });
+  }
+  var s=document.getElementById('cc-save'); if(s)s.onclick=function(){ccSave()};
+  var r=document.getElementById('cc-reload'); if(r)r.onclick=function(){ccLoad()};
+  var x=document.getElementById('cc-export'); if(x)x.onclick=function(){
+    ccCollect();
+    var json=JSON.stringify(window.__cc,null,2);
+    fsApi('write','/Documents/os-settings-export.txt',json).then(function(j){
+      if(j&&j.ok)toast('Exported os-settings-export.txt');
+    });
+  };
+  // when settings window opens via openWin — hook paint
+  var _openWin = window.openWin;
+  if(typeof _openWin==='function'){
+    window.openWin=function(id){
+      _openWin(id);
+      if(id==='settings'){ ccLoad(); }
+    };
+  } else {
+    ccLoad();
+  }
+})();
 
 fsApi('seed','/').then(function(){toast('PasiyaOS · '+APPS.length+' apps')});
 
