@@ -76,6 +76,51 @@ button.b:active{border-color:var(--gold)}
 
 <div class="win" id="w-browser"><div class="hd"><b>Browser</b><button type="button" data-x="browser">X</button></div><div class="bd"><div class="form"><input id="br-url" value="https://example.com"/><div class="row"><button type="button" class="b" id="br-go">Go</button><button type="button" class="b" id="br-save">Save page</button></div></div><div class="scroll muted" id="br-view">HTTPS text</div></div></div>
 
+
+<div class="win" id="w-browserpro"><div class="hd"><b>Browser Pro</b><button type="button" data-x="browserpro">X</button></div><div class="bd">
+<div class="form">
+<input id="bp-url" value="https://www.make.com" placeholder="https://..."/>
+<div class="row">
+<button type="button" class="b" id="bp-open">Open external</button>
+<button type="button" class="b" id="bp-fetch">Fetch text</button>
+</div>
+<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:8px">
+<button type="button" class="b" id="bp-make">Make.com</button>
+<button type="button" class="b" id="bp-meta">Meta Dev</button>
+<button type="button" class="b" id="bp-vercel">Vercel</button>
+<button type="button" class="b" id="bp-gh">GitHub</button>
+<button type="button" class="b" id="bp-fb">Facebook</button>
+</div>
+</div>
+<div class="scroll muted" id="bp-view">Browser Pro · Open external = Telegram openLink (Make/Meta login). Fetch text = proxy HTML text only.</div>
+<div class="tb"><button type="button" class="b" id="bp-save">Save note</button></div>
+</div></div>
+<div class="win" id="w-socialcon"><div class="hd"><b>Social Console</b><button type="button" data-x="socialcon">X</button></div><div class="bd">
+<div class="form">
+<textarea id="sc-cap" placeholder="Caption for /social post ..." style="min-height:100px;width:100%"></textarea>
+<div class="row">
+<button type="button" class="b" id="sc-queue">Save FS queue</button>
+<button type="button" class="b" id="sc-copy">Copy /social post</button>
+</div>
+<p class="muted">Bot chat: /social post YOUR TEXT</p>
+</div>
+<div class="scroll muted" id="sc-log">Ready.</div>
+<div class="tb"><button type="button" class="b" id="sc-load">Load queue</button></div>
+</div></div>
+<div class="win" id="w-makedock"><div class="hd"><b>Make Dock</b><button type="button" data-x="makedock">X</button></div><div class="bd">
+<div class="scroll" id="md-body">
+<div class="card"><h4>Stopped here</h4><div class="muted">Webhook OK. Facebook module blocked on mobile canvas.</div></div>
+<div class="card"><h4>Path A — No Make</h4><div class="muted">FB_PAGE_ID + FB_PAGE_TOKEN on Vercel → /social post hits Page.</div></div>
+<div class="card"><h4>Path B — Make</h4><div class="muted">Browser Pro → Open Make. If canvas blank, need real desktop once OR stay on Path A.</div></div>
+<div class="card"><h4>Checklist</h4>
+<label><input type="checkbox" id="md-c1"/> Webhook works</label><br>
+<label><input type="checkbox" id="md-c2"/> FB token set</label><br>
+<label><input type="checkbox" id="md-c3"/> Test Page post</label><br>
+<label><input type="checkbox" id="md-c4"/> Blog later</label>
+</div>
+</div>
+<div class="tb"><button type="button" class="b" id="md-save">Save checklist</button><button type="button" class="b" id="md-openmake">Open Make</button></div>
+</div></div>
 <div class="win" id="w-studio"><div class="hd"><b>Studio</b><button type="button" data-x="studio">X</button></div><div class="bd"><div class="form"><input id="st-url" placeholder="https:// image URL"/><input id="st-cap" placeholder="Caption"/><div class="row"><button type="button" class="b" id="st-add">Add to board</button><button type="button" class="b" id="st-reload">Reload</button></div></div><div class="scroll" id="st-list"></div><div class="tb"><button type="button" class="b" id="st-clear">Clear</button><button type="button" class="b" id="st-path">Show path</button></div></div></div>
 
 <div class="win" id="w-calc"><div class="hd"><b>Calculator</b><button type="button" data-x="calc">X</button></div><div class="bd"><div class="scroll"><input id="calc-disp" readonly value="0"/><div class="cg" id="calc-g"></div></div><div class="tb"><button type="button" class="b" id="calc-hist">Save history</button></div></div></div>
@@ -250,6 +295,8 @@ function fsApi(action,path,content,extra){
 }
 
 var APPS=[
+  /* WORKSTATION-1 — pinned */
+  ['browserpro','🌐','Browser Pro'],['socialcon','📣','Social'],['makedock','⚙','Make Dock'],
   /* core */
   ['explorer','📁','Explorer'],['notepad','📝','Notepad'],['term','⌨','Terminal'],['ide','💻','IDE'],
   ['kernel','🧠','Kernel'],['office','📄','Office'],['browser','🌐','Browser'],['studio','🎬','Studio'],
@@ -442,6 +489,100 @@ document.getElementById('br-go').onclick=function(){
   });
 };
 document.getElementById('br-save').onclick=function(){fsApi('write','/Documents/browser-save.txt',document.getElementById('br-view').textContent||'').then(function(j){if(j.ok)toast('Saved')})};
+
+/* ——— WORKSTATION-1 ——— */
+function tgOpen(url){
+  try{
+    if(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.openLink){
+      Telegram.WebApp.openLink(url,{try_instant_view:false});
+      return;
+    }
+  }catch(e){}
+  window.open(url,'_blank');
+}
+function bpSet(url){
+  var u=document.getElementById('bp-url');
+  var v=document.getElementById('bp-view');
+  if(u)u.value=url;
+  if(v)v.textContent='Ready: '+url+'\nTap Open external for full site.';
+}
+(function(){
+  var bpOpen=document.getElementById('bp-open');
+  if(bpOpen)bpOpen.onclick=function(){
+    var url=document.getElementById('bp-url').value.trim();
+    if(!/^https:\/\//i.test(url))url='https://'+url;
+    tgOpen(url);toast('Opened external');
+  };
+  var bpFetch=document.getElementById('bp-fetch');
+  if(bpFetch)bpFetch.onclick=function(){
+    var url=document.getElementById('bp-url').value.trim();
+    if(!/^https:\/\//i.test(url))url='https://'+url;
+    document.getElementById('bp-view').textContent='Loading...';
+    fsApi('httpget','/',undefined,{url:url}).then(function(j){
+      if(!j.ok){document.getElementById('bp-view').textContent=j.error||'fail';return}
+      var t=String(j.text||'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+      document.getElementById('bp-view').textContent='HTTP '+j.status+'\n\n'+t.slice(0,12000);
+    });
+  };
+  [['bp-make','https://www.make.com'],['bp-meta','https://developers.facebook.com'],['bp-vercel','https://vercel.com'],['bp-gh','https://github.com'],['bp-fb','https://www.facebook.com']].forEach(function(p){
+    var el=document.getElementById(p[0]);if(el)el.onclick=function(){bpSet(p[1]);};
+  });
+  var bpSave=document.getElementById('bp-save');
+  if(bpSave)bpSave.onclick=function(){
+    fsApi('write','/Documents/browser-pro-note.txt',document.getElementById('bp-view').textContent||'').then(function(j){if(j.ok)toast('Note saved')});
+  };
+  var scQueue=document.getElementById('sc-queue');
+  if(scQueue)scQueue.onclick=function(){
+    var cap=(document.getElementById('sc-cap').value||'').trim();
+    if(!cap){toast('Write a caption');return}
+    var path='/Documents/social/queue.json';
+    fsApi('mkdir','/Documents/social').then(function(){return fsApi('read',path)}).then(function(j){
+      var list=[];try{list=JSON.parse(j.content||'[]')}catch(e){}
+      if(!Array.isArray(list))list=[];
+      list.unshift({caption:cap,ts:Date.now(),status:'pending'});
+      return fsApi('write',path,JSON.stringify(list.slice(0,40),null,2));
+    }).then(function(j){
+      if(j&&j.ok){document.getElementById('sc-log').textContent='Saved. Bot:\n/social post '+cap.slice(0,200);toast('Queue saved')}
+    });
+  };
+  var scCopy=document.getElementById('sc-copy');
+  if(scCopy)scCopy.onclick=function(){
+    var cap=(document.getElementById('sc-cap').value||'').trim();
+    var cmd='/social post '+cap;
+    document.getElementById('sc-log').textContent=cmd;
+    try{navigator.clipboard.writeText(cmd);toast('Copied')}catch(e){toast('See log')}
+  };
+  var scLoad=document.getElementById('sc-load');
+  if(scLoad)scLoad.onclick=function(){
+    fsApi('read','/Documents/social/queue.json').then(function(j){
+      document.getElementById('sc-log').textContent=j.ok?String(j.content||'[]').slice(0,3000):'empty';
+    });
+  };
+  var mdSave=document.getElementById('md-save');
+  if(mdSave)mdSave.onclick=function(){
+    var o={c1:false,c2:false,c3:false,c4:false,ts:Date.now()};
+    try{
+      o.c1=document.getElementById('md-c1').checked;
+      o.c2=document.getElementById('md-c2').checked;
+      o.c3=document.getElementById('md-c3').checked;
+      o.c4=document.getElementById('md-c4').checked;
+    }catch(e){}
+    fsApi('write','/Documents/make-dock.json',JSON.stringify(o,null,2)).then(function(j){if(j.ok)toast('Checklist saved')});
+  };
+  var mdOpen=document.getElementById('md-openmake');
+  if(mdOpen)mdOpen.onclick=function(){tgOpen('https://www.make.com')};
+  fsApi('read','/Documents/make-dock.json').then(function(j){
+    if(!j.ok||!j.content)return;
+    try{
+      var o=JSON.parse(j.content);
+      if(document.getElementById('md-c1'))document.getElementById('md-c1').checked=!!o.c1;
+      if(document.getElementById('md-c2'))document.getElementById('md-c2').checked=!!o.c2;
+      if(document.getElementById('md-c3'))document.getElementById('md-c3').checked=!!o.c3;
+      if(document.getElementById('md-c4'))document.getElementById('md-c4').checked=!!o.c4;
+    }catch(e){}
+  });
+})();
+
 
 /* Studio — form always in .form, never wiped */
 function studioLoad(){
@@ -1758,7 +1899,7 @@ var CAT_MAP={
   Core:['explorer','notepad','term','ide','kernel','settings'],
   Office:['office','markdown','json','planner','snippets','journal','tasks'],
   Tools:['regex','diff','csv','base64','hash','bases','morse','units','calc'],
-  Net:['browser','rss','wiki','translate','qr','coins','ipinfo','weather'],
+  Net:['browser','browserpro','socialcon','makedock','rss','wiki','translate','qr','coins','ipinfo','weather'],
   Media:['studio','draw','music','palette2','colors'],
   System:['syscheck','diag','exportall','backup','findfs','search','aboutos','hotkeys','cats']
 };
