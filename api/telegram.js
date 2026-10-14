@@ -8775,6 +8775,25 @@ bot.command('commands', async (ctx) => {
       const sub = String(args[0] || 'help').toLowerCase();
       const rest = args.slice(1).join(' ').trim();
       const channel = String(process.env.SOCIAL_CHANNEL_ID || '').trim();
+      const makeHook = String(process.env.MAKE_SOCIAL_WEBHOOK || '').trim();
+
+      async function notifyMakeSocial(message, extra) {
+        if (!makeHook) return { ok: false, skipped: true };
+        try {
+          const body = Object.assign(
+            { message: String(message || '').slice(0, 8000), source: 'pasiya-bot', ts: Date.now() },
+            extra && typeof extra === 'object' ? extra : {}
+          );
+          const r = await fetch(makeHook, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+          return { ok: r.ok, status: r.status };
+        } catch (e) {
+          return { ok: false, error: String(e?.message || e).slice(0, 120) };
+        }
+      }
 
       // bare /social with no args → help (not LINKS dump)
       if (!withoutCmd || sub === 'help' || sub === 'h') {
@@ -8785,7 +8804,7 @@ bot.command('commands', async (ctx) => {
             '/social queue\n' +
             '/social links — old links menu\n' +
             '/social daily [topic]\n\n' +
-            'Channel env: ' + (channel ? 'SET' : 'MISSING')
+            'Channel: ' + (channel ? 'SET' : 'MISSING') + ' · Make: ' + (makeHook ? 'SET' : 'MISSING')
         );
         return;
       }
@@ -8807,7 +8826,16 @@ bot.command('commands', async (ctx) => {
         }
         try {
           await ctx.telegram.sendMessage(channel, msg);
-          await ctx.reply('✅ Posted to queue:\n' + msg.slice(0, 500));
+          const mk = await notifyMakeSocial(msg, { type: 'post' });
+          let line = '✅ Posted to queue:\n' + msg.slice(0, 500);
+          if (makeHook) {
+            line += mk.ok
+              ? '\n✅ Make webhook notified'
+              : '\n⚠️ Make webhook: ' + (mk.error || mk.status || 'fail');
+          } else {
+            line += '\n⚠️ MAKE_SOCIAL_WEBHOOK not set';
+          }
+          await ctx.reply(line);
         } catch (e) {
           await ctx.reply(
             '❌ sendMessage failed: ' +
@@ -8898,8 +8926,14 @@ bot.command('commands', async (ctx) => {
           return;
         }
         if (channel) {
-          await ctx.telegram.sendMessage(channel, String(out).slice(0, 4000));
-          await ctx.reply('✅ Daily package sent to queue channel.');
+          const payload = String(out).slice(0, 4000);
+          await ctx.telegram.sendMessage(channel, payload);
+          const mk = await notifyMakeSocial(payload, { type: 'daily' });
+          let line = '✅ Daily package sent to queue channel.';
+          if (makeHook) {
+            line += mk.ok ? '\n✅ Make webhook notified' : '\n⚠️ Make webhook: ' + (mk.error || mk.status || 'fail');
+          }
+          await ctx.reply(line);
         } else {
           await ctx.reply('Set SOCIAL_CHANNEL_ID.\n' + String(out).slice(0, 3500));
         }
@@ -8915,7 +8949,14 @@ bot.command('commands', async (ctx) => {
         }
         try {
           await ctx.telegram.sendMessage(channel, msg);
-          await ctx.reply('✅ Posted to queue:\n' + msg.slice(0, 500));
+          const mk = await notifyMakeSocial(msg, { type: 'post' });
+          let line = '✅ Posted to queue:\n' + msg.slice(0, 500);
+          if (makeHook) {
+            line += mk.ok
+              ? '\n✅ Make webhook notified'
+              : '\n⚠️ Make webhook: ' + (mk.error || mk.status || 'fail');
+          }
+          await ctx.reply(line);
         } catch (e) {
           await ctx.reply('❌ ' + String(e?.response?.description || e?.message || e).slice(0, 200));
         }
