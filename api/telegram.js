@@ -8795,6 +8795,36 @@ bot.command('commands', async (ctx) => {
         }
       }
 
+      async function postToFacebookPage(message) {
+        const pageId = String(process.env.FB_PAGE_ID || '').trim();
+        const token = String(process.env.FB_PAGE_TOKEN || '').trim();
+        if (!pageId || !token) return { ok: false, skipped: true };
+        try {
+          const url =
+            'https://graph.facebook.com/v21.0/' +
+            encodeURIComponent(pageId) +
+            '/feed';
+          const r = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: String(message || '').slice(0, 5000),
+              access_token: token,
+            }),
+          });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok || j.error) {
+            return {
+              ok: false,
+              error: String(j?.error?.message || r.status).slice(0, 160),
+            };
+          }
+          return { ok: true, id: j.id };
+        } catch (e) {
+          return { ok: false, error: String(e?.message || e).slice(0, 120) };
+        }
+      }
+
       // bare /social with no args → help (not LINKS dump)
       if (!withoutCmd || sub === 'help' || sub === 'h') {
         await ctx.reply(
@@ -8827,6 +8857,7 @@ bot.command('commands', async (ctx) => {
         try {
           await ctx.telegram.sendMessage(channel, msg);
           const mk = await notifyMakeSocial(msg, { type: 'post' });
+          const fb = await postToFacebookPage(msg);
           let line = '✅ Posted to queue:\n' + msg.slice(0, 500);
           if (makeHook) {
             line += mk.ok
@@ -8834,6 +8865,13 @@ bot.command('commands', async (ctx) => {
               : '\n⚠️ Make webhook: ' + (mk.error || mk.status || 'fail');
           } else {
             line += '\n⚠️ MAKE_SOCIAL_WEBHOOK not set';
+          }
+          if (fb.skipped) {
+            line += '\n· FB: token not set (optional)';
+          } else if (fb.ok) {
+            line += '\n✅ Facebook Page posted' + (fb.id ? ' (' + fb.id + ')' : '');
+          } else {
+            line += '\n⚠️ FB: ' + (fb.error || 'fail');
           }
           await ctx.reply(line);
         } catch (e) {
@@ -8929,10 +8967,16 @@ bot.command('commands', async (ctx) => {
           const payload = String(out).slice(0, 4000);
           await ctx.telegram.sendMessage(channel, payload);
           const mk = await notifyMakeSocial(payload, { type: 'daily' });
+          const fbLine = payload.split('\n').find((l) => l.startsWith('FB:')) || payload;
+          const fbText = String(fbLine).replace(/^FB:\s*/i, '').slice(0, 5000);
+          const fb = await postToFacebookPage(fbText || payload.slice(0, 500));
           let line = '✅ Daily package sent to queue channel.';
           if (makeHook) {
             line += mk.ok ? '\n✅ Make webhook notified' : '\n⚠️ Make webhook: ' + (mk.error || mk.status || 'fail');
           }
+          if (fb.skipped) line += '\n· FB: token not set';
+          else if (fb.ok) line += '\n✅ Facebook Page posted';
+          else line += '\n⚠️ FB: ' + (fb.error || 'fail');
           await ctx.reply(line);
         } else {
           await ctx.reply('Set SOCIAL_CHANNEL_ID.\n' + String(out).slice(0, 3500));
