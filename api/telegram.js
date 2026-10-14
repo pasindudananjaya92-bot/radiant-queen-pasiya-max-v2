@@ -14923,6 +14923,92 @@ bot.command('commands', async (ctx) => {
     }
   });
 
+  bot.command(['social'], async (ctx) => {
+    try {
+      if (String(ctx.from?.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only feature.');
+        return;
+      }
+      const raw = String(ctx.message?.text || '');
+      const args = raw.split(/\s+/).slice(1);
+      const sub = String(args[0] || 'help').toLowerCase();
+      const rest = args.slice(1).join(' ').trim();
+      const channel = String(process.env.SOCIAL_CHANNEL_ID || '').trim();
+
+      if (sub === 'help' || sub === 'h') {
+        await ctx.reply(
+          '📣 Social (Make.com bridge)\\n' +
+            '/social draft <caption> — save to /Documents/social/queue.json\\n' +
+            '/social post <caption> — send to SOCIAL_CHANNEL_ID queue channel\\n' +
+            '/social queue — show pending drafts\\n\\n' +
+            'Make.com watches the channel → Facebook / YouTube'
+        );
+        return;
+      }
+
+      if (sub === 'post' || sub === 'now') {
+        const msg =
+          rest ||
+          ('Radiant Queen daily 🚀 ' + new Date().toISOString().slice(0, 10) + '\\nhttps://t.me/PasiyaMaxQueen_bot');
+        if (channel) {
+          await ctx.telegram.sendMessage(channel, msg);
+          await ctx.reply('✅ Posted to social queue channel.');
+        } else {
+          await ctx.reply(
+            '⚠️ Set Vercel env SOCIAL_CHANNEL_ID (Telegram channel id, e.g. -100123...).\\n\\nCaption ready:\\n' + msg
+          );
+        }
+        return;
+      }
+
+      if (sub === 'draft') {
+        const caption = rest || ('Draft ' + new Date().toISOString());
+        try {
+          const fs = await import('../lib/pasiyaFs.js');
+          const uid = String(ctx.from.id);
+          const path = '/Documents/social/queue.json';
+          let list = [];
+          try {
+            const cur = await fs.readFile(uid, path);
+            list = JSON.parse(cur || '[]');
+          } catch (_) {}
+          if (!Array.isArray(list)) list = [];
+          list.unshift({
+            id: new Date().toISOString().slice(0, 10),
+            fb_message: caption,
+            fb_link: 'https://t.me/PasiyaMaxQueen_bot',
+            yt_title: caption.slice(0, 80),
+            status: 'pending',
+            ts: Date.now(),
+          });
+          await fs.mkdir(uid, '/Documents/social').catch(() => {});
+          await fs.writeFile(uid, path, JSON.stringify(list.slice(0, 30), null, 2));
+          await ctx.reply('✅ Draft saved → /Documents/social/queue.json');
+        } catch (e) {
+          await ctx.reply('Draft caption:\\n' + caption + '\\n\\n(FS optional fail: ' + String(e?.message || e).slice(0, 80) + ')');
+        }
+        return;
+      }
+
+      if (sub === 'queue') {
+        try {
+          const fs = await import('../lib/pasiyaFs.js');
+          const uid = String(ctx.from.id);
+          const cur = await fs.readFile(uid, '/Documents/social/queue.json');
+          await ctx.reply(String(cur || '[]').slice(0, 3500));
+        } catch (e) {
+          await ctx.reply('Queue empty or unreadable.');
+        }
+        return;
+      }
+
+      await ctx.reply('Unknown. /social help');
+    } catch (err) {
+      await ctx.reply('social: ' + String(err?.message || err).slice(0, 160));
+    }
+  });
+
+
 
 
 
