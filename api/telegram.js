@@ -15171,7 +15171,7 @@ bot.command('commands', async (ctx) => {
   });
 
 
-  // ——— Document reader: send .txt/.md/.json → bot replies text ———
+  // ——— Document reader: ONLY explicit read (never steal /ghpath uploads) ———
   bot.on('document', async (ctx) => {
     try {
       if (String(ctx.from?.id) !== String(ADMIN_ID)) {
@@ -15179,14 +15179,25 @@ bot.command('commands', async (ctx) => {
       }
       const doc = ctx.message?.document;
       if (!doc) return;
-      const name = String(doc.file_name || 'file').toLowerCase();
-      const okExt = /\.(txt|md|json|csv|log|js|ts|html|css|env|yml|yaml)$/i.test(name);
-      const caption = String(ctx.message?.caption || '').trim().toLowerCase();
-      const force = caption === 'read' || caption === '/read' || caption.startsWith('read ');
-      if (!okExt && !force) {
-        await ctx.reply(
-          'Send a text-like file (.txt .md .json .csv .log .js)\nOr caption the file: read\nAlso: reply to a document with /readfile'
-        );
+      const captionRaw = String(ctx.message?.caption || '').trim();
+      const caption = captionRaw.toLowerCase();
+      // CRITICAL: leave GitHub upload path alone
+      if (
+        /^\/?ghpath\b/i.test(captionRaw) ||
+        /^gh\s+\S+/i.test(captionRaw) ||
+        /^\/gh\b/i.test(captionRaw) ||
+        caption.startsWith('gh ') ||
+        caption.startsWith('/ghpath')
+      ) {
+        return;
+      }
+      // Only read when user asks — do NOT auto-dump .html/.js (breaks /ghpath)
+      const force =
+        caption === 'read' ||
+        caption === '/read' ||
+        caption.startsWith('read ') ||
+        caption.startsWith('/read ');
+      if (!force) {
         return;
       }
       if (doc.file_size && doc.file_size > 200000) {
