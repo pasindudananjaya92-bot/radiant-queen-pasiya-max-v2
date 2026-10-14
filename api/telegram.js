@@ -15170,6 +15170,82 @@ bot.command('commands', async (ctx) => {
     }
   });
 
+
+  // ——— Document reader: send .txt/.md/.json → bot replies text ———
+  bot.on('document', async (ctx) => {
+    try {
+      if (String(ctx.from?.id) !== String(ADMIN_ID)) {
+        return;
+      }
+      const doc = ctx.message?.document;
+      if (!doc) return;
+      const name = String(doc.file_name || 'file').toLowerCase();
+      const okExt = /\.(txt|md|json|csv|log|js|ts|html|css|env|yml|yaml)$/i.test(name);
+      const caption = String(ctx.message?.caption || '').trim().toLowerCase();
+      const force = caption === 'read' || caption === '/read' || caption.startsWith('read ');
+      if (!okExt && !force) {
+        await ctx.reply(
+          'Send a text-like file (.txt .md .json .csv .log .js)\nOr caption the file: read\nAlso: reply to a document with /readfile'
+        );
+        return;
+      }
+      if (doc.file_size && doc.file_size > 200000) {
+        await ctx.reply('File too large (max ~200KB for chat text).');
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const link = await ctx.telegram.getFileLink(doc.file_id);
+      const url = typeof link === 'string' ? link : link.href;
+      const r = await fetch(url);
+      let text = Buffer.from(await r.arrayBuffer()).toString('utf8');
+      if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+      if (!text.trim()) {
+        await ctx.reply('File empty or not UTF-8 text.');
+        return;
+      }
+      const header = 'FILE: ' + (doc.file_name || 'file') + ' (' + text.length + ' chars)\n\n';
+      const chunk = 3500;
+      let first = true;
+      for (let i = 0; i < text.length; i += chunk) {
+        const part = (first ? header : '') + text.slice(i, i + chunk);
+        first = false;
+        await ctx.reply(part);
+      }
+    } catch (e) {
+      await ctx.reply('read doc: ' + String(e?.message || e).slice(0, 160));
+    }
+  });
+
+  bot.command(['readfile', 'readdoc', 'catdoc'], async (ctx) => {
+    try {
+      if (String(ctx.from?.id) !== String(ADMIN_ID)) {
+        await ctx.reply('Founder-only.');
+        return;
+      }
+      const rep = ctx.message?.reply_to_message;
+      const doc = rep?.document;
+      if (!doc) {
+        await ctx.reply('Reply to a document with /readfile');
+        return;
+      }
+      if (doc.file_size && doc.file_size > 200000) {
+        await ctx.reply('File too large (max ~200KB).');
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const link = await ctx.telegram.getFileLink(doc.file_id);
+      const url = typeof link === 'string' ? link : link.href;
+      const r = await fetch(url);
+      const text = Buffer.from(await r.arrayBuffer()).toString('utf8');
+      const header = 'FILE: ' + (doc.file_name || 'file') + '\n\n';
+      for (let i = 0; i < text.length; i += 3500) {
+        await ctx.reply((i === 0 ? header : '') + text.slice(i, i + 3500));
+      }
+    } catch (e) {
+      await ctx.reply('readfile: ' + String(e?.message || e).slice(0, 160));
+    }
+  });
+
   // ——— Pack H: /diagnose + radar ———
   bot.command(['diagnose', 'radar', 'selfcheck'], async (ctx) => {
     try {
