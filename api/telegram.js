@@ -8762,8 +8762,170 @@ bot.command('commands', async (ctx) => {
     }
   });
 
-  bot.command('social', async (ctx) => {
-    await uiReply(ctx, LINKS, mainMenuKeyboard(ctx));
+  bot.command(['social', 'socialqueue', 'sq'], async (ctx) => {
+    try {
+      if (String(ctx.from?.id) !== String(ADMIN_ID)) {
+        await ctx.reply('👑 Founder-only. Your id: ' + String(ctx.from?.id));
+        return;
+      }
+      const raw = String(ctx.message?.text || '');
+      // strip /social@BotName
+      const withoutCmd = raw.replace(/^\/(social|socialqueue|sq)(@\w+)?\s*/i, '').trim();
+      const args = withoutCmd ? withoutCmd.split(/\s+/) : [];
+      const sub = String(args[0] || 'help').toLowerCase();
+      const rest = args.slice(1).join(' ').trim();
+      const channel = String(process.env.SOCIAL_CHANNEL_ID || '').trim();
+
+      // bare /social with no args → help (not LINKS dump)
+      if (!withoutCmd || sub === 'help' || sub === 'h') {
+        await ctx.reply(
+          '📣 Social queue (Make.com)\n\n' +
+            '/social post <caption>\n' +
+            '/social draft <caption>\n' +
+            '/social queue\n' +
+            '/social links — old links menu\n' +
+            '/social daily [topic]\n\n' +
+            'Channel env: ' + (channel ? 'SET' : 'MISSING')
+        );
+        return;
+      }
+
+      if (sub === 'links') {
+        await uiReply(ctx, LINKS, mainMenuKeyboard(ctx));
+        return;
+      }
+
+      if (sub === 'post' || sub === 'now') {
+        const msg =
+          rest ||
+          ('Radiant Queen daily 🚀 ' + new Date().toISOString().slice(0, 10) + '\nhttps://t.me/PasiyaMaxQueen_bot');
+        if (!channel) {
+          await ctx.reply(
+            '⚠️ SOCIAL_CHANNEL_ID not set on Vercel.\nCaption:\n' + msg
+          );
+          return;
+        }
+        try {
+          await ctx.telegram.sendMessage(channel, msg);
+          await ctx.reply('✅ Posted to queue:\n' + msg.slice(0, 500));
+        } catch (e) {
+          await ctx.reply(
+            '❌ sendMessage failed: ' +
+              String(e?.response?.description || e?.message || e).slice(0, 200) +
+              '\nCheck bot is ADMIN of channel ' +
+              channel
+          );
+        }
+        return;
+      }
+
+      if (sub === 'draft') {
+        const caption = rest || ('Draft ' + new Date().toISOString());
+        try {
+          const fs = await import('../lib/pasiyaFs.js');
+          const uid = String(ctx.from.id);
+          const path = '/Documents/social/queue.json';
+          let list = [];
+          try {
+            const cur = await fs.readFile(uid, path);
+            list = JSON.parse(cur || '[]');
+          } catch (_) {}
+          if (!Array.isArray(list)) list = [];
+          list.unshift({
+            id: new Date().toISOString().slice(0, 10),
+            fb_message: caption,
+            fb_link: 'https://t.me/PasiyaMaxQueen_bot',
+            yt_title: caption.slice(0, 80),
+            status: 'pending',
+            ts: Date.now(),
+          });
+          try {
+            await fs.mkdir(uid, '/Documents/social');
+          } catch (_) {}
+          await fs.writeFile(uid, path, JSON.stringify(list.slice(0, 30), null, 2));
+          await ctx.reply('✅ Draft saved → /Documents/social/queue.json');
+        } catch (e) {
+          await ctx.reply('Draft:\n' + caption + '\n\nFS: ' + String(e?.message || e).slice(0, 80));
+        }
+        return;
+      }
+
+      if (sub === 'queue') {
+        try {
+          const fs = await import('../lib/pasiyaFs.js');
+          const uid = String(ctx.from.id);
+          const cur = await fs.readFile(uid, '/Documents/social/queue.json');
+          await ctx.reply(String(cur || '[]').slice(0, 3500));
+        } catch (e) {
+          await ctx.reply('Queue empty or unreadable.');
+        }
+        return;
+      }
+
+      if (sub === 'daily') {
+        await ctx.sendChatAction('typing');
+        const topicHint = rest || 'new technology, robots, AI, digitalization, automation';
+        const system =
+          'You are tech journalist for Pasiya Max. Topic: ' +
+          topicHint +
+          '. Return ONLY:\n===PASIYA_SOCIAL===\nPLATFORM: all\nTOPIC: <short>\nFB: <max 400 chars, end with https://t.me/PasiyaMaxQueen_bot>\nTITLE: <blog title>\nBODY:\n<body 400-800 words>\nYT_TITLE: <max 80>\nYT_DESC: <max 500>\nTAGS: AI,Robots,Digitalization\n===END===';
+        let out = '';
+        try {
+          if (process.env.GROQ_API_KEY) {
+            const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                Authorization: 'Bearer ' + process.env.GROQ_API_KEY,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+                messages: [
+                  { role: 'system', content: system },
+                  { role: 'user', content: 'Generate today package.' },
+                ],
+                temperature: 0.7,
+              }),
+            });
+            const j = await r.json();
+            out = j.choices?.[0]?.message?.content || '';
+          } else {
+            out =
+              '===PASIYA_SOCIAL===\nTOPIC: Automation\nFB: Daily tech pulse. https://t.me/PasiyaMaxQueen_bot\nTITLE: Automation update\nBODY:\nAutomation reshapes work.\nYT_TITLE: Automation update\nYT_DESC: Daily tech\nTAGS: AI,Robots\n===END===';
+          }
+        } catch (e) {
+          await ctx.reply('AI failed: ' + String(e?.message || e).slice(0, 120));
+          return;
+        }
+        if (channel) {
+          await ctx.telegram.sendMessage(channel, String(out).slice(0, 4000));
+          await ctx.reply('✅ Daily package sent to queue channel.');
+        } else {
+          await ctx.reply('Set SOCIAL_CHANNEL_ID.\n' + String(out).slice(0, 3500));
+        }
+        return;
+      }
+
+      // unknown sub → treat full text as post caption
+      if (withoutCmd && !['help', 'h', 'links', 'post', 'now', 'draft', 'queue', 'daily'].includes(sub)) {
+        const msg = withoutCmd;
+        if (!channel) {
+          await ctx.reply('⚠️ SOCIAL_CHANNEL_ID missing.\n' + msg);
+          return;
+        }
+        try {
+          await ctx.telegram.sendMessage(channel, msg);
+          await ctx.reply('✅ Posted to queue:\n' + msg.slice(0, 500));
+        } catch (e) {
+          await ctx.reply('❌ ' + String(e?.response?.description || e?.message || e).slice(0, 200));
+        }
+        return;
+      }
+
+      await ctx.reply('Unknown. /social help');
+    } catch (err) {
+      await ctx.reply('social: ' + String(err?.message || err).slice(0, 160));
+    }
   });
 
   bot.command('strideclub', async (ctx) => {
@@ -14922,95 +15084,6 @@ bot.command('commands', async (ctx) => {
       await ctx.reply('build: ' + String(err?.message || err).slice(0, 120));
     }
   });
-
-  bot.command(['social'], async (ctx) => {
-    try {
-      if (String(ctx.from?.id) !== String(ADMIN_ID)) {
-        await ctx.reply('👑 Founder-only feature.');
-        return;
-      }
-      const raw = String(ctx.message?.text || '');
-      const args = raw.split(/\s+/).slice(1);
-      const sub = String(args[0] || 'help').toLowerCase();
-      const rest = args.slice(1).join(' ').trim();
-      const channel = String(process.env.SOCIAL_CHANNEL_ID || '').trim();
-
-      if (sub === 'help' || sub === 'h') {
-        await ctx.reply(
-          '📣 Social (Make.com bridge)\\n' +
-            '/social draft <caption> — save to /Documents/social/queue.json\\n' +
-            '/social post <caption> — send to SOCIAL_CHANNEL_ID queue channel\\n' +
-            '/social queue — show pending drafts\\n\\n' +
-            'Make.com watches the channel → Facebook / YouTube'
-        );
-        return;
-      }
-
-      if (sub === 'post' || sub === 'now') {
-        const msg =
-          rest ||
-          ('Radiant Queen daily 🚀 ' + new Date().toISOString().slice(0, 10) + '\\nhttps://t.me/PasiyaMaxQueen_bot');
-        if (channel) {
-          await ctx.telegram.sendMessage(channel, msg);
-          await ctx.reply('✅ Posted to social queue channel.');
-        } else {
-          await ctx.reply(
-            '⚠️ Set Vercel env SOCIAL_CHANNEL_ID (Telegram channel id, e.g. -100123...).\\n\\nCaption ready:\\n' + msg
-          );
-        }
-        return;
-      }
-
-      if (sub === 'draft') {
-        const caption = rest || ('Draft ' + new Date().toISOString());
-        try {
-          const fs = await import('../lib/pasiyaFs.js');
-          const uid = String(ctx.from.id);
-          const path = '/Documents/social/queue.json';
-          let list = [];
-          try {
-            const cur = await fs.readFile(uid, path);
-            list = JSON.parse(cur || '[]');
-          } catch (_) {}
-          if (!Array.isArray(list)) list = [];
-          list.unshift({
-            id: new Date().toISOString().slice(0, 10),
-            fb_message: caption,
-            fb_link: 'https://t.me/PasiyaMaxQueen_bot',
-            yt_title: caption.slice(0, 80),
-            status: 'pending',
-            ts: Date.now(),
-          });
-          await fs.mkdir(uid, '/Documents/social').catch(() => {});
-          await fs.writeFile(uid, path, JSON.stringify(list.slice(0, 30), null, 2));
-          await ctx.reply('✅ Draft saved → /Documents/social/queue.json');
-        } catch (e) {
-          await ctx.reply('Draft caption:\\n' + caption + '\\n\\n(FS optional fail: ' + String(e?.message || e).slice(0, 80) + ')');
-        }
-        return;
-      }
-
-      if (sub === 'queue') {
-        try {
-          const fs = await import('../lib/pasiyaFs.js');
-          const uid = String(ctx.from.id);
-          const cur = await fs.readFile(uid, '/Documents/social/queue.json');
-          await ctx.reply(String(cur || '[]').slice(0, 3500));
-        } catch (e) {
-          await ctx.reply('Queue empty or unreadable.');
-        }
-        return;
-      }
-
-      await ctx.reply('Unknown. /social help');
-    } catch (err) {
-      await ctx.reply('social: ' + String(err?.message || err).slice(0, 160));
-    }
-  });
-
-
-
-
 
   // ——— Pack H: /diagnose + radar ———
   bot.command(['diagnose', 'radar', 'selfcheck'], async (ctx) => {
