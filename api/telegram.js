@@ -15973,6 +15973,15 @@ bot.command('commands', async (ctx) => {
       path = String(path).replace(/^\/+/, '').replace(/\\/g, '/');
 
       // size limit ~4.5MB for GitHub API practicality on serverless
+      const fname = String(doc.file_name || '');
+      if (/\.zip$/i.test(fname)) {
+        await ctx.reply(
+          'ZIP files cannot be expanded by /ghpath.\n' +
+            'Open the ZIP on your phone → send the inner file only.\n' +
+            'Example caption: gh public/bot/desktop.html'
+        );
+        return;
+      }
       if (doc.file_size && doc.file_size > 4_500_000) {
         await ctx.reply('File too large for bot upload (max ~4.5MB). Use GitHub web UI.');
         return;
