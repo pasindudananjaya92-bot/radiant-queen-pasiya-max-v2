@@ -1,354 +1,2194 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<meta http-equiv="Pragma" content="no-cache"/>
+<meta http-equiv="Expires" content="0"/>
+<meta name="pasiya-desktop-version" content="S70-phone1"/>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
 <title>PasiyaOS</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
-:root{--bg:#0a0706;--gold:#c9a227;--gold2:#e8c547;--card:#14100e;--mut:#8a7a6a;--bd:rgba(201,162,39,.28)}
+:root{--bg:#0a0706;--panel:#14100c;--panel2:#1c1510;--gold:#c9a227;--gold2:#e8c547;--text:#f3e6c8;--muted:#9a8b6e;--border:#3a2e1a}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:#f2e6d0;font:14px/1.4 system-ui,sans-serif;overflow:hidden;height:100vh}
-#desk{position:fixed;inset:0 0 56px 0;overflow:auto;padding:10px}
-#icons{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.icon{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px 6px;text-align:center;cursor:pointer}
-.icon b{display:block;font-size:11px;color:var(--gold2);margin-top:4px}
-#dock{position:fixed;left:0;right:0;bottom:0;height:56px;background:#120e0c;border-top:1px solid var(--bd);display:flex;align-items:center;justify-content:space-around;z-index:50}
-.tbtn{background:transparent;border:0;color:var(--gold2);font-size:20px;padding:8px}
-.win{display:none;position:fixed;left:4%;right:4%;top:6%;bottom:64px;background:var(--card);border:1px solid var(--bd);border-radius:16px;z-index:40;flex-direction:column;overflow:hidden}
-.win.on{display:flex}
-.hd{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--bd);color:var(--gold2);font-weight:700}
-.hd button{background:#2a1810;color:#fff;border:0;border-radius:8px;padding:6px 10px}
-.bd{flex:1;overflow:auto;padding:10px}
-.form input,.form textarea,.form select,input,textarea,select{width:100%;margin:6px 0;padding:10px;border-radius:10px;border:1px solid var(--bd);background:#0d0a08;color:#f2e6d0}
-.b{background:linear-gradient(180deg,#3a2a12,#2a1c0c);color:var(--gold2);border:1px solid var(--bd);border-radius:10px;padding:8px 12px;margin:4px 2px;cursor:pointer}
-.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.card{background:#100c0a;border:1px solid var(--bd);border-radius:12px;padding:10px;margin:8px 0}
-.muted{color:var(--mut);font-size:12px}
-pre{white-space:pre-wrap;word-break:break-word;font-size:11px}
-#toast{position:fixed;left:50%;bottom:70px;transform:translateX(-50%);background:#2a1c0c;color:var(--gold2);padding:8px 14px;border-radius:20px;opacity:0;transition:.2s;z-index:99;border:1px solid var(--bd)}
-#toast.show{opacity:1}
-.cc-tabs{display:flex;flex-wrap:wrap;gap:4px;padding:8px;border-bottom:1px solid var(--bd)}
+html,body{margin:0;height:100%;overflow:hidden;font-family:system-ui,-apple-system,sans-serif;background:#0a0706;color:var(--text)}
+body{background:radial-gradient(ellipse 120% 80% at 50% 20%,#1a0f0a,#0a0706 55%,#050304)}
+#icons{position:fixed;inset:0 0 52px 0;padding:10px;overflow:auto;z-index:2}
+.icon{width:72px;display:inline-flex;flex-direction:column;align-items:center;gap:4px;margin:5px;cursor:pointer;user-select:none}
+.icon .ic{width:46px;height:46px;border-radius:12px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px;pointer-events:none}
+.icon span{font-size:10px;text-align:center;pointer-events:none;text-shadow:0 1px 2px #000}
+.icon:active .ic{border-color:var(--gold)}
+.win{position:fixed;z-index:50;width:min(400px,94vw);height:min(520px,78vh);left:8px;top:8px;background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:0 12px 40px #000a;display:none;flex-direction:column;overflow:hidden}
+.win.open{display:flex!important}
+.win.foc{border-color:var(--gold);z-index:60}
+.hd{height:40px;flex-shrink:0;display:flex;align-items:center;padding:0 10px;background:linear-gradient(180deg,#221810,#18120c);border-bottom:1px solid var(--border)}
+.hd b{flex:1;font-size:13px;color:var(--gold2)}
+.hd button{width:32px;height:32px;border:0;border-radius:8px;background:#3a1515;color:#f0c0c0;cursor:pointer}
+.bd{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.form{flex-shrink:0;padding:10px;border-bottom:1px solid var(--border);background:var(--panel2)}
+.form input,.form textarea{width:100%;margin:0 0 8px;padding:10px;border:1px solid var(--border);border-radius:8px;background:#0e0b09;color:var(--text);font-size:13px;outline:0}
+.form .row{display:flex;gap:6px;flex-wrap:wrap}
+.scroll{flex:1;min-height:80px;overflow:auto;padding:10px}
+.tb{flex-shrink:0;display:flex;gap:6px;padding:8px;border-top:1px solid var(--border);flex-wrap:wrap}
+button.b{border:1px solid var(--border);background:var(--panel2);color:var(--text);border-radius:8px;padding:8px 12px;font-size:12px;cursor:pointer}
+button.b:active{border-color:var(--gold)}
+.muted{color:var(--muted);font-size:12px}
+.card{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px}
+.card h4{margin:0 0 6px;color:var(--gold2);font-size:12px}
+.bar{height:8px;background:#0e0b09;border-radius:99px;overflow:hidden}
+.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),#8b1e1e)}
+.item{display:flex;gap:8px;align-items:center;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:var(--panel2);cursor:pointer}
+.item img{max-width:100%;max-height:100px;border-radius:6px;display:block}
+#taskbar{position:fixed;left:0;right:0;bottom:0;height:52px;z-index:100;background:#0c0907f5;border-top:1px solid var(--border);display:flex;align-items:center;gap:5px;padding:0 8px;overflow-x:auto}
+.tbtn{width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--panel2);font-size:15px;cursor:pointer;flex-shrink:0}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:64px;z-index:200;background:#1a120c;border:1px solid var(--border);padding:8px 14px;border-radius:999px;font-size:12px;display:none;max-width:90vw}
+#toast.show{display:block}
+#np-ed,#ide-ed,#of-ed,#jn-ed,#nt-ed{flex:1;width:100%;min-height:120px;border:0;padding:12px;background:#0e0b09;color:var(--text);font-family:ui-monospace,monospace;font-size:13px;resize:none;outline:0}
+#term-out{flex:1;overflow:auto;padding:10px;font-family:ui-monospace,monospace;font-size:12px;color:#c8e6c9;white-space:pre-wrap;background:#0a0c0a}
+#term-out .cmd{color:#e8c547}#term-out .err{color:#f0a0a0}
+#term-form{display:flex;gap:6px;padding:8px;border-top:1px solid #1e2a1e;background:#0d100d;flex-shrink:0}
+#term-form input{flex:1;background:transparent;border:0;color:#e8ffe8;font-family:monospace;outline:0}
+#calc-disp{width:100%;font-size:22px;text-align:right;padding:12px;margin-bottom:8px;background:#0e0b09;border:1px solid var(--border);border-radius:8px;color:var(--gold2)}
+.cg{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.cg button{padding:14px 0;font-size:16px}
+.side{width:100px;border-right:1px solid var(--border);background:var(--panel2);overflow:auto;font-size:11px;flex-shrink:0}
+.side div{padding:8px;cursor:pointer;color:var(--muted)}
+.rowflex{display:flex;flex:1;min-height:0}
+.list{flex:1;overflow:auto;padding:8px}
+.path{padding:8px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);flex-shrink:0}
 </style>
 </head>
 <body>
-<div id="desk"><div id="icons"></div></div>
-<div id="dock">
-<button type="button" class="tbtn" data-o="explorer">📁</button>
-<button type="button" class="tbtn" data-o="notepad">📝</button>
-<button type="button" class="tbtn" data-o="term">⌨</button>
-<button type="button" class="tbtn" data-o="settings">⚙</button>
-<button type="button" class="tbtn" data-o="browserpro">🌐</button>
-</div>
-<div id="toast"></div>
+<div id="icons"></div>
 
-<div class="win" id="w-explorer"><div class="hd"><span>Explorer</span><button type="button" data-x="explorer">X</button></div><div class="bd"><div class="row"><input id="ex-path" value="/Documents"/><button type="button" class="b" id="ex-go">List</button></div><pre id="ex-out" class="muted">Ready</pre></div></div>
-<div class="win" id="w-notepad"><div class="hd"><span>Notepad</span><button type="button" data-x="notepad">X</button></div><div class="bd"><input id="np-path" value="/Documents/Welcome.txt"/><textarea id="np-ed" rows="12"></textarea><div class="row"><button type="button" class="b" id="np-load">Load</button><button type="button" class="b" id="np-save">Save</button></div></div></div>
-<div class="win" id="w-term"><div class="hd"><span>Terminal</span><button type="button" data-x="term">X</button></div><div class="bd"><pre id="tm-out" class="muted">PasiyaOS term</pre><input id="tm-in" placeholder="help | ls | cat /Documents/x"/><button type="button" class="b" id="tm-run">Run</button></div></div>
-<div class="win" id="w-browserpro"><div class="hd"><span>Browser Pro</span><button type="button" data-x="browserpro">X</button></div><div class="bd"><input id="bp-url" value="https://www.make.com"/><div class="row"><button type="button" class="b" id="bp-open">Open external</button><button type="button" class="b" id="bp-fetch">Fetch text</button></div><pre id="bp-view" class="muted">Open external for full sites.</pre></div></div>
-<div class="win" id="w-settings" style="bottom:64px"><div class="hd"><span>PASIYA MAX LAB</span><button type="button" data-x="settings">X</button></div>
+<div class="win" id="w-explorer"><div class="hd"><b>Explorer</b><button type="button" data-x="explorer">X</button></div><div class="bd rowflex"><div class="side" id="exp-side"></div><div style="flex:1;display:flex;flex-direction:column;min-width:0"><div class="path" id="exp-path">/</div><div class="list" id="exp-list"></div><div class="tb"><button type="button" class="b" id="exp-up">Up</button><button type="button" class="b" id="exp-nf">+File</button><button type="button" class="b" id="exp-nd">+Dir</button><button type="button" class="b" id="exp-ref">Refresh</button></div></div></div></div>
+
+<div class="win" id="w-notepad"><div class="hd"><b>Notepad</b><button type="button" data-x="notepad">X</button></div><div class="bd"><div class="path" id="np-path">No file</div><textarea id="np-ed"></textarea><div class="tb"><button type="button" class="b" id="np-save">Save</button></div></div></div>
+
+<div class="win" id="w-term"><div class="hd"><b>Terminal</b><button type="button" data-x="term">X</button></div><div class="bd"><div id="term-out"></div><form id="term-form"><span style="color:var(--gold);font-family:monospace;font-size:11px" id="term-pr">$</span><input id="term-in" autocomplete="off"/></form></div></div>
+
+<div class="win" id="w-ide"><div class="hd"><b>IDE</b><button type="button" data-x="ide">X</button></div><div class="bd"><div class="path" id="ide-path">/Projects</div><textarea id="ide-ed" placeholder="// code"></textarea><div class="tb"><button type="button" class="b" id="ide-save">Save</button><button type="button" class="b" id="ide-new">New</button></div></div></div>
+
+<div class="win" id="w-kernel"><div class="hd"><b>Kernel</b><button type="button" data-x="kernel">X</button></div><div class="bd"><div class="scroll" id="k-body">...</div><div class="tb"><button type="button" class="b" id="k-ref">Refresh</button></div></div></div>
+
+<div class="win" id="w-office"><div class="hd"><b>Office</b><button type="button" data-x="office">X</button></div><div class="bd"><div class="path" id="of-path">/Documents/Office/notes.txt</div><textarea id="of-ed"></textarea><div class="tb"><button type="button" class="b" id="of-save">Save</button><button type="button" class="b" id="of-load">Load</button></div></div></div>
+
+<div class="win" id="w-browser"><div class="hd"><b>Browser</b><button type="button" data-x="browser">X</button></div><div class="bd"><div class="form"><input id="br-url" value="https://example.com"/><div class="row"><button type="button" class="b" id="br-go">Go</button><button type="button" class="b" id="br-save">Save page</button></div></div><div class="scroll muted" id="br-view">HTTPS text</div></div></div>
+
+
+<div class="win" id="w-browserpro"><div class="hd"><b>Browser Pro</b><button type="button" data-x="browserpro">X</button></div><div class="bd">
+<div class="form">
+<input id="bp-url" value="https://www.make.com" placeholder="https://..."/>
+<div class="row">
+<button type="button" class="b" id="bp-open">Open external</button>
+<button type="button" class="b" id="bp-fetch">Fetch text</button>
+</div>
+<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:8px">
+<button type="button" class="b" id="bp-make">Make.com</button>
+<button type="button" class="b" id="bp-meta">Meta Dev</button>
+<button type="button" class="b" id="bp-vercel">Vercel</button>
+<button type="button" class="b" id="bp-gh">GitHub</button>
+<button type="button" class="b" id="bp-fb">Facebook</button>
+</div>
+</div>
+<div class="scroll muted" id="bp-view">Browser Pro · Open external = Telegram openLink (Make/Meta login). Fetch text = proxy HTML text only.</div>
+<div class="tb"><button type="button" class="b" id="bp-save">Save note</button></div>
+</div></div>
+<div class="win" id="w-socialcon"><div class="hd"><b>Social Console</b><button type="button" data-x="socialcon">X</button></div><div class="bd">
+<div class="form">
+<textarea id="sc-cap" placeholder="Caption for /social post ..." style="min-height:100px;width:100%"></textarea>
+<div class="row">
+<button type="button" class="b" id="sc-queue">Save FS queue</button>
+<button type="button" class="b" id="sc-copy">Copy /social post</button>
+</div>
+<p class="muted">Bot chat: /social post YOUR TEXT</p>
+</div>
+<div class="scroll muted" id="sc-log">Ready.</div>
+<div class="tb"><button type="button" class="b" id="sc-load">Load queue</button></div>
+</div></div>
+<div class="win" id="w-makedock"><div class="hd"><b>Make Dock</b><button type="button" data-x="makedock">X</button></div><div class="bd">
+<div class="scroll" id="md-body">
+<div class="card"><h4>Stopped here</h4><div class="muted">Webhook OK. Facebook module blocked on mobile canvas.</div></div>
+<div class="card"><h4>Path A — No Make</h4><div class="muted">FB_PAGE_ID + FB_PAGE_TOKEN on Vercel → /social post hits Page.</div></div>
+<div class="card"><h4>Path B — Make</h4><div class="muted">Browser Pro → Open Make. If canvas blank, need real desktop once OR stay on Path A.</div></div>
+<div class="card"><h4>Checklist</h4>
+<label><input type="checkbox" id="md-c1"/> Webhook works</label><br>
+<label><input type="checkbox" id="md-c2"/> FB token set</label><br>
+<label><input type="checkbox" id="md-c3"/> Test Page post</label><br>
+<label><input type="checkbox" id="md-c4"/> Blog later</label>
+</div>
+</div>
+<div class="tb"><button type="button" class="b" id="md-save">Save checklist</button><button type="button" class="b" id="md-openmake">Open Make</button></div>
+</div></div>
+<div class="win" id="w-studio"><div class="hd"><b>Studio</b><button type="button" data-x="studio">X</button></div><div class="bd"><div class="form"><input id="st-url" placeholder="https:// image URL"/><input id="st-cap" placeholder="Caption"/><div class="row"><button type="button" class="b" id="st-add">Add to board</button><button type="button" class="b" id="st-reload">Reload</button></div></div><div class="scroll" id="st-list"></div><div class="tb"><button type="button" class="b" id="st-clear">Clear</button><button type="button" class="b" id="st-path">Show path</button></div></div></div>
+
+<div class="win" id="w-calc"><div class="hd"><b>Calculator</b><button type="button" data-x="calc">X</button></div><div class="bd"><div class="scroll"><input id="calc-disp" readonly value="0"/><div class="cg" id="calc-g"></div></div><div class="tb"><button type="button" class="b" id="calc-hist">Save history</button></div></div></div>
+
+<div class="win" id="w-journal"><div class="hd"><b>Journal</b><button type="button" data-x="journal">X</button></div><div class="bd"><div class="path" id="jn-path">today</div><textarea id="jn-ed" placeholder="Write today's journal..."></textarea><div class="tb"><button type="button" class="b" id="jn-save">Save today</button><button type="button" class="b" id="jn-load">Reload</button></div></div></div>
+
+<div class="win" id="w-tasks"><div class="hd"><b>Tasks</b><button type="button" data-x="tasks">X</button></div><div class="bd"><div class="form"><input id="tk-in" placeholder="New task..."/><div class="row"><button type="button" class="b" id="tk-add">Add task</button></div></div><div class="scroll" id="tk-list"></div><div class="tb"><button type="button" class="b" id="tk-save">Save list</button></div></div></div>
+
+<div class="win" id="w-themes"><div class="hd"><b>Themes</b><button type="button" data-x="themes">X</button></div><div class="bd"><div class="scroll"><button type="button" class="b" id="th-gold">Gold Dark</button> <button type="button" class="b" id="th-crimson">Crimson</button> <button type="button" class="b" id="th-matrix">Matrix</button><p class="muted" id="th-st">Current: gold</p></div></div></div>
+
+<div class="win" id="w-share"><div class="hd"><b>Share</b><button type="button" data-x="share">X</button></div><div class="bd"><div class="scroll muted" id="sh-out">Build export</div><div class="tb"><button type="button" class="b" id="sh-build">Build</button><button type="button" class="b" id="sh-save">Save</button></div></div></div>
+
+<div class="win" id="w-settings" style="max-width:96vw;width:420px;height:78vh"><div class="hd"><b>⚙ PASIYA MAX LAB</b><button type="button" data-x="settings">X</button></div>
 <div class="bd" style="padding:0;display:flex;flex-direction:column">
-<div class="cc-tabs" id="cc-tabs"></div>
-<div id="cc-panel" style="flex:1;overflow:auto;padding:10px"></div>
-<div class="row" style="padding:8px;border-top:1px solid var(--bd)">
+<div class="row" id="cc-tabs" style="flex-wrap:wrap;gap:4px;padding:8px;border-bottom:1px solid rgba(201,162,39,0.25)"></div>
+<div class="scroll" id="cc-panel" style="flex:1;padding:10px"></div>
+<div class="tb" style="padding:8px">
 <button type="button" class="b" id="cc-save">Save all</button>
 <button type="button" class="b" id="cc-reload">Reload</button>
 <button type="button" class="b" id="cc-export">Export</button>
 </div>
 </div></div>
+</div>
+
+<!-- S16-20 -->
+<div class="win" id="w-notes"><div class="hd"><b>Quick Notes</b><button type="button" data-x="notes">X</button></div><div class="bd"><textarea id="nt-ed" placeholder="Sticky note..."></textarea><div class="tb"><button type="button" class="b" id="nt-save">Save</button><button type="button" class="b" id="nt-load">Load</button></div></div></div>
+
+<div class="win" id="w-weather"><div class="hd"><b>Weather</b><button type="button" data-x="weather">X</button></div><div class="bd"><div class="form"><input id="wx-city" value="Colombo"/><button type="button" class="b" id="wx-go">Get weather</button></div><div class="scroll" id="wx-out" class="muted">Open-Meteo free API</div></div></div>
+
+<div class="win" id="w-clock"><div class="hd"><b>Clock</b><button type="button" data-x="clock">X</button></div><div class="bd"><div class="scroll" style="text-align:center"><div id="ck-big" style="font-size:36px;color:var(--gold2);margin:20px 0">--:--:--</div><input id="ck-alarm" class="line" placeholder="Alarm note e.g. 14:30 call" style="width:100%;padding:10px;margin:8px 0;background:#0e0b09;border:1px solid var(--border);border-radius:8px;color:var(--text)"/><button type="button" class="b" id="ck-save">Save alarm note</button><p class="muted" id="ck-st"></p></div></div></div>
+
+<div class="win" id="w-contacts"><div class="hd"><b>Contacts</b><button type="button" data-x="contacts">X</button></div><div class="bd"><div class="form"><input id="ct-name" placeholder="Name"/><input id="ct-phone" placeholder="Phone / note"/><button type="button" class="b" id="ct-add">Add contact</button></div><div class="scroll" id="ct-list"></div><div class="tb"><button type="button" class="b" id="ct-save">Save</button></div></div></div>
+
+<div class="win" id="w-dash"><div class="hd"><b>Dashboard</b><button type="button" data-x="dash">X</button></div><div class="bd"><div class="scroll" id="dash-out">Loading...</div><div class="tb"><button type="button" class="b" id="dash-ref">Refresh</button></div></div></div>
+
+
+<div class="win" id="w-vault"><div class="hd"><b>Vault</b><button type="button" data-x="vault">X</button></div><div class="bd"><div class="form"><input id="v-title" placeholder="Label e.g. GitHub"/><input id="v-secret" placeholder="Secret / password note"/><button type="button" class="b" id="v-add">Add entry</button></div><div class="scroll" id="v-list"></div><div class="tb"><button type="button" class="b" id="v-save">Save vault</button></div></div></div>
+
+<div class="win" id="w-kanban"><div class="hd"><b>Kanban</b><button type="button" data-x="kanban">X</button></div><div class="bd"><div class="form"><input id="kb-in" placeholder="New card..."/><div class="row"><button type="button" class="b" id="kb-todo">+ Todo</button><button type="button" class="b" id="kb-doing">+ Doing</button><button type="button" class="b" id="kb-done">+ Done</button></div></div><div class="scroll" id="kb-board"></div><div class="tb"><button type="button" class="b" id="kb-save">Save board</button></div></div></div>
+
+<div class="win" id="w-rss"><div class="hd"><b>RSS</b><button type="button" data-x="rss">X</button></div><div class="bd"><div class="form"><input id="rss-url" value="https://hnrss.org/frontpage" placeholder="Feed URL"/><button type="button" class="b" id="rss-go">Fetch</button></div><div class="scroll muted" id="rss-out">Enter feed URL</div><div class="tb"><button type="button" class="b" id="rss-save">Save items</button></div></div></div>
+
+<div class="win" id="w-pomodoro"><div class="hd"><b>Focus Timer</b><button type="button" data-x="pomodoro">X</button></div><div class="bd"><div class="scroll" style="text-align:center"><div id="pm-disp" style="font-size:42px;color:var(--gold2);margin:24px 0">25:00</div><div class="row" style="justify-content:center"><button type="button" class="b" id="pm-25">25m</button><button type="button" class="b" id="pm-5">5m</button><button type="button" class="b" id="pm-start">Start</button><button type="button" class="b" id="pm-stop">Stop</button></div><p class="muted" id="pm-st">Ready</p></div><div class="tb"><button type="button" class="b" id="pm-log">Log session</button></div></div></div>
+
+<div class="win" id="w-search"><div class="hd"><b>Search FS</b><button type="button" data-x="search">X</button></div><div class="bd"><div class="form"><input id="se-q" placeholder="Keyword..."/><button type="button" class="b" id="se-go">Search</button></div><div class="scroll muted" id="se-out">Search file names under /Documents and /Projects</div></div></div>
+
+
+<div class="win" id="w-bookmarks"><div class="hd"><b>Bookmarks</b><button type="button" data-x="bookmarks">X</button></div><div class="bd"><div class="form"><input id="bm-title" placeholder="Title"/><input id="bm-url" placeholder="https://..."/><button type="button" class="b" id="bm-add">Add</button></div><div class="scroll" id="bm-list"></div><div class="tb"><button type="button" class="b" id="bm-save">Save</button></div></div></div>
+
+<div class="win" id="w-colors"><div class="hd"><b>Colors</b><button type="button" data-x="colors">X</button></div><div class="bd"><div class="form"><input id="cl-hex" value="#c9a227" placeholder="#hex"/><input id="cl-name" placeholder="Name"/><button type="button" class="b" id="cl-add">Add swatch</button></div><div class="scroll" id="cl-list"></div><div class="tb"><button type="button" class="b" id="cl-save">Save palette</button></div></div></div>
+
+<div class="win" id="w-units"><div class="hd"><b>Units</b><button type="button" data-x="units">X</button></div><div class="bd"><div class="form"><input id="un-val" type="number" value="10" placeholder="Value"/><select id="un-from" class="line" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"><option value="km">km</option><option value="mi">mi</option><option value="m">m</option><option value="ft">ft</option><option value="kg">kg</option><option value="lb">lb</option><option value="c">°C</option><option value="f">°F</option></select><select id="un-to" class="line" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"><option value="mi">mi</option><option value="km">km</option><option value="ft">ft</option><option value="m">m</option><option value="lb">lb</option><option value="kg">kg</option><option value="f">°F</option><option value="c">°C</option></select><div class="row"><button type="button" class="b" id="un-go">Convert</button><button type="button" class="b" id="un-save">Save</button></div></div><div class="scroll" id="un-out" class="muted">Result</div></div></div>
+
+<div class="win" id="w-random"><div class="hd"><b>Random</b><button type="button" data-x="random">X</button></div><div class="bd"><div class="form"><div class="row"><button type="button" class="b" id="rn-pass">Password</button><button type="button" class="b" id="rn-uuid">UUID</button><button type="button" class="b" id="rn-dice">Dice</button><button type="button" class="b" id="rn-num">1-100</button></div></div><div class="scroll" id="rn-out" style="font-size:18px;color:var(--gold2)">Tap a button</div><div class="tb"><button type="button" class="b" id="rn-save">Save last</button></div></div></div>
+
+<div class="win" id="w-backup"><div class="hd"><b>Backup</b><button type="button" data-x="backup">X</button></div><div class="bd"><div class="scroll muted" id="bk-out">Build a text backup of key JSON files</div><div class="tb"><button type="button" class="b" id="bk-build">Build backup</button><button type="button" class="b" id="bk-save">Save to FS</button></div></div></div>
+
+
+<div class="win" id="w-snippets"><div class="hd"><b>Snippets</b><button type="button" data-x="snippets">X</button></div><div class="bd"><div class="form"><input id="sn-title" placeholder="Title"/><textarea id="sn-body" rows="3" placeholder="Code or text snippet" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:monospace"></textarea><button type="button" class="b" id="sn-add">Add snippet</button></div><div class="scroll" id="sn-list"></div><div class="tb"><button type="button" class="b" id="sn-save">Save all</button></div></div></div>
+
+<div class="win" id="w-habits"><div class="hd"><b>Habits</b><button type="button" data-x="habits">X</button></div><div class="bd"><div class="form"><input id="hb-in" placeholder="Habit name e.g. Water"/><button type="button" class="b" id="hb-add">Add habit</button></div><div class="scroll" id="hb-list"></div><div class="tb"><button type="button" class="b" id="hb-save">Save</button></div></div></div>
+
+<div class="win" id="w-world"><div class="hd"><b>World Clock</b><button type="button" data-x="world">X</button></div><div class="bd"><div class="scroll" id="wd-out"></div><div class="tb"><button type="button" class="b" id="wd-ref">Refresh</button></div></div></div>
+
+<div class="win" id="w-expenses"><div class="hd"><b>Expenses</b><button type="button" data-x="expenses">X</button></div><div class="bd"><div class="form"><input id="ex-item" placeholder="Item"/><input id="ex-amt" type="number" placeholder="Amount"/><button type="button" class="b" id="ex-add">Add</button></div><div class="scroll" id="ex-list"></div><div class="tb"><button type="button" class="b" id="ex-save">Save</button><button type="button" class="b" id="ex-total">Total</button></div></div></div>
+
+<div class="win" id="w-launcher"><div class="hd"><b>Launcher</b><button type="button" data-x="launcher">X</button></div><div class="bd"><div class="form"><input id="ln-q" placeholder="Type app name..."/><button type="button" class="b" id="ln-go">Open</button></div><div class="scroll" id="ln-list"></div></div></div>
+
+
+<div class="win" id="w-stickies"><div class="hd"><b>Stickies</b><button type="button" data-x="stickies">X</button></div><div class="bd"><div class="form"><textarea id="stc-in" rows="3" placeholder="New sticky note..." style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"></textarea><button type="button" class="b" id="stc-add">Add sticky</button></div><div class="scroll" id="stc-list"></div><div class="tb"><button type="button" class="b" id="stc-save">Save board</button></div></div></div>
+
+<div class="win" id="w-notify"><div class="hd"><b>Notify</b><button type="button" data-x="notify">X</button></div><div class="bd"><div class="form"><input id="ntf-in" placeholder="Reminder text"/><button type="button" class="b" id="ntf-add">Add</button></div><div class="scroll" id="ntf-list"></div><div class="tb"><button type="button" class="b" id="ntf-save">Save</button><button type="button" class="b" id="ntf-clear">Clear done</button></div></div></div>
+
+<div class="win" id="w-dict"><div class="hd"><b>Dictionary</b><button type="button" data-x="dict">X</button></div><div class="bd"><div class="form"><input id="dict-q" placeholder="English word"/><button type="button" class="b" id="dict-go">Define</button></div><div class="scroll muted" id="dict-out">Free Dictionary API</div><div class="tb"><button type="button" class="b" id="dict-save">Save result</button></div></div></div>
+
+<div class="win" id="w-cheats"><div class="hd"><b>Bot Cheats</b><button type="button" data-x="cheats">X</button></div><div class="bd"><div class="scroll" id="ch-out"></div><div class="tb"><button type="button" class="b" id="ch-save">Save list</button></div></div></div>
+
+<div class="win" id="w-syscheck"><div class="hd"><b>SysCheck</b><button type="button" data-x="syscheck">X</button></div><div class="bd"><div class="scroll" id="sy-out">Run check...</div><div class="tb"><button type="button" class="b" id="sy-run">Run checks</button><button type="button" class="b" id="sy-save">Save report</button></div></div></div>
+
+
+<div class="win" id="w-draw"><div class="hd"><b>Draw</b><button type="button" data-x="draw">X</button></div><div class="bd"><div class="form"><canvas id="dw-cv" width="320" height="200" style="width:100%;background:#111;border:1px solid var(--border);border-radius:8px;touch-action:none"></canvas><div class="row"><button type="button" class="b" id="dw-clear">Clear</button><button type="button" class="b" id="dw-save">Save strokes</button></div></div><div class="scroll muted" id="dw-st">Draw with finger/mouse</div></div></div>
+
+<div class="win" id="w-music"><div class="hd"><b>Music</b><button type="button" data-x="music">X</button></div><div class="bd"><div class="form"><input id="mu-url" placeholder="https://... audio URL (mp3)"/><input id="mu-title" placeholder="Title"/><button type="button" class="b" id="mu-add">Add track</button></div><div class="scroll" id="mu-list"></div><div class="tb"><button type="button" class="b" id="mu-save">Save playlist</button></div></div></div>
+
+<div class="win" id="w-quiz"><div class="hd"><b>Quiz</b><button type="button" data-x="quiz">X</button></div><div class="bd"><div class="scroll" id="qz-out"></div><div class="tb"><button type="button" class="b" id="qz-next">Next question</button><button type="button" class="b" id="qz-save">Save score</button></div></div></div>
+
+<div class="win" id="w-countdown"><div class="hd"><b>Countdown</b><button type="button" data-x="countdown">X</button></div><div class="bd"><div class="form"><input id="cd-min" type="number" value="5" placeholder="Minutes"/><div class="row"><button type="button" class="b" id="cd-start">Start</button><button type="button" class="b" id="cd-stop">Stop</button></div></div><div class="scroll" style="text-align:center"><div id="cd-disp" style="font-size:40px;color:var(--gold2);margin:20px">05:00</div><p class="muted" id="cd-st">Ready</p></div></div></div>
+
+<div class="win" id="w-wiki"><div class="hd"><b>Wiki</b><button type="button" data-x="wiki">X</button></div><div class="bd"><div class="form"><input id="wk-q" placeholder="Search Wikipedia"/><button type="button" class="b" id="wk-go">Search</button></div><div class="scroll muted" id="wk-out">Summary via Wikipedia API</div><div class="tb"><button type="button" class="b" id="wk-save">Save</button></div></div></div>
+
+
+<div class="win" id="w-markdown"><div class="hd"><b>Markdown</b><button type="button" data-x="markdown">X</button></div><div class="bd"><div class="form"><textarea id="md-in" rows="5" placeholder="# Hello&#10;**bold**" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:monospace"></textarea><div class="row"><button type="button" class="b" id="md-prev">Preview</button><button type="button" class="b" id="md-save">Save MD</button></div></div><div class="scroll" id="md-out" class="muted">Preview</div></div></div>
+
+<div class="win" id="w-json"><div class="hd"><b>JSON</b><button type="button" data-x="json">X</button></div><div class="bd"><div class="form"><textarea id="js-in" rows="5" placeholder='{"a":1}' style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:monospace"></textarea><div class="row"><button type="button" class="b" id="js-fmt">Format</button><button type="button" class="b" id="js-min">Minify</button><button type="button" class="b" id="js-save">Save</button></div></div><div class="scroll muted" id="js-out">Result</div></div></div>
+
+<div class="win" id="w-base64"><div class="hd"><b>Base64</b><button type="button" data-x="base64">X</button></div><div class="bd"><div class="form"><textarea id="b64-in" rows="4" placeholder="Text..." style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"></textarea><div class="row"><button type="button" class="b" id="b64-enc">Encode</button><button type="button" class="b" id="b64-dec">Decode</button><button type="button" class="b" id="b64-save">Save</button></div></div><div class="scroll muted" id="b64-out">Result</div></div></div>
+
+<div class="win" id="w-hash"><div class="hd"><b>Hash</b><button type="button" data-x="hash">X</button></div><div class="bd"><div class="form"><textarea id="hs-in" rows="3" placeholder="Text to hash" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"></textarea><div class="row"><button type="button" class="b" id="hs-go">SHA-256</button><button type="button" class="b" id="hs-save">Save</button></div></div><div class="scroll muted" id="hs-out">Uses Web Crypto</div></div></div>
+
+<div class="win" id="w-aboutos"><div class="hd"><b>About OS</b><button type="button" data-x="aboutos">X</button></div><div class="bd"><div class="scroll" id="ab-out"></div><div class="tb"><button type="button" class="b" id="ab-inv">App inventory</button><button type="button" class="b" id="ab-save">Save report</button></div></div></div>
+
+
+<div class="win" id="w-regex"><div class="hd"><b>Regex</b><button type="button" data-x="regex">X</button></div><div class="bd"><div class="form"><input id="rx-pat" placeholder="Pattern e.g. \\w+"/><input id="rx-flags" placeholder="Flags e.g. gi" value="g"/><textarea id="rx-text" rows="4" placeholder="Test text..." style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:monospace"></textarea><button type="button" class="b" id="rx-go">Test</button></div><div class="scroll muted" id="rx-out">Matches</div><div class="tb"><button type="button" class="b" id="rx-save">Save result</button></div></div></div>
+
+<div class="win" id="w-diff"><div class="hd"><b>Diff</b><button type="button" data-x="diff">X</button></div><div class="bd"><div class="form"><textarea id="df-a" rows="3" placeholder="Text A" style="width:100%;padding:10px;margin-bottom:6px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:monospace"></textarea><textarea id="df-b" rows="3" placeholder="Text B" style="width:100%;padding:10px;margin-bottom:6px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:monospace"></textarea><button type="button" class="b" id="df-go">Compare</button></div><div class="scroll muted" id="df-out">Line diff</div><div class="tb"><button type="button" class="b" id="df-save">Save</button></div></div></div>
+
+<div class="win" id="w-csv"><div class="hd"><b>CSV</b><button type="button" data-x="csv">X</button></div><div class="bd"><div class="form"><textarea id="cv-in" rows="5" placeholder="name,age&#10;Ada,30" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:monospace"></textarea><button type="button" class="b" id="cv-go">Render table</button></div><div class="scroll" id="cv-out" class="muted">Table</div><div class="tb"><button type="button" class="b" id="cv-save">Save CSV</button></div></div></div>
+
+<div class="win" id="w-lorem"><div class="hd"><b>Lorem</b><button type="button" data-x="lorem">X</button></div><div class="bd"><div class="form"><input id="lo-n" type="number" value="3" placeholder="Paragraphs"/><div class="row"><button type="button" class="b" id="lo-go">Generate</button><button type="button" class="b" id="lo-save">Save</button></div></div><div class="scroll muted" id="lo-out">Placeholder text</div></div></div>
+
+<div class="win" id="w-stopwatch"><div class="hd"><b>Stopwatch</b><button type="button" data-x="stopwatch">X</button></div><div class="bd"><div class="scroll" style="text-align:center"><div id="sw-disp" style="font-size:40px;color:var(--gold2);margin:20px">00:00.0</div><div class="row" style="justify-content:center"><button type="button" class="b" id="sw-start">Start</button><button type="button" class="b" id="sw-lap">Lap</button><button type="button" class="b" id="sw-stop">Stop</button><button type="button" class="b" id="sw-reset">Reset</button></div><div id="sw-laps" class="muted" style="margin-top:12px;text-align:left"></div></div><div class="tb"><button type="button" class="b" id="sw-save">Save laps</button></div></div></div>
+
+
+<div class="win" id="w-outline"><div class="hd"><b>Outline</b><button type="button" data-x="outline">X</button></div><div class="bd"><div class="form"><textarea id="ol-in" rows="4" placeholder="One line per bullet. Indent with 2 spaces or Tab.&#10;Main Topic&#10;  Sub Topic 1&#10;  Sub Topic 2" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px;font-family:monospace"></textarea><div class="row"><button type="button" class="b" id="ol-add">Add lines</button><button type="button" class="b" id="ol-clear">Clear list</button></div></div><div class="scroll" id="ol-list"></div><div class="tb"><button type="button" class="b" id="ol-save">Save outline</button></div></div></div>
+
+<div class="win" id="w-coins"><div class="hd"><b>Coins</b><button type="button" data-x="coins">X</button></div><div class="bd"><div class="form"><input id="cn-ids" value="bitcoin,ethereum,solana" placeholder="ids comma-separated"/><button type="button" class="b" id="cn-go">Fetch prices</button></div><div class="scroll muted" id="cn-out">CoinGecko free API</div><div class="tb"><button type="button" class="b" id="cn-save">Save</button></div></div></div>
+
+<div class="win" id="w-morse"><div class="hd"><b>Morse</b><button type="button" data-x="morse">X</button></div><div class="bd"><div class="form"><textarea id="mo-in" rows="3" placeholder="Text or morse" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"></textarea><div class="row"><button type="button" class="b" id="mo-enc">To Morse</button><button type="button" class="b" id="mo-dec">From Morse</button><button type="button" class="b" id="mo-save">Save</button></div></div><div class="scroll muted" id="mo-out">Result</div></div></div>
+
+<div class="win" id="w-baseconv"><div class="hd"><b>Bases</b><button type="button" data-x="baseconv">X</button></div><div class="bd"><div class="form"><input id="bc-val" placeholder="Number e.g. 255 or FF"/><select id="bc-from" style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"><option value="10">Decimal</option><option value="2">Binary</option><option value="16">Hex</option><option value="8">Octal</option></select><button type="button" class="b" id="bc-go">Convert all</button></div><div class="scroll muted" id="bc-out">DEC / BIN / HEX / OCT</div><div class="tb"><button type="button" class="b" id="bc-save">Save</button></div></div></div>
+
+<div class="win" id="w-ipinfo"><div class="hd"><b>IP Info</b><button type="button" data-x="ipinfo">X</button></div><div class="bd"><div class="form"><button type="button" class="b" id="ip-go">Lookup my IP</button></div><div class="scroll muted" id="ip-out">Uses ipify + ipapi (httpget)</div><div class="tb"><button type="button" class="b" id="ip-save">Save</button></div></div></div>
+
+
+<div class="win" id="w-translate"><div class="hd"><b>Translate</b><button type="button" data-x="translate">X</button></div><div class="bd"><div class="form"><textarea id="tr-in" rows="3" placeholder="Text to translate..." style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"></textarea><div class="row"><select id="tr-from" style="flex:1;padding:10px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"><option value="en">EN</option><option value="si">SI</option><option value="ta">TA</option><option value="auto">Auto</option></select><select id="tr-to" style="flex:1;padding:10px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"><option value="si">SI</option><option value="en">EN</option><option value="ta">TA</option></select></div><button type="button" class="b" id="tr-go" style="margin-top:8px">Translate</button></div><div class="scroll muted" id="tr-out">MyMemory free API</div><div class="tb"><button type="button" class="b" id="tr-save">Save</button></div></div></div>
+
+<div class="win" id="w-qr"><div class="hd"><b>QR</b><button type="button" data-x="qr">X</button></div><div class="bd"><div class="form"><input id="qr-in" placeholder="Text or URL"/><button type="button" class="b" id="qr-go">Generate</button></div><div class="scroll" id="qr-out" style="text-align:center" class="muted">QR image</div><div class="tb"><button type="button" class="b" id="qr-save">Save text</button></div></div></div>
+
+<div class="win" id="w-planner"><div class="hd"><b>Planner</b><button type="button" data-x="planner">X</button></div><div class="bd"><div class="form"><input id="pl-date" type="date"/><input id="pl-item" placeholder="Task for day"/><button type="button" class="b" id="pl-add">Add</button></div><div class="scroll" id="pl-list"></div><div class="tb"><button type="button" class="b" id="pl-save">Save day</button></div></div></div>
+
+<div class="win" id="w-palette2"><div class="hd"><b>Palette+</b><button type="button" data-x="palette2">X</button></div><div class="bd"><div class="form"><input id="pp-hex" value="#c9a227" placeholder="#hex"/><button type="button" class="b" id="pp-go">Harmony</button></div><div class="scroll" id="pp-out"></div><div class="tb"><button type="button" class="b" id="pp-save">Save palette</button></div></div></div>
+
+<div class="win" id="w-findfs"><div class="hd"><b>FindFS</b><button type="button" data-x="findfs">X</button></div><div class="bd"><div class="form"><input id="ff-q" placeholder="Search filename or content keyword"/><button type="button" class="b" id="ff-go">Search</button></div><div class="scroll muted" id="ff-out">Deep search Documents + Projects</div><div class="tb"><button type="button" class="b" id="ff-save">Save results</button></div></div></div>
+
+
+<div class="win" id="w-cats"><div class="hd"><b>Categories</b><button type="button" data-x="cats">X</button></div><div class="bd"><div class="form"><div class="row" id="cat-btns" style="flex-wrap:wrap;gap:6px"></div></div><div class="scroll" id="cat-list"></div></div></div>
+
+<div class="win" id="w-hotkeys"><div class="hd"><b>Hotkeys</b><button type="button" data-x="hotkeys">X</button></div><div class="bd"><div class="scroll" id="hk-out"></div><div class="tb"><button type="button" class="b" id="hk-save">Save list</button></div></div></div>
+
+<div class="win" id="w-exportall"><div class="hd"><b>Export All</b><button type="button" data-x="exportall">X</button></div><div class="bd"><div class="scroll muted" id="exall-out">Build full text export of key Documents files</div><div class="tb"><button type="button" class="b" id="exall-go">Build</button><button type="button" class="b" id="exall-save">Save export</button></div></div></div>
+
+<div class="win" id="w-clip"><div class="hd"><b>Clip</b><button type="button" data-x="clip">X</button></div><div class="bd"><div class="form"><textarea id="clp-in" rows="3" placeholder="Paste or type a clip..." style="width:100%;padding:10px;margin-bottom:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"></textarea><button type="button" class="b" id="clp-add">Add clip</button></div><div class="scroll" id="clp-list"></div><div class="tb"><button type="button" class="b" id="clp-save">Save clips</button></div></div></div>
+
+<div class="win" id="w-diag"><div class="hd"><b>Diag</b><button type="button" data-x="diag">X</button></div><div class="bd"><div class="scroll muted" id="dg-out">Run diagnostics</div><div class="tb"><button type="button" class="b" id="dg-run">Run</button><button type="button" class="b" id="dg-save">Save report</button></div></div></div>
+
+<div class="win" id="w-store"><div class="hd"><b>App Store</b><button type="button" data-x="store">X</button></div><div class="bd"><div class="scroll" id="store-body"></div></div></div>
+
+<div id="taskbar">
+<button type="button" class="tbtn" data-o="explorer">📁</button>
+<button type="button" class="tbtn" data-o="term">⌨</button>
+<button type="button" class="tbtn" data-o="studio">🎬</button>
+<button type="button" class="tbtn" data-o="tasks">✅</button>
+<button type="button" class="tbtn" data-o="journal">📔</button>
+<button type="button" class="tbtn" data-o="dash">📊</button>
+<button type="button" class="tbtn" data-o="vault">🔐</button>
+<button type="button" class="tbtn" data-o="kanban">📋</button>
+<button type="button" class="tbtn" data-o="search">🔍</button>
+<button type="button" class="tbtn" data-o="weather">🌤</button>
+<button type="button" class="tbtn" data-o="settings">⚙</button>
+<span style="color:var(--gold);font-size:11px;font-weight:700;margin-left:4px">PASIYA OS</span>
+<span id="clock" style="margin-left:auto;color:var(--muted);font-size:11px"></span>
+</div>
+<div id="toast"></div>
 
 <script>
 (function(){
-try{if(window.Telegram&&Telegram.WebApp){Telegram.WebApp.ready();Telegram.WebApp.expand();}}catch(e){}
+'use strict';
+var API='/api/fs';
+var tg=window.Telegram&&window.Telegram.WebApp;
+if(tg){try{tg.ready();tg.expand()}catch(e){}}
 
-function toast(m){var t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(function(){t.classList.remove('show');},1800);}
-
-function initData(){
-  try{return(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.initData)||'';}catch(e){return'';}
-}
-
+function toast(m){var el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(window.__t);window.__t=setTimeout(function(){el.classList.remove('show')},2500)}
+function initData(){return(tg&&tg.initData)?tg.initData:''}
 function fsApi(action,path,content,extra){
-  var body={action:action,path:path||'/',content:content||'',initData:initData()};
-  if(extra){for(var k in extra){body[k]=extra[k];}}
-  return fetch('/api/fs',{method:'POST',headers:{'Content-Type':'application/json','X-Telegram-Init-Data':initData()},body:JSON.stringify(body)})
-    .then(function(r){return r.json().catch(function(){return{ok:false,error:'bad json'};});})
-    .catch(function(e){return{ok:false,error:String(e)};});
+  var body={action:action,path:path||'/',initData:initData()};
+  if(extra)for(var k in extra)if(Object.prototype.hasOwnProperty.call(extra,k))body[k]=extra[k];
+  if(content!==undefined)body.content=content;
+  return fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(function(r){return r.text().then(function(t){try{return t?JSON.parse(t):{}}catch(e){return{ok:false,error:'non-JSON '+r.status+': '+String(t).slice(0,80)}}})})
+    .catch(function(e){return{ok:false,error:String(e.message||e)}})
+    .then(function(j){if(j&&j.error)toast(j.error);return j||{ok:false}});
 }
 
 var APPS=[
-  ['explorer','📁','Explorer'],['notepad','📝','Notepad'],['term','⌨','Terminal'],
-  ['settings','⚙','MAX LAB'],['browserpro','🌐','Browser Pro']
+  /* WORKSTATION-1 — pinned */
+  ['browserpro','🌐','Browser Pro'],['socialcon','📣','Social'],['makedock','⚙','Make Dock'],
+  /* core */
+  ['explorer','📁','Explorer'],['notepad','📝','Notepad'],['term','⌨','Terminal'],['ide','💻','IDE'],
+  ['kernel','🧠','Kernel'],['office','📄','Office'],['browser','🌐','Browser'],['studio','🎬','Studio'],
+  /* NEW S56 — pinned near top so visible without long scroll */
+  ['outline','📋','Outline'],['coins','🪙','Coins'],['morse','📡','Morse'],
+  ['baseconv','🔢','Bases'],['ipinfo','🌍','IP Info'],
+  /* recent toolkit */
+  ['regex','🔤','Regex'],['diff','≠','Diff'],['csv','▤','CSV'],
+  ['lorem','¶','Lorem'],['stopwatch','⏱','Stopwatch'],
+  ['markdown','📝','Markdown'],['json','{}','JSON'],['base64','64','Base64'],
+  ['hash','#','Hash'],['aboutos','👑','AboutOS'],
+  ['draw','✏','Draw'],['music','🎵','Music'],['quiz','❓','Quiz'],
+  ['countdown','⏳','Countdown'],['wiki','📚','Wiki'],
+  ['stickies','🟨','Stickies'],['notify','🔔','Notify'],['dict','📖','Dict'],
+  ['cheats','📜','Cheats'],['syscheck','🛡','SysCheck'],
+  ['snippets','📎','Snippets'],['habits','🔥','Habits'],['world','🌐','World'],
+  ['expenses','💰','Expenses'],['launcher','🚀','Launcher'],
+  ['bookmarks','🔖','Bookmarks'],['colors','🎨','Colors'],['units','📐','Units'],
+  ['random','🎲','Random'],['backup','💾','Backup'],
+  ['vault','🔐','Vault'],['kanban','📌','Kanban'],['rss','📰','RSS'],
+  ['pomodoro','☕','Focus'],['search','🔍','Search'],
+  ['calc','🔢','Calc'],['journal','📔','Journal'],['tasks','✅','Tasks'],['themes','🎨','Themes'],
+  ['share','📦','Share'],['notes','📌','Notes'],['weather','🌤','Weather'],['clock','🕐','Clock'],
+  ['contacts','👤','Contacts'],['dash','📊','Dash'],
+  ['translate','🔤','Translate'],['qr','▢','QR'],['planner','📅','Planner'],
+  ['palette2','🎨','Palette'],['findfs','🔎','FindFS'],
+  ['cats','📂','Cats'],['hotkeys','⌨','Hotkeys'],['exportall','📤','Export'],
+  ['clip','📋','Clip'],['diag','🩺','Diag'],
+  ['store','🏪','Store'],['settings','⚙','MAX LAB']
 ];
 
-function paintIcons(){
-  var root=document.getElementById('icons');root.innerHTML='';
+var icons=document.getElementById('icons');
+function paintIcons(filter){
+  if(!icons)return;
+  var q=(filter||'').toLowerCase().trim();
+  icons.innerHTML='';
+  /* filter bar */
+  var bar=document.createElement('div');
+  bar.style.cssText='width:100%;padding:6px 8px 10px;box-sizing:border-box;position:sticky;top:0;background:rgba(10,7,6,0.92);z-index:5';
+  var inp=document.createElement('input');
+  inp.id='icon-filter';
+  inp.placeholder='Search apps… (try outline, coins, morse)';
+  inp.value=filter||'';
+  inp.style.cssText='width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:#120e0c;color:var(--text);font-size:14px;box-sizing:border-box';
+  inp.oninput=function(){paintIcons(inp.value)};
+  bar.appendChild(inp);
+  icons.appendChild(bar);
+  var count=0;
   APPS.forEach(function(a){
-    var d=document.createElement('div');d.className='icon';
-    d.innerHTML='<div style="font-size:28px">'+a[1]+'</div><b>'+a[2]+'</b>';
-    d.onclick=function(){openWin(a[0]);};
-    root.appendChild(d);
+    if(q && a[0].toLowerCase().indexOf(q)<0 && a[2].toLowerCase().indexOf(q)<0)return;
+    var d=document.createElement('div');d.className='icon';d.id='icon-'+a[0];
+    d.innerHTML='<div class="ic">'+a[1]+'</div><span>'+a[2]+'</span>';
+    d.onclick=function(){openWin(a[0])};
+    icons.appendChild(d);
+    count++;
+  });
+  if(!count){
+    var empty=document.createElement('div');
+    empty.className='muted';
+    empty.style.padding='20px';
+    empty.textContent='No apps match';
+    icons.appendChild(empty);
+  }
+}
+paintIcons('');
+
+function openWin(n){
+  var el=document.getElementById('w-'+n);
+  if(!el){toast('No window '+n);return}
+  el.classList.add('open','foc');
+  document.querySelectorAll('.win').forEach(function(w){if(w!==el)w.classList.remove('foc')});
+  if(n==='explorer')refreshList();
+  if(n==='kernel')kernel();
+  if(n==='studio')studioLoad();
+  if(n==='journal')journalLoad();
+  if(n==='tasks')tasksLoad();
+  if(n==='calc')buildCalc();
+  if(n==='office')officeLoad();
+  if(n==='notes')notesLoad();
+  if(n==='contacts')contactsLoad();
+  if(n==='dash')dashLoad();
+  if(n==='store')renderStore();
+  if(n==='vault')vaultLoad();
+  if(n==='kanban')kanbanLoad();
+  if(n==='pomodoro')pmRender();
+  if(n==='search'){document.getElementById('se-out').textContent='Enter keyword';}
+  if(n==='bookmarks')bmLoad();
+  if(n==='colors')clLoad();
+  if(n==='backup'){document.getElementById('bk-out').textContent='Press Build backup';}
+  if(n==='snippets')snLoad();
+  if(n==='habits')hbLoad();
+  if(n==='world')wdRefresh();
+  if(n==='expenses')exLoad();
+  if(n==='launcher')lnRender();
+  if(n==='stickies')stcLoad();
+  if(n==='notify')ntfLoad();
+  if(n==='cheats')chRender();
+  if(n==='syscheck'){document.getElementById('sy-out').textContent='Press Run checks';}
+  if(n==='draw')dwInit();
+  if(n==='music')muLoad();
+  if(n==='quiz')qzShow();
+  if(n==='wiki'){document.getElementById('wk-out').textContent='Search a topic';}
+  if(n==='aboutos')abRender();
+  if(n==='stopwatch')swRender();
+  if(n==='outline')olLoad();
+  if(n==='planner')plLoad();
+  if(n==='findfs'){document.getElementById('ff-out').textContent='Enter keyword'};
+  if(n==='cats')catRender();
+  if(n==='hotkeys')hkRender();
+  if(n==='clip')clpLoad();
+  if(n==='diag'){document.getElementById('dg-out').textContent='Press Run'};
+  if(n==='clock')tickClock();
+  if(n==='term')setTimeout(function(){document.getElementById('term-in').focus()},50);
+  toast(n+' open');
+}
+function closeWin(n){var el=document.getElementById('w-'+n);if(el)el.classList.remove('open','foc')}
+document.querySelectorAll('[data-x]').forEach(function(b){b.onclick=function(){closeWin(b.getAttribute('data-x'))}});
+document.querySelectorAll('[data-o]').forEach(function(b){b.onclick=function(){openWin(b.getAttribute('data-o'))}});
+
+var cwd='/',npPath=null,termCwd='/',idePath='/Projects/main.js',ofPath='/Documents/Office/notes.txt';
+var ST='/Documents/Studio/board.json',TK='/Documents/Tasks/todo.json',CT='/Documents/contacts.json';
+var calcExpr='',calcHist=[],tasks=[],contacts=[],shareText='';
+
+function bn(p){var a=String(p).split('/').filter(Boolean);return a.length?a[a.length-1]:p}
+
+function refreshList(){
+  document.getElementById('exp-path').textContent=cwd;
+  var list=document.getElementById('exp-list');list.textContent='Loading...';
+  fsApi('list',cwd).then(function(j){
+    list.innerHTML='';
+    if(!j.ok){list.textContent=j.error||'err';return}
+    if(cwd!=='/'){var u=document.createElement('div');u.className='item';u.textContent='📁 ..';u.onclick=function(){var p=cwd.split('/').filter(Boolean);p.pop();cwd=p.length?'/'+p.join('/'):'/';refreshList()};list.appendChild(u)}
+    (j.entries||[]).forEach(function(e){
+      var d=document.createElement('div');d.className='item';
+      d.textContent=(e.type==='dir'?'📁 ':'📄 ')+bn(e.path)+(e.type==='file'?' ('+e.size+'b)':'');
+      d.onclick=function(){if(e.type==='dir'){cwd=e.path;refreshList()}else{npPath=e.path;fsApi('read',e.path).then(function(r){if(r.ok){document.getElementById('np-path').textContent=e.path;document.getElementById('np-ed').value=r.content||'';openWin('notepad')}})}};
+      list.appendChild(d);
+    });
   });
 }
-
-function openWin(id){
-  document.querySelectorAll('.win').forEach(function(w){w.classList.remove('on');});
-  var w=document.getElementById('w-'+id);
-  if(w){w.classList.add('on');}
-  if(id==='settings'){ccLoad();}
-  if(id==='explorer'){document.getElementById('ex-go').click();}
-}
-function closeWin(id){var w=document.getElementById('w-'+id);if(w)w.classList.remove('on');}
-
-document.getElementById('dock').onclick=function(ev){
-  var b=ev.target.closest('[data-o]');if(!b)return;openWin(b.getAttribute('data-o'));
-};
-document.body.addEventListener('click',function(ev){
-  var x=ev.target.getAttribute('data-x');if(x)closeWin(x);
+var side=document.getElementById('exp-side');
+['/','/Documents','/Projects','/Desktop','/.Trash'].forEach(function(p){
+  var d=document.createElement('div');d.textContent=p==='/'?'This PC':bn(p);d.onclick=function(){cwd=p;refreshList()};side.appendChild(d);
 });
+document.getElementById('exp-up').onclick=function(){var p=cwd.split('/').filter(Boolean);p.pop();cwd=p.length?'/'+p.join('/'):'/';refreshList()};
+document.getElementById('exp-ref').onclick=refreshList;
+document.getElementById('exp-nd').onclick=function(){var n=prompt('Folder');if(!n)return;fsApi('mkdir',(cwd==='/'?'':cwd)+'/'+n.replace(/^\//,'')).then(function(j){if(j.ok)refreshList()})};
+document.getElementById('exp-nf').onclick=function(){var n=prompt('File','note.txt');if(!n)return;var p=(cwd==='/'?'':cwd)+'/'+n.replace(/^\//,'');fsApi('write',p,'').then(function(j){if(j.ok)refreshList()})};
+document.getElementById('np-save').onclick=function(){if(!npPath){npPath=prompt('Path','/Documents/note.txt');if(!npPath)return}fsApi('write',npPath,document.getElementById('np-ed').value).then(function(j){if(j.ok)toast('Saved')})};
 
-document.getElementById('ex-go').onclick=function(){
-  var p=document.getElementById('ex-path').value||'/';
-  fsApi('ls',p).then(function(j){
-    document.getElementById('ex-out').textContent=j.ok?JSON.stringify(j,null,2):(j.error||'fail');
+function termPrint(t,c){var o=document.getElementById('term-out');var d=document.createElement('div');if(c)d.className=c;d.textContent=t;o.appendChild(d);o.scrollTop=o.scrollHeight}
+document.getElementById('term-form').onsubmit=function(e){
+  e.preventDefault();var line=document.getElementById('term-in').value.trim();document.getElementById('term-in').value='';
+  if(!line)return;termPrint('$ '+line,'cmd');
+  fsApi('shell','/',undefined,{cwd:termCwd,line:line}).then(function(j){
+    if(!j.ok){termPrint(j.error||'err','err');return}
+    if(j.cwd)termCwd=j.cwd;
+    document.getElementById('term-pr').textContent=termCwd+'$';
+    if(j.output==='__CLEAR__'){document.getElementById('term-out').innerHTML='';return}
+    if(j.output)String(j.output).split('\n').forEach(function(l){termPrint(l,/error|fail|not found/i.test(l)?'err':'')});
   });
 };
-document.getElementById('np-load').onclick=function(){
-  fsApi('read',document.getElementById('np-path').value).then(function(j){
-    document.getElementById('np-ed').value=j.ok?(j.content||''):(j.error||'');
-  });
-};
-document.getElementById('np-save').onclick=function(){
-  var p=document.getElementById('np-path').value;
-  fsApi('write',p,document.getElementById('np-ed').value).then(function(j){toast(j.ok?'Saved':'Fail');});
-};
-document.getElementById('tm-run').onclick=function(){
-  var cmd=(document.getElementById('tm-in').value||'').trim();
-  var out=document.getElementById('tm-out');
-  if(cmd==='help'){out.textContent='help | ls | cat <path>';return;}
-  if(cmd==='ls'||cmd.indexOf('ls ')===0){
-    var p=cmd.length>2?cmd.slice(3).trim():'/Documents';
-    fsApi('ls',p||'/Documents').then(function(j){out.textContent=JSON.stringify(j,null,2);});
-    return;
-  }
-  if(cmd.indexOf('cat ')===0){
-    fsApi('read',cmd.slice(4).trim()).then(function(j){out.textContent=j.ok?(j.content||''):(j.error||'');});
-    return;
-  }
-  out.textContent='unknown';
-};
 
-function tgOpen(url){
-  try{if(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.openLink){Telegram.WebApp.openLink(url,{try_instant_view:false});return;}}catch(e){}
-  window.open(url,'_blank');
+document.getElementById('ide-save').onclick=function(){
+  if(!idePath)idePath='/Projects/main.js';
+  fsApi('mkdir','/Projects').then(function(){return fsApi('write',idePath,document.getElementById('ide-ed').value)})
+    .then(function(j){if(j.ok)toast('IDE saved')});
+};
+document.getElementById('ide-new').onclick=function(){var n=prompt('File','app.js');if(!n)return;idePath='/Projects/'+n.replace(/^\//,'');document.getElementById('ide-path').textContent=idePath;document.getElementById('ide-ed').value=''};
+
+function kernel(){
+  Promise.all([fsApi('df','/'),fsApi('list','/')]).then(function(a){
+    var df=a[0],ls=a[1],u=df.ok?df.used:0,m=df.ok?df.max:1,p=Math.min(100,Math.round(u/m*100));
+    document.getElementById('k-body').innerHTML='<div class="card"><h4>Disk</h4>'+u+' / '+m+' ('+p+'%)<div class="bar"><i style="width:'+p+'%"></i></div></div><div class="card"><h4>Root</h4 class="muted">'+(ls.ok?(ls.entries||[]).map(function(e){return bn(e.path)}).join(', '):'')+'</div>';
+  });
 }
-document.getElementById('bp-open').onclick=function(){
-  var u=document.getElementById('bp-url').value.trim();if(!/^https:\/\//i.test(u))u='https://'+u;tgOpen(u);
-};
-document.getElementById('bp-fetch').onclick=function(){
-  var u=document.getElementById('bp-url').value.trim();if(!/^https:\/\//i.test(u))u='https://'+u;
-  document.getElementById('bp-view').textContent='Loading...';
-  fsApi('httpget','/',undefined,{url:u}).then(function(j){
-    if(!j.ok){document.getElementById('bp-view').textContent=j.error||'fail';return;}
+document.getElementById('k-ref').onclick=kernel;
+
+function officeLoad(){document.getElementById('of-path').textContent=ofPath;fsApi('mkdir','/Documents/Office').then(function(){return fsApi('read',ofPath)}).then(function(j){if(j.ok)document.getElementById('of-ed').value=j.content||''})}
+document.getElementById('of-save').onclick=function(){fsApi('mkdir','/Documents/Office').then(function(){return fsApi('write',ofPath,document.getElementById('of-ed').value)}).then(function(j){if(j.ok)toast('Office saved')})};
+document.getElementById('of-load').onclick=officeLoad;
+
+document.getElementById('br-go').onclick=function(){
+  var url=document.getElementById('br-url').value.trim();if(!/^https:\/\//i.test(url))url='https://'+url;
+  document.getElementById('br-view').textContent='Loading...';
+  fsApi('httpget','/',undefined,{url:url}).then(function(j){
+    if(!j.ok){document.getElementById('br-view').textContent=j.error||'fail';return}
     var t=String(j.text||'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
-    document.getElementById('bp-view').textContent=t.slice(0,8000);
+    document.getElementById('br-view').textContent='HTTP '+j.status+'\n\n'+t.slice(0,10000);
   });
 };
+document.getElementById('br-save').onclick=function(){fsApi('write','/Documents/browser-save.txt',document.getElementById('br-view').textContent||'').then(function(j){if(j.ok)toast('Saved')})};
 
-/* ---- CONTROL LAB ---- */
-window.__cc={
-  version:3,
-  system:{hostname:'PasiyaOS',locale:'si-LK',theme:'gold',scheduler:'balanced',selfHeal:'soft',overclock:5},
-  ai:{defaultModel:'auto',reasoningDepth:40,firewallLayers:3,swarmSize:3,memoryMix:'long',promptDna:'',temperature:0.7},
-  security:{lockMode:'none',encProfile:'std',ghost:'off',destruct:'off',founderOnlyHeavy:true,requireInitData:true,radar:true,autoBan:true},
-  network:{proxyMode:'httpget',openExternal:true,ratePosture:'smart',bookmarks:['https://vercel.com','https://supabase.com','https://www.make.com']},
-  nodes:{chain:[]},
-  ui:{themeEngine:'gold',hapticProfile:'light'},
-  obs:{logLevel:'info'},
-  triad:{botSync:true,miniAppHeartbeat:true,alertFounder:true},
-  gene:{}
-};
-
-var TABS=[
-  ['sys','Core Matrix'],['ai','AI Forge'],['sec','Fortress'],['net','Hydra'],
-  ['nodes','Nodes'],['ui','God UI'],['obs','Observatory'],['gene','Gene'],['triad','Triad']
-];
-
-function buildTabs(){
-  var el=document.getElementById('cc-tabs');el.innerHTML='';
-  TABS.forEach(function(t){
-    var b=document.createElement('button');b.type='button';b.className='b';b.textContent=t[1];
-    b.onclick=function(){ccCollect();ccRender(t[0]);};
-    el.appendChild(b);
-  });
-}
-
-function ccPanel(){return document.getElementById('cc-panel');}
-
-function ccRender(tab){
-  window.__ccTab=tab||'sys';
-  var c=window.__cc,p=ccPanel();
-  if(tab==='sys'){
-    p.innerHTML='<div class="card"><h3>Core Matrix</h3><div class="muted">Power 9 · Risk 5</div>'+
-      '<label class="muted">Scheduler</label><select id="cc-sched"><option>balanced</option><option>quantum</option><option>aggressive</option><option>eco</option></select>'+
-      '<label class="muted">Self-heal</label><select id="cc-heal"><option>off</option><option>soft</option><option>hard</option></select>'+
-      '<label class="muted">Overclock 1-10</label><input id="cc-oc" type="range" min="1" max="10" value="'+(c.system.overclock||5)+'"/>'+
-      '<label class="muted">Hostname</label><input id="cc-host" value="'+(c.system.hostname||'')+'"/></div>';
-    document.getElementById('cc-sched').value=c.system.scheduler||'balanced';
-    document.getElementById('cc-heal').value=c.system.selfHeal||'soft';
-  } else if(tab==='ai'){
-    p.innerHTML='<div class="card"><h3>AI Brain Forge</h3><div class="muted">Power 10 · Risk 7 · Keys on Vercel only</div>'+
-      '<label class="muted">Router</label><select id="cc-model"><option value="auto">auto cascade</option><option value="groq">groq</option><option value="gemini">gemini</option><option value="swarm">swarm</option></select>'+
-      '<label class="muted">Reasoning depth</label><input id="cc-depth" type="range" min="1" max="100" value="'+(c.ai.reasoningDepth||40)+'"/>'+
-      '<label class="muted">Firewall layers</label><select id="cc-fw"><option value="1">1</option><option value="3">3</option><option value="5">5</option></select>'+
-      '<label class="muted">Swarm size</label><input id="cc-swarm" type="number" min="1" max="20" value="'+(c.ai.swarmSize||3)+'"/>'+
-      '<label class="muted">Prompt DNA</label><textarea id="cc-dna" rows="3">'+(c.ai.promptDna||'')+'</textarea></div>';
-    document.getElementById('cc-model').value=c.ai.defaultModel||'auto';
-    document.getElementById('cc-fw').value=String(c.ai.firewallLayers||3);
-  } else if(tab==='sec'){
-    p.innerHTML='<div class="card"><h3>Security Fortress</h3><div class="muted">DEFENSE only · no offensive hacks</div>'+
-      '<label class="muted">Lock</label><select id="cc-lock"><option value="none">none</option><option value="pass">passcode</option><option value="soul">soul-lock sim</option></select>'+
-      '<label class="muted">Ghost</label><select id="cc-ghost"><option value="off">off</option><option value="soft">soft</option><option value="hard">hard</option></select>'+
-      '<label><input type="checkbox" id="cc-radar"/> Threat radar (bot-side bans)</label><br>'+
-      '<label><input type="checkbox" id="cc-ban"/> Auto-ban abusive users</label><br>'+
-      '<label><input type="checkbox" id="cc-founder"/> Founder-only heavy cmds</label></div>';
-    document.getElementById('cc-lock').value=c.security.lockMode||'none';
-    document.getElementById('cc-ghost').value=c.security.ghost||'off';
-    document.getElementById('cc-radar').checked=!!c.security.radar;
-    document.getElementById('cc-ban').checked=!!c.security.autoBan;
-    document.getElementById('cc-founder').checked=!!c.security.founderOnlyHeavy;
-  } else if(tab==='net'){
-    p.innerHTML='<div class="card"><h3>Network Hydra</h3>'+
-      '<label class="muted">Proxy</label><select id="cc-proxy"><option value="direct">direct</option><option value="httpget">httpget</option></select>'+
-      '<label class="muted">Bookmarks</label><textarea id="cc-bm" rows="4">'+(c.network.bookmarks||[]).join('\\n')+'</textarea>'+
-      '<button type="button" class="b" id="cc-om">Open Make</button></div>';
-    document.getElementById('cc-proxy').value=c.network.proxyMode||'httpget';
-    document.getElementById('cc-om').onclick=function(){tgOpen('https://www.make.com');};
-  } else if(tab==='nodes'){
-    var list=((c.nodes&&c.nodes.chain)||[]).map(function(n,i){return (i+1)+'. '+n.type+' '+(n.label||'');}).join('\\n')||'(empty)';
-    p.innerHTML='<div class="card"><h3>Node Factory</h3><div class="muted">Mobile-safe chain (not drag canvas)</div>'+
-      '<select id="cc-nt"><option value="trigger:telegram">trigger:telegram</option><option value="trigger:time">trigger:time</option><option value="action:ai">action:ai</option><option value="action:fs">action:fs</option><option value="logic:if">logic:if</option></select>'+
-      '<input id="cc-nl" placeholder="label"/><div class="row"><button type="button" class="b" id="cc-na">Add</button><button type="button" class="b" id="cc-nc">Clear</button></div>'+
-      '<pre id="cc-nlist">'+list+'</pre></div>';
-    document.getElementById('cc-na').onclick=function(){
-      c.nodes=c.nodes||{chain:[]};
-      c.nodes.chain.push({type:document.getElementById('cc-nt').value,label:document.getElementById('cc-nl').value||''});
-      ccRender('nodes');
-    };
-    document.getElementById('cc-nc').onclick=function(){c.nodes={chain:[]};ccRender('nodes');};
-  } else if(tab==='ui'){
-    p.innerHTML='<div class="card"><h3>God UI</h3>'+
-      '<select id="cc-uit"><option value="gold">gold</option><option value="cyber">cyber</option><option value="matrix">matrix</option><option value="nasa">nasa</option></select></div>';
-    document.getElementById('cc-uit').value=c.ui.themeEngine||'gold';
-  } else if(tab==='obs'){
-    p.innerHTML='<div class="card"><h3>Observatory</h3>'+
-      '<button type="button" class="b" id="cc-snap">Snapshot</button><pre id="cc-oo" class="muted">Ready</pre></div>';
-    document.getElementById('cc-snap').onclick=function(){
-      var snap={ts:Date.now(),cc:c,apps:APPS.length};
-      var path='/Documents/lab/snapshot-'+Date.now()+'.json';
-      fsApi('mkdir','/Documents/lab').then(function(){return fsApi('write',path,JSON.stringify(snap));})
-        .then(function(j){document.getElementById('cc-oo').textContent=j.ok?('OK '+path):(j.error||'fail');});
-    };
-  } else if(tab==='gene'){
-    p.innerHTML='<div class="card"><h3>Gene Robot</h3>'+
-      '<input id="cc-gq" placeholder="search query"/><div class="row">'+
-      '<button type="button" class="b" id="cc-gs">Search</button>'+
-      '<button type="button" class="b" id="cc-gm">Mutate</button>'+
-      '<button type="button" class="b" id="cc-gsa">Save gene</button></div><pre id="cc-go" class="muted"></pre></div>';
-    document.getElementById('cc-gs').onclick=function(){
-      var q=document.getElementById('cc-gq').value.trim();if(!q)return;
-      var url='https://duckduckgo.com/html/?q='+encodeURIComponent(q);
-      document.getElementById('cc-go').textContent='Searching...';
-      fsApi('httpget','/',undefined,{url:url}).then(function(j){
-        if(!j.ok){document.getElementById('cc-go').textContent=j.error||'fail';return;}
-        var t=String(j.text||'');var hits=[];var re=/uddg=([^&"]+)/g;var m;var n=0;
-        while((m=re.exec(t))&&n<10){try{hits.push(decodeURIComponent(m[1]));n++;}catch(e){}}
-        window.__geneHits=hits;document.getElementById('cc-go').textContent=hits.join('\\n')||t.replace(/<[^>]+>/g,' ').slice(0,1500);
-      });
-    };
-    document.getElementById('cc-gm').onclick=function(){
-      var pack={id:'gene-'+Date.now(),q:document.getElementById('cc-gq').value,sources:window.__geneHits||[],steps:['research','design','implement','test']};
-      window.__genePack=pack;document.getElementById('cc-go').textContent=JSON.stringify(pack,null,2);
-    };
-    document.getElementById('cc-gsa').onclick=function(){
-      var pack=window.__genePack;if(!pack){toast('Mutate first');return;}
-      var path='/Documents/lab/genes/'+pack.id+'.json';
-      fsApi('mkdir','/Documents/lab/genes').then(function(){return fsApi('write',path,JSON.stringify(pack));})
-        .then(function(j){toast(j.ok?'Gene saved':'fail');});
-    };
-  } else if(tab==='triad'){
-    p.innerHTML='<div class="card"><h3>Unified Triad</h3><div class="muted">Bot + Mini App + Phone session</div>'+
-      '<label><input type="checkbox" id="cc-sync"/> Heartbeat sync to FS</label><br>'+
-      '<label><input type="checkbox" id="cc-hb"/> Log UI actions to /Documents/lab/triad-events.jsonl</label><br>'+
-      '<label><input type="checkbox" id="cc-al"/> Alert founder on security events</label>'+
-      '<p class="muted">Honest scope: Mini App + bot + your FS — not full phone OS spyware.</p>'+
-      '<button type="button" class="b" id="cc-ping">Write heartbeat now</button><pre id="cc-tr" class="muted"></pre></div>';
-    document.getElementById('cc-sync').checked=!!c.triad.botSync;
-    document.getElementById('cc-hb').checked=!!c.triad.miniAppHeartbeat;
-    document.getElementById('cc-al').checked=!!c.triad.alertFounder;
-    document.getElementById('cc-ping').onclick=function(){
-      var ev={ts:Date.now(),type:'heartbeat',ua:(navigator.userAgent||'').slice(0,80)};
-      fsApi('write','/Documents/lab/triad-heartbeat.json',JSON.stringify(ev)).then(function(j){
-        document.getElementById('cc-tr').textContent=j.ok?'heartbeat OK':'fail';
-      });
-    };
-  }
-}
-
-function ccCollect(){
-  var c=window.__cc,tab=window.__ccTab||'sys';
+/* ——— WORKSTATION-1 ——— */
+function tgOpen(url){
   try{
-    if(tab==='sys'){
-      c.system.scheduler=(document.getElementById('cc-sched')||{}).value||c.system.scheduler;
-      c.system.selfHeal=(document.getElementById('cc-heal')||{}).value||c.system.selfHeal;
-      c.system.overclock=parseInt((document.getElementById('cc-oc')||{}).value,10)||c.system.overclock;
-      c.system.hostname=(document.getElementById('cc-host')||{}).value||c.system.hostname;
-    } else if(tab==='ai'){
-      c.ai.defaultModel=(document.getElementById('cc-model')||{}).value||c.ai.defaultModel;
-      c.ai.reasoningDepth=parseInt((document.getElementById('cc-depth')||{}).value,10)||c.ai.reasoningDepth;
-      c.ai.firewallLayers=parseInt((document.getElementById('cc-fw')||{}).value,10)||c.ai.firewallLayers;
-      c.ai.swarmSize=parseInt((document.getElementById('cc-swarm')||{}).value,10)||c.ai.swarmSize;
-      c.ai.promptDna=(document.getElementById('cc-dna')||{}).value||'';
-    } else if(tab==='sec'){
-      c.security.lockMode=(document.getElementById('cc-lock')||{}).value||c.security.lockMode;
-      c.security.ghost=(document.getElementById('cc-ghost')||{}).value||c.security.ghost;
-      c.security.radar=!!(document.getElementById('cc-radar')||{}).checked;
-      c.security.autoBan=!!(document.getElementById('cc-ban')||{}).checked;
-      c.security.founderOnlyHeavy=!!(document.getElementById('cc-founder')||{}).checked;
-    } else if(tab==='net'){
-      c.network.proxyMode=(document.getElementById('cc-proxy')||{}).value||c.network.proxyMode;
-      var bm=(document.getElementById('cc-bm')||{}).value||'';
-      c.network.bookmarks=bm.split(/\\n/).map(function(s){return s.trim();}).filter(Boolean);
-    } else if(tab==='ui'){
-      c.ui.themeEngine=(document.getElementById('cc-uit')||{}).value||c.ui.themeEngine;
-    } else if(tab==='triad'){
-      c.triad.botSync=!!(document.getElementById('cc-sync')||{}).checked;
-      c.triad.miniAppHeartbeat=!!(document.getElementById('cc-hb')||{}).checked;
-      c.triad.alertFounder=!!(document.getElementById('cc-al')||{}).checked;
+    if(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.openLink){
+      Telegram.WebApp.openLink(url,{try_instant_view:false});
+      return;
     }
   }catch(e){}
-  return c;
+  window.open(url,'_blank');
 }
+function bpSet(url){
+  var u=document.getElementById('bp-url');
+  var v=document.getElementById('bp-view');
+  if(u)u.value=url;
+  if(v)v.textContent='Ready: '+url+'\nTap Open external for full site.';
+}
+(function(){
+  var bpOpen=document.getElementById('bp-open');
+  if(bpOpen)bpOpen.onclick=function(){
+    var url=document.getElementById('bp-url').value.trim();
+    if(!/^https:\/\//i.test(url))url='https://'+url;
+    tgOpen(url);toast('Opened external');
+  };
+  var bpFetch=document.getElementById('bp-fetch');
+  if(bpFetch)bpFetch.onclick=function(){
+    var url=document.getElementById('bp-url').value.trim();
+    if(!/^https:\/\//i.test(url))url='https://'+url;
+    document.getElementById('bp-view').textContent='Loading...';
+    fsApi('httpget','/',undefined,{url:url}).then(function(j){
+      if(!j.ok){document.getElementById('bp-view').textContent=j.error||'fail';return}
+      var t=String(j.text||'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+      document.getElementById('bp-view').textContent='HTTP '+j.status+'\n\n'+t.slice(0,12000);
+    });
+  };
+  [['bp-make','https://www.make.com'],['bp-meta','https://developers.facebook.com'],['bp-vercel','https://vercel.com'],['bp-gh','https://github.com'],['bp-fb','https://www.facebook.com']].forEach(function(p){
+    var el=document.getElementById(p[0]);if(el)el.onclick=function(){bpSet(p[1]);};
+  });
+  var bpSave=document.getElementById('bp-save');
+  if(bpSave)bpSave.onclick=function(){
+    fsApi('write','/Documents/browser-pro-note.txt',document.getElementById('bp-view').textContent||'').then(function(j){if(j.ok)toast('Note saved')});
+  };
+  var scQueue=document.getElementById('sc-queue');
+  if(scQueue)scQueue.onclick=function(){
+    var cap=(document.getElementById('sc-cap').value||'').trim();
+    if(!cap){toast('Write a caption');return}
+    var path='/Documents/social/queue.json';
+    fsApi('mkdir','/Documents/social').then(function(){return fsApi('read',path)}).then(function(j){
+      var list=[];try{list=JSON.parse(j.content||'[]')}catch(e){}
+      if(!Array.isArray(list))list=[];
+      list.unshift({caption:cap,ts:Date.now(),status:'pending'});
+      return fsApi('write',path,JSON.stringify(list.slice(0,40),null,2));
+    }).then(function(j){
+      if(j&&j.ok){document.getElementById('sc-log').textContent='Saved. Bot:\n/social post '+cap.slice(0,200);toast('Queue saved')}
+    });
+  };
+  var scCopy=document.getElementById('sc-copy');
+  if(scCopy)scCopy.onclick=function(){
+    var cap=(document.getElementById('sc-cap').value||'').trim();
+    var cmd='/social post '+cap;
+    document.getElementById('sc-log').textContent=cmd;
+    try{navigator.clipboard.writeText(cmd);toast('Copied')}catch(e){toast('See log')}
+  };
+  var scLoad=document.getElementById('sc-load');
+  if(scLoad)scLoad.onclick=function(){
+    fsApi('read','/Documents/social/queue.json').then(function(j){
+      document.getElementById('sc-log').textContent=j.ok?String(j.content||'[]').slice(0,3000):'empty';
+    });
+  };
+  var mdSave=document.getElementById('md-save');
+  if(mdSave)mdSave.onclick=function(){
+    var o={c1:false,c2:false,c3:false,c4:false,ts:Date.now()};
+    try{
+      o.c1=document.getElementById('md-c1').checked;
+      o.c2=document.getElementById('md-c2').checked;
+      o.c3=document.getElementById('md-c3').checked;
+      o.c4=document.getElementById('md-c4').checked;
+    }catch(e){}
+    fsApi('write','/Documents/make-dock.json',JSON.stringify(o,null,2)).then(function(j){if(j.ok)toast('Checklist saved')});
+  };
+  var mdOpen=document.getElementById('md-openmake');
+  if(mdOpen)mdOpen.onclick=function(){tgOpen('https://www.make.com')};
+  fsApi('read','/Documents/make-dock.json').then(function(j){
+    if(!j.ok||!j.content)return;
+    try{
+      var o=JSON.parse(j.content);
+      if(document.getElementById('md-c1'))document.getElementById('md-c1').checked=!!o.c1;
+      if(document.getElementById('md-c2'))document.getElementById('md-c2').checked=!!o.c2;
+      if(document.getElementById('md-c3'))document.getElementById('md-c3').checked=!!o.c3;
+      if(document.getElementById('md-c4'))document.getElementById('md-c4').checked=!!o.c4;
+    }catch(e){}
+  });
+})();
 
-function ccSave(){
-  ccCollect();
-  fsApi('write','/Documents/os-settings.json',JSON.stringify(window.__cc,null,2)).then(function(j){toast(j.ok?'Lab saved':'Save fail');});
-}
-function ccLoad(){
-  fsApi('read','/Documents/os-settings.json').then(function(j){
-    if(j.ok&&j.content){try{window.__cc=Object.assign(window.__cc,JSON.parse(j.content));}catch(e){}}
-    ccRender(window.__ccTab||'sys');
+
+/* Studio — form always in .form, never wiped */
+function studioLoad(){
+  var list=document.getElementById('st-list');list.textContent='Loading...';
+  fsApi('mkdir','/Documents/Studio').then(function(){return fsApi('read',ST)}).then(function(j){
+    var items=[];if(j.ok&&j.content){try{items=JSON.parse(j.content)}catch(e){}}
+    if(!Array.isArray(items))items=[];
+    window.__st=items;list.innerHTML='';
+    if(!items.length){list.innerHTML='<div class="muted">No media yet — use fields above</div>';return}
+    items.forEach(function(it,idx){
+      var d=document.createElement('div');d.className='card';
+      var t=document.createElement('div');t.style.color='var(--gold2)';t.style.fontSize='11px';t.textContent='#'+(idx+1)+' '+(it.cap||'');d.appendChild(t);
+      if(it.url){var img=document.createElement('img');img.src=String(it.url);img.alt='';img.style.maxWidth='100%';img.style.maxHeight='100px';img.onerror=function(){img.remove()};d.appendChild(img)}
+      var u=document.createElement('div');u.className='muted';u.textContent=it.url||'';d.appendChild(u);
+      var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';rm.onclick=function(){var a=window.__st||[];a.splice(idx,1);studioSave(a)};d.appendChild(rm);
+      list.appendChild(d);
+    });
   });
 }
-document.getElementById('cc-save').onclick=ccSave;
-document.getElementById('cc-reload').onclick=ccLoad;
-document.getElementById('cc-export').onclick=function(){
-  ccCollect();
-  fsApi('write','/Documents/os-settings-export.txt',JSON.stringify(window.__cc,null,2)).then(function(j){toast(j.ok?'Exported':'fail');});
+function studioSave(items){
+  window.__st=items||[];
+  return fsApi('mkdir','/Documents/Studio').then(function(){return fsApi('write',ST,JSON.stringify(window.__st,null,2))})
+    .then(function(j){if(j.ok){toast('Studio saved ('+j.size+'b)');studioLoad()}return j});
+}
+document.getElementById('st-add').onclick=function(){
+  var url=document.getElementById('st-url').value.trim();
+  var cap=document.getElementById('st-cap').value.trim();
+  if(!url){toast('URL required');return}
+  if(!/^https?:\/\//i.test(url))url='https://'+url;
+  var a=window.__st||[];a.unshift({url:url,cap:cap,ts:Date.now()});
+  document.getElementById('st-url').value='';document.getElementById('st-cap').value='';
+  studioSave(a);
+};
+document.getElementById('st-reload').onclick=studioLoad;
+document.getElementById('st-clear').onclick=function(){if(confirm('Clear board?'))studioSave([])};
+document.getElementById('st-path').onclick=function(){toast(ST)};
+
+function buildCalc(){
+  var g=document.getElementById('calc-g');if(g.childNodes.length)return;
+  ['7','8','9','/','4','5','6','*','1','2','3','-','0','.','=','+','C'].forEach(function(k){
+    var b=document.createElement('button');b.type='button';b.className='b';b.textContent=k;
+    b.onclick=function(){
+      if(k==='C'){calcExpr='';document.getElementById('calc-disp').value='0';return}
+      if(k==='='){try{var s=calcExpr.replace(/[^0-9+\-*/().]/g,'');var r=Function('return('+s+')')();calcHist.push(calcExpr+'='+r);calcExpr=String(r);document.getElementById('calc-disp').value=calcExpr}catch(e){document.getElementById('calc-disp').value='Error';calcExpr=''}return}
+      calcExpr=(calcExpr==='0'&&k!=='.')?k:calcExpr+k;document.getElementById('calc-disp').value=calcExpr;
+    };
+    g.appendChild(b);
+  });
+}
+document.getElementById('calc-hist').onclick=function(){fsApi('write','/Documents/calc-history.txt',calcHist.join('\n')||'').then(function(j){if(j.ok)toast('History saved')})};
+
+function jPath(){var d=new Date();return '/Documents/Journal/'+d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')+'.txt'}
+function journalLoad(){var p=jPath();document.getElementById('jn-path').textContent=p;fsApi('mkdir','/Documents/Journal').then(function(){return fsApi('read',p)}).then(function(j){document.getElementById('jn-ed').value=j.ok?(j.content||''):''})}
+document.getElementById('jn-save').onclick=function(){var p=jPath();fsApi('mkdir','/Documents/Journal').then(function(){return fsApi('write',p,document.getElementById('jn-ed').value)}).then(function(j){if(j.ok)toast('Journal saved')})};
+document.getElementById('jn-load').onclick=journalLoad;
+
+function tasksRender(){
+  var list=document.getElementById('tk-list');list.innerHTML='';
+  tasks.forEach(function(t,i){
+    var d=document.createElement('div');d.className='card';
+    var lab=document.createElement('label');lab.style.display='flex';lab.style.gap='8px';
+    var cb=document.createElement('input');cb.type='checkbox';cb.checked=!!t.done;cb.onchange=function(){tasks[i].done=cb.checked};
+    var sp=document.createElement('span');sp.textContent=t.text||'';
+    lab.appendChild(cb);lab.appendChild(sp);d.appendChild(lab);list.appendChild(d);
+  });
+  if(!tasks.length)list.innerHTML='<div class="muted">No tasks — add above</div>';
+}
+function tasksLoad(){fsApi('mkdir','/Documents/Tasks').then(function(){return fsApi('read',TK)}).then(function(j){tasks=[];if(j.ok&&j.content){try{tasks=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(tasks))tasks=[];tasksRender()})}
+document.getElementById('tk-add').onclick=function(){var t=document.getElementById('tk-in').value.trim();if(!t)return;tasks.push({text:t,done:false});document.getElementById('tk-in').value='';tasksRender()};
+document.getElementById('tk-save').onclick=function(){fsApi('mkdir','/Documents/Tasks').then(function(){return fsApi('write',TK,JSON.stringify(tasks,null,2))}).then(function(j){if(j.ok)toast('Tasks saved')})};
+
+function applyTheme(n){
+  var r=document.documentElement;
+  if(n==='crimson'){r.style.setProperty('--gold','#e85d4c');r.style.setProperty('--gold2','#ff8a7a');r.style.setProperty('--border','#4a2018')}
+  else if(n==='matrix'){r.style.setProperty('--gold','#33ff66');r.style.setProperty('--gold2','#99ffbb');r.style.setProperty('--border','#1a3a20');r.style.setProperty('--text','#c8ffd0')}
+  else{r.style.setProperty('--gold','#c9a227');r.style.setProperty('--gold2','#e8c547');r.style.setProperty('--border','#3a2e1a');r.style.setProperty('--text','#f3e6c8')}
+  document.getElementById('th-st').textContent='Current: '+n;fsApi('write','/Documents/theme.txt',n);
+}
+document.getElementById('th-gold').onclick=function(){applyTheme('gold')};
+document.getElementById('th-crimson').onclick=function(){applyTheme('crimson')};
+document.getElementById('th-matrix').onclick=function(){applyTheme('matrix')};
+
+document.getElementById('sh-build').onclick=function(){
+  document.getElementById('sh-out').textContent='Building...';
+  var paths=['/Documents','/Projects','/Documents/Studio','/Documents/Journal','/Documents/Tasks'];
+  var out='=== SHARE ===\n'+new Date().toISOString()+'\n\n',i=0;
+  function next(){if(i>=paths.length){shareText=out;document.getElementById('sh-out').textContent=out.slice(0,8000);toast('Ready');return}var p=paths[i++];fsApi('tree',p).then(function(j){out+='--- '+p+' ---\n'+(j.ok?j.tree:(j.error||''))+'\n\n';next()})}
+  next();
+};
+document.getElementById('sh-save').onclick=function(){fsApi('write','/Documents/share-export.txt',shareText||document.getElementById('sh-out').textContent||'').then(function(j){if(j.ok)toast('Export saved')})};
+document.getElementById('clip-save').onclick=function(){fsApi('write','/Documents/clipboard.txt',document.getElementById('clip').value||'').then(function(j){if(j.ok)toast('Clipboard saved')})};
+
+/* S16 Notes */
+function notesLoad(){fsApi('read','/Documents/quick-note.txt').then(function(j){document.getElementById('nt-ed').value=j.ok?(j.content||''):''})}
+document.getElementById('nt-save').onclick=function(){fsApi('write','/Documents/quick-note.txt',document.getElementById('nt-ed').value).then(function(j){if(j.ok)toast('Note saved')})};
+document.getElementById('nt-load').onclick=notesLoad;
+
+/* S17 Weather Open-Meteo */
+document.getElementById('wx-go').onclick=function(){
+  var city=document.getElementById('wx-city').value.trim()||'Colombo';
+  document.getElementById('wx-out').textContent='Loading...';
+  fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(city)+'&count=1')
+    .then(function(r){return r.json()}).then(function(g){
+      if(!g.results||!g.results[0]){document.getElementById('wx-out').textContent='City not found';return}
+      var lat=g.results[0].latitude,lon=g.results[0].longitude,name=g.results[0].name;
+      return fetch('https://api.open-meteo.com/v1/forecast?latitude='+lat+'&longitude='+lon+'&current_weather=true')
+        .then(function(r){return r.json()}).then(function(w){
+          var c=w.current_weather||{};
+          var txt=name+'\nTemp: '+c.temperature+'°C\nWind: '+c.windspeed+' km/h\nCode: '+c.weathercode+'\nTime: '+c.time;
+          document.getElementById('wx-out').textContent=txt;
+          fsApi('write','/Documents/weather-last.txt',txt);
+        });
+    }).catch(function(e){document.getElementById('wx-out').textContent=String(e.message||e)});
 };
 
-paintIcons();buildTabs();ccRender('sys');
-fsApi('seed','/').then(function(){toast('PasiyaOS Core Lab online');});
+/* S18 Clock */
+function tickClock(){var d=new Date();document.getElementById('ck-big').textContent=d.toLocaleTimeString()}
+setInterval(function(){document.getElementById('clock').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});if(document.getElementById('w-clock').classList.contains('open'))tickClock()},1000);
+document.getElementById('ck-save').onclick=function(){
+  var note=document.getElementById('ck-alarm').value.trim();
+  fsApi('write','/Documents/alarm-note.txt',note).then(function(j){if(j.ok){document.getElementById('ck-st').textContent='Saved: '+note;toast('Alarm note saved')}});
+};
+
+/* S19 Contacts */
+function contactsRender(){
+  var list=document.getElementById('ct-list');list.innerHTML='';
+  contacts.forEach(function(c,i){
+    var d=document.createElement('div');d.className='card';
+    d.innerHTML='<b>'+String(c.name||'').replace(/</g,'')+'</b><div class="muted">'+String(c.phone||'')+'</div>';
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(){contacts.splice(i,1);contactsRender()};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!contacts.length)list.innerHTML='<div class="muted">No contacts</div>';
+}
+function contactsLoad(){fsApi('read',CT).then(function(j){contacts=[];if(j.ok&&j.content){try{contacts=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(contacts))contacts=[];contactsRender()})}
+document.getElementById('ct-add').onclick=function(){
+  var n=document.getElementById('ct-name').value.trim();
+  var p=document.getElementById('ct-phone').value.trim();
+  if(!n){toast('Name required');return}
+  contacts.push({name:n,phone:p});document.getElementById('ct-name').value='';document.getElementById('ct-phone').value='';contactsRender();
+};
+document.getElementById('ct-save').onclick=function(){fsApi('write',CT,JSON.stringify(contacts,null,2)).then(function(j){if(j.ok)toast('Contacts saved')})};
+
+/* S20 Dashboard */
+function dashLoad(){
+  document.getElementById('dash-out').textContent='Loading...';
+  Promise.all([fsApi('df','/'),fsApi('list','/Documents'),fsApi('read','/Documents/theme.txt'),fsApi('read',TK)]).then(function(a){
+    var df=a[0],docs=a[1],th=a[2],tk=a[3];
+    var tc=0;if(tk.ok&&tk.content){try{tc=(JSON.parse(tk.content)||[]).length}catch(e){}}
+    var html='<div class="card"><h4>Disk</h4>'+(df.ok?df.used+'/'+df.max+'b':'?')+'</div>';
+    html+='<div class="card"><h4>Documents</h4>'+(docs.ok?(docs.entries||[]).length+' items':'?')+'</div>';
+    html+='<div class="card"><h4>Theme</h4>'+(th.ok?th.content:'gold')+'</div>';
+    html+='<div class="card"><h4>Tasks</h4>'+tc+' items</div>';
+    html+='<div class="card"><h4>Apps</h4>'+APPS.length+' installed</div>';
+    document.getElementById('dash-out').innerHTML=html;
+  });
+}
+document.getElementById('dash-ref').onclick=dashLoad;
+
+function renderStore(){
+  var el=document.getElementById('store-body');el.innerHTML='';
+  APPS.forEach(function(a){
+    var d=document.createElement('div');d.className='item';
+    d.innerHTML='<span style="font-size:20px">'+a[1]+'</span><div><b style="color:var(--gold2)">'+a[2]+'</b></div>';
+    d.onclick=function(){openWin(a[0])};el.appendChild(d);
+  });
+}
+
+
+/* STEP 21 Vault */
+var VA='/Documents/vault.json';
+var vaultItems=[];
+function vaultRender(){
+  var list=document.getElementById('v-list');if(!list)return;list.innerHTML='';
+  vaultItems.forEach(function(it,i){
+    var d=document.createElement('div');d.className='card';
+    d.innerHTML='<b>'+String(it.title||'').replace(/</g,'')+'</b><div class="muted">'+(it.secret? '•••••••• (tap reveal)':'')+'</div>';
+    d.onclick=function(){toast(String(it.secret||'').slice(0,80));};
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(e){e.stopPropagation();vaultItems.splice(i,1);vaultRender();};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!vaultItems.length)list.innerHTML='<div class="muted">No secrets — phone-only notes (not military crypto)</div>';
+}
+function vaultLoad(){
+  fsApi('read',VA).then(function(j){vaultItems=[];if(j.ok&&j.content){try{vaultItems=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(vaultItems))vaultItems=[];vaultRender()});
+}
+var vAdd=document.getElementById('v-add');
+if(vAdd)vAdd.onclick=function(){
+  var t=document.getElementById('v-title').value.trim();
+  var s=document.getElementById('v-secret').value.trim();
+  if(!t){toast('Label required');return}
+  vaultItems.push({title:t,secret:s,ts:Date.now()});
+  document.getElementById('v-title').value='';document.getElementById('v-secret').value='';vaultRender();
+};
+var vSave=document.getElementById('v-save');
+if(vSave)vSave.onclick=function(){fsApi('write',VA,JSON.stringify(vaultItems,null,2)).then(function(j){if(j.ok)toast('Vault saved')})};
+
+/* STEP 22 Kanban */
+var KB='/Documents/kanban.json';
+var kb={todo:[],doing:[],done:[]};
+function kanbanRender(){
+  var el=document.getElementById('kb-board');if(!el)return;el.innerHTML='';
+  ['todo','doing','done'].forEach(function(col){
+    var c=document.createElement('div');c.className='card';
+    c.innerHTML='<h4>'+col.toUpperCase()+'</h4>';
+    (kb[col]||[]).forEach(function(card,i){
+      var row=document.createElement('div');row.className='item';row.textContent=card;
+      row.onclick=function(){
+        // cycle columns
+        kb[col].splice(i,1);
+        var next=col==='todo'?'doing':(col==='doing'?'done':'todo');
+        kb[next].push(card);kanbanRender();
+      };
+      c.appendChild(row);
+    });
+    el.appendChild(c);
+  });
+}
+function kanbanLoad(){
+  fsApi('read',KB).then(function(j){
+    kb={todo:[],doing:[],done:[]};
+    if(j.ok&&j.content){try{var o=JSON.parse(j.content);kb.todo=o.todo||[];kb.doing=o.doing||[];kb.done=o.done||[]}catch(e){}}
+    kanbanRender();
+  });
+}
+function kbAdd(col){
+  var t=document.getElementById('kb-in').value.trim();if(!t)return;
+  kb[col]=kb[col]||[];kb[col].push(t);document.getElementById('kb-in').value='';kanbanRender();
+}
+var kbt=document.getElementById('kb-todo');if(kbt)kbt.onclick=function(){kbAdd('todo')};
+var kbd=document.getElementById('kb-doing');if(kbd)kbd.onclick=function(){kbAdd('doing')};
+var kbe=document.getElementById('kb-done');if(kbe)kbe.onclick=function(){kbAdd('done')};
+var kbs=document.getElementById('kb-save');if(kbs)kbs.onclick=function(){fsApi('write',KB,JSON.stringify(kb,null,2)).then(function(j){if(j.ok)toast('Kanban saved')})};
+
+/* STEP 23 RSS */
+var lastRss='';
+var rssGo=document.getElementById('rss-go');
+if(rssGo)rssGo.onclick=function(){
+  var url=document.getElementById('rss-url').value.trim();
+  if(!url)return;
+  if(!/^https?:\/\//i.test(url))url='https://'+url;
+  document.getElementById('rss-out').textContent='Loading via /api/fs...';
+  // Server-side fetch (no CORS) — action httpget on api/fs.js
+  fsApi('httpget','/',undefined,{url:url}).then(function(j){
+    if(!j.ok){
+      document.getElementById('rss-out').textContent=j.error||'fetch failed';
+      return;
+    }
+    var xml=String(j.text||'');
+    var titles=[];
+    var re=/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/gi;
+    var m,n=0;
+    while((m=re.exec(xml))&&n<20){
+      var t=m[1].replace(/<[^>]+>/g,'').trim();
+      if(!t)continue;
+      var low=t.toLowerCase();
+      if(low==='rss'||low.indexOf('rss feed')>=0||low==='hacker news')continue;
+      n++;
+      titles.push(n+'. '+t);
+    }
+    // also try <item> link pairs
+    if(titles.length<3){
+      var items=xml.match(/<item[\s\S]*?<\/item>/gi)||[];
+      titles=[];
+      items.slice(0,15).forEach(function(it,i){
+        var tm=it.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/i);
+        var t=tm?tm[1].replace(/<[^>]+>/g,'').trim():'(no title)';
+        titles.push((i+1)+'. '+t);
+      });
+    }
+    lastRss=titles.join('\n')||('HTTP '+(j.status||'')+' — no items parsed\n'+xml.slice(0,400));
+    document.getElementById('rss-out').textContent=lastRss;
+  });
+};
+var rssSave=document.getElementById('rss-save');
+if(rssSave)rssSave.onclick=function(){fsApi('write','/Documents/rss-last.txt',lastRss||document.getElementById('rss-out').textContent||'').then(function(j){if(j.ok)toast('RSS saved')})};
+
+/* STEP 24 Pomodoro */
+var pmLeft=25*60,pmTimer=null;
+function pmRender(){
+  var m=Math.floor(pmLeft/60),s=pmLeft%60;
+  var el=document.getElementById('pm-disp');
+  if(el)el.textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+var pm25=document.getElementById('pm-25');if(pm25)pm25.onclick=function(){pmLeft=25*60;pmRender();document.getElementById('pm-st').textContent='25 min focus'};
+var pm5=document.getElementById('pm-5');if(pm5)pm5.onclick=function(){pmLeft=5*60;pmRender();document.getElementById('pm-st').textContent='5 min break'};
+var pmStart=document.getElementById('pm-start');
+if(pmStart)pmStart.onclick=function(){
+  if(pmTimer)return;
+  document.getElementById('pm-st').textContent='Running...';
+  pmTimer=setInterval(function(){
+    pmLeft--;pmRender();
+    if(pmLeft<=0){clearInterval(pmTimer);pmTimer=null;document.getElementById('pm-st').textContent='Done!';toast('Focus session complete');pmLeft=25*60}
+  },1000);
+};
+var pmStop=document.getElementById('pm-stop');
+if(pmStop)pmStop.onclick=function(){if(pmTimer){clearInterval(pmTimer);pmTimer=null}document.getElementById('pm-st').textContent='Stopped'};
+var pmLog=document.getElementById('pm-log');
+if(pmLog)pmLog.onclick=function(){
+  var line=new Date().toISOString()+' focus session\n';
+  fsApi('read','/Documents/pomodoro-log.txt').then(function(j){
+    var prev=j.ok?(j.content||''):'';
+    return fsApi('write','/Documents/pomodoro-log.txt',prev+line);
+  }).then(function(j){if(j.ok)toast('Logged')});
+};
+
+/* STEP 25 Search FS */
+var seGo=document.getElementById('se-go');
+if(seGo)seGo.onclick=function(){
+  var q=document.getElementById('se-q').value.trim().toLowerCase();
+  if(!q){toast('Enter keyword');return}
+  document.getElementById('se-out').textContent='Searching...';
+  var roots=['/Documents','/Projects'],hits=[],pending=roots.length;
+  roots.forEach(function(root){
+    fsApi('tree',root,undefined,{depth:5}).then(function(j){
+      var tree=j.ok?String(j.tree||''):'';
+      tree.split('\n').forEach(function(line){
+        if(line.toLowerCase().indexOf(q)>=0)hits.push(line.trim());
+      });
+      pending--;
+      if(pending<=0){
+        document.getElementById('se-out').textContent=hits.length?hits.slice(0,40).join('\n'):'No matches for '+q;
+      }
+    });
+  });
+};
+
+
+
+/* STEP 26 Bookmarks */
+var BM='/Documents/bookmarks.json';
+var bms=[];
+function bmRender(){
+  var list=document.getElementById('bm-list');if(!list)return;list.innerHTML='';
+  bms.forEach(function(it,i){
+    var d=document.createElement('div');d.className='card';
+    d.innerHTML='<b>'+String(it.title||'').replace(/</g,'')+'</b><div class="muted">'+String(it.url||'')+'</div>';
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(){bms.splice(i,1);bmRender()};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!bms.length)list.innerHTML='<div class="muted">No bookmarks</div>';
+}
+function bmLoad(){fsApi('read',BM).then(function(j){bms=[];if(j.ok&&j.content){try{bms=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(bms))bms=[];bmRender()})}
+var bmAdd=document.getElementById('bm-add');
+if(bmAdd)bmAdd.onclick=function(){
+  var t=document.getElementById('bm-title').value.trim();
+  var u=document.getElementById('bm-url').value.trim();
+  if(!u){toast('URL required');return}
+  if(!t)t=u;
+  bms.unshift({title:t,url:u,ts:Date.now()});
+  document.getElementById('bm-title').value='';document.getElementById('bm-url').value='';bmRender();
+};
+var bmSave=document.getElementById('bm-save');
+if(bmSave)bmSave.onclick=function(){fsApi('write',BM,JSON.stringify(bms,null,2)).then(function(j){if(j.ok)toast('Bookmarks saved')})};
+
+/* STEP 27 Colors */
+var CL='/Documents/palette.json';
+var cols=[];
+function clRender(){
+  var list=document.getElementById('cl-list');if(!list)return;list.innerHTML='';
+  cols.forEach(function(it,i){
+    var d=document.createElement('div');d.className='card';d.style.borderLeft='6px solid '+(it.hex||'#ccc');
+    d.innerHTML='<b>'+String(it.name||it.hex)+'</b> <span class="muted">'+it.hex+'</span>';
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(){cols.splice(i,1);clRender()};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!cols.length)list.innerHTML='<div class="muted">No swatches</div>';
+}
+function clLoad(){fsApi('read',CL).then(function(j){cols=[];if(j.ok&&j.content){try{cols=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(cols))cols=[];clRender()})}
+var clAdd=document.getElementById('cl-add');
+if(clAdd)clAdd.onclick=function(){
+  var hex=document.getElementById('cl-hex').value.trim()||'#c9a227';
+  var name=document.getElementById('cl-name').value.trim()||hex;
+  cols.unshift({hex:hex,name:name});clRender();
+};
+var clSave=document.getElementById('cl-save');
+if(clSave)clSave.onclick=function(){fsApi('write',CL,JSON.stringify(cols,null,2)).then(function(j){if(j.ok)toast('Palette saved')})};
+
+/* STEP 28 Units */
+function convertUnits(v,frm,to){
+  var n=Number(v);if(isNaN(n))return 'Invalid number';
+  // normalize to SI-ish
+  var map={
+    km:function(x){return x*1000},m:function(x){return x},mi:function(x){return x*1609.344},ft:function(x){return x*0.3048},
+    kg:function(x){return x},lb:function(x){return x*0.45359237}
+  };
+  var inv={
+    km:function(m){return m/1000},m:function(m){return m},mi:function(m){return m/1609.344},ft:function(m){return m/0.3048},
+    kg:function(k){return k},lb:function(k){return k/0.45359237}
+  };
+  if(frm==='c'&&to==='f')return (n*9/5+32).toFixed(2)+' °F';
+  if(frm==='f'&&to==='c')return ((n-32)*5/9).toFixed(2)+' °C';
+  if(frm==='c'&&to==='c')return n+' °C';
+  if(frm==='f'&&to==='f')return n+' °F';
+  if((frm==='c'||frm==='f')||(to==='c'||to==='f'))return 'Use °C↔°F pair';
+  if(!map[frm]||!inv[to])return 'Unsupported pair';
+  var base=map[frm](n);
+  return inv[to](base).toFixed(6)+' '+to;
+}
+var lastUnit='';
+var unGo=document.getElementById('un-go');
+if(unGo)unGo.onclick=function(){
+  var v=document.getElementById('un-val').value;
+  var f=document.getElementById('un-from').value;
+  var t=document.getElementById('un-to').value;
+  lastUnit=v+' '+f+' = '+convertUnits(v,f,t);
+  document.getElementById('un-out').textContent=lastUnit;
+};
+var unSave=document.getElementById('un-save');
+if(unSave)unSave.onclick=function(){
+  var line=lastUnit||document.getElementById('un-out').textContent||'';
+  if(!line||line==='Result'){toast('Convert first');return}
+  fsApi('write','/Documents/units-last.txt',line+'\n').then(function(j){if(j.ok)toast('Saved units-last.txt')});
+};
+
+/* STEP 29 Random */
+var lastRn='';
+function setRn(t){lastRn=t;document.getElementById('rn-out').textContent=t}
+var rnP=document.getElementById('rn-pass');
+if(rnP)rnP.onclick=function(){
+  var chars='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+  var s='';for(var i=0;i<16;i++)s+=chars[Math.floor(Math.random()*chars.length)];
+  setRn(s);
+};
+var rnU=document.getElementById('rn-uuid');
+if(rnU)rnU.onclick=function(){
+  setRn('xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){var r=Math.random()*16|0;return(c==='x'?r:(r&0x3|0x8)).toString(16)}));
+};
+var rnD=document.getElementById('rn-dice');
+if(rnD)rnD.onclick=function(){setRn('Dice: '+(1+Math.floor(Math.random()*6)))};
+var rnN=document.getElementById('rn-num');
+if(rnN)rnN.onclick=function(){setRn(String(1+Math.floor(Math.random()*100)))};
+var rnS=document.getElementById('rn-save');
+if(rnS)rnS.onclick=function(){fsApi('write','/Documents/random-last.txt',lastRn||'').then(function(j){if(j.ok)toast('Saved')})};
+
+/* STEP 30 Backup */
+var backupText='';
+var bkBuild=document.getElementById('bk-build');
+if(bkBuild)bkBuild.onclick=function(){
+  document.getElementById('bk-out').textContent='Building...';
+  var files=['/Documents/vault.json','/Documents/kanban.json','/Documents/tasks/todo.json','/Documents/Tasks/todo.json','/Documents/bookmarks.json','/Documents/palette.json','/Documents/contacts.json','/Documents/theme.txt','/Documents/Studio/board.json'];
+  var out='=== PASIYAOS BACKUP ===\n'+new Date().toISOString()+'\n\n';
+  var i=0;
+  function next(){
+    if(i>=files.length){backupText=out;document.getElementById('bk-out').textContent=out.slice(0,12000);toast('Backup ready');return}
+    var p=files[i++];
+    fsApi('read',p).then(function(j){
+      out+='--- '+p+' ---\n'+(j.ok?String(j.content||'').slice(0,4000):(j.error||'missing'))+'\n\n';
+      next();
+    });
+  }
+  next();
+};
+var bkSave=document.getElementById('bk-save');
+if(bkSave)bkSave.onclick=function(){fsApi('write','/Documents/backup-export.txt',backupText||document.getElementById('bk-out').textContent||'').then(function(j){if(j.ok)toast('Backup file saved')})};
+
+
+
+/* STEP 31 Snippets */
+var SN='/Documents/snippets.json';
+var snippets=[];
+function snRender(){
+  var list=document.getElementById('sn-list');if(!list)return;list.innerHTML='';
+  snippets.forEach(function(it,i){
+    var d=document.createElement('div');d.className='card';
+    d.innerHTML='<b>'+String(it.title||'').replace(/</g,'')+'</b><pre class="muted" style="white-space:pre-wrap;font-size:11px">'+String(it.body||'').replace(/</g,'&lt;').slice(0,300)+'</pre>';
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(){snippets.splice(i,1);snRender()};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!snippets.length)list.innerHTML='<div class="muted">No snippets</div>';
+}
+function snLoad(){fsApi('read',SN).then(function(j){snippets=[];if(j.ok&&j.content){try{snippets=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(snippets))snippets=[];snRender()})}
+var snAdd=document.getElementById('sn-add');
+if(snAdd)snAdd.onclick=function(){
+  var t=document.getElementById('sn-title').value.trim();
+  var b=document.getElementById('sn-body').value;
+  if(!t&&!b){toast('Empty');return}
+  snippets.unshift({title:t||'untitled',body:b,ts:Date.now()});
+  document.getElementById('sn-title').value='';document.getElementById('sn-body').value='';snRender();
+};
+var snSave=document.getElementById('sn-save');
+if(snSave)snSave.onclick=function(){fsApi('write',SN,JSON.stringify(snippets,null,2)).then(function(j){if(j.ok)toast('Snippets saved')})};
+
+/* STEP 32 Habits */
+var HB='/Documents/habits.json';
+var habits=[];
+function hbRender(){
+  var list=document.getElementById('hb-list');if(!list)return;list.innerHTML='';
+  habits.forEach(function(h,i){
+    var d=document.createElement('div');d.className='card';
+    var lab=document.createElement('label');lab.style.display='flex';lab.style.gap='8px';lab.style.alignItems='center';
+    var cb=document.createElement('input');cb.type='checkbox';cb.checked=!!h.doneToday;
+    cb.onchange=function(){habits[i].doneToday=cb.checked;if(cb.checked)habits[i].streak=(habits[i].streak||0)+1};
+    var sp=document.createElement('span');sp.textContent=(h.name||'')+'  · streak '+(h.streak||0);
+    lab.appendChild(cb);lab.appendChild(sp);d.appendChild(lab);
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(){habits.splice(i,1);hbRender()};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!habits.length)list.innerHTML='<div class="muted">No habits</div>';
+}
+function hbLoad(){fsApi('read',HB).then(function(j){habits=[];if(j.ok&&j.content){try{habits=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(habits))habits=[];hbRender()})}
+var hbAdd=document.getElementById('hb-add');
+if(hbAdd)hbAdd.onclick=function(){
+  var n=document.getElementById('hb-in').value.trim();if(!n)return;
+  habits.push({name:n,doneToday:false,streak:0});document.getElementById('hb-in').value='';hbRender();
+};
+var hbSave=document.getElementById('hb-save');
+if(hbSave)hbSave.onclick=function(){fsApi('write',HB,JSON.stringify(habits,null,2)).then(function(j){if(j.ok)toast('Habits saved')})};
+
+/* STEP 33 World clock */
+function wdRefresh(){
+  var zones=[
+    {n:'Colombo',tz:'Asia/Colombo'},
+    {n:'UTC',tz:'UTC'},
+    {n:'London',tz:'Europe/London'},
+    {n:'New York',tz:'America/New_York'},
+    {n:'Tokyo',tz:'Asia/Tokyo'},
+    {n:'Dubai',tz:'Asia/Dubai'}
+  ];
+  var now=new Date();
+  var html='';
+  zones.forEach(function(z){
+    var t=now.toLocaleString('en-GB',{timeZone:z.tz,hour:'2-digit',minute:'2-digit',second:'2-digit',weekday:'short'});
+    html+='<div class="card"><h4>'+z.n+'</h4><div style="font-size:18px;color:var(--gold2)">'+t+'</div></div>';
+  });
+  document.getElementById('wd-out').innerHTML=html;
+}
+var wdRef=document.getElementById('wd-ref');
+if(wdRef)wdRef.onclick=wdRefresh;
+
+/* STEP 34 Expenses */
+var EX='/Documents/expenses.json';
+var expenses=[];
+function exRender(){
+  var list=document.getElementById('ex-list');if(!list)return;list.innerHTML='';
+  var total=0;
+  expenses.forEach(function(e,i){
+    total+=Number(e.amt)||0;
+    var d=document.createElement('div');d.className='card';
+    d.innerHTML='<b>'+String(e.item||'').replace(/</g,'')+'</b> <span class="muted">'+e.amt+'</span>';
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(){expenses.splice(i,1);exRender()};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!expenses.length)list.innerHTML='<div class="muted">No expenses</div>';
+  else{
+    var t=document.createElement('div');t.className='muted';t.textContent='Sum visible: '+total;list.appendChild(t);
+  }
+}
+function exLoad(){fsApi('read',EX).then(function(j){expenses=[];if(j.ok&&j.content){try{expenses=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(expenses))expenses=[];exRender()})}
+var exAdd=document.getElementById('ex-add');
+if(exAdd)exAdd.onclick=function(){
+  var item=document.getElementById('ex-item').value.trim();
+  var amt=document.getElementById('ex-amt').value;
+  if(!item){toast('Item required');return}
+  expenses.unshift({item:item,amt:Number(amt)||0,ts:Date.now()});
+  document.getElementById('ex-item').value='';document.getElementById('ex-amt').value='';exRender();
+};
+var exSave=document.getElementById('ex-save');
+if(exSave)exSave.onclick=function(){fsApi('write',EX,JSON.stringify(expenses,null,2)).then(function(j){if(j.ok)toast('Expenses saved')})};
+var exTot=document.getElementById('ex-total');
+if(exTot)exTot.onclick=function(){
+  var t=expenses.reduce(function(s,e){return s+(Number(e.amt)||0)},0);
+  toast('Total: '+t);
+};
+
+/* STEP 35 Launcher */
+function lnRender(){
+  var q=(document.getElementById('ln-q').value||'').toLowerCase();
+  var list=document.getElementById('ln-list');if(!list)return;list.innerHTML='';
+  APPS.forEach(function(a){
+    if(q&&a[2].toLowerCase().indexOf(q)<0&&a[0].indexOf(q)<0)return;
+    var d=document.createElement('div');d.className='item';
+    d.innerHTML='<span style="font-size:18px">'+a[1]+'</span><b style="color:var(--gold2)">'+a[2]+'</b>';
+    d.onclick=function(){openWin(a[0])};list.appendChild(d);
+  });
+}
+var lnGo=document.getElementById('ln-go');
+if(lnGo)lnGo.onclick=function(){
+  var q=(document.getElementById('ln-q').value||'').toLowerCase().trim();
+  var hit=APPS.find(function(a){return a[0]===q||a[2].toLowerCase()===q||a[2].toLowerCase().indexOf(q)===0});
+  if(hit)openWin(hit[0]);else{lnRender();toast('Pick from list')}
+};
+var lnQ=document.getElementById('ln-q');
+if(lnQ)lnQ.oninput=lnRender;
+
+
+
+/* STEP 36 Stickies */
+var STC='/Documents/stickies.json';
+var stickies=[];
+function stcRender(){
+  var list=document.getElementById('stc-list');if(!list)return;list.innerHTML='';
+  stickies.forEach(function(s,i){
+    var d=document.createElement('div');d.className='card';d.style.background='#2a2410';
+    d.innerHTML='<div style="white-space:pre-wrap">'+String(s.text||'').replace(/</g,'&lt;')+'</div>';
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(){stickies.splice(i,1);stcRender()};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!stickies.length)list.innerHTML='<div class="muted">No stickies</div>';
+}
+function stcLoad(){fsApi('read',STC).then(function(j){stickies=[];if(j.ok&&j.content){try{stickies=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(stickies))stickies=[];stcRender()})}
+var stcAdd=document.getElementById('stc-add');
+if(stcAdd)stcAdd.onclick=function(){
+  var t=document.getElementById('stc-in').value.trim();if(!t)return;
+  stickies.unshift({text:t,ts:Date.now()});document.getElementById('stc-in').value='';stcRender();
+};
+var stcSave=document.getElementById('stc-save');
+if(stcSave)stcSave.onclick=function(){fsApi('write',STC,JSON.stringify(stickies,null,2)).then(function(j){if(j.ok)toast('Stickies saved')})};
+
+/* STEP 37 Notify */
+var NTF='/Documents/notifications.json';
+var notifs=[];
+function ntfRender(){
+  var list=document.getElementById('ntf-list');if(!list)return;list.innerHTML='';
+  notifs.forEach(function(n,i){
+    var d=document.createElement('div');d.className='card';
+    var lab=document.createElement('label');lab.style.display='flex';lab.style.gap='8px';
+    var cb=document.createElement('input');cb.type='checkbox';cb.checked=!!n.done;
+    cb.onchange=function(){notifs[i].done=cb.checked};
+    var sp=document.createElement('span');sp.textContent=n.text||'';
+    lab.appendChild(cb);lab.appendChild(sp);d.appendChild(lab);list.appendChild(d);
+  });
+  if(!notifs.length)list.innerHTML='<div class="muted">No reminders</div>';
+}
+function ntfLoad(){fsApi('read',NTF).then(function(j){notifs=[];if(j.ok&&j.content){try{notifs=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(notifs))notifs=[];ntfRender()})}
+var ntfAdd=document.getElementById('ntf-add');
+if(ntfAdd)ntfAdd.onclick=function(){
+  var t=document.getElementById('ntf-in').value.trim();if(!t)return;
+  notifs.unshift({text:t,done:false,ts:Date.now()});document.getElementById('ntf-in').value='';ntfRender();
+};
+var ntfSave=document.getElementById('ntf-save');
+if(ntfSave)ntfSave.onclick=function(){fsApi('write',NTF,JSON.stringify(notifs,null,2)).then(function(j){if(j.ok)toast('Notify saved')})};
+var ntfClr=document.getElementById('ntf-clear');
+if(ntfClr)ntfClr.onclick=function(){notifs=notifs.filter(function(n){return !n.done});ntfRender();toast('Cleared done')};
+
+/* STEP 38 Dictionary — free dictionaryapi.dev */
+var lastDict='';
+var dictGo=document.getElementById('dict-go');
+if(dictGo)dictGo.onclick=function(){
+  var q=document.getElementById('dict-q').value.trim();
+  if(!q){toast('Enter word');return}
+  document.getElementById('dict-out').textContent='Loading via /api/fs...';
+  var url='https://api.dictionaryapi.dev/api/v2/entries/en/'+encodeURIComponent(q);
+  fsApi('httpget','/',undefined,{url:url}).then(function(j){
+    if(!j.ok){document.getElementById('dict-out').textContent=j.error||'fail';return}
+    var data;
+    try{data=JSON.parse(j.text||'[]')}catch(e){document.getElementById('dict-out').textContent='Bad JSON';return}
+    if(!Array.isArray(data)){lastDict=(data&&data.title)||'Not found';document.getElementById('dict-out').textContent=lastDict;return}
+    var lines=[q.toUpperCase()];
+    data[0].meanings&&data[0].meanings.forEach(function(m){
+      lines.push('['+m.partOfSpeech+']');
+      (m.definitions||[]).slice(0,3).forEach(function(d){lines.push('• '+d.definition)});
+    });
+    lastDict=lines.join('\n');
+    document.getElementById('dict-out').textContent=lastDict;
+  });
+};
+var dictSave=document.getElementById('dict-save');
+if(dictSave)dictSave.onclick=function(){fsApi('write','/Documents/dict-last.txt',lastDict||document.getElementById('dict-out').textContent||'').then(function(j){if(j.ok)toast('Dict saved')})};
+
+/* STEP 39 Bot cheatsheet */
+function chRender(){
+  var cmds=[
+    '/start /version /menu /desktop','/fs ls|cat|write|tree','/ask /imagine /daily',
+    '/git status /vercel deploys /supa tables','/ops status /ops doctor',
+    '/remember /recall /track','/morningdigest /oracle','Open Mini App: Queen Studio'
+  ];
+  document.getElementById('ch-out').innerHTML=cmds.map(function(c){return '<div class="card">'+c+'</div>'}).join('');
+}
+var chSave=document.getElementById('ch-save');
+if(chSave)chSave.onclick=function(){
+  var t=document.getElementById('ch-out').innerText||'';
+  fsApi('write','/Documents/bot-cheats.txt',t).then(function(j){if(j.ok)toast('Cheats saved')});
+};
+
+/* STEP 40 SysCheck */
+var lastSy='';
+var syRun=document.getElementById('sy-run');
+if(syRun)syRun.onclick=function(){
+  document.getElementById('sy-out').textContent='Running...';
+  var checks=[
+    ['API seed',function(){return fsApi('seed','/')}],
+    ['Disk quota',function(){return fsApi('df','/')}],
+    ['Documents',function(){return fsApi('list','/Documents')}],
+    ['Projects',function(){return fsApi('list','/Projects')}]
+  ];
+  var lines=['PasiyaOS SysCheck '+new Date().toISOString()],i=0;
+  function next(){
+    if(i>=checks.length){
+      lines.push('Apps installed: '+APPS.length);
+      lines.push('initData: '+(initData()?'yes':'no — open from Telegram'));
+      lastSy=lines.join('\n');
+      document.getElementById('sy-out').textContent=lastSy;
+      toast('SysCheck done');
+      return;
+    }
+    var c=checks[i++];
+    c[1]().then(function(j){
+      lines.push(c[0]+': '+(j.ok?'OK':'FAIL '+(j.error||'')));
+      if(c[0]==='Disk quota'&&j.ok)lines.push('  used '+j.used+' / '+j.max);
+      if((c[0]==='Documents'||c[0]==='Projects')&&j.ok)lines.push('  entries '+(j.entries||[]).length);
+      next();
+    });
+  }
+  next();
+};
+var sySave=document.getElementById('sy-save');
+if(sySave)sySave.onclick=function(){fsApi('write','/Documents/syscheck.txt',lastSy||document.getElementById('sy-out').textContent||'').then(function(j){if(j.ok)toast('Report saved')})};
+
+
+
+/* STEP 41 Draw */
+var dwDrawing=false,dwPts=[];
+function dwInit(){
+  var cv=document.getElementById('dw-cv');if(!cv)return;
+  var ctx=cv.getContext('2d');
+  ctx.strokeStyle='#e8c547';ctx.lineWidth=2;ctx.lineCap='round';
+  function pos(e){
+    var r=cv.getBoundingClientRect();
+    var x,y;
+    if(e.touches&&e.touches[0]){x=e.touches[0].clientX-r.left;y=e.touches[0].clientY-r.top}
+    else{x=e.clientX-r.left;y=e.clientY-r.top}
+    return{x:x*(cv.width/r.width),y:y*(cv.height/r.height)};
+  }
+  function start(e){e.preventDefault();dwDrawing=true;var p=pos(e);dwPts.push(['M',p.x,p.y]);ctx.beginPath();ctx.moveTo(p.x,p.y)}
+  function move(e){if(!dwDrawing)return;e.preventDefault();var p=pos(e);dwPts.push(['L',p.x,p.y]);ctx.lineTo(p.x,p.y);ctx.stroke()}
+  function end(e){dwDrawing=false}
+  cv.onmousedown=start;cv.onmousemove=move;cv.onmouseup=end;cv.onmouseleave=end;
+  cv.ontouchstart=start;cv.ontouchmove=move;cv.ontouchend=end;
+}
+var dwClear=document.getElementById('dw-clear');
+if(dwClear)dwClear.onclick=function(){
+  var cv=document.getElementById('dw-cv');var ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,cv.width,cv.height);dwPts=[];document.getElementById('dw-st').textContent='Cleared';
+};
+var dwSave=document.getElementById('dw-save');
+if(dwSave)dwSave.onclick=function(){
+  fsApi('write','/Documents/draw-strokes.json',JSON.stringify(dwPts)).then(function(j){
+    if(j.ok){document.getElementById('dw-st').textContent='Saved '+dwPts.length+' points';toast('Draw saved')}
+  });
+};
+
+/* STEP 42 Music playlist */
+var MU='/Documents/playlist.json';
+var tracks=[];
+function muRender(){
+  var list=document.getElementById('mu-list');if(!list)return;list.innerHTML='';
+  tracks.forEach(function(t,i){
+    var d=document.createElement('div');d.className='card';
+    d.innerHTML='<b>'+String(t.title||'track').replace(/</g,'')+'</b><div class="muted">'+String(t.url||'')+'</div>';
+    if(t.url){var a=document.createElement('audio');a.controls=true;a.src=t.url;a.style.width='100%';a.style.marginTop='6px';d.appendChild(a)}
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(){tracks.splice(i,1);muRender()};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!tracks.length)list.innerHTML='<div class="muted">Add mp3/https audio URL</div>';
+}
+function muLoad(){fsApi('read',MU).then(function(j){tracks=[];if(j.ok&&j.content){try{tracks=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(tracks))tracks=[];muRender()})}
+var muAdd=document.getElementById('mu-add');
+if(muAdd)muAdd.onclick=function(){
+  var u=document.getElementById('mu-url').value.trim();
+  var t=document.getElementById('mu-title').value.trim()||u;
+  if(!u){toast('URL required');return}
+  tracks.unshift({title:t,url:u});document.getElementById('mu-url').value='';document.getElementById('mu-title').value='';muRender();
+};
+var muSave=document.getElementById('mu-save');
+if(muSave)muSave.onclick=function(){fsApi('write',MU,JSON.stringify(tracks,null,2)).then(function(j){if(j.ok)toast('Playlist saved')})};
+
+/* STEP 43 Quiz */
+var qzScore=0,qzI=0;
+var QZ=[
+  {q:'Capital of Sri Lanka?',a:'Sri Jayawardenepura Kotte'},
+  {q:'2+2?',a:'4'},
+  {q:'HTTP success code?',a:'200'},
+  {q:'PasiyaOS disk table?',a:'pasiya_fs'},
+  {q:'Telegram Mini App API?',a:'WebApp'}
+];
+function qzShow(){
+  if(qzI>=QZ.length)qzI=0;
+  var item=QZ[qzI];
+  document.getElementById('qz-out').innerHTML='<div class="card"><h4>Q'+(qzI+1)+'</h4><p>'+item.q+'</p><input id="qz-ans" class="line" placeholder="Your answer" style="width:100%;padding:10px;margin-top:8px;background:#0e0b09;color:var(--text);border:1px solid var(--border);border-radius:8px"/><button type="button" class="b" id="qz-check" style="margin-top:8px">Check</button><p class="muted" id="qz-fb"></p><p class="muted">Score: '+qzScore+'</p></div>';
+  document.getElementById('qz-check').onclick=function(){
+    var a=(document.getElementById('qz-ans').value||'').trim().toLowerCase();
+    var ok=a&&item.a.toLowerCase().indexOf(a)>=0||a===item.a.toLowerCase();
+    if(ok){qzScore++;document.getElementById('qz-fb').textContent='Correct!'}
+    else document.getElementById('qz-fb').textContent='Answer: '+item.a;
+  };
+}
+var qzNext=document.getElementById('qz-next');
+if(qzNext)qzNext.onclick=function(){qzI++;qzShow()};
+var qzSave=document.getElementById('qz-save');
+if(qzSave)qzSave.onclick=function(){fsApi('write','/Documents/quiz-score.txt','score='+qzScore+' at '+new Date().toISOString()).then(function(j){if(j.ok)toast('Score saved')})};
+
+/* STEP 44 Countdown */
+var cdLeft=5*60,cdTimer=null;
+function cdRender(){
+  var m=Math.floor(cdLeft/60),s=cdLeft%60;
+  document.getElementById('cd-disp').textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+var cdStart=document.getElementById('cd-start');
+if(cdStart)cdStart.onclick=function(){
+  var mins=Number(document.getElementById('cd-min').value)||5;
+  cdLeft=Math.max(1,mins)*60;cdRender();
+  if(cdTimer)clearInterval(cdTimer);
+  document.getElementById('cd-st').textContent='Running...';
+  cdTimer=setInterval(function(){
+    cdLeft--;cdRender();
+    if(cdLeft<=0){clearInterval(cdTimer);cdTimer=null;document.getElementById('cd-st').textContent='Done!';toast('Countdown finished')}
+  },1000);
+};
+var cdStop=document.getElementById('cd-stop');
+if(cdStop)cdStop.onclick=function(){if(cdTimer)clearInterval(cdTimer);cdTimer=null;document.getElementById('cd-st').textContent='Stopped'};
+
+/* STEP 45 Wiki summary via httpget */
+var lastWiki='';
+var wkGo=document.getElementById('wk-go');
+if(wkGo)wkGo.onclick=function(){
+  var q=document.getElementById('wk-q').value.trim();
+  if(!q)return;
+  document.getElementById('wk-out').textContent='Loading...';
+  var api='https://en.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(q.replace(/ /g,'_'));
+  fsApi('httpget','/',undefined,{url:api}).then(function(j){
+    if(!j.ok){document.getElementById('wk-out').textContent=j.error||'fail';return}
+    try{
+      var d=JSON.parse(j.text||'{}');
+      lastWiki=(d.title||q)+'\n\n'+(d.extract||d.detail||'No summary');
+      document.getElementById('wk-out').textContent=lastWiki;
+    }catch(e){document.getElementById('wk-out').textContent='Parse error'}
+  });
+};
+var wkSave=document.getElementById('wk-save');
+if(wkSave)wkSave.onclick=function(){fsApi('write','/Documents/wiki-last.txt',lastWiki||document.getElementById('wk-out').textContent||'').then(function(j){if(j.ok)toast('Wiki saved')})};
+
+
+
+/* STEP 46 Markdown (lightweight) */
+function mdEscape(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function mdRender(src){
+  var lines=String(src||'').split('\n'), out=[];
+  lines.forEach(function(line){
+    if(/^### /.test(line))out.push('<h4>'+mdEscape(line.slice(4))+'</h4>');
+    else if(/^## /.test(line))out.push('<h3 style="color:var(--gold2)">'+mdEscape(line.slice(3))+'</h3>');
+    else if(/^# /.test(line))out.push('<h2 style="color:var(--gold2)">'+mdEscape(line.slice(2))+'</h2>');
+    else if(/^[-*] /.test(line))out.push('<div>• '+mdEscape(line.slice(2))+'</div>');
+    else if(!line.trim())out.push('<br/>');
+    else{
+      var t=mdEscape(line);
+      t=t.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\*(.+?)\*/g,'<i>$1</i>').replace(/`(.+?)`/g,'<code>$1</code>');
+      out.push('<div>'+t+'</div>');
+    }
+  });
+  return out.join('');
+}
+var mdPrev=document.getElementById('md-prev');
+if(mdPrev)mdPrev.onclick=function(){document.getElementById('md-out').innerHTML=mdRender(document.getElementById('md-in').value)};
+var mdSave=document.getElementById('md-save');
+if(mdSave)mdSave.onclick=function(){fsApi('write','/Documents/markdown-last.md',document.getElementById('md-in').value||'').then(function(j){if(j.ok)toast('Markdown saved')})};
+
+/* STEP 47 JSON tools */
+var lastJson='';
+var jsFmt=document.getElementById('js-fmt');
+if(jsFmt)jsFmt.onclick=function(){
+  try{var o=JSON.parse(document.getElementById('js-in').value);lastJson=JSON.stringify(o,null,2);document.getElementById('js-out').textContent=lastJson;document.getElementById('js-in').value=lastJson}
+  catch(e){document.getElementById('js-out').textContent='Invalid JSON: '+e.message}
+};
+var jsMin=document.getElementById('js-min');
+if(jsMin)jsMin.onclick=function(){
+  try{var o=JSON.parse(document.getElementById('js-in').value);lastJson=JSON.stringify(o);document.getElementById('js-out').textContent=lastJson;document.getElementById('js-in').value=lastJson}
+  catch(e){document.getElementById('js-out').textContent='Invalid JSON: '+e.message}
+};
+var jsSave=document.getElementById('js-save');
+if(jsSave)jsSave.onclick=function(){fsApi('write','/Documents/json-last.txt',lastJson||document.getElementById('js-in').value||'').then(function(j){if(j.ok)toast('JSON saved')})};
+
+/* STEP 48 Base64 */
+var lastB64='';
+var b64Enc=document.getElementById('b64-enc');
+if(b64Enc)b64Enc.onclick=function(){
+  try{lastB64=btoa(unescape(encodeURIComponent(document.getElementById('b64-in').value||'')));document.getElementById('b64-out').textContent=lastB64}
+  catch(e){document.getElementById('b64-out').textContent='Encode error'}
+};
+var b64Dec=document.getElementById('b64-dec');
+if(b64Dec)b64Dec.onclick=function(){
+  try{lastB64=decodeURIComponent(escape(atob(document.getElementById('b64-in').value||'')));document.getElementById('b64-out').textContent=lastB64}
+  catch(e){document.getElementById('b64-out').textContent='Decode error'}
+};
+var b64Save=document.getElementById('b64-save');
+if(b64Save)b64Save.onclick=function(){fsApi('write','/Documents/base64-last.txt',lastB64||document.getElementById('b64-out').textContent||'').then(function(j){if(j.ok)toast('Base64 saved')})};
+
+/* STEP 49 Hash SHA-256 */
+var lastHash='';
+var hsGo=document.getElementById('hs-go');
+if(hsGo)hsGo.onclick=function(){
+  var text=document.getElementById('hs-in').value||'';
+  if(!window.crypto||!crypto.subtle){document.getElementById('hs-out').textContent='Web Crypto unavailable';return}
+  var data=new TextEncoder().encode(text);
+  crypto.subtle.digest('SHA-256',data).then(function(buf){
+    var arr=Array.from(new Uint8Array(buf));
+    lastHash=arr.map(function(b){return b.toString(16).padStart(2,'0')}).join('');
+    document.getElementById('hs-out').textContent=lastHash;
+  }).catch(function(e){document.getElementById('hs-out').textContent=String(e.message||e)});
+};
+var hsSave=document.getElementById('hs-save');
+if(hsSave)hsSave.onclick=function(){fsApi('write','/Documents/hash-last.txt',lastHash||'').then(function(j){if(j.ok)toast('Hash saved')})};
+
+/* STEP 50 About OS + inventory */
+function abRender(){
+  var el=document.getElementById('ab-out');if(!el)return;
+  el.innerHTML='<div class="card"><h4>PasiyaOS</h4><div class="muted">Radiant Queen · Desktop S1–S50<br/>Kernel: pasiya_fs · API: /api/fs<br/>Host: Vercel · DB: Supabase</div></div>'+
+    '<div class="card"><h4>Apps</h4><div class="muted">'+APPS.length+' installed</div></div>'+
+    '<div class="card"><h4>Brand</h4><div class="muted">RADIANT QUEEN · PASIYA MAX</div></div>';
+}
+var abInv=document.getElementById('ab-inv');
+if(abInv)abInv.onclick=function(){
+  var lines=APPS.map(function(a,i){return (i+1)+'. '+a[1]+' '+a[2]+' ('+a[0]+')'});
+  document.getElementById('ab-out').innerHTML='<div class="card"><pre style="white-space:pre-wrap;font-size:11px">'+lines.join('\n')+'</pre></div>';
+};
+var abSave=document.getElementById('ab-save');
+if(abSave)abSave.onclick=function(){
+  var lines=['PasiyaOS inventory '+new Date().toISOString(),'Apps: '+APPS.length,''].concat(APPS.map(function(a){return a[0]+'\t'+a[2]}));
+  fsApi('write','/Documents/os-inventory.txt',lines.join('\n')).then(function(j){if(j.ok)toast('Inventory saved')});
+};
+
+
+
+/* STEP 51 Regex */
+var lastRx='';
+var rxGo=document.getElementById('rx-go');
+if(rxGo)rxGo.onclick=function(){
+  var pat=document.getElementById('rx-pat').value;
+  var flags=document.getElementById('rx-flags').value||'';
+  var text=document.getElementById('rx-text').value||'';
+  try{
+    var re=new RegExp(pat,flags);
+    var matches=[],m;
+    if(flags.indexOf('g')>=0){while((m=re.exec(text))!==null){matches.push('['+m.index+'] '+m[0]);if(m[0]==='')re.lastIndex++}}
+    else{m=re.exec(text);if(m)matches.push('['+m.index+'] '+m[0])}
+    lastRx=matches.length?matches.join('\n'):'No matches';
+    document.getElementById('rx-out').textContent=lastRx;
+  }catch(e){document.getElementById('rx-out').textContent='Error: '+e.message}
+};
+var rxSave=document.getElementById('rx-save');
+if(rxSave)rxSave.onclick=function(){fsApi('write','/Documents/regex-last.txt',lastRx||document.getElementById('rx-out').textContent||'').then(function(j){if(j.ok)toast('Regex saved')})};
+
+/* STEP 52 Diff */
+var lastDiff='';
+var dfGo=document.getElementById('df-go');
+if(dfGo)dfGo.onclick=function(){
+  var a=(document.getElementById('df-a').value||'').split('\n');
+  var b=(document.getElementById('df-b').value||'').split('\n');
+  var max=Math.max(a.length,b.length),lines=[];
+  for(var i=0;i<max;i++){
+    var la=a[i],lb=b[i];
+    if(la===undefined)lines.push('+ '+lb);
+    else if(lb===undefined)lines.push('- '+la);
+    else if(la===lb)lines.push('  '+la);
+    else{lines.push('- '+la);lines.push('+ '+lb)}
+  }
+  lastDiff=lines.join('\n')||'(empty)';
+  document.getElementById('df-out').textContent=lastDiff;
+};
+var dfSave=document.getElementById('df-save');
+if(dfSave)dfSave.onclick=function(){fsApi('write','/Documents/diff-last.txt',lastDiff||'').then(function(j){if(j.ok)toast('Diff saved')})};
+
+/* STEP 53 CSV */
+var lastCsv='';
+var cvGo=document.getElementById('cv-go');
+if(cvGo)cvGo.onclick=function(){
+  var raw=document.getElementById('cv-in').value||'';
+  lastCsv=raw;
+  var rows=raw.trim().split(/\r?\n/).filter(Boolean).map(function(line){
+    return line.split(',').map(function(c){return c.trim()});
+  });
+  if(!rows.length){document.getElementById('cv-out').textContent='Empty';return}
+  var h='<table style="width:100%;border-collapse:collapse;font-size:12px">';
+  rows.forEach(function(r,ri){
+    h+='<tr>';
+    r.forEach(function(c){
+      var tag=ri===0?'th':'td';
+      h+='<'+tag+' style="border:1px solid var(--border);padding:6px;text-align:left">'+(String(c).replace(/</g,'&lt;'))+'</'+tag+'>';
+    });
+    h+='</tr>';
+  });
+  h+='</table>';
+  document.getElementById('cv-out').innerHTML=h;
+};
+var cvSave=document.getElementById('cv-save');
+if(cvSave)cvSave.onclick=function(){fsApi('write','/Documents/csv-last.csv',lastCsv||document.getElementById('cv-in').value||'').then(function(j){if(j.ok)toast('CSV saved')})};
+
+/* STEP 54 Lorem */
+var LOREM='Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.';
+var lastLo='';
+var loGo=document.getElementById('lo-go');
+if(loGo)loGo.onclick=function(){
+  var n=Math.max(1,Math.min(20,Number(document.getElementById('lo-n').value)||3));
+  var parts=[];
+  for(var i=0;i<n;i++)parts.push(LOREM);
+  lastLo=parts.join('\n\n');
+  document.getElementById('lo-out').textContent=lastLo;
+};
+var loSave=document.getElementById('lo-save');
+if(loSave)loSave.onclick=function(){fsApi('write','/Documents/lorem-last.txt',lastLo||document.getElementById('lo-out').textContent||'').then(function(j){if(j.ok)toast('Lorem saved')})};
+
+/* STEP 55 Stopwatch */
+var swT0=0,swAcc=0,swTimer=null,swLaps=[];
+function swRender(){
+  var ms=swAcc;
+  if(swTimer)ms=swAcc+(Date.now()-swT0);
+  var t=Math.floor(ms/1000),dec=Math.floor((ms%1000)/100);
+  var m=Math.floor(t/60),s=t%60;
+  var el=document.getElementById('sw-disp');
+  if(el)el.textContent=String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')+'.'+dec;
+}
+var swStart=document.getElementById('sw-start');
+if(swStart)swStart.onclick=function(){
+  if(swTimer)return;
+  swT0=Date.now();
+  swTimer=setInterval(swRender,100);
+};
+var swStop=document.getElementById('sw-stop');
+if(swStop)swStop.onclick=function(){
+  if(!swTimer)return;
+  swAcc+=(Date.now()-swT0);
+  clearInterval(swTimer);swTimer=null;swRender();
+};
+var swReset=document.getElementById('sw-reset');
+if(swReset)swReset.onclick=function(){
+  if(swTimer){clearInterval(swTimer);swTimer=null}
+  swAcc=0;swLaps=[];swRender();
+  document.getElementById('sw-laps').textContent='';
+};
+var swLap=document.getElementById('sw-lap');
+if(swLap)swLap.onclick=function(){
+  var ms=swAcc+(swTimer?Date.now()-swT0:0);
+  swLaps.push(ms);
+  var t=Math.floor(ms/1000),m=Math.floor(t/60),s=t%60;
+  document.getElementById('sw-laps').textContent=swLaps.map(function(x,i){
+    var tt=Math.floor(x/1000);return 'Lap '+(i+1)+': '+String(Math.floor(tt/60)).padStart(2,'0')+':'+String(tt%60).padStart(2,'0');
+  }).join('\n');
+};
+var swSave=document.getElementById('sw-save');
+if(swSave)swSave.onclick=function(){
+  var body=(document.getElementById('sw-laps').textContent||'')+'\nfinal='+(document.getElementById('sw-disp').textContent||'');
+  fsApi('write','/Documents/stopwatch-last.txt',body).then(function(j){if(j.ok)toast('Laps saved')});
+};
+
+
+
+/* STEP 56 Outline — multi-line + indent */
+var OL='/Documents/outline.json';
+var outline=[];
+function olParseLine(raw){
+  var line=String(raw||'').replace(/\t/g,'  ');
+  // strip bullet markers after indent
+  var m=line.match(/^( *)(.*)$/);
+  if(!m)return null;
+  var spaces=m[1].length;
+  var text=m[2].replace(/^[-*•]\s*/,'').trim();
+  if(!text)return null;
+  var indent=Math.min(6, Math.floor(spaces/2));
+  return {text:text, indent:indent};
+}
+function olRender(){
+  var list=document.getElementById('ol-list');if(!list)return;list.innerHTML='';
+  outline.forEach(function(line,i){
+    var d=document.createElement('div');d.className='card';
+    d.style.paddingLeft=(8+(line.indent||0)*16)+'px';
+    var prefix=(line.indent? '– ':'● ');
+    d.innerHTML='<span>'+prefix+String(line.text||'').replace(/</g,'&lt;')+'</span> <span class="muted">indent='+(line.indent||0)+'</span>';
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(){outline.splice(i,1);olRender()};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!outline.length)list.innerHTML='<div class="muted">Paste multi-line outline, then Add lines</div>';
+}
+function olLoad(){fsApi('read',OL).then(function(j){outline=[];if(j.ok&&j.content){try{outline=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(outline))outline=[];olRender()})}
+var olAdd=document.getElementById('ol-add');
+if(olAdd)olAdd.onclick=function(){
+  var raw=document.getElementById('ol-in').value||'';
+  var lines=raw.split(/\r?\n/);
+  var added=0;
+  lines.forEach(function(ln){
+    var item=olParseLine(ln);
+    if(item){outline.push(item);added++}
+  });
+  if(!added){toast('No lines parsed');return}
+  document.getElementById('ol-in').value='';
+  olRender();
+  toast('Added '+added+' lines');
+};
+var olClear=document.getElementById('ol-clear');
+if(olClear)olClear.onclick=function(){outline=[];olRender()};
+var olSave=document.getElementById('ol-save');
+if(olSave)olSave.onclick=function(){fsApi('write',OL,JSON.stringify(outline,null,2)).then(function(j){if(j.ok)toast('Outline saved ('+outline.length+')')})};
+
+/* STEP 57 Coins — CoinGecko free */
+var lastCoins='';
+var cnGo=document.getElementById('cn-go');
+if(cnGo)cnGo.onclick=function(){
+  var ids=(document.getElementById('cn-ids').value||'bitcoin').replace(/\s+/g,'');
+  document.getElementById('cn-out').textContent='Loading...';
+  var url='https://api.coingecko.com/api/v3/simple/price?ids='+encodeURIComponent(ids)+'&vs_currencies=usd&include_24hr_change=true';
+  fsApi('httpget','/',undefined,{url:url}).then(function(j){
+    if(!j.ok){document.getElementById('cn-out').textContent=j.error||'fail';return}
+    try{
+      var data=JSON.parse(j.text||'{}');
+      var lines=[];
+      Object.keys(data).forEach(function(k){
+        var o=data[k];
+        lines.push(k+': $'+(o.usd!=null?o.usd:'?')+'  (24h '+(o.usd_24h_change!=null?o.usd_24h_change.toFixed(2)+'%':'n/a')+')');
+      });
+      lastCoins=lines.join('\n')||'No data';
+      document.getElementById('cn-out').textContent=lastCoins;
+    }catch(e){document.getElementById('cn-out').textContent='Parse error'}
+  });
+};
+var cnSave=document.getElementById('cn-save');
+if(cnSave)cnSave.onclick=function(){fsApi('write','/Documents/coins-last.txt',lastCoins||document.getElementById('cn-out').textContent||'').then(function(j){if(j.ok)toast('Coins saved')})};
+
+/* STEP 58 Morse */
+var MORSE={A:'.-',B:'-...',C:'-.-.',D:'-..',E:'.',F:'..-.',G:'--.',H:'....',I:'..',J:'.---',K:'-.-',L:'.-..',M:'--',N:'-.',O:'---',P:'.--.',Q:'--.-',R:'.-.',S:'...',T:'-',U:'..-',V:'...-',W:'.--',X:'-..-',Y:'-.--',Z:'--..','0':'-----','1':'.----','2':'..---','3':'...--','4':'....-','5':'.....','6':'-....','7':'--...','8':'---..','9':'----.', ' ':'/'};
+var REV={};Object.keys(MORSE).forEach(function(k){REV[MORSE[k]]=k});
+var lastMo='';
+var moEnc=document.getElementById('mo-enc');
+if(moEnc)moEnc.onclick=function(){
+  var t=(document.getElementById('mo-in').value||'').toUpperCase();
+  lastMo=t.split('').map(function(c){return MORSE[c]||c}).join(' ');
+  document.getElementById('mo-out').textContent=lastMo;
+};
+var moDec=document.getElementById('mo-dec');
+if(moDec)moDec.onclick=function(){
+  var t=(document.getElementById('mo-in').value||'').trim().split(/\s+/);
+  lastMo=t.map(function(c){return REV[c]||c}).join('');
+  document.getElementById('mo-out').textContent=lastMo;
+};
+var moSave=document.getElementById('mo-save');
+if(moSave)moSave.onclick=function(){fsApi('write','/Documents/morse-last.txt',lastMo||document.getElementById('mo-out').textContent||'').then(function(j){if(j.ok)toast('Morse saved')})};
+
+/* STEP 59 Base converter */
+var lastBc='';
+var bcGo=document.getElementById('bc-go');
+if(bcGo)bcGo.onclick=function(){
+  var raw=(document.getElementById('bc-val').value||'').trim();
+  var from=Number(document.getElementById('bc-from').value)||10;
+  try{
+    var n=parseInt(raw,from);
+    if(isNaN(n)){document.getElementById('bc-out').textContent='Invalid';return}
+    lastBc='DEC: '+n+'\nBIN: '+n.toString(2)+'\nHEX: '+n.toString(16).toUpperCase()+'\nOCT: '+n.toString(8);
+    document.getElementById('bc-out').textContent=lastBc;
+  }catch(e){document.getElementById('bc-out').textContent=String(e.message||e)}
+};
+var bcSave=document.getElementById('bc-save');
+if(bcSave)bcSave.onclick=function(){fsApi('write','/Documents/bases-last.txt',lastBc||'').then(function(j){if(j.ok)toast('Bases saved')})};
+
+/* STEP 60 IP Info */
+var lastIp='';
+var ipGo=document.getElementById('ip-go');
+if(ipGo)ipGo.onclick=function(){
+  document.getElementById('ip-out').textContent='Loading...';
+  fsApi('httpget','/',undefined,{url:'https://api.ipify.org?format=json'}).then(function(j){
+    if(!j.ok){document.getElementById('ip-out').textContent=j.error||'fail';return}
+    var ip='';
+    try{ip=JSON.parse(j.text||'{}').ip||''}catch(e){}
+    if(!ip){document.getElementById('ip-out').textContent='No IP';return}
+    var url2='https://ipapi.co/'+ip+'/json/';
+    return fsApi('httpget','/',undefined,{url:url2}).then(function(j2){
+      if(!j2.ok){lastIp='IP: '+ip+'\n(geo lookup failed)';document.getElementById('ip-out').textContent=lastIp;return}
+      try{
+        var d=JSON.parse(j2.text||'{}');
+        lastIp=['IP: '+(d.ip||ip),'City: '+(d.city||'?'),'Region: '+(d.region||'?'),'Country: '+(d.country_name||d.country||'?'),'Org: '+(d.org||'?'),'Timezone: '+(d.timezone||'?')].join('\n');
+        document.getElementById('ip-out').textContent=lastIp;
+      }catch(e){lastIp='IP: '+ip;document.getElementById('ip-out').textContent=lastIp}
+    });
+  });
+};
+var ipSave=document.getElementById('ip-save');
+if(ipSave)ipSave.onclick=function(){fsApi('write','/Documents/ip-last.txt',lastIp||document.getElementById('ip-out').textContent||'').then(function(j){if(j.ok)toast('IP info saved')})};
+
+
+
+/* STEP 61 Translate — MyMemory free */
+var lastTr='';
+var trGo=document.getElementById('tr-go');
+if(trGo)trGo.onclick=function(){
+  var text=(document.getElementById('tr-in').value||'').trim();
+  if(!text){toast('Enter text');return}
+  var fr=document.getElementById('tr-from').value||'en';
+  var to=document.getElementById('tr-to').value||'si';
+  document.getElementById('tr-out').textContent='Translating...';
+  var langpair=fr+'|'+to;
+  var url='https://api.mymemory.translated.net/get?q='+encodeURIComponent(text.slice(0,500))+'&langpair='+encodeURIComponent(langpair);
+  fsApi('httpget','/',undefined,{url:url}).then(function(j){
+    if(!j.ok){document.getElementById('tr-out').textContent=j.error||'fail';return}
+    try{
+      var d=JSON.parse(j.text||'{}');
+      lastTr=(d.responseData&&d.responseData.translatedText)||JSON.stringify(d);
+      document.getElementById('tr-out').textContent=lastTr;
+    }catch(e){document.getElementById('tr-out').textContent='Parse error'}
+  });
+};
+var trSave=document.getElementById('tr-save');
+if(trSave)trSave.onclick=function(){fsApi('write','/Documents/translate-last.txt',lastTr||document.getElementById('tr-out').textContent||'').then(function(j){if(j.ok)toast('Saved')})};
+
+/* STEP 62 QR — image via qrserver free */
+var lastQr='';
+var qrGo=document.getElementById('qr-go');
+if(qrGo)qrGo.onclick=function(){
+  var t=(document.getElementById('qr-in').value||'').trim();
+  if(!t){toast('Enter text');return}
+  lastQr=t;
+  var url='https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='+encodeURIComponent(t);
+  document.getElementById('qr-out').innerHTML='<img src="'+url+'" alt="QR" style="max-width:200px;border-radius:8px;background:#fff;padding:8px"/><div class="muted" style="margin-top:8px">'+String(t).replace(/</g,'&lt;')+'</div>';
+};
+var qrSave=document.getElementById('qr-save');
+if(qrSave)qrSave.onclick=function(){fsApi('write','/Documents/qr-last.txt',lastQr||document.getElementById('qr-in').value||'').then(function(j){if(j.ok)toast('QR text saved')})};
+
+/* STEP 63 Planner */
+var PL='/Documents/planner.json';
+var plan={};
+function plKey(){var d=document.getElementById('pl-date').value;return d||new Date().toISOString().slice(0,10)}
+function plRender(){
+  var k=plKey();
+  var items=plan[k]||[];
+  var list=document.getElementById('pl-list');if(!list)return;list.innerHTML='<div class="muted">'+k+'</div>';
+  items.forEach(function(it,i){
+    var d=document.createElement('div');d.className='card';d.textContent=it;
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(){plan[k].splice(i,1);plRender()};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!items.length)list.innerHTML+='<div class="muted">No tasks for this day</div>';
+}
+function plLoad(){
+  var inp=document.getElementById('pl-date');
+  if(inp&&!inp.value)inp.value=new Date().toISOString().slice(0,10);
+  fsApi('read',PL).then(function(j){plan={};if(j.ok&&j.content){try{plan=JSON.parse(j.content)}catch(e){}}if(typeof plan!=='object'||!plan)plan={};plRender()});
+}
+var plAdd=document.getElementById('pl-add');
+if(plAdd)plAdd.onclick=function(){
+  var t=(document.getElementById('pl-item').value||'').trim();if(!t)return;
+  var k=plKey();plan[k]=plan[k]||[];plan[k].push(t);
+  document.getElementById('pl-item').value='';plRender();
+};
+var plDate=document.getElementById('pl-date');
+if(plDate)plDate.onchange=plRender;
+var plSave=document.getElementById('pl-save');
+if(plSave)plSave.onclick=function(){fsApi('write',PL,JSON.stringify(plan,null,2)).then(function(j){if(j.ok)toast('Planner saved')})};
+
+/* STEP 64 Palette harmony */
+function hexToRgb(hex){
+  hex=hex.replace('#','');
+  if(hex.length===3)hex=hex.split('').map(function(c){return c+c}).join('');
+  var n=parseInt(hex,16);return {r:(n>>16)&255,g:(n>>8)&255,b:n&255};
+}
+function rgbToHex(r,g,b){
+  return '#'+[r,g,b].map(function(x){return Math.max(0,Math.min(255,x|0)).toString(16).padStart(2,'0')}).join('');
+}
+var lastPal='';
+var ppGo=document.getElementById('pp-go');
+if(ppGo)ppGo.onclick=function(){
+  var hex=(document.getElementById('pp-hex').value||'#c9a227').trim();
+  if(hex[0]!=='#')hex='#'+hex;
+  try{
+    var c=hexToRgb(hex);
+    var comp=rgbToHex(255-c.r,255-c.g,255-c.b);
+    var light=rgbToHex(c.r+40,c.g+40,c.b+40);
+    var dark=rgbToHex(c.r-40,c.g-40,c.b-40);
+    var colors=[hex,comp,light,dark];
+    lastPal=colors.join('\n');
+    document.getElementById('pp-out').innerHTML=colors.map(function(h){
+      return '<div class="card" style="border-left:12px solid '+h+'"><b>'+h+'</b></div>';
+    }).join('');
+  }catch(e){document.getElementById('pp-out').textContent='Bad hex'}
+};
+var ppSave=document.getElementById('pp-save');
+if(ppSave)ppSave.onclick=function(){fsApi('write','/Documents/palette-harmony.txt',lastPal||'').then(function(j){if(j.ok)toast('Palette saved')})};
+
+/* STEP 65 FindFS deep */
+var lastFf='';
+var ffGo=document.getElementById('ff-go');
+if(ffGo)ffGo.onclick=function(){
+  var q=(document.getElementById('ff-q').value||'').trim().toLowerCase();
+  if(!q){toast('Enter keyword');return}
+  document.getElementById('ff-out').textContent='Searching...';
+  var roots=['/Documents','/Projects'],hits=[],pending=roots.length;
+  roots.forEach(function(root){
+    fsApi('tree',root,undefined,{depth:6}).then(function(j){
+      var tree=j.ok?String(j.tree||''):'';
+      tree.split('\n').forEach(function(line){
+        if(line.toLowerCase().indexOf(q)>=0)hits.push(line.trim());
+      });
+      pending--;
+      if(pending<=0){
+        lastFf=hits.length?hits.slice(0,50).join('\n'):'No matches for '+q;
+        document.getElementById('ff-out').textContent=lastFf;
+      }
+    });
+  });
+};
+var ffSave=document.getElementById('ff-save');
+if(ffSave)ffSave.onclick=function(){fsApi('write','/Documents/findfs-last.txt',lastFf||'').then(function(j){if(j.ok)toast('Results saved')})};
+
+
+
+/* STEP 66 Categories */
+var CAT_MAP={
+  Core:['explorer','notepad','term','ide','kernel','settings'],
+  Office:['office','markdown','json','planner','snippets','journal','tasks'],
+  Tools:['regex','diff','csv','base64','hash','bases','morse','units','calc'],
+  Net:['browser','browserpro','socialcon','makedock','rss','wiki','translate','qr','coins','ipinfo','weather'],
+  Media:['studio','draw','music','palette2','colors'],
+  System:['syscheck','diag','exportall','backup','findfs','search','aboutos','hotkeys','cats']
+};
+function catRender(){
+  var btns=document.getElementById('cat-btns');var list=document.getElementById('cat-list');
+  if(!btns||!list)return;
+  btns.innerHTML='';
+  Object.keys(CAT_MAP).forEach(function(cat){
+    var b=document.createElement('button');b.type='button';b.className='b';b.textContent=cat;
+    b.onclick=function(){
+      list.innerHTML='<div class="muted">'+cat+'</div>';
+      CAT_MAP[cat].forEach(function(id){
+        var app=APPS.find(function(a){return a[0]===id});
+        if(!app)return;
+        var d=document.createElement('div');d.className='item';
+        d.innerHTML='<span style="font-size:18px">'+app[1]+'</span><b style="color:var(--gold2)">'+app[2]+'</b>';
+        d.onclick=function(){openWin(id)};
+        list.appendChild(d);
+      });
+    };
+    btns.appendChild(b);
+  });
+  list.innerHTML='<div class="muted">Pick a category</div>';
+}
+
+/* STEP 67 Hotkeys / shortcuts reference */
+function hkRender(){
+  var lines=[
+    'DESKTOP SHORTCUTS (reference)',
+    '• Search bar: filter apps by name',
+    '• Launcher app: type app id → Open',
+    '• Categories: group jump to tools',
+    '',
+    'BOT SHORTCUTS',
+    '• /desktop — open this OS',
+    '• /fs ls|cat|write|tree — filesystem',
+    '• /version /ops status — health',
+    '• /ghpath <file> — upload from bot',
+    '',
+    'EXAMPLES',
+    '• /fs cat /Documents/vault.json',
+    '• /fs write /Documents/note.txt | hello',
+    '• Outline indent: 2 spaces per level',
+    '• Translate EN→SI: Hello → ආයුබෝවන්',
+    '• Bases: 255 → HEX FF',
+    '',
+    'COMMON ERRORS → FIX',
+    '• Icons missing → search bar / S56fix pin / hard close Mini App',
+    '• Failed to fetch → use httpget apps (RSS, Dict, Wiki, Coins, IP, Translate)',
+    '• not found → check path case /Documents vs /documents',
+    '• Save no effect → open from Telegram (initData) not external browser',
+    '• Vercel 12 functions → keep api/cron consolidated',
+    '• Outline indent 0 → paste multi-line with 2 spaces'
+  ];
+  document.getElementById('hk-out').innerHTML=lines.map(function(l){return '<div class="card" style="font-size:12px">'+l.replace(/</g,'&lt;')+'</div>'}).join('');
+}
+var hkSave=document.getElementById('hk-save');
+if(hkSave)hkSave.onclick=function(){
+  var t=document.getElementById('hk-out').innerText||'';
+  fsApi('write','/Documents/hotkeys.txt',t).then(function(j){if(j.ok)toast('Hotkeys saved')});
+};
+
+/* STEP 68 Export All */
+var exportBlob='';
+var exallGo=document.getElementById('exall-go');
+if(exallGo)exallGo.onclick=function(){
+  document.getElementById('exall-out').textContent='Building...';
+  var files=['/Documents/vault.json','/Documents/kanban.json','/Documents/bookmarks.json','/Documents/planner.json',
+    '/Documents/outline.json','/Documents/snippets.json','/Documents/habits.json','/Documents/expenses.json',
+    '/Documents/stickies.json','/Documents/notifications.json','/Documents/playlist.json','/Documents/theme.txt',
+    '/Documents/os-inventory.txt','/Documents/syscheck.txt','/Documents/hotkeys.txt'];
+  var out='=== PASIYAOS FULL EXPORT ===\n'+new Date().toISOString()+'\nApps: '+APPS.length+'\n\n';
+  var i=0;
+  function next(){
+    if(i>=files.length){exportBlob=out;document.getElementById('exall-out').textContent=out.slice(0,14000);toast('Export ready');return}
+    var p=files[i++];
+    fsApi('read',p).then(function(j){
+      out+='----- '+p+' -----\n'+(j.ok?String(j.content||'').slice(0,3000):(j.error||'missing'))+'\n\n';
+      next();
+    });
+  }
+  next();
+};
+var exallSave=document.getElementById('exall-save');
+if(exallSave)exallSave.onclick=function(){fsApi('write','/Documents/full-export.txt',exportBlob||document.getElementById('exall-out').textContent||'').then(function(j){if(j.ok)toast('full-export.txt saved')})};
+
+/* STEP 69 Clip board history (manual) */
+var CLP='/Documents/clips.json';
+var clips=[];
+function clpRender(){
+  var list=document.getElementById('clp-list');if(!list)return;list.innerHTML='';
+  clips.forEach(function(c,i){
+    var d=document.createElement('div');d.className='card';
+    d.innerHTML='<div style="white-space:pre-wrap">'+String(c).replace(/</g,'&lt;')+'</div>';
+    var rm=document.createElement('button');rm.type='button';rm.className='b';rm.textContent='Remove';
+    rm.onclick=function(){clips.splice(i,1);clpRender()};
+    d.appendChild(rm);list.appendChild(d);
+  });
+  if(!clips.length)list.innerHTML='<div class="muted">No clips</div>';
+}
+function clpLoad(){fsApi('read',CLP).then(function(j){clips=[];if(j.ok&&j.content){try{clips=JSON.parse(j.content)}catch(e){}}if(!Array.isArray(clips))clips=[];clpRender()})}
+var clpAdd=document.getElementById('clp-add');
+if(clpAdd)clpAdd.onclick=function(){
+  var t=(document.getElementById('clp-in').value||'').trim();if(!t)return;
+  clips.unshift(t);document.getElementById('clp-in').value='';clpRender();
+};
+var clpSave=document.getElementById('clp-save');
+if(clpSave)clpSave.onclick=function(){fsApi('write',CLP,JSON.stringify(clips,null,2)).then(function(j){if(j.ok)toast('Clips saved')})};
+
+/* STEP 70 Diag — errors + health */
+var lastDg='';
+var dgRun=document.getElementById('dg-run');
+if(dgRun)dgRun.onclick=function(){
+  document.getElementById('dg-out').textContent='Running diagnostics...';
+  var lines=['PasiyaOS Diag '+new Date().toISOString(),'Apps: '+APPS.length,'UA: '+(navigator.userAgent||'').slice(0,80)];
+  var checks=[
+    ['seed',function(){return fsApi('seed','/')}],
+    ['df',function(){return fsApi('df','/')}],
+    ['list /Documents',function(){return fsApi('list','/Documents')}],
+    ['httpget ipify',function(){return fsApi('httpget','/',undefined,{url:'https://api.ipify.org?format=json'})}]
+  ];
+  var i=0;
+  function next(){
+    if(i>=checks.length){
+      lines.push('');
+      lines.push('ERROR GUIDE:');
+      lines.push('Failed to fetch → CORS; use httpget apps');
+      lines.push('not found → path/case');
+      lines.push('No window X → app id mismatch');
+      lines.push('initData missing → open via Telegram /desktop');
+      lastDg=lines.join('\n');
+      document.getElementById('dg-out').textContent=lastDg;
+      toast('Diag done');
+      return;
+    }
+    var c=checks[i++];
+    c[1]().then(function(j){
+      lines.push(c[0]+': '+(j.ok?'OK':'FAIL '+(j.error||'')));
+      if(c[0]==='df'&&j.ok)lines.push('  quota '+j.used+'/'+j.max);
+      if(c[0]==='list /Documents'&&j.ok)lines.push('  entries '+(j.entries||[]).length);
+      if(c[0]==='httpget ipify'&&j.ok)lines.push('  body '+(j.text||'').slice(0,40));
+      next();
+    });
+  }
+  next();
+};
+var dgSave=document.getElementById('dg-save');
+if(dgSave)dgSave.onclick=function(){fsApi('write','/Documents/diag-last.txt',lastDg||document.getElementById('dg-out').textContent||'').then(function(j){if(j.ok)toast('Diag saved')})};
+
+
+fsApi('seed','/').then(function(){toast('PasiyaOS · '+APPS.length+' apps')});
+
+/* Phone shell deep-link: desktop.html?open=vault */
+try{
+  var params=new URLSearchParams(location.search||'');
+  var openApp=params.get('open')||params.get('app');
+  if(openApp){setTimeout(function(){openWin(openApp)},400)}
+}catch(e){}
+
+fsApi('read','/Documents/theme.txt').then(function(j){if(j.ok&&j.content)applyTheme(String(j.content).trim())});
+termPrint('PasiyaOS terminal — type help','');
 })();
 </script>
+
+<script>
+/* PASIYA MAX LAB v3 — safe overlay */
+(function(){
+  if(window.__MAXLAB__) return; window.__MAXLAB__=1;
+  window.__cc = window.__cc || {
+    version:3,
+    system:{hostname:'PasiyaOS',locale:'si-LK',theme:'gold',scheduler:'balanced',selfHeal:'soft',overclock:5},
+    ai:{defaultModel:'auto',reasoningDepth:40,firewallLayers:3,swarmSize:3,promptDna:'',temperature:0.7},
+    security:{lockMode:'none',ghost:'off',radar:true,autoBan:true,founderOnlyHeavy:true},
+    network:{proxyMode:'httpget',openExternal:true,bookmarks:['https://vercel.com','https://supabase.com','https://www.make.com']},
+    nodes:{chain:[]},
+    ui:{themeEngine:'gold'},
+    triad:{botSync:true,miniAppHeartbeat:true,alertFounder:true},
+    obs:{logLevel:'info'}
+  };
+  var TABS=[['sys','Core'],['ai','AI'],['sec','Fortress'],['net','Hydra'],['nodes','Nodes'],['obs','Obs'],['gene','Gene'],['triad','Triad']];
+  function toast2(m){ if(typeof toast==='function')toast(m); }
+  function fs2(action,path,content,extra){
+    if(typeof fsApi==='function') return fsApi(action,path,content,extra);
+    var body={action:action,path:path||'/',content:content||'',initData:(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.initData)||''};
+    if(extra) for(var k in extra) body[k]=extra[k];
+    return fetch('/api/fs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json();});
+  }
+  function buildTabs(){
+    var el=document.getElementById('cc-tabs'); if(!el) return;
+    el.innerHTML='';
+    TABS.forEach(function(t){
+      var b=document.createElement('button'); b.type='button'; b.className='b'; b.textContent=t[1];
+      b.onclick=function(){ try{ccCollect();}catch(e){} ccRender(t[0]); };
+      el.appendChild(b);
+    });
+  }
+  function ccRender(tab){
+    window.__ccTab=tab||'sys';
+    var c=window.__cc, p=document.getElementById('cc-panel'); if(!p) return;
+    if(tab==='sys'){
+      p.innerHTML='<div class="card"><b>Core Matrix</b><br><select id="ml-sched"><option>balanced</option><option>quantum</option><option>aggressive</option></select><select id="ml-heal"><option>off</option><option>soft</option><option>hard</option></select><input id="ml-host" value="'+(c.system.hostname||'')+'"/></div>';
+      document.getElementById('ml-sched').value=c.system.scheduler||'balanced';
+      document.getElementById('ml-heal').value=c.system.selfHeal||'soft';
+    } else if(tab==='ai'){
+      p.innerHTML='<div class="card"><b>AI Forge</b><br><select id="ml-model"><option value="auto">auto</option><option value="groq">groq</option><option value="gemini">gemini</option></select><input id="ml-depth" type="range" min="1" max="100" value="'+(c.ai.reasoningDepth||40)+'"/><textarea id="ml-dna" rows="3">'+(c.ai.promptDna||'')+'</textarea></div>';
+      document.getElementById('ml-model').value=c.ai.defaultModel||'auto';
+    } else if(tab==='sec'){
+      p.innerHTML='<div class="card"><b>Fortress</b> (defense only)<br><label><input type="checkbox" id="ml-radar"/> Radar</label> <label><input type="checkbox" id="ml-ban"/> Auto-ban</label> <label><input type="checkbox" id="ml-fo"/> Founder-only</label></div>';
+      document.getElementById('ml-radar').checked=!!c.security.radar;
+      document.getElementById('ml-ban').checked=!!c.security.autoBan;
+      document.getElementById('ml-fo').checked=!!c.security.founderOnlyHeavy;
+    } else if(tab==='net'){
+      p.innerHTML='<div class="card"><b>Hydra</b><br><textarea id="ml-bm" rows="4">'+(c.network.bookmarks||[]).join(String.fromCharCode(10))+'</textarea></div>';
+    } else if(tab==='nodes'){
+      var list=((c.nodes&&c.nodes.chain)||[]).map(function(n,i){return (i+1)+'. '+n.type;}).join(String.fromCharCode(10))||'(empty)';
+      p.innerHTML='<div class="card"><b>Nodes</b><br><select id="ml-nt"><option value="trigger:telegram">trigger:telegram</option><option value="action:ai">action:ai</option><option value="action:fs">action:fs</option><option value="logic:if">logic:if</option></select><button type="button" class="b" id="ml-na">Add</button><button type="button" class="b" id="ml-nc">Clear</button><pre class="muted">'+list+'</pre></div>';
+      document.getElementById('ml-na').onclick=function(){c.nodes=c.nodes||{chain:[]};c.nodes.chain.push({type:document.getElementById('ml-nt').value});ccRender('nodes');};
+      document.getElementById('ml-nc').onclick=function(){c.nodes={chain:[]};ccRender('nodes');};
+    } else if(tab==='obs'){
+      p.innerHTML='<div class="card"><b>Observatory</b><br><button type="button" class="b" id="ml-snap">Snapshot</button><pre id="ml-oo" class="muted"></pre></div>';
+      document.getElementById('ml-snap').onclick=function(){
+        var path='/Documents/lab/snapshot-'+Date.now()+'.json';
+        fs2('mkdir','/Documents/lab').then(function(){return fs2('write',path,JSON.stringify({ts:Date.now(),cc:c}));})
+          .then(function(j){document.getElementById('ml-oo').textContent=j&&j.ok?path:'fail';});
+      };
+    } else if(tab==='gene'){
+      p.innerHTML='<div class="card"><b>Gene Robot</b><br><input id="ml-gq"/><button type="button" class="b" id="ml-gs">Search</button><button type="button" class="b" id="ml-gm">Mutate+Save</button><pre id="ml-go" class="muted"></pre></div>';
+      document.getElementById('ml-gs').onclick=function(){
+        var q=document.getElementById('ml-gq').value.trim(); if(!q)return;
+        var url='https://duckduckgo.com/html/?q='+encodeURIComponent(q);
+        document.getElementById('ml-go').textContent='...';
+        fs2('httpget','/',undefined,{url:url}).then(function(j){
+          if(!j||!j.ok){document.getElementById('ml-go').textContent=(j&&j.error)||'fail';return;}
+          var t=String(j.text||''),hits=[],re=/uddg=([^&"]+)/g,m,n=0;
+          while((m=re.exec(t))&&n<8){try{hits.push(decodeURIComponent(m[1]));n++;}catch(e){}}
+          window.__gh=hits; document.getElementById('ml-go').textContent=hits.join(String.fromCharCode(10))||'no hits';
+        });
+      };
+      document.getElementById('ml-gm').onclick=function(){
+        var pack={id:'gene-'+Date.now(),sources:window.__gh||[],q:document.getElementById('ml-gq').value};
+        var path='/Documents/lab/genes/'+pack.id+'.json';
+        fs2('mkdir','/Documents/lab/genes').then(function(){return fs2('write',path,JSON.stringify(pack));})
+          .then(function(j){document.getElementById('ml-go').textContent=j&&j.ok?('saved '+path):'fail';});
+      };
+    } else if(tab==='triad'){
+      p.innerHTML='<div class="card"><b>Triad</b><br><button type="button" class="b" id="ml-hb">Heartbeat</button><pre id="ml-tr" class="muted"></pre><p class="muted">Bot+MiniApp sync via FS — not full phone spyware.</p></div>';
+      document.getElementById('ml-hb').onclick=function(){
+        fs2('write','/Documents/lab/triad-heartbeat.json',JSON.stringify({ts:Date.now()})).then(function(j){
+          document.getElementById('ml-tr').textContent=j&&j.ok?'OK':'fail';
+        });
+      };
+    }
+  }
+  function ccCollect(){
+    var c=window.__cc,t=window.__ccTab||'sys';
+    try{
+      if(t==='sys'){c.system.scheduler=(document.getElementById('ml-sched')||{}).value||c.system.scheduler;c.system.selfHeal=(document.getElementById('ml-heal')||{}).value||c.system.selfHeal;c.system.hostname=(document.getElementById('ml-host')||{}).value||c.system.hostname;}
+      if(t==='ai'){c.ai.defaultModel=(document.getElementById('ml-model')||{}).value||c.ai.defaultModel;c.ai.reasoningDepth=parseInt((document.getElementById('ml-depth')||{}).value,10)||c.ai.reasoningDepth;c.ai.promptDna=(document.getElementById('ml-dna')||{}).value||'';}
+      if(t==='sec'){c.security.radar=!!(document.getElementById('ml-radar')||{}).checked;c.security.autoBan=!!(document.getElementById('ml-ban')||{}).checked;c.security.founderOnlyHeavy=!!(document.getElementById('ml-fo')||{}).checked;}
+      if(t==='net'){var bm=(document.getElementById('ml-bm')||{}).value||'';c.network.bookmarks=bm.split(/\\n/).map(function(s){return s.trim();}).filter(Boolean);}
+    }catch(e){}
+  }
+  function ccSave(){ccCollect();fs2('write','/Documents/os-settings.json',JSON.stringify(window.__cc,null,2)).then(function(j){toast2(j&&j.ok?'Lab saved':'fail');});}
+  function ccLoad(){fs2('read','/Documents/os-settings.json').then(function(j){if(j&&j.ok&&j.content){try{Object.assign(window.__cc,JSON.parse(j.content));}catch(e){}}ccRender(window.__ccTab||'sys');});}
+  var _ow=window.openWin;
+  window.openWin=function(id){
+    if(typeof _ow==='function')_ow(id);
+    else {
+      document.querySelectorAll('.win').forEach(function(w){w.classList.remove('on');});
+      var w=document.getElementById('w-'+id); if(w) w.classList.add('on');
+    }
+    if(id==='settings'){ buildTabs(); ccLoad(); }
+  };
+  var s=document.getElementById('cc-save'); if(s) s.onclick=ccSave;
+  var r=document.getElementById('cc-reload'); if(r) r.onclick=ccLoad;
+  var x=document.getElementById('cc-export'); if(x) x.onclick=function(){ccCollect();fs2('write','/Documents/os-settings-export.txt',JSON.stringify(window.__cc,null,2)).then(function(j){toast2(j&&j.ok?'exported':'fail');});};
+  buildTabs();
+})();
+</script>
+
 </body>
 </html>
