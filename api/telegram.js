@@ -1,6 +1,18 @@
 import { Telegraf, Markup } from 'telegraf';
 import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
+import {
+  fortressMiddleware,
+  isBanned,
+  banUser,
+  unbanUser,
+  listBans,
+  loadOsSecurityFlags,
+  saveOsSecurityFlags,
+  logTriadEvent,
+  alertFounder,
+  firebaseTriadPing,
+} from '../lib/fortress.js';
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ADMIN_ID = String(process.env.ADMIN_ID || '').trim();
@@ -2983,6 +2995,13 @@ function buildBot() {
   if (!BOT_TOKEN) return null;
 
   bot = new Telegraf(BOT_TOKEN);
+
+  // Fortress Phase 2 — ban + flood gate (before everything)
+  try {
+    bot.use(fortressMiddleware());
+  } catch (e) {
+    console.error('fortress mw load', e);
+  }
 
   bot.use(async (ctx, next) => {
     try { trackGroupUser(ctx); } catch (_) {}
@@ -15167,6 +15186,133 @@ bot.command('commands', async (ctx) => {
       );
     } catch (err) {
       await ctx.reply('build: ' + String(err?.message || err).slice(0, 120));
+    }
+  });
+
+
+
+  // ——— Fortress Phase 2 commands ———
+  bot.command(['triad', 'heartbeat', 'syncstatus'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const flags = await loadOsSecurityFlags();
+      let hb = 'no FS read from bot';
+      // Best-effort: store last bot-side ping
+      await logTriadEvent(ctx.from.id, 'triad_cmd', { chat: ctx.chat?.type });
+      const fb = await firebaseTriadPing(ctx.from.id, { source: 'bot', cmd: 'triad' });
+      await ctx.reply(
+        '🔗 TRIAD STATUS\n' +
+          `Security flags: radar=${flags.radar} autoBan=${flags.autoBan} founderHeavy=${flags.founderOnlyHeavy}\n` +
+          `Firebase RTDB: ${fb.ok ? 'ping OK' : (fb.error || 'not configured')}\n` +
+          `Mini App heartbeat file: /Documents/lab/triad-heartbeat.json\n` +
+          `Open /desktop → MAX LAB → Triad → Heartbeat\n` +
+          `Then: /triad again after saving.`
+      );
+    } catch (e) {
+      await ctx.reply('triad: ' + String(e?.message || e).slice(0, 160));
+    }
+  });
+
+  bot.command(['ban'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const arg = (ctx.message.text || '').replace(/^\/ban(@\w+)?\s*/i, '').trim();
+      const parts = arg.split(/\s+/);
+      const target = parts[0];
+      const reason = parts.slice(1).join(' ') || 'manual';
+      if (!target || !/^\d+$/.test(target)) {
+        await ctx.reply('Usage: /ban <telegram_user_id> [reason]');
+        return;
+      }
+      const r = await banUser(target, reason, 'founder');
+      await alertFounder(`Ban ${target}: ${reason}`);
+      await ctx.reply(r.ok ? `Banned ${target}` : `Fail: ${r.error}`);
+    } catch (e) {
+      await ctx.reply('ban: ' + String(e?.message || e).slice(0, 160));
+    }
+  });
+
+  bot.command(['unban'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const target = (ctx.message.text || '').replace(/^\/unban(@\w+)?\s*/i, '').trim();
+      if (!target) {
+        await ctx.reply('Usage: /unban <telegram_user_id>');
+        return;
+      }
+      const r = await unbanUser(target);
+      await ctx.reply(r.ok ? `Unbanned ${target}` : `Fail: ${r.error}`);
+    } catch (e) {
+      await ctx.reply('unban failed');
+    }
+  });
+
+  bot.command(['banlist', 'bans'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const rows = await listBans(25);
+      if (!rows.length) {
+        await ctx.reply('No bans.');
+        return;
+      }
+      const lines = rows.map(
+        (r, i) =>
+          `${i + 1}. ${r.user_id} · ${r.reason || '-'} · ${r.banned_at || ''}`
+      );
+      await ctx.reply('🛡 BAN LIST\n' + lines.join('\n'));
+    } catch (e) {
+      await ctx.reply('banlist failed');
+    }
+  });
+
+  bot.command(['fortress', 'secflags'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const arg = (ctx.message.text || '').replace(/^\/(fortress|secflags)(@\w+)?\s*/i, '').trim();
+      if (!arg) {
+        const f = await loadOsSecurityFlags();
+        await ctx.reply(
+          '🛡 FORTRESS FLAGS\n' +
+            JSON.stringify(f, null, 2) +
+            '\n\nSet: /fortress radar=1 autoBan=1\nSync from LAB: /fortress pull'
+        );
+        return;
+      }
+      if (arg === 'pull') {
+        // Mini App saves os-settings.json in FS — founder can paste flags via set
+        await ctx.reply(
+          'Open MAX LAB → Fortress → Save all.\n' +
+            'Then /fortress radar=1 autoBan=1 founderOnlyHeavy=1 to push bot-side flags.'
+        );
+        return;
+      }
+      const flags = await loadOsSecurityFlags();
+      arg.split(/\s+/).forEach((pair) => {
+        const [k, v] = pair.split('=');
+        if (!k) return;
+        if (v === '1' || v === 'true') flags[k] = true;
+        else if (v === '0' || v === 'false') flags[k] = false;
+        else if (v != null) flags[k] = v;
+      });
+      await saveOsSecurityFlags(flags);
+      await ctx.reply('Updated:\n' + JSON.stringify(flags, null, 2));
+    } catch (e) {
+      await ctx.reply('fortress: ' + String(e?.message || e).slice(0, 160));
     }
   });
 
