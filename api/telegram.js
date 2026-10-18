@@ -527,6 +527,25 @@ function getAI() {
   return aiClient;
 }
 
+
+function miniAppBaseUrl() {
+  let base = String(
+    process.env.MINIAPP_URL ||
+      process.env.WEBAPP_URL ||
+      process.env.VERCEL_URL ||
+      'https://radiant-queen-pasiya-max-v2.vercel.app'
+  ).trim();
+  if (base && !/^https?:\/\//i.test(base)) {
+    base = 'https://' + base.replace(/^\/+/, '');
+  }
+  base = base.replace(/\/$/, '');
+  // If env was set to .../bot or .../bot/desktop.html, strip so we never get /bot/bot/
+  base = base.replace(/\/bot\/desktop\.html$/i, '');
+  base = base.replace(/\/bot$/i, '');
+  if (!base) base = 'https://radiant-queen-pasiya-max-v2.vercel.app';
+  return base;
+}
+
 function isAdmin(ctx) {
   const id = String(ctx.from?.id ?? '');
   return Boolean(ADMIN_ID && id === ADMIN_ID);
@@ -15105,7 +15124,7 @@ bot.command('commands', async (ctx) => {
 
   bot.command(['desktop'], async (ctx) => {
     try {
-      const url = String(process.env.MINIAPP_URL || process.env.WEBAPP_URL || 'https://radiant-queen-pasiya-max-v2.vercel.app').replace(/\/$/, '') + '/bot/desktop.html';
+      const url = miniAppBaseUrl() + '/bot/desktop.html';
       // seed fs for founder
       if (String(ctx.from.id) === String(ADMIN_ID)) {
         try {
@@ -15134,8 +15153,7 @@ bot.command('commands', async (ctx) => {
 
   bot.command(['phone', 'pasiyaphone', 'ios'], async (ctx) => {
     try {
-      const base = String(process.env.MINIAPP_URL || process.env.WEBAPP_URL || 'https://radiant-queen-pasiya-max-v2.vercel.app').replace(/\/$/, '');
-      const url = base + '/bot/phone.html';
+      const url = miniAppBaseUrl() + '/bot/phone.html';
       if (String(ctx.from.id) === String(ADMIN_ID)) {
         try {
           const fs = await import('../lib/pasiyaFs.js');
@@ -15318,24 +15336,32 @@ bot.command('commands', async (ctx) => {
 
 
   // ——— Document reader: ONLY explicit read (never steal /ghpath uploads) ———
-  bot.on('document', async (ctx) => {
+  // MUST call next() when not reading — otherwise second document handler (ghpath) never runs
+  bot.on('document', async (ctx, next) => {
     try {
       if (String(ctx.from?.id) !== String(ADMIN_ID)) {
-        return;
+        return next();
       }
       const doc = ctx.message?.document;
-      if (!doc) return;
+      if (!doc) return next();
       const captionRaw = String(ctx.message?.caption || '').trim();
       const caption = captionRaw.toLowerCase();
+      // If founder set /ghpath pending, never intercept
+      try {
+        const pending = await getPendingGhPath(ctx.from.id);
+        if (pending) return next();
+      } catch (_) {}
       // CRITICAL: leave GitHub upload path alone
       if (
         /^\/?ghpath\b/i.test(captionRaw) ||
         /^gh\s+\S+/i.test(captionRaw) ||
         /^\/gh\b/i.test(captionRaw) ||
+        /^upload\s*:?\s*\S+/i.test(captionRaw) ||
         caption.startsWith('gh ') ||
-        caption.startsWith('/ghpath')
+        caption.startsWith('/ghpath') ||
+        caption.startsWith('upload')
       ) {
-        return;
+        return next();
       }
       // Only read when user asks — do NOT auto-dump .html/.js (breaks /ghpath)
       const force =
@@ -15344,7 +15370,7 @@ bot.command('commands', async (ctx) => {
         caption.startsWith('read ') ||
         caption.startsWith('/read ');
       if (!force) {
-        return;
+        return next();
       }
       if (doc.file_size && doc.file_size > 200000) {
         await ctx.reply('File too large (max ~200KB for chat text).');
