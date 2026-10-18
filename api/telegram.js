@@ -15471,6 +15471,160 @@ bot.command('commands', async (ctx) => {
 
 
   // ——— Syswatch + Self-heal (founder) ———
+  
+  // ——— AI status + Ultimate ops ———
+  bot.command(['ai_status', 'aistatus', 'routerstatus'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const lines = ['🤖 AI ROUTER STATUS', ''];
+      lines.push('Groq: ' + (process.env.GROQ_API_KEY ? '✅ Active' : '❌ Missing'));
+      lines.push('Gemini: ' + (process.env.GEMINI_API_KEY || process.env.GEMINI_KEY ? '✅ Active' : '❌ Missing'));
+      lines.push('OpenRouter: ' + (process.env.OPENROUTER_API_KEY ? '✅ Active' : '❌ Missing'));
+      try {
+        const { getAiProviderStatus } = await import('../lib/aiRouter.js');
+        const st = getAiProviderStatus();
+        lines.push('');
+        lines.push('Last provider: ' + (st.lastProvider || 'none'));
+        lines.push('Last error: ' + (st.lastError || '—'));
+      } catch (_) {
+        lines.push('');
+        lines.push('Router module: default order Groq → Gemini → OpenRouter');
+      }
+      lines.push('');
+      lines.push('Order: Groq → Gemini → OpenRouter');
+      await ctx.reply(lines.join('\n'));
+    } catch (e) {
+      await ctx.reply('ai_status: ' + String(e?.message || e).slice(0, 160));
+    }
+  });
+
+  bot.command(['nightly', 'nightaudit', 'fullaudit'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const lines = ['🌙 NIGHTLY FULL AUDIT', new Date().toISOString(), ''];
+      // diagnose
+      try {
+        const { runDiagnose } = await import('../lib/errorRadar.js');
+        const report = await runDiagnose({
+          supabase,
+          BOT_TOKEN,
+          GEMINI_KEY,
+          ADMIN_ID,
+          GITHUB_TOKEN,
+        });
+        lines.push(String(report.text || '').slice(0, 1800));
+      } catch (e) {
+        lines.push('diagnose: ' + String(e.message || e).slice(0, 120));
+      }
+      // FS heartbeat
+      try {
+        const fs = await import('../lib/pasiyaFs.js');
+        const uid = String(ctx.from.id);
+        await fs.ensureUserSeed(uid);
+        const hb = await fs.fsRead(uid, '/Documents/lab/triad-heartbeat.json');
+        lines.push('');
+        lines.push('Triad: ' + (hb.ok ? 'OK' : hb.error || 'missing'));
+        await fs.fsWrite(
+          uid,
+          '/Documents/lab/nightly-audit.txt',
+          lines.join('\n').slice(0, 12000)
+        );
+        lines.push('Saved: /Documents/lab/nightly-audit.txt');
+      } catch (e) {
+        lines.push('fs: ' + String(e.message || e).slice(0, 100));
+      }
+      await ctx.reply(lines.join('\n').slice(0, 3500));
+    } catch (e) {
+      await ctx.reply('nightly: ' + String(e?.message || e).slice(0, 160));
+    }
+  });
+
+  bot.command(['prfix', 'gitpr'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const arg = (ctx.message.text || '')
+        .replace(/^\/(prfix|gitpr)(@\w+)?\s*/i, '')
+        .trim();
+      if (!arg) {
+        await ctx.reply(
+          '🔧 PR FIX (AI → branch file)\n' +
+            'Usage:\n' +
+            '/prfix path/to/file.js :: describe the fix\n\n' +
+            'Example:\n' +
+            '/prfix lib/errorRadar.js :: make SENTRY optional pass'
+        );
+        return;
+      }
+      const parts = arg.split(/::/);
+      const filePath = (parts[0] || '').trim().replace(/^\/+/, '');
+      const desc = (parts.slice(1).join('::') || 'improve').trim();
+      if (!filePath) {
+        await ctx.reply('Need file path before ::');
+        return;
+      }
+      await ctx.reply('Reading ' + filePath + ' …');
+      // Reuse /git ai fix style via gitClient if present
+      try {
+        const g = await import('../lib/gitClient.js');
+        const client = g.createGitClient ? g.createGitClient() : g;
+        const read = await (client.gitRead || client.read)(filePath);
+        if (!read || !read.ok) {
+          await ctx.reply('read fail: ' + (read?.error || 'unknown'));
+          return;
+        }
+        const prompt =
+          'You are a senior engineer. Propose a MINIMAL patch for this file.\n' +
+          'Goal: ' +
+          desc +
+          '\n\nReturn ONLY the full new file content, no markdown fences.\n\nFILE:\n' +
+          String(read.content || '').slice(0, 120000);
+        const fixed = await generateReply(prompt, ctx);
+        if (!fixed || fixed.length < 20) {
+          await ctx.reply('AI returned empty patch.');
+          return;
+        }
+        const write = await (client.gitWrite || client.write)(
+          filePath,
+          fixed,
+          'bot prfix: ' + desc.slice(0, 80)
+        );
+        if (write && write.ok) {
+          await ctx.reply(
+            '✅ Wrote ' +
+              filePath +
+              '\n' +
+              (write.url || '') +
+              '\nReview on GitHub then merge / wait for Vercel.'
+          );
+        } else {
+          await ctx.reply('write fail: ' + (write?.error || 'unknown'));
+        }
+      } catch (e) {
+        await ctx.reply(
+          'prfix needs lib/gitClient.js.\nFallback: /git ai fix ' +
+            filePath +
+            ' :: ' +
+            desc +
+            '\nErr: ' +
+            String(e.message || e).slice(0, 120)
+        );
+      }
+    } catch (e) {
+      await ctx.reply('prfix: ' + String(e?.message || e).slice(0, 160));
+    }
+  });
+
+
   bot.command(['syswatch', 'heartbeat', 'triadwatch'], async (ctx) => {
     try {
       if (!isAdmin(ctx)) {
