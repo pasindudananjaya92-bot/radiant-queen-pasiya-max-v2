@@ -7321,7 +7321,7 @@ bot.command('commands', async (ctx) => {
 
 
 
-  bot.command('ghpath', async (ctx) => {
+  bot.command(['ghpath', 'gh', 'ghu'], async (ctx) => {
     try {
       if (!isAdmin(ctx)) {
         await ctx.reply('Founder only.');
@@ -7332,7 +7332,7 @@ bot.command('commands', async (ctx) => {
         return;
       }
       const path = (ctx.message.text || '')
-        .replace(/^\/ghpath(@\w+)?\s*/i, '')
+        .replace(/^\/(ghpath|gh|ghu)(@\w+)?\s*/i, '')
         .trim()
         .replace(/^\/+/, '');
       if (!path) {
@@ -15335,67 +15335,107 @@ bot.command('commands', async (ctx) => {
   });
 
 
-  // ——— Document reader: ONLY explicit read (never steal /ghpath uploads) ———
-  // MUST call next() when not reading — otherwise second document handler (ghpath) never runs
-  bot.on('document', async (ctx, next) => {
+
+  // ——— UNIFIED document handler (gh upload FIRST — never AI, never CLI tutorial) ———
+  bot.on('document', async (ctx) => {
     try {
-      if (String(ctx.from?.id) !== String(ADMIN_ID)) {
-        return next();
-      }
+      if (!isAdmin(ctx)) return;
+      if (ctx.chat?.type !== 'private') return;
+
       const doc = ctx.message?.document;
-      if (!doc) return next();
+      if (!doc) return;
+
       const captionRaw = String(ctx.message?.caption || '').trim();
-      const caption = captionRaw.toLowerCase();
-      // If founder set /ghpath pending, never intercept
+      const captionLow = captionRaw.toLowerCase();
+
+      // Explicit READ only
+      const forceRead =
+        captionLow === 'read' ||
+        captionLow === '/read' ||
+        captionLow.startsWith('read ') ||
+        captionLow.startsWith('/read ');
+      if (forceRead) {
+        if (doc.file_size && doc.file_size > 200000) {
+          await ctx.reply('File too large (max ~200KB for chat text).');
+          return;
+        }
+        await ctx.sendChatAction('typing');
+        const link = await ctx.telegram.getFileLink(doc.file_id);
+        const url = typeof link === 'string' ? link : link.href;
+        const r = await fetch(url);
+        let text = Buffer.from(await r.arrayBuffer()).toString('utf8');
+        if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+        if (!text.trim()) {
+          await ctx.reply('File empty or not UTF-8 text.');
+          return;
+        }
+        const header = 'FILE: ' + (doc.file_name || 'file') + ' (' + text.length + ' chars)\n\n';
+        for (let i = 0; i < text.length; i += 3500) {
+          await ctx.reply((i === 0 ? header : '') + text.slice(i, i + 3500));
+        }
+        return;
+      }
+
+      // GitHub upload path from caption OR pending /ghpath
+      let path = await getPendingGhPath(ctx.from.id);
+      const cap =
+        captionRaw.match(/^(?:\/?ghpath|\/?gh|upload)\s*:?\s*(\S+)/i) ||
+        captionRaw.match(/^ghpath\s+(\S+)/i);
+      if (cap) path = cap[1].replace(/^\/+/, '');
+
+      // Also accept caption that is only the path if pending set: "public/bot/desktop.html"
+      if (!path && captionRaw && !captionRaw.startsWith('/') && /\.\w{1,8}$/.test(captionRaw) && captionRaw.indexOf(' ') < 0) {
+        path = captionRaw.replace(/^\/+/, '');
+      }
+
+      if (!path) {
+        // Not an upload intent — ignore quietly (do not dump file, do not AI)
+        return;
+      }
+
+      if (!GITHUB_TOKEN) {
+        await ctx.reply('GITHUB_TOKEN not set on Vercel (Contents: Read and write).');
+        return;
+      }
+
+      path = String(path).replace(/^\/+/, '').replace(/\\/g, '/');
+      const fname = String(doc.file_name || '');
+      if (/\.zip$/i.test(fname)) {
+        await ctx.reply(
+          'ZIP cannot be expanded.\nSend the inner file only.\nCaption: gh public/bot/desktop.html'
+        );
+        return;
+      }
+      if (doc.file_size && doc.file_size > 4_500_000) {
+        await ctx.reply('File too large (max ~4.5MB).');
+        return;
+      }
+
+      await ctx.reply('Uploading to ' + GITHUB_REPO + ':' + path + ' …');
+      const file = await ctx.telegram.getFile(doc.file_id);
+      const fileUrl = 'https://api.telegram.org/file/bot' + BOT_TOKEN + '/' + file.file_path;
+      const res = await fetch(fileUrl);
+      const buf = Buffer.from(await res.arrayBuffer());
+      const result = await githubPutFile(path, buf, 'bot-upload: ' + path + ' by founder');
+      await clearPendingGhPath(ctx.from.id);
+      if (!result.ok) {
+        await ctx.reply('Upload failed:\n' + result.error);
+        return;
+      }
+      await ctx.reply(
+        '✅ Uploaded\nRepo: ' +
+          (result.repo || GITHUB_REPO) +
+          '\nPath: ' +
+          (result.path || path) +
+          '\n' +
+          (result.url || '') +
+          '\nVercel redeploys if linked.'
+      );
+    } catch (err) {
+      console.error('document unified', err);
       try {
-        const pending = await getPendingGhPath(ctx.from.id);
-        if (pending) return next();
+        await ctx.reply('document upload failed: ' + String(err?.message || err).slice(0, 150));
       } catch (_) {}
-      // CRITICAL: leave GitHub upload path alone
-      if (
-        /^\/?ghpath\b/i.test(captionRaw) ||
-        /^gh\s+\S+/i.test(captionRaw) ||
-        /^\/gh\b/i.test(captionRaw) ||
-        /^upload\s*:?\s*\S+/i.test(captionRaw) ||
-        caption.startsWith('gh ') ||
-        caption.startsWith('/ghpath') ||
-        caption.startsWith('upload')
-      ) {
-        return next();
-      }
-      // Only read when user asks — do NOT auto-dump .html/.js (breaks /ghpath)
-      const force =
-        caption === 'read' ||
-        caption === '/read' ||
-        caption.startsWith('read ') ||
-        caption.startsWith('/read ');
-      if (!force) {
-        return next();
-      }
-      if (doc.file_size && doc.file_size > 200000) {
-        await ctx.reply('File too large (max ~200KB for chat text).');
-        return;
-      }
-      await ctx.sendChatAction('typing');
-      const link = await ctx.telegram.getFileLink(doc.file_id);
-      const url = typeof link === 'string' ? link : link.href;
-      const r = await fetch(url);
-      let text = Buffer.from(await r.arrayBuffer()).toString('utf8');
-      if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
-      if (!text.trim()) {
-        await ctx.reply('File empty or not UTF-8 text.');
-        return;
-      }
-      const header = 'FILE: ' + (doc.file_name || 'file') + ' (' + text.length + ' chars)\n\n';
-      const chunk = 3500;
-      let first = true;
-      for (let i = 0; i < text.length; i += chunk) {
-        const part = (first ? header : '') + text.slice(i, i + chunk);
-        first = false;
-        await ctx.reply(part);
-      }
-    } catch (e) {
-      await ctx.reply('read doc: ' + String(e?.message || e).slice(0, 160));
     }
   });
 
@@ -15428,6 +15468,102 @@ bot.command('commands', async (ctx) => {
       await ctx.reply('readfile: ' + String(e?.message || e).slice(0, 160));
     }
   });
+
+
+  // ——— Syswatch + Self-heal (founder) ———
+  bot.command(['syswatch', 'heartbeat', 'triadwatch'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const lines = ['📡 SYSWATCH', 'time: ' + new Date().toISOString()];
+      // Mini App heartbeat file via FS lib
+      try {
+        const fs = await import('../lib/pasiyaFs.js');
+        const uid = String(ctx.from.id);
+        await fs.ensureUserSeed(uid);
+        const hb = await fs.fsRead(uid, '/Documents/lab/triad-heartbeat.json');
+        if (hb.ok) {
+          lines.push('triad-heartbeat: OK');
+          lines.push(String(hb.content || '').slice(0, 200));
+        } else {
+          lines.push('triad-heartbeat: ' + (hb.error || 'missing'));
+        }
+        const os = await fs.fsRead(uid, '/Documents/os-settings.json');
+        lines.push('os-settings: ' + (os.ok ? 'OK (' + String(os.content || '').length + 'b)' : os.error || 'missing'));
+      } catch (e) {
+        lines.push('fs: ' + String(e.message || e).slice(0, 120));
+      }
+      // Recent triad events
+      if (supabase) {
+        try {
+          const { data } = await supabase
+            .from('rq_triad_events')
+            .select('event_type, created_at')
+            .order('created_at', { ascending: false })
+            .limit(5);
+          if (data && data.length) {
+            lines.push('events:');
+            data.forEach((r) => lines.push('- ' + (r.event_type || '') + ' ' + (r.created_at || '')));
+          }
+        } catch (_) {}
+      }
+      lines.push('GitHub token: ' + (GITHUB_TOKEN ? 'yes' : 'NO'));
+      lines.push('Upload: caption document → gh path/to/file');
+      await ctx.reply(lines.join('\n').slice(0, 3500));
+    } catch (e) {
+      await ctx.reply('syswatch: ' + String(e?.message || e).slice(0, 160));
+    }
+  });
+
+  bot.command(['selfheal', 'autofix', 'heal'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      await ctx.sendChatAction('typing');
+      const hints = [];
+      hints.push('🛠 SELF-HEAL HINTS');
+      // Quick env checks
+      if (!BOT_TOKEN) hints.push('• BOT_TOKEN missing');
+      if (!GITHUB_TOKEN) hints.push('• GITHUB_TOKEN missing → /gh upload broken');
+      if (!GITHUB_REPO) hints.push('• GITHUB_REPO missing (owner/name)');
+      if (!supabase) hints.push('• Supabase not configured');
+      // Desktop URL
+      try {
+        const base = typeof miniAppBaseUrl === 'function' ? miniAppBaseUrl() : 'https://radiant-queen-pasiya-max-v2.vercel.app';
+        hints.push('• Desktop URL should be: ' + base + '/bot/desktop.html');
+      } catch (_) {}
+      // errorRadar if available
+      try {
+        const { runDiagnose } = await import('../lib/errorRadar.js');
+        const report = await runDiagnose({
+          supabase,
+          BOT_TOKEN,
+          GEMINI_KEY,
+          ADMIN_ID,
+          GITHUB_TOKEN,
+        });
+        if (report && report.text) {
+          hints.push('--- diagnose ---');
+          hints.push(String(report.text).slice(0, 2000));
+        }
+      } catch (e) {
+        hints.push('diagnose module: ' + String(e.message || e).slice(0, 100));
+      }
+      hints.push('');
+      hints.push('If /gh upload fails: resend file with caption exactly:');
+      hints.push('gh public/bot/desktop.html');
+      hints.push('(private chat, Document not Photo)');
+      await ctx.reply(hints.join('\n').slice(0, 3500));
+    } catch (e) {
+      await ctx.reply('selfheal: ' + String(e?.message || e).slice(0, 160));
+    }
+  });
+
 
   // ——— Pack H: /diagnose + radar ———
   bot.command(['diagnose', 'radar', 'selfcheck'], async (ctx) => {
@@ -16110,86 +16246,6 @@ bot.command('commands', async (ctx) => {
   });
 
 
-  bot.on('document', async (ctx) => {
-    try {
-      if (!isAdmin(ctx)) return;
-      if (ctx.chat?.type !== 'private') {
-        // ignore group document spam
-        return;
-      }
-      if (!GITHUB_TOKEN) {
-        await ctx.reply('GITHUB_TOKEN not set on Vercel (need Contents: Read and write).');
-        return;
-      }
-
-      const caption = (ctx.message.caption || '').trim();
-      let path = await getPendingGhPath(ctx.from.id);
-
-      // caption: "gh api/telegram.js" or "upload:README.md"
-      const cap = caption.match(/^(?:gh|upload)\s*:?\s*(\S+)/i);
-      if (cap) path = cap[1].replace(/^\/+/, '');
-
-      const doc = ctx.message.document;
-      if (!path && doc?.file_name) {
-        path = doc.file_name;
-        await ctx.reply(
-          `⚠ No /ghpath set — would upload to ROOT as ${path}.\n` +
-            `Cancel mentally & use:\n/ghpath lib/${doc.file_name}\nthen resend.\n` +
-            `Or caption this file: gh lib/${doc.file_name}`
-        );
-      }
-      if (!path) {
-        await ctx.reply('Set path first:\n/ghpath lib/aiRouter.js\nor caption: gh lib/aiRouter.js');
-        return;
-      }
-      path = String(path).replace(/^\/+/, '').replace(/\\/g, '/');
-
-      // size limit ~4.5MB for GitHub API practicality on serverless
-      const fname = String(doc.file_name || '');
-      if (/\.zip$/i.test(fname)) {
-        await ctx.reply(
-          'ZIP files cannot be expanded by /ghpath.\n' +
-            'Open the ZIP on your phone → send the inner file only.\n' +
-            'Example caption: gh public/bot/desktop.html'
-        );
-        return;
-      }
-      if (doc.file_size && doc.file_size > 4_500_000) {
-        await ctx.reply('File too large for bot upload (max ~4.5MB). Use GitHub web UI.');
-        return;
-      }
-
-      await ctx.reply(`Uploading to ${GITHUB_REPO}:${path} …`);
-      const file = await ctx.telegram.getFile(doc.file_id);
-      const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
-      const res = await fetch(fileUrl);
-      const buf = Buffer.from(await res.arrayBuffer());
-
-      const result = await githubPutFile(
-        path,
-        buf,
-        `bot-upload: ${path} by founder`
-      );
-      await clearPendingGhPath(ctx.from.id);
-
-      if (!result.ok) {
-        await ctx.reply(`Upload failed:\n${result.error}`);
-        return;
-      }
-      await ctx.reply(
-        `Uploaded.\nRepo: ${result.repo}\nPath: ${result.path}\n${result.url || 'Open GitHub repo to verify.'}\n\nVercel will redeploy if this is the linked repo.`
-      );
-    } catch (err) {
-      console.error('document', err);
-      try {
-        await ctx.reply(`document upload failed: ${String(err?.message || err).slice(0, 150)}`);
-      } catch (_) {}
-    }
-  });
-
-
-
-
   async function handleVideoLike(ctx, fileId, kind) {
     const isPrivate = ctx.chat?.type === 'private';
     if (!isPrivate && !isAdmin(ctx)) return;
@@ -16487,6 +16543,20 @@ bot.command('commands', async (ctx) => {
   bot.on('text', async (ctx) => {
     const text = (ctx.message.text || '').trim();
     if (!text) return;
+
+    // Never send founder GitHub upload captions to AI as "how to use git CLI"
+    if (isAdmin(ctx) && /^(gh|ghpath|upload)\s+\S+/i.test(text)) {
+      const m = text.match(/^(?:gh|ghpath|upload)\s+:?\s*(\S+)/i);
+      const p = m ? m[1].replace(/^\/+/, '') : '';
+      if (p) {
+        await setPendingGhPath(ctx.from.id, p);
+        await ctx.reply(
+          'Path armed: ' + p + '\nNow send the file as Document (same chat).\nOr send Document with caption: gh ' + p
+        );
+        return;
+      }
+    }
+
 
     // Non-AI slash commands (guard: never send these to Gemini)
     try {
