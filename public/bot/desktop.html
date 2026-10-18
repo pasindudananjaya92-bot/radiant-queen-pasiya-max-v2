@@ -283,7 +283,7 @@ button.b:active{border-color:var(--gold)}
 <span style="color:var(--gold);font-size:11px;font-weight:700;margin-left:4px">PASIYA OS</span>
 <span id="clock" style="margin-left:auto;color:var(--muted);font-size:11px"></span>
 </div>
-<div id="toast"></div>
+<div id="boot-status" class="muted" style="position:fixed;top:6px;left:8px;font-size:11px;opacity:.8;z-index:50"></div><div id="toast"></div>
 
 <script>
 (function(){
@@ -292,16 +292,50 @@ var API='/api/fs';
 var tg=window.Telegram&&window.Telegram.WebApp;
 if(tg){try{tg.ready();tg.expand()}catch(e){}}
 
-function toast(m){var el=document.getElementById('toast');el.textContent=m;el.classList.add('show');clearTimeout(window.__t);window.__t=setTimeout(function(){el.classList.remove('show')},2500)}
+function toast(m){var el=document.getElementById('toast');if(!el)return;el.textContent=String(m||'');el.classList.add('show');clearTimeout(window.__t);window.__t=setTimeout(function(){el.classList.remove('show')},2800)}
 function initData(){return(tg&&tg.initData)?tg.initData:''}
+function isSoftFsError(err){
+  var e=String(err||'').toLowerCase();
+  if(!e)return true;
+  // missing files/folders are normal on first open — do not scare user
+  if(e.indexOf('not found')>=0)return true;
+  if(e.indexOf('no such')>=0)return true;
+  return false;
+}
 function fsApi(action,path,content,extra){
   var body={action:action,path:path||'/',initData:initData()};
   if(extra)for(var k in extra)if(Object.prototype.hasOwnProperty.call(extra,k))body[k]=extra[k];
   if(content!==undefined)body.content=content;
+  if(!body.initData){
+    // still try — api may reject; show once
+    console.warn('no Telegram initData');
+  }
   return fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-    .then(function(r){return r.text().then(function(t){try{return t?JSON.parse(t):{}}catch(e){return{ok:false,error:'non-JSON '+r.status+': '+String(t).slice(0,80)}}})})
+    .then(function(r){
+      return r.text().then(function(t){
+        try{return t?JSON.parse(t):{ok:false,error:'empty '+r.status}}
+        catch(e){return{ok:false,error:'non-JSON '+r.status+': '+String(t).slice(0,80)}}
+      });
+    })
     .catch(function(e){return{ok:false,error:String(e.message||e)}})
-    .then(function(j){if(j&&j.error)toast(j.error);return j||{ok:false}});
+    .then(function(j){
+      if(j&&j.error&&!isSoftFsError(j.error)){
+        toast(j.error);
+      }
+      return j||{ok:false};
+    });
+}
+function bootDisk(){
+  // seed standard folders then quiet status
+  return fsApi('seed','/').then(function(j){
+    var st=document.getElementById('boot-status');
+    if(st){
+      if(j&&j.ok) st.textContent='Disk: OK';
+      else if(j&&j.error) st.textContent='Disk: '+(isSoftFsError(j.error)?'ready':j.error);
+      else st.textContent='Disk: …';
+    }
+    return j;
+  });
 }
 
 var APPS=[
@@ -2172,8 +2206,8 @@ termPrint('PasiyaOS terminal — type help','');
       if(t==='net'){var bm=(document.getElementById('ml-bm')||{}).value||'';c.network.bookmarks=bm.split(/\\n/).map(function(s){return s.trim();}).filter(Boolean);}
     }catch(e){}
   }
-  function ccSave(){ccCollect();fs2('write','/Documents/os-settings.json',JSON.stringify(window.__cc,null,2)).then(function(j){toast2(j&&j.ok?'Lab saved':'fail');});}
-  function ccLoad(){fs2('read','/Documents/os-settings.json').then(function(j){if(j&&j.ok&&j.content){try{Object.assign(window.__cc,JSON.parse(j.content));}catch(e){}}ccRender(window.__ccTab||'sys');});}
+  function ccSave(){ccCollect();var payload=JSON.stringify(window.__cc,null,2);fs2('mkdir','/Documents/lab').then(function(){return fs2('write','/Documents/os-settings.json',payload)}).then(function(j){if(j&&j.ok){toast2('Lab saved ✓');if(typeof toast==='function')toast('Lab saved ✓')}else{var er=(j&&j.error)||'fail';toast2(er);if(typeof toast==='function')toast(er)}});}
+  function ccLoad(){fs2('read','/Documents/os-settings.json').then(function(j){if(j&&j.ok&&j.content){try{Object.assign(window.__cc,JSON.parse(j.content));}catch(e){}}/* missing file = defaults */ccRender(window.__ccTab||'sys');});}
   var _ow=window.openWin;
   window.openWin=function(id){
     if(typeof _ow==='function')_ow(id);
