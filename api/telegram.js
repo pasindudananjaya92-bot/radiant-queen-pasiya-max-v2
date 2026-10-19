@@ -15546,81 +15546,76 @@ bot.command('commands', async (ctx) => {
     }
   });
 
-  bot.command(['prfix', 'gitpr'], async (ctx) => {
+  
+  bot.command(['prfix', 'gitpr', 'autofix'], async (ctx) => {
     try {
       if (!isAdmin(ctx)) {
         await ctx.reply('👑 Founder-only.');
         return;
       }
       const arg = (ctx.message.text || '')
-        .replace(/^\/(prfix|gitpr)(@\w+)?\s*/i, '')
+        .replace(/^\/(prfix|gitpr|autofix)(@\w+)?\s*/i, '')
         .trim();
       if (!arg) {
         await ctx.reply(
-          '🔧 PR FIX (AI → branch file)\n' +
+          '🔧 BULLETPROOF PR FIX\n\n' +
             'Usage:\n' +
-            '/prfix path/to/file.js :: describe the fix\n\n' +
+            '/prfix path/to/file.js :: what to fix\n\n' +
+            'Safety:\n' +
+            '• Full-file AI (NOT chat 3500 limit)\n' +
+            '• Syntax / balance / size checks\n' +
+            '• Up to 3 auto-retries\n' +
+            '• Writes GitHub only after validation\n\n' +
             'Example:\n' +
-            '/prfix lib/errorRadar.js :: make SENTRY optional pass'
+            '/prfix lib/errorRadar.js :: SENTRY optional always pass'
         );
         return;
       }
       const parts = arg.split(/::/);
       const filePath = (parts[0] || '').trim().replace(/^\/+/, '');
-      const desc = (parts.slice(1).join('::') || 'improve').trim();
-      if (!filePath) {
-        await ctx.reply('Need file path before ::');
+      const desc = (parts.slice(1).join('::') || '').trim();
+      if (!filePath || !desc) {
+        await ctx.reply('Need: /prfix path/file.js :: goal description');
         return;
       }
-      await ctx.reply('Reading ' + filePath + ' …');
-      // Reuse /git ai fix style via gitClient if present
-      try {
-        const g = await import('../lib/gitClient.js');
-        const client = g.createGitClient ? g.createGitClient() : g;
-        const read = await (client.gitRead || client.read)(filePath);
-        if (!read || !read.ok) {
-          await ctx.reply('read fail: ' + (read?.error || 'unknown'));
-          return;
-        }
-        const prompt =
-          'You are a senior engineer. Propose a MINIMAL patch for this file.\n' +
-          'Goal: ' +
-          desc +
-          '\n\nReturn ONLY the full new file content, no markdown fences.\n\nFILE:\n' +
-          String(read.content || '').slice(0, 120000);
-        const fixed = await generateReply(prompt, ctx);
-        if (!fixed || fixed.length < 20) {
-          await ctx.reply('AI returned empty patch.');
-          return;
-        }
-        const write = await (client.gitWrite || client.write)(
-          filePath,
-          fixed,
-          'bot prfix: ' + desc.slice(0, 80)
-        );
-        if (write && write.ok) {
-          await ctx.reply(
-            '✅ Wrote ' +
-              filePath +
-              '\n' +
-              (write.url || '') +
-              '\nReview on GitHub then merge / wait for Vercel.'
-          );
-        } else {
-          await ctx.reply('write fail: ' + (write?.error || 'unknown'));
-        }
-      } catch (e) {
+      if (/^api\/telegram\.js$/i.test(filePath) && !/allow-telegram-rewrite/i.test(desc)) {
         await ctx.reply(
-          'prfix needs lib/gitClient.js.\nFallback: /git ai fix ' +
-            filePath +
-            ' :: ' +
-            desc +
-            '\nErr: ' +
-            String(e.message || e).slice(0, 120)
+          '⛔ Refusing full rewrite of api/telegram.js via /prfix.\n' +
+            'Too large for one AI pass. Fix smaller modules (lib/*) instead.\n' +
+            'Or add "allow-telegram-rewrite" to goal if you really mean it.'
         );
+        return;
       }
+      await ctx.reply('🛡 prfix starting…\nFile: ' + filePath + '\nGoal: ' + desc.slice(0, 120));
+      const { runPrFix } = await import('../lib/prFix.js');
+      const result = await runPrFix(filePath, desc, async (msg) => {
+        try {
+          await ctx.reply('… ' + String(msg).slice(0, 200));
+        } catch (_) {}
+      });
+      if (!result.ok) {
+        await ctx.reply(
+          '❌ prfix aborted (repo NOT changed).\n' +
+            String(result.error || 'fail').slice(0, 400)
+        );
+        return;
+      }
+      await ctx.reply(
+        '✅ prfix applied\n' +
+          'Path: ' +
+          result.path +
+          '\nBytes: ' +
+          result.bytes +
+          '\nProvider: ' +
+          (result.provider || '?') +
+          '\nAttempts: ' +
+          result.attempts +
+          '\n' +
+          (result.url || '') +
+          '\nWait for Vercel Ready, then /diagnose'
+      );
     } catch (e) {
-      await ctx.reply('prfix: ' + String(e?.message || e).slice(0, 160));
+      await ctx.reply('prfix: ' + String(e?.message || e).slice(0, 200));
     }
   });
 
