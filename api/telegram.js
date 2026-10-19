@@ -15547,6 +15547,97 @@ bot.command('commands', async (ctx) => {
   });
 
   
+  
+  bot.command(['sql', 'godsql', 'dbsql'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const arg = (ctx.message.text || '')
+        .replace(/^\/(sql|godsql|dbsql)(@\w+)?\s*/i, '')
+        .trim();
+
+      const {
+        staticValidate,
+        aiSafetyCheck,
+        executeSql,
+        formatResult,
+        setPending,
+        getPending,
+        clearPending,
+      } = await import('../lib/sqlCommander.js');
+
+      if (/^confirm$/i.test(arg)) {
+        const p = getPending(ctx.from.id);
+        if (!p) {
+          await ctx.reply('No pending SQL. Send /sql <query> first.');
+          return;
+        }
+        await ctx.reply('Executing…');
+        const ex = await executeSql(supabase, p.sql, p.isReadOnly);
+        clearPending(ctx.from.id);
+        if (!ex.ok) {
+          await ctx.reply('❌ ' + String(ex.error || 'fail').slice(0, 500));
+          return;
+        }
+        await ctx.reply('✅ OK (' + (ex.via || 'exec') + ')\n' + formatResult(ex.data));
+        return;
+      }
+      if (/^cancel$/i.test(arg)) {
+        clearPending(ctx.from.id);
+        await ctx.reply('Cancelled.');
+        return;
+      }
+
+      if (!arg) {
+        await ctx.reply(
+          '🗄 SQL GOD MODE (founder)\n\n' +
+            '/sql SELECT ...\n' +
+            '/sql confirm   — run pending write\n' +
+            '/sql cancel\n\n' +
+            'Blocked: DROP TABLE/DATABASE, TRUNCATE, DELETE/UPDATE without WHERE\n' +
+            'Writes need AI safety + /sql confirm'
+        );
+        return;
+      }
+
+      const v = staticValidate(arg);
+      if (!v.ok) {
+        await ctx.reply('🛡 Blocked: ' + v.reason);
+        return;
+      }
+
+      if (!v.isReadOnly) {
+        const ai = await aiSafetyCheck(v.sql, false);
+        if (!ai.ok) {
+          await ctx.reply('🛡 AI safety: ' + (ai.reason || 'blocked'));
+          return;
+        }
+        setPending(ctx.from.id, { sql: v.sql, isReadOnly: false });
+        await ctx.reply(
+          '⚠️ WRITE SQL queued.\n' +
+            v.sql.slice(0, 800) +
+            '\n\nAI: ' +
+            (ai.reason || 'ok') +
+            '\n\nSend /sql confirm to execute\n/sql cancel to abort'
+        );
+        return;
+      }
+
+      await ctx.reply('Running read-only…');
+      const ex = await executeSql(supabase, v.sql, true);
+      if (!ex.ok) {
+        await ctx.reply('❌ ' + String(ex.error || 'fail').slice(0, 600));
+        return;
+      }
+      await ctx.reply('✅\n' + formatResult(ex.data));
+    } catch (e) {
+      await ctx.reply('sql: ' + String(e?.message || e).slice(0, 200));
+    }
+  });
+
+
   bot.command(['prfix', 'gitpr', 'autofix'], async (ctx) => {
     try {
       if (!isAdmin(ctx)) {
