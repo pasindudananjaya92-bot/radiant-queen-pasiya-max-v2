@@ -15548,6 +15548,143 @@ bot.command('commands', async (ctx) => {
 
   
   
+  
+  bot.command(['chronos', 'timeguard'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const arg = (ctx.message.text || '')
+        .replace(/^\/(chronos|timeguard)(@\w+)?\s*/i, '')
+        .trim();
+      const chronos = await import('../lib/chronos.js');
+
+      if (!arg || /^status$/i.test(arg)) {
+        const h = await chronos.checkProductionHealth();
+        const snap = chronos.getLastSnapshot();
+        const lines = [
+          '⏳ CHRONOS STATUS',
+          'Health: ' + (h.ok ? '✅' : '❌') + ' ' + (h.status || h.error || ''),
+          'URL: ' + (h.url || ''),
+          'ms: ' + (h.ms || '?'),
+          '',
+          snap
+            ? 'Last snapshot: ' + snap.path + ' (' + snap.content.length + 'b)'
+            : 'Last snapshot: none (cold start or no /prfix yet)',
+          '',
+          'Commands:',
+          '/chronos health',
+          '/chronos commits [path]',
+          '/rollback',
+          '/rollback lib/errorRadar.js',
+          '/rollback history lib/errorRadar.js',
+        ];
+        await ctx.reply(lines.join('\n'));
+        return;
+      }
+      if (/^health$/i.test(arg)) {
+        await ctx.reply('Probing /api/health…');
+        const h = await chronos.checkProductionHealth();
+        await ctx.reply(
+          (h.ok ? '✅ HEALTHY\n' : '❌ UNHEALTHY\n') +
+            JSON.stringify(h, null, 2).slice(0, 1500)
+        );
+        return;
+      }
+      if (/^commits\b/i.test(arg)) {
+        const path = arg.replace(/^commits\s*/i, '').trim() || '';
+        const r = await chronos.listRecentCommits(path || undefined, 6);
+        if (!r.ok) {
+          await ctx.reply('commits: ' + r.error);
+          return;
+        }
+        const lines = r.commits.map(
+          (c, i) => i + 1 + '. ' + c.sha + ' — ' + c.message + '\n   ' + c.date
+        );
+        await ctx.reply('📜 Commits' + (path ? ' (' + path + ')' : '') + '\n' + lines.join('\n'));
+        return;
+      }
+      await ctx.reply('Unknown. Try /chronos status');
+    } catch (e) {
+      await ctx.reply('chronos: ' + String(e?.message || e).slice(0, 200));
+    }
+  });
+
+  bot.command(['rollback', 'chronosrb'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const arg = (ctx.message.text || '')
+        .replace(/^\/(rollback|chronosrb)(@\w+)?\s*/i, '')
+        .trim();
+      const chronos = await import('../lib/chronos.js');
+
+      if (!arg || /^last$/i.test(arg)) {
+        await ctx.reply('Rolling back last Chronos snapshot…');
+        const r = await chronos.rollbackToSnapshot();
+        if (!r.ok) {
+          await ctx.reply(
+            '❌ ' +
+              r.error +
+              '\nTip: /rollback history lib/errorRadar.js'
+          );
+          return;
+        }
+        await ctx.reply(
+          '✅ Rolled back ' +
+            (r.path || '') +
+            '\n' +
+            (r.url || r.note || '') +
+            '\nWait Vercel Ready, then /chronos health'
+        );
+        return;
+      }
+
+      if (/^history\b/i.test(arg)) {
+        const path = arg.replace(/^history\s+/i, '').trim();
+        if (!path) {
+          await ctx.reply('Usage: /rollback history lib/errorRadar.js');
+          return;
+        }
+        await ctx.reply('Restoring ' + path + ' from previous commit…');
+        const r = await chronos.rollbackFileFromHistory(path, 1);
+        if (!r.ok) {
+          await ctx.reply('❌ ' + r.error);
+          return;
+        }
+        await ctx.reply(
+          '✅ History rollback\n' +
+            r.path +
+            ' @ ' +
+            r.commit +
+            '\n' +
+            (r.message || '') +
+            '\n' +
+            (r.url || '')
+        );
+        return;
+      }
+
+      // path → try snapshot first, else history
+      await ctx.reply('Rollback ' + arg + '…');
+      let r = await chronos.rollbackToSnapshot(arg);
+      if (!r.ok) {
+        r = await chronos.rollbackFileFromHistory(arg, 1);
+      }
+      if (!r.ok) {
+        await ctx.reply('❌ ' + r.error);
+        return;
+      }
+      await ctx.reply('✅ ' + (r.path || arg) + '\n' + (r.url || r.note || ''));
+    } catch (e) {
+      await ctx.reply('rollback: ' + String(e?.message || e).slice(0, 200));
+    }
+  });
+
+
   bot.command(['sql', 'godsql', 'dbsql'], async (ctx) => {
     try {
       if (!isAdmin(ctx)) {
