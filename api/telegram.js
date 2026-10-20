@@ -3031,6 +3031,136 @@ function buildBot() {
     console.error('fortress mw load', e);
   }
 
+  
+  // === ULTIMATE P1: hard-route founder system commands (never fall through to AI) ===
+  bot.use(async (ctx, next) => {
+    try {
+      const text = String(ctx.message?.text || '').trim();
+      if (!text.startsWith('/')) return next();
+      const cmd = text.split(/\s+/)[0].replace(/@\w+$/, '').toLowerCase();
+      const founderCmds = new Set([
+        '/swarm', '/spawn', '/share_pattern', '/sharepattern', '/hive',
+        '/sql', '/chronos', '/rollback', '/chronosrb', '/timeguard',
+        '/audit', '/ledger', '/intentlog',
+        '/secreport', '/panopticon', '/sec', '/checkvulns', '/vulns', '/osv',
+        '/prfix', '/browse', '/spider',
+      ]);
+      if (!founderCmds.has(cmd)) return next();
+
+      // founder gate
+      const uid = String(ctx.from?.id || '');
+      const admin = String(typeof ADMIN_ID !== 'undefined' ? ADMIN_ID : process.env.ADMIN_ID || '');
+      if (admin && uid !== admin) {
+        await ctx.reply('👑 Founder-only.');
+        return; // stop — do not AI
+      }
+
+      const arg = text.replace(/^\/\S+\s*/, '').trim();
+
+      if (cmd === '/swarm') {
+        const swarm = await import('../lib/swarm.js');
+        if (!arg || /^status$/i.test(arg)) {
+          const a = await swarm.listAgents(supabase);
+          const p = await swarm.recallPatterns(supabase, '', 5);
+          if (!a.ok) {
+            await ctx.reply('Swarm: ' + (a.error || '') + '\nRun+Save sql/S5_OMEGA_SWARM.sql');
+            return;
+          }
+          await ctx.reply(swarm.formatSwarmStatus(a.agents, p.patterns || []));
+          return;
+        }
+        if (/^init$/i.test(arg)) {
+          const r = await swarm.ensureDefaultAgents(supabase);
+          if (!r.ok) {
+            await ctx.reply('init: ' + r.error);
+            return;
+          }
+          const a = await swarm.listAgents(supabase);
+          await ctx.reply('✅ Agents seeded\n' + swarm.formatSwarmStatus(a.agents || [], []));
+          return;
+        }
+        if (/^recall\b/i.test(arg)) {
+          const q = arg.replace(/^recall\s*/i, '').trim();
+          const p = await swarm.recallPatterns(supabase, q, 10);
+          if (!p.ok) {
+            await ctx.reply('recall: ' + p.error);
+            return;
+          }
+          if (!p.patterns?.length) {
+            await ctx.reply('No patterns' + (q ? ' for ' + q : ''));
+            return;
+          }
+          const lines = p.patterns.map(
+            (x, i) =>
+              i + 1 + '. [' + (x.kind || 'fix') + '] ' + String(x.title || x.body || '').slice(0, 80)
+          );
+          await ctx.reply('🧠 Hive\n' + lines.join('\n'));
+          return;
+        }
+        await ctx.reply('Usage: /swarm status|init|recall <q>');
+        return;
+      }
+
+      if (cmd === '/spawn') {
+        const swarm = await import('../lib/swarm.js');
+        const parts = arg.split(/\s+/).filter(Boolean);
+        if (!parts.length) {
+          await ctx.reply('Usage: /spawn name [role]');
+          return;
+        }
+        const r = await swarm.spawnAgent(supabase, parts[0], parts[1] || 'worker');
+        await ctx.reply(r.ok ? '✅ Spawned ' + parts[0] : '❌ ' + r.error);
+        return;
+      }
+
+      if (cmd === '/share_pattern' || cmd === '/sharepattern' || cmd === '/hive') {
+        if (!arg) {
+          await ctx.reply('Usage: /share_pattern <text>');
+          return;
+        }
+        const swarm = await import('../lib/swarm.js');
+        const r = await swarm.sharePattern(supabase, {
+          agentName: 'founder',
+          kind: 'tip',
+          title: arg.slice(0, 80),
+          body: arg,
+          tags: ['manual'],
+        });
+        await ctx.reply(r.ok ? '✅ Shared to hive' : '❌ ' + r.error);
+        return;
+      }
+
+      if (cmd === '/browse' || cmd === '/spider') {
+        if (!arg) {
+          await ctx.reply('Usage: /browse https://example.com');
+          return;
+        }
+        await ctx.reply('🕷 Spider fetching…');
+        const { browseUrl } = await import('../lib/spider.js');
+        const r = await browseUrl(arg, { supabase });
+        if (!r.ok) {
+          await ctx.reply('❌ ' + r.error);
+          return;
+        }
+        const body = (r.markdown || '').slice(0, 3500);
+        await ctx.reply(
+          (r.cached ? '📦 cached\n' : '') + r.url + '\n\n' + body,
+          { disable_web_page_preview: true }
+        );
+        return;
+      }
+
+      // other founder cmds: fall through to existing bot.command handlers
+      return next();
+    } catch (e) {
+      try {
+        await ctx.reply('route: ' + String(e?.message || e).slice(0, 180));
+      } catch (_) {}
+      return; // still do not AI on founder cmd errors
+    }
+  });
+
+
   bot.use(async (ctx, next) => {
     try { trackGroupUser(ctx); } catch (_) {}
     return next();
