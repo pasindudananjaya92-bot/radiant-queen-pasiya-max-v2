@@ -3018,6 +3018,15 @@ function buildBot() {
   // Fortress Phase 2 — ban + flood gate (before everything)
   try {
     bot.use(fortressMiddleware());
+
+    // S3 Intent Ledger — forensic log (founder commands)
+    try {
+      const { intentLedgerMiddleware } = await import('../lib/intentLedger.js');
+      bot.use(intentLedgerMiddleware({ supabase, adminId: ADMIN_ID, founderOnly: true }));
+    } catch (e) {
+      console.error('intentLedger middleware', e);
+    }
+
   } catch (e) {
     console.error('fortress mw load', e);
   }
@@ -15549,6 +15558,43 @@ bot.command('commands', async (ctx) => {
   
   
   
+  
+  bot.command(['audit', 'ledger', 'intentlog'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const arg = (ctx.message.text || '')
+        .replace(/^\/(audit|ledger|intentlog)(@\w+)?\s*/i, '')
+        .trim();
+      const { fetchRecentAudit, formatAuditLines, logIntent } = await import('../lib/intentLedger.js');
+      const limit = Math.min(30, Math.max(5, parseInt(arg, 10) || 15));
+      const r = await fetchRecentAudit(supabase, { limit });
+      if (!r.ok) {
+        await ctx.reply(
+          'Audit read failed: ' +
+            (r.error || '') +
+            '\nDid you run sql/RQ_AUDIT_LOG.sql in Supabase?'
+        );
+        return;
+      }
+      await ctx.reply('📜 INTENT LEDGER (last ' + limit + ')\n\n' + formatAuditLines(r.rows));
+      // also log this view
+      logIntent(supabase, {
+        userId: ctx.from.id,
+        isFounder: true,
+        command: 'audit',
+        action: 'view',
+        argsPreview: String(limit),
+        result: 'ok',
+      }).catch(() => {});
+    } catch (e) {
+      await ctx.reply('audit: ' + String(e?.message || e).slice(0, 200));
+    }
+  });
+
+
   bot.command(['chronos', 'timeguard'], async (ctx) => {
     try {
       if (!isAdmin(ctx)) {
