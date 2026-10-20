@@ -3038,6 +3038,79 @@ function buildBot() {
 
   
   // EMERGENCY: always-alive ping (hotfix)
+  
+  // SQL File Runner: document .sql OR caption /sqlfile|/sqlexec
+  bot.on('document', async (ctx, next) => {
+    try {
+      const doc = ctx.message?.document;
+      if (!doc) return next();
+
+      const caption = String(ctx.message?.caption || '').trim();
+      const fname = String(doc.file_name || '').toLowerCase();
+      const isSql =
+        fname.endsWith('.sql') ||
+        /^\/?(sqlfile|sqlexec|sqlrun)\b/i.test(caption) ||
+        (caption.startsWith('/sql') && fname.endsWith('.sql'));
+
+      // Let /ghpath|gh win first for non-sql or when caption is gh
+      if (/^\/?(gh|ghpath|github)\b/i.test(caption)) {
+        return next();
+      }
+      if (!isSql) return next();
+
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only SQL file runner.');
+        return;
+      }
+
+      const { maxSqlFileBytes, downloadTelegramFile, runSqlFileText } = await import(
+        '../lib/sqlFileRunner.js'
+      );
+      if (doc.file_size && doc.file_size > maxSqlFileBytes()) {
+        await ctx.reply('❌ SQL file too large (max 1MB).');
+        return;
+      }
+
+      await ctx.reply('📥 Downloading SQL file…');
+      const dl = await downloadTelegramFile(BOT_TOKEN, doc.file_id);
+      if (!dl.ok) {
+        await ctx.reply('Download failed: ' + dl.error);
+        return;
+      }
+      if (dl.bytes > maxSqlFileBytes()) {
+        await ctx.reply('❌ File exceeds 1MB after download.');
+        return;
+      }
+      const sqlText = dl.buffer.toString('utf8');
+      await ctx.reply('⚙️ Validating + executing (' + dl.bytes + ' bytes)…');
+      const result = await runSqlFileText(sqlText, { supabase });
+      try {
+        await supabase.from('rq_sql_file_runs').insert({
+          user_id: String(ctx.from.id),
+          filename: doc.file_name || '',
+          bytes: dl.bytes,
+          result: result.ok ? 'ok' : 'error',
+          detail: String(result.error || JSON.stringify(result.rows || result).slice(0, 500)),
+        });
+      } catch (_) {}
+
+      if (!result.ok) {
+        await ctx.reply(
+          (result.blocked ? '🛡 ' : '❌ ') + (result.error || 'failed')
+        );
+        return;
+      }
+      const preview = JSON.stringify(result.rows ?? result, null, 2).slice(0, 3000);
+      await ctx.reply('✅ SQL file executed\n' + preview);
+    } catch (e) {
+      try {
+        await ctx.reply('sqlfile: ' + String(e?.message || e).slice(0, 200));
+      } catch (_) {}
+      return next();
+    }
+  });
+
+
   bot.command(['ping', 'pong'], async (ctx) => {
     try {
       await ctx.reply('pong ✅ ' + (typeof BOT_VERSION !== 'undefined' ? BOT_VERSION : '') + ' · ' + new Date().toISOString());
