@@ -3043,7 +3043,7 @@ function buildBot() {
         '/sql', '/chronos', '/rollback', '/chronosrb', '/timeguard',
         '/audit', '/ledger', '/intentlog',
         '/secreport', '/panopticon', '/sec', '/checkvulns', '/vulns', '/osv',
-        '/prfix', '/browse', '/spider',
+        '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile',
       ]);
       if (!founderCmds.has(cmd)) return next();
 
@@ -3127,6 +3127,31 @@ function buildBot() {
           tags: ['manual'],
         });
         await ctx.reply(r.ok ? '✅ Shared to hive' : '❌ ' + r.error);
+        return;
+      }
+
+      
+      if (cmd === '/git') {
+        const bridge = await import('../lib/repoBridge.js');
+        const arg2 = arg;
+        if (!arg2 || /^status$/i.test(arg2)) {
+          const active = await bridge.getActiveRepo(supabase);
+          const gh = await bridge.githubRepoStatus(active.repo);
+          await ctx.reply(bridge.formatRepoStatus(active, gh));
+          return;
+        }
+        if (/^switch\b/i.test(arg2)) {
+          const repo = arg2.replace(/^switch\s+/i, '').trim();
+          const r = await bridge.setActiveRepo(supabase, repo);
+          if (!r.ok) {
+            await ctx.reply('❌ ' + r.error);
+            return;
+          }
+          const gh = await bridge.githubRepoStatus(r.repo);
+          await ctx.reply('✅ Switched\\n' + bridge.formatRepoStatus({ repo: r.repo, source: 'db' }, gh));
+          return;
+        }
+        await ctx.reply('Usage: /git status | /git switch owner/repo');
         return;
       }
 
@@ -3230,8 +3255,9 @@ function buildBot() {
         );
         return;
       }
-      const preview = JSON.stringify(result.rows ?? result, null, 2).slice(0, 3000);
-      await ctx.reply('✅ SQL file executed\n' + preview);
+      let preview = result.formatted || JSON.stringify(result.rows ?? result, null, 2);
+      preview = String(preview).slice(0, 3000);
+      await ctx.reply('✅ SQL file executed' + (result.via ? ' (' + result.via + ')' : '') + '\n' + preview);
     } catch (e) {
       try {
         await ctx.reply('sqlfile: ' + String(e?.message || e).slice(0, 200));
@@ -15763,6 +15789,64 @@ bot.command('commands', async (ctx) => {
   
   
   
+  
+  bot.command(['git'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const arg = (ctx.message.text || '').replace(/^\/git(@\w+)?\s*/i, '').trim();
+      const bridge = await import('../lib/repoBridge.js');
+      if (!arg || /^status$/i.test(arg)) {
+        const active = await bridge.getActiveRepo(supabase);
+        const gh = await bridge.githubRepoStatus(active.repo);
+        await ctx.reply(bridge.formatRepoStatus(active, gh));
+        return;
+      }
+      if (/^switch\b/i.test(arg)) {
+        const repo = arg.replace(/^switch\s+/i, '').trim();
+        const r = await bridge.setActiveRepo(supabase, repo);
+        if (!r.ok) {
+          await ctx.reply('❌ ' + r.error + '\nRun+Save sql/BOT_CONFIG.sql if table missing.');
+          return;
+        }
+        const gh = await bridge.githubRepoStatus(r.repo);
+        await ctx.reply('✅ Switched repo\n' + bridge.formatRepoStatus({ repo: r.repo, source: 'db' }, gh));
+        return;
+      }
+      await ctx.reply('Usage:\n/git status\n/git switch owner/repo');
+    } catch (e) {
+      await ctx.reply('git: ' + String(e?.message || e).slice(0, 200));
+    }
+  });
+
+  bot.command(['forgedrop', 'dropfile'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const arg = (ctx.message.text || '')
+        .replace(/^\/(forgedrop|dropfile)(@\w+)?\s*/i, '')
+        .trim();
+      const { replyCodeOrFile } = await import('../lib/forgeDrop.js');
+      const sample =
+        arg ||
+        ('// Forge Drop test\n' + Array.from({ length: 200 }, (_, i) => `line ${i + 1}: PasiyaOS`).join('\n'));
+      await replyCodeOrFile(ctx, {
+        text: sample,
+        filename: 'forge-drop.txt',
+        lang: 'txt',
+        caption: 'Forge Drop',
+        threshold: 4000,
+      });
+    } catch (e) {
+      await ctx.reply('forgedrop: ' + String(e?.message || e).slice(0, 200));
+    }
+  });
+
+
   bot.command(['secreport', 'panopticon', 'sec'], async (ctx) => {
     try {
       if (!isAdmin(ctx)) {
