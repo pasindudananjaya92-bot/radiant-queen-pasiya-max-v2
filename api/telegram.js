@@ -3043,7 +3043,7 @@ function buildBot() {
         '/sql', '/chronos', '/rollback', '/chronosrb', '/timeguard',
         '/audit', '/ledger', '/intentlog',
         '/secreport', '/panopticon', '/sec', '/checkvulns', '/vulns', '/osv',
-        '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile', '/cron', '/mem', '/memory', '/memgraph', '/jarvis', '/forgepage', '/canvas', '/nightly', '/constitution',
+        '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile', '/cron', '/mem', '/memory', '/memgraph', '/jarvis', '/deploy', '/redeploy', '/env', '/venv', '/shell', '/piston', '/exec', '/forgepage', '/canvas', '/nightly', '/constitution',
       ]);
       if (!founderCmds.has(cmd)) return next();
 
@@ -12845,6 +12845,127 @@ bot.command('commands', async (ctx) => {
       await ctx.reply('twin failed: ' + String(err?.message || err).slice(0, 160));
     }
   });
+
+  
+  bot.command(['deploy', 'redeploy'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const arg = (ctx.message.text || '').replace(/^\/(deploy|redeploy)(@\w+)?\s*/i, '').trim();
+      const g = await import('../lib/galaxyGod.js');
+      if (!g.vercelConfigured()) {
+        await ctx.reply(
+          'Set VERCEL_TOKEN in Vercel env (Account → Settings → Tokens).\nOptional: VERCEL_PROJECT_ID, VERCEL_TEAM_ID'
+        );
+        return;
+      }
+      if (!arg || /^list$/i.test(arg)) {
+        await ctx.reply('Fetching deployments…');
+        const list = await g.listDeployments(6);
+        await ctx.reply(g.formatDeployments(list));
+        return;
+      }
+      if (/^now|go|trigger$/i.test(arg)) {
+        await ctx.reply('Triggering redeploy…');
+        const r = await g.triggerRedeploy();
+        if (!r.ok) {
+          await ctx.reply('❌ ' + r.error + (r.hint ? '\n' + r.hint : ''));
+          return;
+        }
+        await ctx.reply('✅ Redeploy queued\n' + (r.url || '') + '\nstate: ' + (r.state || ''));
+        return;
+      }
+      await ctx.reply('Usage:\n/deploy list\n/deploy now');
+    } catch (e) {
+      await ctx.reply('deploy: ' + String(e?.message || e).slice(0, 200));
+    }
+  });
+
+  bot.command(['env', 'venv'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const arg = (ctx.message.text || '').replace(/^\/(env|venv)(@\w+)?\s*/i, '').trim();
+      const g = await import('../lib/galaxyGod.js');
+      if (!g.vercelConfigured()) {
+        await ctx.reply('Set VERCEL_TOKEN first.');
+        return;
+      }
+      if (!arg || /^list$/i.test(arg)) {
+        const list = await g.listEnv(true);
+        await ctx.reply(g.formatEnvs(list));
+        return;
+      }
+      if (/^set\s+/i.test(arg)) {
+        const body = arg.replace(/^set\s+/i, '');
+        const eq = body.indexOf('=');
+        if (eq < 1) {
+          await ctx.reply('Usage: /env set KEY=value');
+          return;
+        }
+        const key = body.slice(0, eq).trim();
+        const value = body.slice(eq + 1).trim();
+        await ctx.reply('Setting ' + key + ' (masked)…');
+        const r = await g.setEnv(key, value);
+        if (!r.ok) {
+          await ctx.reply('❌ ' + r.error);
+          return;
+        }
+        await ctx.reply(
+          '✅ Env ' + key + ' ' + (r.created ? 'created' : 'updated') + '\nRun /deploy now to apply on serverless.'
+        );
+        return;
+      }
+      await ctx.reply('Usage:\n/env list\n/env set KEY=value');
+    } catch (e) {
+      await ctx.reply('env: ' + String(e?.message || e).slice(0, 200));
+    }
+  });
+
+  bot.command(['shell', 'piston', 'exec'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const arg = (ctx.message.text || '')
+        .replace(/^\/(shell|piston|exec)(@\w+)?\s*/i, '')
+        .trim();
+      const shell = await import('../lib/universeShell.js');
+      if (!arg) {
+        await ctx.reply(
+          '🐚 Universe Shell (Piston sandbox)\n' +
+            'Usage:\n/shell py: print(2+2)\n/shell js: console.log("hi")\n/shell bash: echo hello\n\nNo host Docker — isolated free API.'
+        );
+        return;
+      }
+      const parsed = shell.parseShellArgs(arg);
+      if (!parsed) {
+        await ctx.reply('Could not parse code');
+        return;
+      }
+      await ctx.reply('Running ' + parsed.language + '…');
+      const r = await shell.execCode(parsed);
+      const text = shell.formatExec(r);
+      if (text.length > 3500) {
+        const { replyCodeOrFile } = await import('../lib/forgeDrop.js');
+        await replyCodeOrFile(ctx, {
+          text: r.ok ? r.output : r.error,
+          filename: 'shell-out.txt',
+          threshold: 3000,
+        });
+      } else {
+        await ctx.reply(text);
+      }
+    } catch (e) {
+      await ctx.reply('shell: ' + String(e?.message || e).slice(0, 200));
+    }
+  });
+
 
   bot.command(['forgepage', 'forge', 'makepage'], async (ctx) => {
     try {
