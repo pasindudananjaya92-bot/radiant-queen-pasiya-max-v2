@@ -15559,6 +15559,68 @@ bot.command('commands', async (ctx) => {
   
   
   
+  
+  bot.command(['secreport', 'panopticon', 'sec'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      await ctx.reply('🕶 Panopticon scanning package.json + OSV + Dependabot…');
+      const { runPanopticonScan, formatPanopticonReport } = await import('../lib/panopticon.js');
+      const report = await runPanopticonScan();
+      await ctx.reply(formatPanopticonReport(report));
+      try {
+        const { logIntent } = await import('../lib/intentLedger.js');
+        logIntent(supabase, {
+          userId: ctx.from.id,
+          isFounder: true,
+          command: 'secreport',
+          action: 'scan',
+          result: report.ok ? 'ok' : 'error',
+          detail: report.error || JSON.stringify(report.summary || {}).slice(0, 200),
+        }).catch(() => {});
+      } catch (_) {}
+    } catch (e) {
+      await ctx.reply('secreport: ' + String(e?.message || e).slice(0, 200));
+    }
+  });
+
+  bot.command(['checkvulns', 'vulns', 'osv'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      await ctx.reply('Scanning OSV for npm deps…');
+      const { runPanopticonScan, formatPanopticonReport } = await import('../lib/panopticon.js');
+      const report = await runPanopticonScan();
+      // shorter focus
+      const vulns = report.osv?.vulns || [];
+      if (!report.ok && report.error) {
+        await ctx.reply('❌ ' + report.error);
+        return;
+      }
+      if (!vulns.length) {
+        await ctx.reply(
+          '✅ No OSV vulns for scanned deps (' +
+            (report.summary?.depsScanned || 0) +
+            ' packages).\nFull: /secreport'
+        );
+        return;
+      }
+      const lines = ['⚠ OSV vulns: ' + vulns.length, ''];
+      for (const v of vulns.slice(0, 15)) {
+        lines.push('• ' + v.package + '@' + v.version + ' — ' + v.id);
+      }
+      lines.push('', 'Full report: /secreport');
+      await ctx.reply(lines.join('\n').slice(0, 3500));
+    } catch (e) {
+      await ctx.reply('checkvulns: ' + String(e?.message || e).slice(0, 200));
+    }
+  });
+
+
   bot.command(['audit', 'ledger', 'intentlog'], async (ctx) => {
     try {
       if (!isAdmin(ctx)) {
