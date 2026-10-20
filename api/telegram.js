@@ -13,6 +13,7 @@ import {
   alertFounder,
   firebaseTriadPing,
 } from '../lib/fortress.js';
+import { intentLedgerMiddleware } from '../lib/intentLedger.js';
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ADMIN_ID = String(process.env.ADMIN_ID || '').trim();
@@ -3019,9 +3020,8 @@ function buildBot() {
   try {
     bot.use(fortressMiddleware());
 
-    // S3 Intent Ledger — forensic log (founder commands)
+    // S3 Intent Ledger — forensic log (founder commands) — sync import (buildBot is NOT async)
     try {
-      const { intentLedgerMiddleware } = await import('../lib/intentLedger.js');
       bot.use(intentLedgerMiddleware({ supabase, adminId: ADMIN_ID, founderOnly: true }));
     } catch (e) {
       console.error('intentLedger middleware', e);
