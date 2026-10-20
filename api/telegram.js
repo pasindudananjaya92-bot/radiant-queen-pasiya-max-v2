@@ -3043,7 +3043,7 @@ function buildBot() {
         '/sql', '/chronos', '/rollback', '/chronosrb', '/timeguard',
         '/audit', '/ledger', '/intentlog',
         '/secreport', '/panopticon', '/sec', '/checkvulns', '/vulns', '/osv',
-        '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile',
+        '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile', '/cron', '/mem', '/memory', '/memgraph', '/jarvis',
       ]);
       if (!founderCmds.has(cmd)) return next();
 
@@ -15843,6 +15843,194 @@ bot.command('commands', async (ctx) => {
       });
     } catch (e) {
       await ctx.reply('forgedrop: ' + String(e?.message || e).slice(0, 200));
+    }
+  });
+
+
+  
+  // /jarvis as reply to voice
+  bot.command(['jarvis'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const reply = ctx.message?.reply_to_message;
+      const voice = reply?.voice || reply?.audio;
+      if (!voice) {
+        await ctx.reply(
+          '🎙 Jarvis Mode\nReply to a voice message with /jarvis\nor send voice with caption /jarvis'
+        );
+        return;
+      }
+      await ctx.reply('🎙 Jarvis listening…');
+      const { downloadTelegramFile } = await import('../lib/sqlFileRunner.js');
+      const dl = await downloadTelegramFile(BOT_TOKEN, voice.file_id);
+      if (!dl.ok) {
+        await ctx.reply('voice dl: ' + dl.error);
+        return;
+      }
+      const { runJarvisPipeline } = await import('../lib/jarvis.js');
+      const r = await runJarvisPipeline(dl.buffer, { supabase, lang: 'en' });
+      if (!r.ok) {
+        await ctx.reply('❌ ' + (r.phase || '') + ': ' + r.error);
+        return;
+      }
+      await ctx.reply('🗣 ' + r.transcript + '\n\n' + String(r.answer || '').slice(0, 3000));
+      if (r.audio) {
+        await ctx.replyWithVoice({ source: r.audio, filename: 'jarvis.mp3' });
+      }
+    } catch (e) {
+      await ctx.reply('jarvis: ' + String(e?.message || e).slice(0, 200));
+    }
+  });
+
+
+  bot.command(['cron'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const arg = (ctx.message.text || '').replace(/^\/cron(@\w+)?\s*/i, '').trim();
+      const cron = await import('../lib/cronSwarm.js');
+      if (!arg || /^list$/i.test(arg)) {
+        const r = await cron.listJobs(supabase);
+        if (!r.ok) {
+          await ctx.reply('cron: ' + r.error + '\nRun+Save sql/P4P5P6.sql');
+          return;
+        }
+        await ctx.reply('⏱ CRON SWARM\n' + cron.formatJobs(r.jobs));
+        return;
+      }
+      if (/^create\b/i.test(arg)) {
+        // /cron create name | schedule | action
+        const rest = arg.replace(/^create\s*/i, '');
+        const parts = rest.split('|').map((s) => s.trim()).filter(Boolean);
+        const name = parts[0] || 'job';
+        const schedule = parts[1] || '0 * * * *';
+        const action = parts[2] || 'health';
+        const r = await cron.createJob(supabase, { name, schedule, action });
+        if (!r.ok) {
+          await ctx.reply('❌ ' + r.error);
+          return;
+        }
+        await ctx.reply(
+          '✅ Cron job saved: ' +
+            name +
+            '\nSchedule: ' +
+            schedule +
+            '\nAction: ' +
+            action +
+            '\n\nPoint cron-job.org to:\n/api/cron?job=swarm&secret=CRON_SECRET\n(Does not rewrite vercel.json — safer on Hobby)'
+        );
+        return;
+      }
+      if (/^delete\b/i.test(arg)) {
+        const id = arg.replace(/^delete\s*/i, '').trim();
+        const r = await cron.deleteJob(supabase, id);
+        await ctx.reply(r.ok ? '✅ Deleted' : '❌ ' + r.error);
+        return;
+      }
+      if (/^run\b/i.test(arg)) {
+        const r = await cron.runDueJobs(supabase);
+        await ctx.reply(
+          r.ok
+            ? '✅ Ran:\n' +
+                (r.results || []).map((x) => x.name + ': ' + x.detail).join('\n')
+            : '❌ ' + r.error
+        );
+        return;
+      }
+      await ctx.reply(
+        'Usage:\n/cron list\n/cron create name | 0 * * * * | health\n/cron delete <name|id>\n/cron run'
+      );
+    } catch (e) {
+      await ctx.reply('cron: ' + String(e?.message || e).slice(0, 200));
+    }
+  });
+
+  bot.command(['mem', 'memory', 'memgraph'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const arg = (ctx.message.text || '')
+        .replace(/^\/(mem|memory|memgraph)(@\w+)?\s*/i, '')
+        .trim();
+      const mg = await import('../lib/memoryGraph.js');
+      if (/^recall\b/i.test(arg) || /^search\b/i.test(arg)) {
+        const q = arg.replace(/^(recall|search)\s*/i, '').trim();
+        const r = await mg.recall(supabase, { userId: ctx.from.id, query: q });
+        if (!r.ok) {
+          await ctx.reply('recall: ' + r.error);
+          return;
+        }
+        await ctx.reply(mg.formatHits(r.hits, r.mode));
+        return;
+      }
+      // default remember
+      const content = arg.replace(/^add\s*/i, '').trim();
+      if (!content) {
+        await ctx.reply('Usage:\n/mem <text to remember>\n/mem recall <query>');
+        return;
+      }
+      const r = await mg.remember(supabase, {
+        userId: ctx.from.id,
+        content,
+        kind: 'note',
+      });
+      if (!r.ok) {
+        await ctx.reply('❌ ' + r.error + '\nRun+Save sql/P4P5P6.sql');
+        return;
+      }
+      await ctx.reply(
+        '✅ Remembered' + (r.embedded ? ' (embedded)' : ' (keyword only)') + '\nid=' + (r.id || '')
+      );
+    } catch (e) {
+      await ctx.reply('mem: ' + String(e?.message || e).slice(0, 200));
+    }
+  });
+
+
+  bot.on(['voice', 'audio'], async (ctx, next) => {
+    try {
+      const caption = String(ctx.message?.caption || '').trim();
+      const isJarvis =
+        /^\/jarvis\b/i.test(caption) ||
+        (ctx.message?.reply_to_message && false);
+      // Also: founder replies to voice with /jarvis handled by command — here caption /jarvis on voice
+      if (!/^\/jarvis\b/i.test(caption)) return next();
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      await ctx.reply('🎙 Jarvis listening…');
+      const fileId = ctx.message.voice?.file_id || ctx.message.audio?.file_id;
+      const { downloadTelegramFile } = await import('../lib/sqlFileRunner.js');
+      const dl = await downloadTelegramFile(BOT_TOKEN, fileId);
+      if (!dl.ok) {
+        await ctx.reply('voice dl: ' + dl.error);
+        return;
+      }
+      const { runJarvisPipeline } = await import('../lib/jarvis.js');
+      const r = await runJarvisPipeline(dl.buffer, { supabase, lang: 'en' });
+      if (!r.ok) {
+        await ctx.reply('❌ Jarvis ' + (r.phase || '') + ': ' + r.error + (r.transcript ? '\nSTT: ' + r.transcript : ''));
+        return;
+      }
+      await ctx.reply('🗣 ' + r.transcript + '\n\n' + String(r.answer || '').slice(0, 3000));
+      if (r.audio) {
+        await ctx.replyWithVoice({ source: r.audio, filename: 'jarvis.mp3' });
+      } else if (r.ttsError) {
+        await ctx.reply('(TTS skip: ' + r.ttsError + ')');
+      }
+    } catch (e) {
+      try {
+        await ctx.reply('jarvis voice: ' + String(e?.message || e).slice(0, 180));
+      } catch (_) {}
+      return next();
     }
   });
 
