@@ -13074,14 +13074,24 @@ bot.command('commands', async (ctx) => {
         return;
       }
       await ctx.reply(
-        '✅ Live Canvas\n' +
-          'ID: ' + r.id + '\n' +
-          'API: ' + (r.apiUrl || '') + '\n' +
-          'Pretty: ' + (r.liveUrl || '') + '\n' +
-          'Instant: ' + (r.rawUrl || '') + '\n' +
-          'Path: ' + r.path
+        '✅ Live Canvas
+' +
+          'ID: ' + r.id + '
+' +
+          'Live: ' + r.liveUrl + '
+' +
+          'Direct: ' + (r.liveIndexUrl || '') + '
+' +
+          'Instant: ' + (r.rawUrl || '') + '
+' +
+          'Path: ' + r.path + '
+' +
+          (r.deployHook && r.deployHook.ok
+            ? 'Deploy hook: fired — wait 30–90s'
+            : 'Tip: run /deploy now if Live 404
+Instant raw URL works immediately')
       );
-    } catch (e) {
+} catch (e) {
       await ctx.reply('forgepage: ' + String(e?.message || e).slice(0, 200));
     }
   });
