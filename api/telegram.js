@@ -3043,7 +3043,7 @@ function buildBot() {
         '/sql', '/chronos', '/rollback', '/chronosrb', '/timeguard',
         '/audit', '/ledger', '/intentlog',
         '/secreport', '/panopticon', '/sec', '/checkvulns', '/vulns', '/osv',
-        '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile', '/cron', '/mem', '/memory', '/memgraph', '/jarvis', '/deploy', '/redeploy', '/env', '/venv', '/shell', '/piston', '/exec', '/forgepage', '/canvas', '/nightly', '/constitution', '/architect', '/godarchitect', '/legion',
+        '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile', '/cron', '/mem', '/memory', '/memgraph', '/jarvis', '/deploy', '/redeploy', '/env', '/venv', '/shell', '/piston', '/exec', '/forgepage', '/canvas', '/nightly', '/constitution', '/architect', '/godarchitect', '/legion', '/omni', '/omniscience', '/revenue',
       ]);
       if (!founderCmds.has(cmd)) return next();
 
@@ -3172,6 +3172,96 @@ function buildBot() {
           (r.cached ? '📦 cached\n' : '') + r.url + '\n\n' + body,
           { disable_web_page_preview: true }
         );
+        return;
+      }
+
+
+      if (cmd === '/architect' || cmd === '/godarchitect') {
+        const mode = /^pr\b/i.test(arg) ? 'pr' : 'scan';
+        const focus = arg.replace(/^(pr|scan)\s*/i, '').trim();
+        await ctx.reply(mode === 'pr' ? '🏛 Architect PR…' : '🏛 Architect scan…');
+        const { runArchitect, formatArchitect } = await import('../lib/godArchitect.js');
+        const r = await runArchitect({ mode, focus });
+        await ctx.reply(formatArchitect(r));
+        return;
+      }
+
+      if (cmd === '/legion') {
+        const { legionStatus, formatLegion, legionTick, creditAgent, spawnLegion } = await import(
+          '../lib/legionSwarm.js'
+        );
+        if (!arg || /^status|list$/i.test(arg)) {
+          const st = await legionStatus(supabase);
+          await ctx.reply(formatLegion(st));
+          return;
+        }
+        if (/^tick$/i.test(arg)) {
+          const r = await legionTick(supabase);
+          if (!r.ok) {
+            await ctx.reply('❌ ' + r.error + '\nRun sql/LEGION_ECONOMY.sql');
+            return;
+          }
+          await ctx.reply(
+            '⚔ tick · fired=' +
+              (r.fired || []).join(',') +
+              ' · spawned=' +
+              (r.spawned || []).join(',')
+          );
+          const st = await legionStatus(supabase);
+          await ctx.reply(formatLegion(st));
+          return;
+        }
+        if (/^spawn\s+/i.test(arg)) {
+          const name = arg.replace(/^spawn\s+/i, '').trim().slice(0, 32);
+          const r = await spawnLegion(supabase, name || 'legion-' + Date.now().toString(36));
+          await ctx.reply(r.ok ? '✅ ' + r.agent.name + ' ¢20' : '❌ ' + r.error);
+          return;
+        }
+        if (/^reward\s+/i.test(arg)) {
+          const parts = arg.replace(/^reward\s+/i, '').trim().split(/\s+/);
+          const name = parts[0];
+          const reason = parts[1] === 'fix' ? 'fix' : 'find';
+          const r = await creditAgent(supabase, name, reason === 'fix' ? 10 : 5, reason);
+          await ctx.reply(r.ok ? '✅ ' + name + ' ¢' + r.credits : '❌ ' + r.error);
+          return;
+        }
+        await ctx.reply('/legion status|tick|spawn <n>|reward <n> [find|fix]');
+        return;
+      }
+
+      if (cmd === '/omni' || cmd === '/omniscience') {
+        await ctx.reply('🕳 Omniscience running…');
+        const { runOmni, formatOmni } = await import('../lib/omniscience.js');
+        const r = await runOmni(supabase, arg);
+        await ctx.reply(formatOmni(r));
+        return;
+      }
+
+      if (cmd === '/revenue') {
+        const rev = await import('../lib/revenueAgent.js');
+        if (!arg || /^list$/i.test(arg)) {
+          const r = await rev.listLeads(supabase);
+          await ctx.reply(rev.formatLeads(r));
+          return;
+        }
+        if (/^idea\b/i.test(arg)) {
+          const topic = arg.replace(/^idea\s*/i, '').trim() || 'Telegram bot';
+          const r = await rev.ideaPitch(topic);
+          await ctx.reply('💡 ' + (r.text || '').slice(0, 3500));
+          return;
+        }
+        if (/^add\s+/i.test(arg)) {
+          const body = arg.replace(/^add\s+/i, '');
+          const parts = body.split('|').map((s) => s.trim());
+          const r = await rev.addLead(supabase, {
+            title: parts[0],
+            note: parts[1] || '',
+            value: parts[2],
+          });
+          await ctx.reply(r.ok ? '✅ Lead saved id=' + (r.id || '') : '❌ ' + r.error + '\nRun sql/REVENUE.sql');
+          return;
+        }
+        await ctx.reply('/revenue list\n/revenue idea <topic>\n/revenue add Title | note | 100');
         return;
       }
 
