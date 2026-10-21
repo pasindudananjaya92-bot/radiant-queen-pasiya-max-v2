@@ -5,6 +5,9 @@
     { "source": "/api/cron-watch", "destination": "/api/cron?job=watch" },
     { "source": "/api/cron-reminders", "destination": "/api/cron?job=reminders" },
     { "source": "/api/cron-reminder", "destination": "/api/cron?job=reminders" },
-    { "source": "/api/cron-digest", "destination": "/api/cron?job=digest" }
+    { "source": "/api/cron-digest", "destination": "/api/cron?job=digest" },
+    { "source": "/canvas/:id", "destination": "/api/canvas?id=:id" },
+    { "source": "/canvas/:id/", "destination": "/api/canvas?id=:id" },
+    { "source": "/canvas/:id/index.html", "destination": "/api/canvas?id=:id" }
   ]
 }
