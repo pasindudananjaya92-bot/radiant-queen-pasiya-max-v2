@@ -3043,7 +3043,7 @@ function buildBot() {
         '/sql', '/chronos', '/rollback', '/chronosrb', '/timeguard',
         '/audit', '/ledger', '/intentlog',
         '/secreport', '/panopticon', '/sec', '/checkvulns', '/vulns', '/osv',
-        '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile', '/cron', '/mem', '/memory', '/memgraph', '/jarvis', '/deploy', '/redeploy', '/env', '/venv', '/shell', '/piston', '/exec', '/forgepage', '/canvas', '/nightly', '/constitution',
+        '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile', '/cron', '/mem', '/memory', '/memgraph', '/jarvis', '/deploy', '/redeploy', '/env', '/venv', '/shell', '/piston', '/exec', '/forgepage', '/canvas', '/nightly', '/constitution', '/architect', '/godarchitect', '/legion',
       ]);
       if (!founderCmds.has(cmd)) return next();
 
@@ -12848,6 +12848,94 @@ bot.command('commands', async (ctx) => {
 
   
   
+  
+  bot.command(['architect', 'godarchitect'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const arg = (ctx.message.text || '')
+        .replace(/^\/(architect|godarchitect)(@\w+)?\s*/i, '')
+        .trim();
+      const mode = /^pr\b/i.test(arg) ? 'pr' : 'scan';
+      const focus = arg.replace(/^(pr|scan)\s*/i, '').trim();
+      await ctx.reply(
+        mode === 'pr'
+          ? '🏛 Architect PR mode — scanning + opening PR…'
+          : '🏛 Architect scanning repo…'
+      );
+      const { runArchitect, formatArchitect } = await import('../lib/godArchitect.js');
+      const r = await runArchitect({ mode, focus });
+      await ctx.reply(formatArchitect(r));
+    } catch (e) {
+      await ctx.reply('architect: ' + String(e?.message || e).slice(0, 200));
+    }
+  });
+
+  bot.command(['legion'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const arg = (ctx.message.text || '')
+        .replace(/^\/legion(@\w+)?\s*/i, '')
+        .trim();
+      const { legionStatus, formatLegion, legionTick, creditAgent, spawnLegion } = await import(
+        '../lib/legionSwarm.js'
+      );
+      if (!arg || /^status|list$/i.test(arg)) {
+        const st = await legionStatus(supabase);
+        await ctx.reply(formatLegion(st));
+        return;
+      }
+      if (/^tick$/i.test(arg)) {
+        const r = await legionTick(supabase);
+        if (!r.ok) {
+          await ctx.reply('❌ ' + r.error);
+          return;
+        }
+        await ctx.reply(
+          '⚔ Legion tick\nFired: ' +
+            (r.fired || []).join(', ') +
+            '\nSpawned: ' +
+            (r.spawned || []).join(', ')
+        );
+        const st = await legionStatus(supabase);
+        await ctx.reply(formatLegion(st));
+        return;
+      }
+      if (/^spawn\s+/i.test(arg)) {
+        const name = arg.replace(/^spawn\s+/i, '').trim().slice(0, 32);
+        const r = await spawnLegion(supabase, name || 'legion-' + Date.now().toString(36));
+        await ctx.reply(r.ok ? '✅ Spawned ' + r.agent.name + ' ¢20' : '❌ ' + r.error);
+        return;
+      }
+      if (/^reward\s+/i.test(arg)) {
+        const parts = arg.replace(/^reward\s+/i, '').trim().split(/\s+/);
+        const name = parts[0];
+        const reason = parts[1] === 'fix' ? 'fix' : 'find';
+        const delta = reason === 'fix' ? 10 : 5;
+        const r = await creditAgent(supabase, name, delta, reason);
+        await ctx.reply(
+          r.ok ? '✅ ' + name + ' ¢' + r.credits + ' (' + reason + ')' : '❌ ' + r.error
+        );
+        return;
+      }
+      await ctx.reply(
+        '⚔ /legion status\n/legion tick\n/legion spawn <name>\n/legion reward <name> [find|fix]'
+      );
+    } catch (e) {
+      await ctx.reply(
+        'legion: ' +
+          String(e?.message || e).slice(0, 200) +
+          '\nRun sql/LEGION_ECONOMY.sql in Supabase if columns missing'
+      );
+    }
+  });
+
+
   bot.command(['constitution', 'capabilities', 'osmap'], async (ctx) => {
     try {
       if (!isAdmin(ctx)) {
@@ -12896,13 +12984,24 @@ bot.command('commands', async (ctx) => {
         return;
       }
       await ctx.reply(
-        '✅ Live Canvas\n' +
-          'ID: ' + r.id + '\n' +
-          'URL: ' + r.liveUrl + '\n' +
-          'Path: ' + r.path + '\n' +
-          '(If 404, wait 30–60s for Vercel deploy)'
+        '✅ Live Canvas
+' +
+          'ID: ' + r.id + '
+' +
+          'Live: ' + r.liveUrl + '
+' +
+          'Direct: ' + (r.liveIndexUrl || '') + '
+' +
+          'Instant: ' + (r.rawUrl || '') + '
+' +
+          'Path: ' + r.path + '
+' +
+          (r.deployHook && r.deployHook.ok
+            ? 'Deploy hook: fired — wait 30–90s'
+            : 'Tip: run /deploy now if Live 404
+Instant raw URL works immediately')
       );
-    } catch (e) {
+} catch (e) {
       await ctx.reply('forgepage: ' + String(e?.message || e).slice(0, 200));
     }
   });
