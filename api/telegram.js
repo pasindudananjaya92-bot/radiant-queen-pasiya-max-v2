@@ -12847,6 +12847,67 @@ bot.command('commands', async (ctx) => {
   });
 
   
+  
+  bot.command(['constitution', 'capabilities', 'osmap'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      try {
+        const { buildConstitution } = await import('../lib/constitution.js');
+        await ctx.reply(buildConstitution());
+      } catch (e) {
+        await ctx.reply(
+          '📜 PASIYAOS CONSTITUTION\n' +
+            '· /sql /chronos /swarm /mem /browse /forgedrop\n' +
+            '· /deploy /env /shell /forgepage /nightly\n' +
+            '· Founder-only · Vercel + Supabase free stack\n' +
+            '(fallback map)'
+        );
+      }
+    } catch (e) {
+      await ctx.reply('constitution: ' + String(e?.message || e).slice(0, 180));
+    }
+  });
+
+  bot.command(['forgepage', 'forge', 'makepage', 'canvas'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const prompt = (ctx.message.text || '')
+        .replace(/^\/(forgepage|forge|makepage|canvas)(@\w+)?\s*/i, '')
+        .trim();
+      if (!prompt) {
+        await ctx.reply(
+          '🖼 LIVE CANVAS\n' +
+            '/forgepage dark portfolio for Radiant Queen\n' +
+            'Uploads public/canvas/<id>/index.html → live Vercel URL'
+        );
+        return;
+      }
+      await ctx.reply('🖼 Forging + uploading to GitHub…');
+      const { forgePage } = await import('../lib/liveCanvas.js');
+      const r = await forgePage(prompt);
+      if (!r.ok) {
+        await ctx.reply('❌ ' + r.error);
+        return;
+      }
+      await ctx.reply(
+        '✅ Live Canvas\n' +
+          'ID: ' + r.id + '\n' +
+          'URL: ' + r.liveUrl + '\n' +
+          'Path: ' + r.path + '\n' +
+          '(If 404, wait 30–60s for Vercel deploy)'
+      );
+    } catch (e) {
+      await ctx.reply('forgepage: ' + String(e?.message || e).slice(0, 200));
+    }
+  });
+
+
   bot.command(['deploy', 'redeploy'], async (ctx) => {
     try {
       if (!isAdmin(ctx)) {
@@ -12874,7 +12935,7 @@ bot.command('commands', async (ctx) => {
           await ctx.reply('❌ ' + r.error + (r.hint ? '\n' + r.hint : ''));
           return;
         }
-        await ctx.reply('✅ Redeploy queued\n' + (r.url || '') + '\nstate: ' + (r.state || ''));
+        await ctx.reply('✅ Redeploy queued (' + (r.method || 'api') + ')\n' + (r.url || '') + '\nstate: ' + (r.state || ''));
         return;
       }
       await ctx.reply('Usage:\n/deploy list\n/deploy now');
@@ -12939,7 +13000,7 @@ bot.command('commands', async (ctx) => {
       if (!arg) {
         await ctx.reply(
           '🐚 Universe Shell (Piston sandbox)\n' +
-            'Usage:\n/shell py: print(2+2)\n/shell js: console.log("hi")\n/shell bash: echo hello\n\nNo host Docker — isolated free API.'
+            'Usage:\n/shell py: print(2+2)\n/shell js: console.log("hi")\n/shell bash: echo hello\n\nSandbox: Wandbox → Judge0 CE fallback (no Piston).'
         );
         return;
       }
@@ -12967,7 +13028,7 @@ bot.command('commands', async (ctx) => {
   });
 
 
-  bot.command(['forgepage', 'forge', 'makepage'], async (ctx) => {
+  bot.command(['__legacy_forgepage_disabled'], async (ctx) => {
     try {
       if (String(ctx.from.id) !== String(ADMIN_ID)) {
         await ctx.reply('👑 Founder-only feature.');
