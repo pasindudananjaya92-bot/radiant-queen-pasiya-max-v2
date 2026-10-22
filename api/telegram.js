@@ -3043,7 +3043,7 @@ function buildBot() {
         '/sql', '/chronos', '/rollback', '/chronosrb', '/timeguard',
         '/audit', '/ledger', '/intentlog',
         '/secreport', '/panopticon', '/sec', '/checkvulns', '/vulns', '/osv',
-        '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile', '/cron', '/mem', '/memory', '/memgraph', '/jarvis', '/deploy', '/redeploy', '/env', '/venv', '/shell', '/piston', '/exec', '/forgepage', '/canvas', '/nightly', '/constitution', '/architect', '/godarchitect', '/legion', '/omni', '/omniscience', '/revenue',
+        '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile', '/cron', '/mem', '/memory', '/memgraph', '/jarvis', '/deploy', '/redeploy', '/env', '/venv', '/shell', '/piston', '/exec', '/forgepage', '/canvas', '/nightly', '/constitution', '/architect', '/godarchitect', '/legion', '/omni', '/omniscience', '/revenue', '/chain', '/replicate',
       ]);
       if (!founderCmds.has(cmd)) return next();
 
@@ -3244,6 +3244,17 @@ function buildBot() {
           await ctx.reply(rev.formatLeads(r));
           return;
         }
+        if (/^stats|pipeline$/i.test(arg)) {
+          const st = await rev.pipelineStats(supabase);
+          await ctx.reply(rev.formatStats(st));
+          return;
+        }
+        if (/^(won|lost|paused)\s+(\S+)/i.test(arg)) {
+          const m = arg.match(/^(won|lost|paused)\s+(\S+)/i);
+          const r = await rev.setLeadStatus(supabase, m[2], m[1].toLowerCase());
+          await ctx.reply(r.ok ? '✅ ' + m[1] + ' · ' + m[2] : '❌ ' + r.error);
+          return;
+        }
         if (/^idea\b/i.test(arg)) {
           const topic = arg.replace(/^idea\s*/i, '').trim() || 'Telegram bot';
           const r = await rev.ideaPitch(topic);
@@ -3261,7 +3272,38 @@ function buildBot() {
           await ctx.reply(r.ok ? '✅ Lead saved id=' + (r.id || '') : '❌ ' + r.error + '\nRun sql/REVENUE.sql');
           return;
         }
-        await ctx.reply('/revenue list\n/revenue idea <topic>\n/revenue add Title | note | 100');
+        await ctx.reply(
+          '/revenue list\n/revenue stats\n/revenue idea <topic>\n/revenue add Title | note | 100\n/revenue won <id>'
+        );
+        return;
+      }
+
+      if (cmd === '/chain') {
+        const chain = await import('../lib/chainAudit.js');
+        if (/^verify/i.test(arg)) {
+          const v = await chain.verifyChain(supabase, 40);
+          await ctx.reply(chain.formatVerify(v));
+          return;
+        }
+        const tip = await chain.getChainTip(supabase);
+        await ctx.reply(
+          tip.ok
+            ? '⛓ CHAIN\ntip: ' +
+                String(tip.tipHash || '').slice(0, 20) +
+                '\nheight: ' +
+                (tip.height || 0) +
+                '\n\n/chain verify'
+            : '❌ ' + tip.error + '\nRun sql/CHAIN_AUDIT.sql'
+        );
+        return;
+      }
+
+      if (cmd === '/replicate') {
+        const { replicateBlueprint, formatBlueprint } = await import('../lib/replicate.js');
+        const name = arg || 'child-bot';
+        await ctx.reply('🧬 Building blueprint…');
+        const r = await replicateBlueprint(supabase, name);
+        await ctx.reply(formatBlueprint(r));
         return;
       }
 
@@ -13048,6 +13090,48 @@ bot.command('commands', async (ctx) => {
       await ctx.reply('constitution: ' + String(e?.message || e).slice(0, 180));
     }
   });
+
+
+  bot.command(['chain'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const arg = (ctx.message.text || '').replace(/^\/chain(@\w+)?\s*/i, '').trim();
+      const chain = await import('../lib/chainAudit.js');
+      if (/^verify/i.test(arg)) {
+        const v = await chain.verifyChain(supabase, 40);
+        await ctx.reply(chain.formatVerify(v));
+        return;
+      }
+      const tip = await chain.getChainTip(supabase);
+      await ctx.reply(
+        tip.ok
+          ? '⛓ CHAIN\ntip: ' + String(tip.tipHash || '').slice(0, 20) + '\nheight: ' + (tip.height || 0)
+          : '❌ ' + tip.error
+      );
+    } catch (e) {
+      await ctx.reply('chain: ' + String(e?.message || e).slice(0, 180));
+    }
+  });
+
+  bot.command(['replicate'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const arg = (ctx.message.text || '').replace(/^\/replicate(@\w+)?\s*/i, '').trim();
+      const { replicateBlueprint, formatBlueprint } = await import('../lib/replicate.js');
+      await ctx.reply('🧬 Building blueprint…');
+      const r = await replicateBlueprint(supabase, arg || 'child-bot');
+      await ctx.reply(formatBlueprint(r));
+    } catch (e) {
+      await ctx.reply('replicate: ' + String(e?.message || e).slice(0, 180));
+    }
+  });
+
 
   bot.command(['forgepage', 'forge', 'makepage', 'canvas'], async (ctx) => {
     try {
