@@ -3043,7 +3043,7 @@ function buildBot() {
         '/sql', '/chronos', '/rollback', '/chronosrb', '/timeguard',
         '/audit', '/ledger', '/intentlog',
         '/secreport', '/panopticon', '/sec', '/checkvulns', '/vulns', '/osv',
-        '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile', '/cron', '/mem', '/memory', '/memgraph', '/jarvis', '/deploy', '/redeploy', '/env', '/venv', '/shell', '/piston', '/exec', '/forgepage', '/canvas', '/nightly', '/constitution', '/architect', '/godarchitect', '/legion', '/omni', '/omniscience', '/revenue', '/chain', '/replicate',
+        '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile', '/cron', '/mem', '/memory', '/memgraph', '/jarvis', '/deploy', '/redeploy', '/env', '/venv', '/shell', '/piston', '/exec', '/forgepage', '/canvas', '/nightly', '/constitution', '/architect', '/godarchitect', '/legion', '/omni', '/omniscience', '/revenue', '/chain', '/replicate', '/neuralmemory', '/neural', '/nmem', '/logs', '/logradar',
       ]);
       if (!founderCmds.has(cmd)) return next();
 
@@ -3304,6 +3304,48 @@ function buildBot() {
         await ctx.reply('🧬 Building blueprint…');
         const r = await replicateBlueprint(supabase, name);
         await ctx.reply(formatBlueprint(r));
+        return;
+      }
+
+
+      if (cmd === '/neuralmemory' || cmd === '/neural' || cmd === '/nmem') {
+        const nm = await import('../lib/neuralMemory.js');
+        if (!arg || /^list$/i.test(arg)) {
+          const r = await nm.neuralList(supabase, 12);
+          await ctx.reply(nm.formatNeuralList(r));
+          return;
+        }
+        if (/^add\s+/i.test(arg)) {
+          const text = arg.replace(/^add\s+/i, '').trim();
+          const r = await nm.neuralRemember(supabase, {
+            text,
+            userId: String(ctx.from?.id || ''),
+          });
+          await ctx.reply(
+            r.ok
+              ? '✅ Neural saved' +
+                  (r.embedded ? ' [embedded]' : ' [keyword-only]') +
+                  (r.id ? ' id=' + String(r.id).slice(0, 8) : '')
+              : '❌ ' + r.error + '\nRun NEURAL_MEMORY.sql in Supabase'
+          );
+          return;
+        }
+        if (/^(search|find|recall)\s+/i.test(arg)) {
+          const q = arg.replace(/^(search|find|recall)\s+/i, '').trim();
+          const r = await nm.neuralRecall(supabase, q, 5);
+          await ctx.reply(nm.formatNeuralRecall(r));
+          return;
+        }
+        const r = await nm.neuralRecall(supabase, arg, 5);
+        await ctx.reply(nm.formatNeuralRecall(r));
+        return;
+      }
+
+      if (cmd === '/logs' || cmd === '/logradar') {
+        const al = await import('../lib/autoLogs.js');
+        const mode = /^fails/i.test(arg) ? 'fails' : 'all';
+        const r = await al.runLogs(supabase, mode);
+        await ctx.reply(al.formatLogs(r, mode));
         return;
       }
 
@@ -13130,7 +13172,57 @@ bot.command('commands', async (ctx) => {
     } catch (e) {
       await ctx.reply('replicate: ' + String(e?.message || e).slice(0, 180));
     }
+  }
+
+  bot.command(['neuralmemory', 'neural', 'nmem'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const arg = (ctx.message.text || '')
+        .replace(/^\/(neuralmemory|neural|nmem)(@\w+)?\s*/i, '')
+        .trim();
+      const nm = await import('../lib/neuralMemory.js');
+      if (!arg || /^list$/i.test(arg)) {
+        await ctx.reply(nm.formatNeuralList(await nm.neuralList(supabase, 12)));
+        return;
+      }
+      if (/^add\s+/i.test(arg)) {
+        const text = arg.replace(/^add\s+/i, '').trim();
+        const r = await nm.neuralRemember(supabase, {
+          text,
+          userId: String(ctx.from?.id || ''),
+        });
+        await ctx.reply(
+          r.ok
+            ? '✅ Neural saved' + (r.embedded ? ' [embedded]' : ' [keyword-only]')
+            : '❌ ' + r.error
+        );
+        return;
+      }
+      const q = arg.replace(/^(search|find|recall)\s+/i, '').trim();
+      await ctx.reply(nm.formatNeuralRecall(await nm.neuralRecall(supabase, q || arg, 5)));
+    } catch (e) {
+      await ctx.reply('neural: ' + String(e?.message || e).slice(0, 180));
+    }
   });
+
+  bot.command(['logs', 'logradar'], async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const arg = (ctx.message.text || '').replace(/^\/(logs|logradar)(@\w+)?\s*/i, '').trim();
+      const al = await import('../lib/autoLogs.js');
+      const mode = /^fails/i.test(arg) ? 'fails' : 'all';
+      await ctx.reply(al.formatLogs(await al.runLogs(supabase, mode), mode));
+    } catch (e) {
+      await ctx.reply('logs: ' + String(e?.message || e).slice(0, 180));
+    }
+  });
+);
 
 
   bot.command(['forgepage', 'forge', 'makepage', 'canvas'], async (ctx) => {
