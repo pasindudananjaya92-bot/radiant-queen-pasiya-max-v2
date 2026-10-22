@@ -2036,6 +2036,23 @@ async function githubPutFile(path, contentBuffer, message) {
   if (!GITHUB_TOKEN) {
     return { ok: false, error: 'GITHUB_TOKEN missing on Vercel' };
   }
+  // Self-healing upload for JS/TS — syntax check + AI fix before push
+  try {
+    const pth = String(path || '');
+    if (/\.(js|mjs|cjs|ts)$/i.test(pth)) {
+      const { healSourceBeforePush } = await import('../lib/ghHeal.js');
+      const healed = await healSourceBeforePush(pth, contentBuffer.toString('utf8'));
+      if (!healed.ok) {
+        return { ok: false, error: 'Syntax blocked push: ' + (healed.error || 'invalid'), heal: healed };
+      }
+      if (healed.code) contentBuffer = Buffer.from(healed.code, 'utf8');
+      if (healed.fixed) {
+        message = (message || '') + ' [ghHeal auto-syntax-fix]';
+      }
+    }
+  } catch (e) {
+    return { ok: false, error: 'ghHeal: ' + String(e?.message || e) };
+  }
   const repo = GITHUB_REPO || 'pasindudananjaya92-bot/radiant-queen-pasiya-max-v2';
   const cleanPath = String(path || '')
     .trim()
@@ -3309,43 +3326,41 @@ function buildBot() {
 
 
       if (cmd === '/neuralmemory' || cmd === '/neural' || cmd === '/nmem') {
-        const nm = await import('../lib/neuralMemory.js');
-        if (!arg || /^list$/i.test(arg)) {
-          const r = await nm.neuralList(supabase, 12);
-          await ctx.reply(nm.formatNeuralList(r));
-          return;
+        try {
+          const nm = await import('../lib/neuralMemory.js');
+          if (!arg || /^list$/i.test(arg)) {
+            await ctx.reply(nm.formatNeuralList(await nm.neuralList(supabase, 12)));
+            return;
+          }
+          if (/^add\s+/i.test(arg)) {
+            const text = arg.replace(/^add\s+/i, '').trim();
+            const r = await nm.neuralRemember(supabase, {
+              text,
+              userId: String(ctx.from?.id || ''),
+            });
+            await ctx.reply(
+              r.ok
+                ? '✅ Neural saved' + (r.embedded ? ' [embedded]' : ' [keyword-only]')
+                : '❌ ' + r.error + '\nRun NEURAL_MEMORY.sql'
+            );
+            return;
+          }
+          const q = arg.replace(/^(search|find|recall)\s+/i, '').trim() || arg;
+          await ctx.reply(nm.formatNeuralRecall(await nm.neuralRecall(supabase, q, 5)));
+        } catch (e) {
+          await ctx.reply('neural: ' + String(e?.message || e).slice(0, 180));
         }
-        if (/^add\s+/i.test(arg)) {
-          const text = arg.replace(/^add\s+/i, '').trim();
-          const r = await nm.neuralRemember(supabase, {
-            text,
-            userId: String(ctx.from?.id || ''),
-          });
-          await ctx.reply(
-            r.ok
-              ? '✅ Neural saved' +
-                  (r.embedded ? ' [embedded]' : ' [keyword-only]') +
-                  (r.id ? ' id=' + String(r.id).slice(0, 8) : '')
-              : '❌ ' + r.error + '\nRun NEURAL_MEMORY.sql in Supabase'
-          );
-          return;
-        }
-        if (/^(search|find|recall)\s+/i.test(arg)) {
-          const q = arg.replace(/^(search|find|recall)\s+/i, '').trim();
-          const r = await nm.neuralRecall(supabase, q, 5);
-          await ctx.reply(nm.formatNeuralRecall(r));
-          return;
-        }
-        const r = await nm.neuralRecall(supabase, arg, 5);
-        await ctx.reply(nm.formatNeuralRecall(r));
         return;
       }
 
       if (cmd === '/logs' || cmd === '/logradar') {
-        const al = await import('../lib/autoLogs.js');
-        const mode = /^fails/i.test(arg) ? 'fails' : 'all';
-        const r = await al.runLogs(supabase, mode);
-        await ctx.reply(al.formatLogs(r, mode));
+        try {
+          const al = await import('../lib/autoLogs.js');
+          const mode = /^fails/i.test(arg) ? 'fails' : 'all';
+          await ctx.reply(al.formatLogs(await al.runLogs(supabase, mode), mode));
+        } catch (e) {
+          await ctx.reply('logs: ' + String(e?.message || e).slice(0, 180));
+        }
         return;
       }
 
@@ -13172,57 +13187,7 @@ bot.command('commands', async (ctx) => {
     } catch (e) {
       await ctx.reply('replicate: ' + String(e?.message || e).slice(0, 180));
     }
-  }
-
-  bot.command(['neuralmemory', 'neural', 'nmem'], async (ctx) => {
-    try {
-      if (!isAdmin(ctx)) {
-        await ctx.reply('👑 Founder-only.');
-        return;
-      }
-      const arg = (ctx.message.text || '')
-        .replace(/^\/(neuralmemory|neural|nmem)(@\w+)?\s*/i, '')
-        .trim();
-      const nm = await import('../lib/neuralMemory.js');
-      if (!arg || /^list$/i.test(arg)) {
-        await ctx.reply(nm.formatNeuralList(await nm.neuralList(supabase, 12)));
-        return;
-      }
-      if (/^add\s+/i.test(arg)) {
-        const text = arg.replace(/^add\s+/i, '').trim();
-        const r = await nm.neuralRemember(supabase, {
-          text,
-          userId: String(ctx.from?.id || ''),
-        });
-        await ctx.reply(
-          r.ok
-            ? '✅ Neural saved' + (r.embedded ? ' [embedded]' : ' [keyword-only]')
-            : '❌ ' + r.error
-        );
-        return;
-      }
-      const q = arg.replace(/^(search|find|recall)\s+/i, '').trim();
-      await ctx.reply(nm.formatNeuralRecall(await nm.neuralRecall(supabase, q || arg, 5)));
-    } catch (e) {
-      await ctx.reply('neural: ' + String(e?.message || e).slice(0, 180));
-    }
   });
-
-  bot.command(['logs', 'logradar'], async (ctx) => {
-    try {
-      if (!isAdmin(ctx)) {
-        await ctx.reply('👑 Founder-only.');
-        return;
-      }
-      const arg = (ctx.message.text || '').replace(/^\/(logs|logradar)(@\w+)?\s*/i, '').trim();
-      const al = await import('../lib/autoLogs.js');
-      const mode = /^fails/i.test(arg) ? 'fails' : 'all';
-      await ctx.reply(al.formatLogs(await al.runLogs(supabase, mode), mode));
-    } catch (e) {
-      await ctx.reply('logs: ' + String(e?.message || e).slice(0, 180));
-    }
-  });
-);
 
 
   bot.command(['forgepage', 'forge', 'makepage', 'canvas'], async (ctx) => {
