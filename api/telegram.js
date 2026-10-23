@@ -14,6 +14,7 @@ import {
   firebaseTriadPing,
 } from '../lib/fortress.js';
 import { intentLedgerMiddleware } from '../lib/intentLedger.js';
+import { createPrometheusCatch, runPrometheus } from '../lib/autoFixer.js';
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ADMIN_ID = String(process.env.ADMIN_ID || '').trim();
@@ -18871,18 +18872,23 @@ bot.command('commands', async (ctx) => {
     return next();
   });
 
+  const prometheusHandler = createPrometheusCatch(bot);
   bot.catch(async (err, ctx) => {
     console.error('telegram bot error', err);
     try {
-      const { reportError, autoHintFromError } = await import('../lib/errorRadar.js');
+      const { reportError } = await import('../lib/errorRadar.js');
       await reportError(err, 'bot.catch');
-      if (ctx && isAdmin(ctx)) {
-        const hints = autoHintFromError(err).join('\n');
-        try {
-          await ctx.reply('Radar caught error:\n' + String(err?.message || err).slice(0, 200) + (hints ? '\n' + hints : ''));
-        } catch (_) {}
-      }
     } catch (_) {}
+    try {
+      await prometheusHandler(err, ctx);
+    } catch (e2) {
+      console.error('prometheus catch', e2);
+      try {
+        if (ctx && typeof isAdmin === 'function' && isAdmin(ctx)) {
+          await ctx.reply('Radar caught error:\n' + String(err?.message || err).slice(0, 200));
+        }
+      } catch (_) {}
+    }
   });
   return bot;
 }
