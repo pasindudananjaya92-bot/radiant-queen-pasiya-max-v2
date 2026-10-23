@@ -15,6 +15,7 @@ import {
 } from '../lib/fortress.js';
 import { intentLedgerMiddleware } from '../lib/intentLedger.js';
 import { createPrometheusCatch, runPrometheus } from '../lib/autoFixer.js';
+import { isV2000Command, handleV2000 } from '../lib/v2000Routes.js';
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ADMIN_ID = String(process.env.ADMIN_ID || '').trim();
@@ -3063,7 +3064,7 @@ function buildBot() {
         '/secreport', '/panopticon', '/sec', '/checkvulns', '/vulns', '/osv',
         '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile', '/cron', '/mem', '/memory', '/memgraph', '/jarvis', '/deploy', '/redeploy', '/env', '/venv', '/shell', '/piston', '/exec', '/forgepage', '/canvas', '/nightly', '/constitution', '/architect', '/godarchitect', '/legion', '/omni', '/omniscience', '/revenue', '/chain', '/replicate', '/neuralmemory', '/neural', '/nmem', '/logs', '/logradar',
         '/review', '/prreview', '/secrets', '/leakscan', '/dbslow', '/db',
-        '/domain', '/watchdog', '/sandbox', '/weekly', '/digest', '/clubweekly', '/selfheal', '/heal', '/omniprompt', '/omniask', '/seal',
+        '/domain', '/watchdog', '/sandbox', '/weekly', '/digest', '/clubweekly', '/selfheal', '/heal', '/omniprompt', '/echo', '/research', '/deepmind', '/radar', '/power', '/ph', '/browse', '/scantext', '/omniask', '/seal',
       ]);
       if (!founderCmds.has(cmd)) return next();
 
@@ -3071,6 +3072,13 @@ function buildBot() {
       const uid = String(ctx.from?.id || '');
       const admin = String(typeof ADMIN_ID !== 'undefined' ? ADMIN_ID : process.env.ADMIN_ID || '');
       if (admin && uid !== admin) {
+        if (typeof isV2000Command === 'function' && isV2000Command(cmd)) {
+          try {
+            const out = await handleV2000({ cmd, text, ctx, supabase, bot });
+            if (out) { await ctx.reply(String(out).slice(0, 4000)); return; }
+          } catch (e) { await ctx.reply('v2000: ' + (e.message || e)); return; }
+        }
+
         await ctx.reply('👑 Founder-only.');
         return; // stop — do not AI
       }
