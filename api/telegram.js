@@ -297,6 +297,18 @@ async function fetchStrideJson(path, timeoutMs = 8000) {
     } finally {
       clearTimeout(t);
     }
+
+// === EMERGENCY EARLY PING (never remove) ===
+try {
+  const _earlyText = String(ctx?.message?.text || ctx?.update?.message?.text || '').trim();
+  const _earlyCmd = _earlyText.split(/\s+/)[0].split('@')[0].toLowerCase();
+  if (_earlyCmd === '/ping' || _earlyText === 'ping') {
+    await ctx.reply('pong ✅ emergency-boot · ' + new Date().toISOString());
+    return;
+  }
+} catch (_e) { /* continue */ }
+// === END EARLY PING ===
+
     const text = await r.text();
     if (!r.ok) {
       return { ok: false, error: `HTTP ${r.status}`, status: r.status };
