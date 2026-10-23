@@ -3061,6 +3061,8 @@ function buildBot() {
         '/audit', '/ledger', '/intentlog',
         '/secreport', '/panopticon', '/sec', '/checkvulns', '/vulns', '/osv',
         '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile', '/cron', '/mem', '/memory', '/memgraph', '/jarvis', '/deploy', '/redeploy', '/env', '/venv', '/shell', '/piston', '/exec', '/forgepage', '/canvas', '/nightly', '/constitution', '/architect', '/godarchitect', '/legion', '/omni', '/omniscience', '/revenue', '/chain', '/replicate', '/neuralmemory', '/neural', '/nmem', '/logs', '/logradar',
+        '/review', '/prreview', '/secrets', '/leakscan', '/dbslow', '/db',
+        '/domain', '/watchdog', '/sandbox', '/weekly', '/digest', '/clubweekly',
       ]);
       if (!founderCmds.has(cmd)) return next();
 
@@ -3362,6 +3364,103 @@ function buildBot() {
           await ctx.reply('logs: ' + String(e?.message || e).slice(0, 180));
         }
         return;
+      }
+
+
+      if (cmd === '/review' || cmd === '/prreview') {
+        try {
+          const pr = await import('../lib/prReview.js');
+          if (!arg || /^list$/i.test(arg)) {
+            await ctx.reply(pr.formatReview(await pr.listOpenPrs(10)));
+            return;
+          }
+          const m = arg.match(/^(\d+)\s*(comment)?/i);
+          if (!m) {
+            await ctx.reply('Usage: /review list · /review <n> · /review <n> comment');
+            return;
+          }
+          await ctx.reply('Reviewing PR #' + m[1] + '...');
+          const r = await pr.reviewPr(m[1], { postComment: Boolean(m[2]) });
+          await ctx.reply(pr.formatReview(r));
+        } catch (e) {
+          await ctx.reply('review: ' + String(e && e.message ? e.message : e).slice(0, 200));
+        }
+        return;
+      }
+
+      if (cmd === '/secrets' || cmd === '/leakscan') {
+        try {
+          const sc = await import('../lib/secretsScan.js');
+          await ctx.reply('Scanning repo for leaks...');
+          const r = await sc.runSecretsScan();
+          await ctx.reply(sc.formatSecrets(r));
+        } catch (e) {
+          await ctx.reply('secrets: ' + String(e && e.message ? e.message : e).slice(0, 200));
+        }
+        return;
+      }
+
+      if (cmd === '/dbslow' || (cmd === '/db' && /^slow\b/i.test(arg))) {
+        try {
+          const db = await import('../lib/dbSlow.js');
+          await ctx.reply('Analyzing DB...');
+          const r = await db.analyzeDb(supabase);
+          await ctx.reply(db.formatDbSlow(r));
+        } catch (e) {
+          await ctx.reply('dbslow: ' + String(e && e.message ? e.message : e).slice(0, 200));
+        }
+        return;
+      }
+
+      if (cmd === '/domain' || cmd === '/watchdog') {
+        try {
+          const dw = await import('../lib/domainWatch.js');
+          const urls = arg
+            ? arg.split(/\s+/).filter(function (u) {
+                return /^https?:\/\//i.test(u);
+              })
+            : [];
+          const r = await dw.checkDomains(urls);
+          await ctx.reply(dw.formatDomain(r));
+        } catch (e) {
+          await ctx.reply('domain: ' + String(e && e.message ? e.message : e).slice(0, 200));
+        }
+        return;
+      }
+
+      if (cmd === '/sandbox') {
+        try {
+          const sb = await import('../lib/sandboxLite.js');
+          var lang = 'js';
+          var code = arg;
+          var mm = arg.match(/^(js|javascript|py|python|bash|sh)\s*[:\s]\s*([\s\S]+)/i);
+          if (mm) {
+            lang = mm[1];
+            code = mm[2];
+          }
+          await ctx.reply('Sandbox (' + lang + ')...');
+          const r = await sb.runSandbox(lang, code);
+          await ctx.reply(sb.formatSandbox(r));
+        } catch (e) {
+          await ctx.reply('sandbox: ' + String(e && e.message ? e.message : e).slice(0, 200));
+        }
+        return;
+      }
+
+      if (cmd === '/weekly' || cmd === '/digest') {
+        try {
+          const w = await import('../lib/weeklyDigest.js');
+          await ctx.reply('Building weekly digest...');
+          const r = await w.buildWeekly(supabase);
+          await ctx.reply(w.formatWeekly(r));
+        } catch (e) {
+          await ctx.reply('weekly: ' + String(e && e.message ? e.message : e).slice(0, 200));
+        }
+        return;
+      }
+
+      if (cmd === '/clubweekly') {
+        return next();
       }
 
       // other founder cmds: fall through to existing bot.command handlers
@@ -5595,7 +5694,7 @@ bot.start(async (ctx) => {
     }
   });
 
-  bot.command('weekly', async (ctx) => {
+  bot.command(['clubweekly', 'xpweekly'], async (ctx) => {
     try {
       if (!supabase) {
         await ctx.reply('Supabase not connected.');
