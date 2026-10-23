@@ -3062,7 +3062,7 @@ function buildBot() {
         '/secreport', '/panopticon', '/sec', '/checkvulns', '/vulns', '/osv',
         '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile', '/cron', '/mem', '/memory', '/memgraph', '/jarvis', '/deploy', '/redeploy', '/env', '/venv', '/shell', '/piston', '/exec', '/forgepage', '/canvas', '/nightly', '/constitution', '/architect', '/godarchitect', '/legion', '/omni', '/omniscience', '/revenue', '/chain', '/replicate', '/neuralmemory', '/neural', '/nmem', '/logs', '/logradar',
         '/review', '/prreview', '/secrets', '/leakscan', '/dbslow', '/db',
-        '/domain', '/watchdog', '/sandbox', '/weekly', '/digest', '/clubweekly',
+        '/domain', '/watchdog', '/sandbox', '/weekly', '/digest', '/clubweekly', '/selfheal', '/heal', '/omniprompt', '/omniask', '/seal',
       ]);
       if (!founderCmds.has(cmd)) return next();
 
@@ -3461,6 +3461,45 @@ function buildBot() {
 
       if (cmd === '/clubweekly') {
         return next();
+      }
+
+
+      if (cmd === '/selfheal' || cmd === '/heal') {
+        try {
+          const sh = await import('../lib/selfHealTele.js');
+          const r = await sh.runSelfHeal(supabase, arg || 'status');
+          await ctx.reply(sh.formatSelfHeal(r));
+        } catch (e) {
+          await ctx.reply('selfheal: ' + String(e && e.message ? e.message : e).slice(0, 200));
+        }
+        return;
+      }
+
+      if (cmd === '/omniprompt' || cmd === '/omniask') {
+        try {
+          const op = await import('../lib/omniPrompt.js');
+          if (!arg) {
+            await ctx.reply('Usage: /omniprompt <your prompt>');
+            return;
+          }
+          await ctx.reply('OmniPrompt running (Groq→Gemini→OpenRouter)...');
+          const r = await op.runOmniPrompt(arg);
+          await ctx.reply(op.formatOmni(r));
+        } catch (e) {
+          await ctx.reply('omniprompt: ' + String(e && e.message ? e.message : e).slice(0, 200));
+        }
+        return;
+      }
+
+      if (cmd === '/seal') {
+        try {
+          const se = await import('../lib/projectSeal.js');
+          const r = await se.buildSeal(supabase);
+          await ctx.reply(se.formatSeal(r));
+        } catch (e) {
+          await ctx.reply('seal: ' + String(e && e.message ? e.message : e).slice(0, 200));
+        }
+        return;
       }
 
       // other founder cmds: fall through to existing bot.command handlers
