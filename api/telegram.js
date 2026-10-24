@@ -3076,7 +3076,7 @@ function buildBot() {
         '/secreport', '/panopticon', '/sec', '/checkvulns', '/vulns', '/osv',
         '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile', '/cron', '/mem', '/memory', '/memgraph', '/jarvis', '/deploy', '/redeploy', '/env', '/venv', '/shell', '/piston', '/exec', '/forgepage', '/canvas', '/nightly', '/constitution', '/architect', '/godarchitect', '/legion', '/omni', '/omniscience', '/revenue', '/chain', '/replicate', '/neuralmemory', '/neural', '/nmem', '/logs', '/logradar',
         '/review', '/prreview', '/secrets', '/leakscan', '/dbslow', '/db',
-        '/domain', '/watchdog', '/sandbox', '/weekly', '/digest', '/clubweekly', '/selfheal', '/heal', '/omniprompt', '/echo', '/research', '/deepmind', '/radar', '/power', '/ph', '/browse', '/scantext', '/omniask', '/seal', '/chronosv', '/expect',
+        '/domain', '/watchdog', '/sandbox', '/weekly', '/digest', '/clubweekly', '/selfheal', '/heal', '/omniprompt', '/echo', '/research', '/deepmind', '/radar', '/power', '/ph', '/browse', '/scantext', '/omniask', '/seal', '/chronosv', '/expect', '/debug',
       ]);
       if (!founderCmds.has(cmd)) return next();
 
@@ -3101,8 +3101,31 @@ function buildBot() {
           return;
         }
       }
-      // Chronos-V — logic watchdog / expect wrong output
-      if (cmd === '/chronosv' || cmd === '/expect') {
+      // V3000 — live expect contracts + debug
+      if (cmd === '/expect') {
+        try {
+          const { handleExpect } = await import('../lib/expectCmd.js');
+          const out = await handleExpect({ text, ctx, supabase });
+          await ctx.reply(String(out).slice(0, 4000));
+          return;
+        } catch (e) {
+          await ctx.reply('expect: ' + String(e.message || e).slice(0, 300));
+          return;
+        }
+      }
+      if (cmd === '/debug') {
+        try {
+          const { handleDebug } = await import('../lib/debugLite.js');
+          const out = await handleDebug({ text, ctx });
+          await ctx.reply(String(out).slice(0, 4000));
+          return;
+        } catch (e) {
+          await ctx.reply('debug: ' + String(e.message || e).slice(0, 300));
+          return;
+        }
+      }
+      // Chronos-V — logic watchdog only
+      if (cmd === '/chronosv') {
         try {
           const cv = await import('../lib/chronosV.js');
           const out = await cv.handleChronosV({ cmd, text, ctx, supabase, bot });
