@@ -3077,7 +3077,7 @@ function buildBot() {
         '/secreport', '/panopticon', '/sec', '/checkvulns', '/vulns', '/osv',
         '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile', '/cron', '/mem', '/memory', '/memgraph', '/jarvis', '/deploy', '/redeploy', '/env', '/venv', '/shell', '/piston', '/exec', '/forgepage', '/canvas', '/nightly', '/constitution', '/architect', '/godarchitect', '/legion', '/omni', '/omniscience', '/revenue', '/chain', '/replicate', '/neuralmemory', '/neural', '/nmem', '/logs', '/logradar',
         '/review', '/prreview', '/secrets', '/leakscan', '/dbslow', '/db',
-        '/domain', '/watchdog', '/sandbox', '/weekly', '/digest', '/clubweekly', '/selfheal', '/heal', '/omniprompt', '/echo', '/research', '/deepmind', '/radar', '/power', '/ph', '/browse', '/scantext', '/omniask', '/seal', '/chronosv', '/expect', '/asknews', '/doc', '/doclist', '/docask', '/docdel', '/docadd', '/researchdeep', '/researchstatus', '/researchlist', '/debug', '/askweb', '/vane', '/webask', '/askreddit', '/askscholar', '/askacademic', '/askyt', '/askyoutube',
+        '/domain', '/watchdog', '/sandbox', '/weekly', '/digest', '/clubweekly', '/selfheal', '/heal', '/omniprompt', '/echo', '/research', '/deepmind', '/radar', '/power', '/ph', '/browse', '/scantext', '/omniask', '/seal', '/chronosv', '/expect', '/asknews', '/doc', '/doclist', '/docask', '/docdel', '/docadd', '/researchdeep', '/researchstatus', '/researchlist', '/cachestats', '/cache', '/debug', '/askweb', '/vane', '/webask', '/askreddit', '/askscholar', '/askacademic', '/askyt', '/askyoutube',
       ]);
       if (!founderCmds.has(cmd)) return next();
 
@@ -3109,7 +3109,9 @@ function buildBot() {
         cmd === '/research' ||
         cmd === '/researchdeep' ||
         cmd === '/researchstatus' ||
-        cmd === '/researchlist'
+        cmd === '/researchlist' ||
+        cmd === '/cachestats' ||
+        cmd === '/cache'
       ) {
         try {
           const handled = await handleV4000({ text, ctx, bot });
@@ -3620,6 +3622,72 @@ function buildBot() {
   // SQL File Runner: document .sql OR caption /sqlfile|/sqlexec
   
   // v4000 C3 — PDF/TXT RAG upload (caption must include /docadd)
+  
+  // C5: reliable GitHub upload — caption "gh path/to/file" or "/ghpath path"
+  bot.on('document', async (ctx, next) => {
+    try {
+      const cap = String(ctx.message?.caption || '').trim();
+      const ghMatch = cap.match(/^(?:\/)?(?:gh|ghpath)\s+(\S+)/i);
+      if (!ghMatch) {
+        if (typeof next === 'function') return next();
+        return;
+      }
+      const uid = String(ctx.from?.id || '');
+      const admin = String(typeof ADMIN_ID !== 'undefined' ? ADMIN_ID : process.env.ADMIN_ID || '');
+      if (admin && uid !== admin) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const destPath = ghMatch[1].replace(/^\//, '');
+      const doc = ctx.message.document;
+      if (!doc) return;
+      if (doc.file_size && doc.file_size > 4.5 * 1024 * 1024) {
+        await ctx.reply('Max ~4.5MB for gh upload.');
+        return;
+      }
+      await ctx.reply('📤 GitHub upload → `' + destPath + '` …');
+      const link = await ctx.telegram.getFileLink(doc.file_id);
+      const res = await fetch(link.href);
+      const buf = Buffer.from(await res.arrayBuffer());
+      const text = buf.toString('utf8');
+      const { githubPutFile, quickSyntaxGate } = await import('../lib/ghUploadLite.js');
+      const gate = quickSyntaxGate(text, destPath);
+      if (!gate.ok) {
+        await ctx.reply('🛡 Upload blocked: ' + gate.error + '\nFix syntax, then retry.');
+        return;
+      }
+      // Prefer ghHeal if available
+      try {
+        const heal = await import('../lib/ghHeal.js');
+        if (typeof heal.healSourceBeforePush === 'function') {
+          const h = await heal.healSourceBeforePush(text, destPath);
+          if (h && h.blocked) {
+            await ctx.reply('🛡 ghHeal blocked: ' + (h.error || 'invalid'));
+            return;
+          }
+          if (h && h.content) {
+            const r = await githubPutFile({
+              path: destPath,
+              content: h.content,
+              message: 'bot gh: ' + destPath + (h.healed ? ' (healed)' : ''),
+            });
+            await ctx.reply('✅ Uploaded `' + destPath + '`' + (r.commit ? '\\ncommit ' + String(r.commit).slice(0, 7) : ''));
+            return;
+          }
+        }
+      } catch (_) { /* fall through */ }
+      const r = await githubPutFile({
+        path: destPath,
+        content: text,
+        message: 'bot gh: ' + destPath,
+      });
+      await ctx.reply('✅ Uploaded `' + destPath + '`' + (r.commit ? '\\ncommit ' + String(r.commit).slice(0, 7) : ''));
+    } catch (e) {
+      await ctx.reply('❌ gh upload: ' + String(e.message || e).slice(0, 400));
+    }
+  });
+
+
   bot.on('document', async (ctx) => {
     try {
       const cap = ctx.message?.caption || '';
