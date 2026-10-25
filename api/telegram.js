@@ -3077,7 +3077,7 @@ function buildBot() {
         '/secreport', '/panopticon', '/sec', '/checkvulns', '/vulns', '/osv',
         '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile', '/cron', '/mem', '/memory', '/memgraph', '/jarvis', '/deploy', '/redeploy', '/env', '/venv', '/shell', '/piston', '/exec', '/forgepage', '/canvas', '/nightly', '/constitution', '/architect', '/godarchitect', '/legion', '/omni', '/omniscience', '/revenue', '/chain', '/replicate', '/neuralmemory', '/neural', '/nmem', '/logs', '/logradar',
         '/review', '/prreview', '/secrets', '/leakscan', '/dbslow', '/db',
-        '/domain', '/watchdog', '/sandbox', '/weekly', '/digest', '/clubweekly', '/selfheal', '/heal', '/omniprompt', '/echo', '/research', '/deepmind', '/radar', '/power', '/ph', '/browse', '/scantext', '/omniask', '/seal', '/chronosv', '/expect', '/asknews', '/doc', '/doclist', '/docask', '/docdel', '/docadd', '/debug', '/askweb', '/vane', '/webask', '/askreddit', '/askscholar', '/askacademic', '/askyt', '/askyoutube',
+        '/domain', '/watchdog', '/sandbox', '/weekly', '/digest', '/clubweekly', '/selfheal', '/heal', '/omniprompt', '/echo', '/research', '/deepmind', '/radar', '/power', '/ph', '/browse', '/scantext', '/omniask', '/seal', '/chronosv', '/expect', '/asknews', '/doc', '/doclist', '/docask', '/docdel', '/docadd', '/researchdeep', '/researchstatus', '/researchlist', '/debug', '/askweb', '/vane', '/webask', '/askreddit', '/askscholar', '/askacademic', '/askyt', '/askyoutube',
       ]);
       if (!founderCmds.has(cmd)) return next();
 
@@ -3105,7 +3105,11 @@ function buildBot() {
         cmd === '/doclist' ||
         cmd === '/docask' ||
         cmd === '/docdel' ||
-        cmd === '/docadd'
+        cmd === '/docadd' ||
+        cmd === '/research' ||
+        cmd === '/researchdeep' ||
+        cmd === '/researchstatus' ||
+        cmd === '/researchlist'
       ) {
         try {
           const handled = await handleV4000({ text, ctx, bot });

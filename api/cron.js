@@ -448,6 +448,24 @@ async function jobNewsPodcast(client) {
   return { job: 'news_podcast', sent, subs: subs.length };
 }
 
+
+  // v4000 C4 deep research queue
+  if (job === 'research' || job === 'researchdeep') {
+    const secret = process.env.CRON_SECRET || '';
+    const q = (req.query && req.query.secret) || req.headers['x-cron-secret'] || '';
+    if (secret && String(q) !== String(secret)) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+    try {
+      const { processPendingResearchJobs } = await import('../lib/searchJobs.js');
+      const results = await processPendingResearchJobs(2);
+      return res.status(200).json({ ok: true, job: 'research', results });
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: String(e.message || e) });
+    }
+  }
+
+
 export default async function handler(req, res) {
   if (!authorized(req)) {
     res.status(401).json({ ok: false, error: 'unauthorized' });
