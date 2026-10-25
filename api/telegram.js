@@ -16,6 +16,7 @@ import {
 import { intentLedgerMiddleware } from '../lib/intentLedger.js';
 import { createPrometheusCatch, runPrometheus } from '../lib/autoFixer.js';
 import { isV2000Command, handleV2000 } from '../lib/v2000Routes.js';
+import { handleV4000 } from '../lib/v4000Routes.js';
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ADMIN_ID = String(process.env.ADMIN_ID || '').trim();
@@ -3076,7 +3077,7 @@ function buildBot() {
         '/secreport', '/panopticon', '/sec', '/checkvulns', '/vulns', '/osv',
         '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile', '/cron', '/mem', '/memory', '/memgraph', '/jarvis', '/deploy', '/redeploy', '/env', '/venv', '/shell', '/piston', '/exec', '/forgepage', '/canvas', '/nightly', '/constitution', '/architect', '/godarchitect', '/legion', '/omni', '/omniscience', '/revenue', '/chain', '/replicate', '/neuralmemory', '/neural', '/nmem', '/logs', '/logradar',
         '/review', '/prreview', '/secrets', '/leakscan', '/dbslow', '/db',
-        '/domain', '/watchdog', '/sandbox', '/weekly', '/digest', '/clubweekly', '/selfheal', '/heal', '/omniprompt', '/echo', '/research', '/deepmind', '/radar', '/power', '/ph', '/browse', '/scantext', '/omniask', '/seal', '/chronosv', '/expect', '/debug',
+        '/domain', '/watchdog', '/sandbox', '/weekly', '/digest', '/clubweekly', '/selfheal', '/heal', '/omniprompt', '/echo', '/research', '/deepmind', '/radar', '/power', '/ph', '/browse', '/scantext', '/omniask', '/seal', '/chronosv', '/expect', '/debug', '/askweb', '/vane', '/webask', '/askreddit', '/askscholar', '/askacademic', '/askyt', '/askyoutube',
       ]);
       if (!founderCmds.has(cmd)) return next();
 
@@ -3086,6 +3087,27 @@ function buildBot() {
       if (admin && uid !== admin) {
         await ctx.reply('👑 Founder-only.');
         return; // stop — do not AI
+      }
+
+      // v4000 Vane search + Phase C debug/surgeon
+      if (
+        cmd === '/debug' ||
+        cmd === '/askweb' ||
+        cmd === '/vane' ||
+        cmd === '/webask' ||
+        cmd === '/askreddit' ||
+        cmd === '/askscholar' ||
+        cmd === '/askacademic' ||
+        cmd === '/askyt' ||
+        cmd === '/askyoutube'
+      ) {
+        try {
+          const handled = await handleV4000({ text, ctx, bot });
+          if (handled) return;
+        } catch (e) {
+          await ctx.reply('v4000: ' + String(e.message || e).slice(0, 300));
+          return;
+        }
       }
 
       // v2000 Powerhouse / Echo X / DeepMind — FOUNDER only, before other routes
