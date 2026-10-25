@@ -3077,7 +3077,7 @@ function buildBot() {
         '/secreport', '/panopticon', '/sec', '/checkvulns', '/vulns', '/osv',
         '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile', '/cron', '/mem', '/memory', '/memgraph', '/jarvis', '/deploy', '/redeploy', '/env', '/venv', '/shell', '/piston', '/exec', '/forgepage', '/canvas', '/nightly', '/constitution', '/architect', '/godarchitect', '/legion', '/omni', '/omniscience', '/revenue', '/chain', '/replicate', '/neuralmemory', '/neural', '/nmem', '/logs', '/logradar',
         '/review', '/prreview', '/secrets', '/leakscan', '/dbslow', '/db',
-        '/domain', '/watchdog', '/sandbox', '/weekly', '/digest', '/clubweekly', '/selfheal', '/heal', '/omniprompt', '/echo', '/research', '/deepmind', '/radar', '/power', '/ph', '/browse', '/scantext', '/omniask', '/seal', '/chronosv', '/expect', '/debug', '/askweb', '/vane', '/webask', '/askreddit', '/askscholar', '/askacademic', '/askyt', '/askyoutube',
+        '/domain', '/watchdog', '/sandbox', '/weekly', '/digest', '/clubweekly', '/selfheal', '/heal', '/omniprompt', '/echo', '/research', '/deepmind', '/radar', '/power', '/ph', '/browse', '/scantext', '/omniask', '/seal', '/chronosv', '/expect', '/asknews', '/doc', '/doclist', '/docask', '/docdel', '/docadd', '/debug', '/askweb', '/vane', '/webask', '/askreddit', '/askscholar', '/askacademic', '/askyt', '/askyoutube',
       ]);
       if (!founderCmds.has(cmd)) return next();
 
@@ -3099,7 +3099,13 @@ function buildBot() {
         cmd === '/askscholar' ||
         cmd === '/askacademic' ||
         cmd === '/askyt' ||
-        cmd === '/askyoutube'
+        cmd === '/askyoutube' ||
+        cmd === '/asknews' ||
+        cmd === '/doc' ||
+        cmd === '/doclist' ||
+        cmd === '/docask' ||
+        cmd === '/docdel' ||
+        cmd === '/docadd'
       ) {
         try {
           const handled = await handleV4000({ text, ctx, bot });
@@ -3608,7 +3614,45 @@ function buildBot() {
   // EMERGENCY: always-alive ping (hotfix)
   
   // SQL File Runner: document .sql OR caption /sqlfile|/sqlexec
-  bot.on('document', async (ctx, next) => {
+  
+  // v4000 C3 — PDF/TXT RAG upload (caption must include /docadd)
+  bot.on('document', async (ctx) => {
+    try {
+      const cap = ctx.message?.caption || '';
+      if (!/\/docadd\b/i.test(cap)) return;
+      const uid = String(ctx.from?.id || '');
+      const admin = String(typeof ADMIN_ID !== 'undefined' ? ADMIN_ID : process.env.ADMIN_ID || '');
+      if (admin && uid !== admin) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const doc = ctx.message.document;
+      if (!doc) return;
+      const fileName = doc.file_name || 'file.bin';
+      if (doc.file_size && doc.file_size > 4 * 1024 * 1024) {
+        await ctx.reply('File too large (max 4MB for /docadd).');
+        return;
+      }
+      await ctx.reply('📥 Downloading + indexing…');
+      const link = await ctx.telegram.getFileLink(doc.file_id);
+      const res = await fetch(link.href);
+      const buf = Buffer.from(await res.arrayBuffer());
+      const { handleDocUpload } = await import('../lib/docRag.js');
+      const msg = await handleDocUpload({
+        ctx,
+        bot: ctx.telegram,
+        fileBuffer: buf,
+        fileName,
+        caption: cap,
+      });
+      if (msg) await ctx.reply(msg);
+    } catch (e) {
+      console.error('docadd', e);
+      await ctx.reply('docadd failed: ' + String(e?.message || e).slice(0, 300));
+    }
+  });
+
+bot.on('document', async (ctx, next) => {
     try {
       const doc = ctx.message?.document;
       if (!doc) return next();
