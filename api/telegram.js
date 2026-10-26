@@ -17,6 +17,7 @@ import { intentLedgerMiddleware } from '../lib/intentLedger.js';
 import { createPrometheusCatch, runPrometheus } from '../lib/autoFixer.js';
 import { isV2000Command, handleV2000 } from '../lib/v2000Routes.js';
 import { handleV4000 } from '../lib/v4000Routes.js';
+import { handlePhaseADebug } from '../lib/phaseADebug.js';
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ADMIN_ID = String(process.env.ADMIN_ID || '').trim();
@@ -3114,7 +3115,18 @@ function buildBot() {
         cmd === '/cache'
       ) {
         try {
-          const handled = await handleV4000({ text, ctx, bot });
+          
+        // Phase A debug intercept (file/apply/reject/pending)
+        if (/^\/debug(?:@\w+)?\s+(file|apply|reject|pending|help)\b/i.test(text) || text.trim() === '/debug') {
+          try {
+            const msg = await handlePhaseADebug({ text, ctx });
+            if (msg) { await ctx.reply(String(msg).slice(0, 4000)); return; }
+          } catch (e) {
+            await ctx.reply('debug: ' + String(e.message || e).slice(0, 300));
+            return;
+          }
+        }
+        const handled = await handleV4000({ text, ctx, bot });
           if (handled) return;
         } catch (e) {
           await ctx.reply('v4000: ' + String(e.message || e).slice(0, 300));
@@ -3626,6 +3638,82 @@ function buildBot() {
   // C5: reliable GitHub upload — caption "gh path/to/file" or "/ghpath path"
   
   // HOTFIX2: GitHub upload MUST reply — caption "gh path" or "/ghpath path"
+  
+  // V5000-A: unified document router — SQL files always executed (founder)
+  bot.on('document', async (ctx, next) => {
+    try {
+      const doc = ctx.message?.document;
+      if (!doc) return typeof next === 'function' ? next() : undefined;
+      const caption = String(ctx.message?.caption || '').trim();
+      const fname = String(doc.file_name || '').toLowerCase();
+
+      // 1) GitHub upload
+      if (/^(?:\/)?(?:gh|ghpath|github)\s+\S+/i.test(caption)) {
+        return typeof next === 'function' ? next() : undefined; // handled by gh handlers
+      }
+
+      // 2) SQL file runner
+      const isSql =
+        fname.endsWith('.sql') ||
+        /^\/?(sqlfile|sqlexec|sqlrun)\b/i.test(caption);
+      if (isSql) {
+        const uid = String(ctx.from?.id || '');
+        const admin = String(
+          (typeof ADMIN_ID !== 'undefined' && ADMIN_ID) ||
+            process.env.ADMIN_ID ||
+            process.env.FOUNDER_ID ||
+            ''
+        ).trim();
+        if (admin && uid !== admin) {
+          await ctx.reply('👑 Founder-only SQL file runner.');
+          return;
+        }
+        const { maxSqlFileBytes, downloadTelegramFile, runSqlFileText } = await import(
+          '../lib/sqlFileRunner.js'
+        );
+        if (doc.file_size && doc.file_size > maxSqlFileBytes()) {
+          await ctx.reply('❌ SQL file too large (max 1MB).');
+          return;
+        }
+        await ctx.reply('📥 Downloading SQL file…');
+        const token =
+          (typeof BOT_TOKEN !== 'undefined' && BOT_TOKEN) || process.env.BOT_TOKEN;
+        const dl = await downloadTelegramFile(token, doc.file_id);
+        if (!dl.ok) {
+          await ctx.reply('Download failed: ' + dl.error);
+          return;
+        }
+        await ctx.reply('⚙️ Validating + executing (' + dl.bytes + ' bytes)…');
+        const sqlText = dl.buffer.toString('utf8');
+        const sb =
+          (typeof supabase !== 'undefined' && supabase) ||
+          null;
+        const result = await runSqlFileText(sqlText, { supabase: sb });
+        if (!result.ok) {
+          await ctx.reply((result.blocked ? '🛡 ' : '❌ ') + (result.error || 'failed'));
+          return;
+        }
+        let preview = result.formatted || JSON.stringify(result.rows ?? result, null, 2);
+        preview = String(preview).slice(0, 3000);
+        await ctx.reply(
+          '✅ SQL file executed' +
+            (result.via ? ' (' + result.via + ')' : '') +
+            '\\n' +
+            preview
+        );
+        return;
+      }
+
+      // 3) else continue (docadd, readers, etc.)
+      return typeof next === 'function' ? next() : undefined;
+    } catch (e) {
+      try {
+        await ctx.reply('document router: ' + String(e?.message || e).slice(0, 250));
+      } catch (_) {}
+    }
+  });
+
+
   bot.on('document', async (ctx, next) => {
     const cap = String(ctx.message?.caption || '').trim();
     const ghMatch = cap.match(/^(?:\/)?(?:gh|ghpath|github)\s+(\S+)/i);
@@ -3766,10 +3854,13 @@ function buildBot() {
   });
 
 
-  bot.on('document', async (ctx) => {
+  bot.on('document', async (ctx, next) => {
     try {
       const cap = ctx.message?.caption || '';
-      if (!/\/docadd\b/i.test(cap)) return;
+      if (!/\/docadd\b/i.test(cap)) {
+        if (typeof next === 'function') return next();
+        return;
+      }
       const uid = String(ctx.from?.id || '');
       const admin = String(typeof ADMIN_ID !== 'undefined' ? ADMIN_ID : process.env.ADMIN_ID || '');
       if (admin && uid !== admin) {
@@ -3777,7 +3868,10 @@ function buildBot() {
         return;
       }
       const doc = ctx.message.document;
-      if (!doc) return;
+      if (!doc) {
+        if (typeof next === 'function') return next();
+        return;
+      }
       const fileName = doc.file_name || 'file.bin';
       if (doc.file_size && doc.file_size > 4 * 1024 * 1024) {
         await ctx.reply('File too large (max 4MB for /docadd).');
