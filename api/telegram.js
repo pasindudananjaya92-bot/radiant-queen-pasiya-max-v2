@@ -3152,7 +3152,33 @@ async function buildBot() {
         return; // stop — do not AI
       }
 
-      // v4000 Vane search + Phase C debug/surgeon
+      
+      // Phase D2 EARLY — heavy → Hull B BEFORE local researchdeep/v4000 handlers
+      if (cmd === '/hulljobs') {
+        try {
+          const { handleHullJobsCmd } = await import('../lib/hullRouter.js');
+          const out = await handleHullJobsCmd(text, ctx);
+          if (out) {
+            await ctx.reply(String(out).slice(0, 4000));
+            return;
+          }
+        } catch (e) {
+          await ctx.reply('hulljobs: ' + String(e.message || e).slice(0, 200));
+          return;
+        }
+      }
+      try {
+        const { maybeRouteHeavy } = await import('../lib/hullRouter.js');
+        const routed = await maybeRouteHeavy({ text, ctx });
+        if (routed) {
+          await ctx.reply(String(routed).slice(0, 4000));
+          return;
+        }
+      } catch (e) {
+        /* fall through to local handlers */
+      }
+
+// v4000 Vane search + Phase C debug/surgeon
       if (
         cmd === '/debug' ||
         cmd === '/askweb' ||
@@ -3249,31 +3275,6 @@ async function buildBot() {
       
       
       
-      // Phase D2 — heavy command → Hull B queue/proxy
-      if (cmd === '/hulljobs') {
-        try {
-          const { handleHullJobsCmd } = await import('../lib/hullRouter.js');
-          const out = await handleHullJobsCmd(text, ctx);
-          if (out) {
-            await ctx.reply(String(out).slice(0, 4000));
-            return;
-          }
-        } catch (e) {
-          await ctx.reply('hulljobs: ' + String(e.message || e).slice(0, 200));
-          return;
-        }
-      }
-      try {
-        const { maybeRouteHeavy } = await import('../lib/hullRouter.js');
-        const routed = await maybeRouteHeavy({ text, ctx });
-        if (routed) {
-          await ctx.reply(String(routed).slice(0, 4000));
-          return;
-        }
-      } catch (e) {
-        /* routing optional — fall through */
-      }
-
       // v5000 Phase D — Hull Control + Error DNA
       if (cmd === '/hull' || cmd === '/errordna' || cmd === '/dna') {
         try {
