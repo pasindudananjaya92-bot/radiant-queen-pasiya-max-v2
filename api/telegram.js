@@ -3368,8 +3368,26 @@ async function buildBot() {
 
 
       if (cmd === '/architect' || cmd === '/godarchitect') {
-        const mode = /^pr\b/i.test(arg) ? 'pr' : 'scan';
-        const focus = arg.replace(/^(pr|scan)\s*/i, '').trim();
+        const sub = String(arg || '').trim();
+        // Omniscient: status / retest / fix / unlock / lessons / deploy / failed / help
+        if (
+          !sub ||
+          /^(help|status|lessons|deploy|retest|fix|failed|unlock)\b/i.test(sub)
+        ) {
+          const { handleOmniscient } = await import('../lib/omniscientArchitect.js');
+          const out = await handleOmniscient({
+            cmd: '/architect',
+            text: '/architect ' + sub,
+            ctx,
+            supabase,
+            bot,
+          });
+          if (out) await ctx.reply(String(out).slice(0, 4000));
+          return;
+        }
+        // God Architect repo scan / PR only for explicit scan|pr
+        const mode = /^pr\b/i.test(sub) ? 'pr' : 'scan';
+        const focus = sub.replace(/^(pr|scan)\s*/i, '').trim();
         await ctx.reply(mode === 'pr' ? '🏛 Architect PR…' : '🏛 Architect scan…');
         const { runArchitect, formatArchitect } = await import('../lib/godArchitect.js');
         const r = await runArchitect({ mode, focus });
@@ -13651,6 +13669,21 @@ bot.command('commands', async (ctx) => {
       const arg = (ctx.message.text || '')
         .replace(/^\/(architect|godarchitect)(@\w+)?\s*/i, '')
         .trim();
+      if (
+        !arg ||
+        /^(help|status|lessons|deploy|retest|fix|failed|unlock)\b/i.test(arg)
+      ) {
+        const { handleOmniscient } = await import('../lib/omniscientArchitect.js');
+        const out = await handleOmniscient({
+          cmd: '/architect',
+          text: '/architect ' + arg,
+          ctx,
+          supabase,
+          bot,
+        });
+        if (out) await ctx.reply(String(out).slice(0, 4000));
+        return;
+      }
       const mode = /^pr\b/i.test(arg) ? 'pr' : 'scan';
       const focus = arg.replace(/^(pr|scan)\s*/i, '').trim();
       await ctx.reply(
