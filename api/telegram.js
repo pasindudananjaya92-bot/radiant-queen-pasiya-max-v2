@@ -1,23 +1,84 @@
 import { Telegraf, Markup } from 'telegraf';
-import { GoogleGenAI } from '@google/genai';
 import { createClient } from '@supabase/supabase-js';
-import {
-  fortressMiddleware,
-  isBanned,
-  banUser,
-  unbanUser,
-  listBans,
-  loadOsSecurityFlags,
-  saveOsSecurityFlags,
-  logTriadEvent,
-  alertFounder,
-  firebaseTriadPing,
-} from '../lib/fortress.js';
-import { intentLedgerMiddleware } from '../lib/intentLedger.js';
-import { createPrometheusCatch, runPrometheus } from '../lib/autoFixer.js'; // PROMETHEUS_KILL_MARKER — catch no longer calls these
-import { isV2000Command, handleV2000 } from '../lib/v2000Routes.js';
-import { handleV4000 } from '../lib/v4000Routes.js';
-import { handlePhaseADebug } from '../lib/phaseADebug.js';
+
+/* ── SAFE BOOT: local libs + @google/genai loaded with try/catch (never crash module) ── */
+let GoogleGenAI = null;
+let fortressMiddleware = () => (ctx, next) => next();
+let isBanned = async () => false;
+let banUser = async () => ({ ok: false });
+let unbanUser = async () => ({ ok: false });
+let listBans = async () => [];
+let loadOsSecurityFlags = async () => ({});
+let saveOsSecurityFlags = async () => ({});
+let logTriadEvent = async () => {};
+let alertFounder = async () => {};
+let firebaseTriadPing = async () => {};
+let intentLedgerMiddleware = () => (ctx, next) => next();
+let createPrometheusCatch = () => async () => {};
+let runPrometheus = async () => ({ skipped: true });
+let isV2000Command = () => false;
+let handleV2000 = async () => null;
+let handleV4000 = async () => null;
+let handlePhaseADebug = async () => null;
+let _libsReady = false;
+
+async function ensureLibs() {
+  if (_libsReady) return;
+  try {
+    const g = await import('@google/genai');
+    GoogleGenAI = g.GoogleGenAI || g.default?.GoogleGenAI || null;
+  } catch (e) {
+    console.error('genai load', e?.message || e);
+  }
+  try {
+    const f = await import('../lib/fortress.js');
+    fortressMiddleware = f.fortressMiddleware || fortressMiddleware;
+    isBanned = f.isBanned || isBanned;
+    banUser = f.banUser || banUser;
+    unbanUser = f.unbanUser || unbanUser;
+    listBans = f.listBans || listBans;
+    loadOsSecurityFlags = f.loadOsSecurityFlags || loadOsSecurityFlags;
+    saveOsSecurityFlags = f.saveOsSecurityFlags || saveOsSecurityFlags;
+    logTriadEvent = f.logTriadEvent || logTriadEvent;
+    alertFounder = f.alertFounder || alertFounder;
+    firebaseTriadPing = f.firebaseTriadPing || firebaseTriadPing;
+  } catch (e) {
+    console.error('fortress load', e?.message || e);
+  }
+  try {
+    const i = await import('../lib/intentLedger.js');
+    intentLedgerMiddleware = i.intentLedgerMiddleware || intentLedgerMiddleware;
+  } catch (e) {
+    console.error('intentLedger load', e?.message || e);
+  }
+  try {
+    const a = await import('../lib/autoFixer.js');
+    createPrometheusCatch = a.createPrometheusCatch || createPrometheusCatch;
+    runPrometheus = a.runPrometheus || runPrometheus;
+  } catch (e) {
+    console.error('autoFixer load', e?.message || e);
+  }
+  try {
+    const v2 = await import('../lib/v2000Routes.js');
+    isV2000Command = v2.isV2000Command || isV2000Command;
+    handleV2000 = v2.handleV2000 || handleV2000;
+  } catch (e) {
+    console.error('v2000 load', e?.message || e);
+  }
+  try {
+    const v4 = await import('../lib/v4000Routes.js');
+    handleV4000 = v4.handleV4000 || handleV4000;
+  } catch (e) {
+    console.error('v4000 load', e?.message || e);
+  }
+  try {
+    const pA = await import('../lib/phaseADebug.js');
+    handlePhaseADebug = pA.handlePhaseADebug || handlePhaseADebug;
+  } catch (e) {
+    console.error('phaseADebug load', e?.message || e);
+  }
+  _libsReady = true;
+}
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
 const ADMIN_ID = String(process.env.ADMIN_ID || '').trim();
@@ -540,7 +601,7 @@ let bootTime = Date.now();
 
 function getAI() {
   if (!GEMINI_KEY) return null;
-  if (!aiClient) aiClient = new GoogleGenAI({ apiKey: GEMINI_KEY });
+  if (!aiClient) aiClient = GoogleGenAI ? new GoogleGenAI({ apiKey: GEMINI_KEY }) : null;
   return aiClient;
 }
 
@@ -3043,9 +3104,10 @@ async function handlePhoto(ctx) {
   await ctx.reply(out, afterReplyKeyboard(ctx));
 }
 
-function buildBot() {
+async function buildBot() {
   if (bot) return bot;
   if (!BOT_TOKEN) return null;
+  await ensureLibs();
 
   bot = new Telegraf(BOT_TOKEN);
 
@@ -19330,7 +19392,7 @@ export default async function handler(req, res) {
       }
       return res.status(200).json({
         ok: true,
-        service: 'radiant-queen-telegram',
+        service: 'radiant-queen-telegram', boot: 'SAFE_LAZY_LIBS_V1',
         version: typeof BOT_VERSION !== 'undefined' ? BOT_VERSION : '',
         hasToken: Boolean(BOT_TOKEN),
         hasGemini: Boolean(GEMINI_KEY),
@@ -19347,7 +19409,8 @@ export default async function handler(req, res) {
 
     let instance = null;
     try {
-      instance = buildBot();
+      await ensureLibs();
+      instance = await buildBot();
     } catch (e) {
       console.error('buildBot failed', e);
       return res.status(200).json({ ok: false, error: 'buildBot: ' + String(e && e.message ? e.message : e) });
