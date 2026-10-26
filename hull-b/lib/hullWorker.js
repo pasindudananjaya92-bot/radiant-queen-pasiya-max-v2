@@ -1,5 +1,5 @@
 /**
- * Hull B worker core — process rq_hull_jobs and optional direct run
+ * Hull B worker core — soft-deps, never crash on missing vane
  */
 function sb() {
   const url = process.env.SUPABASE_URL;
@@ -81,60 +81,129 @@ async function telegramSend(chatId, text) {
   });
 }
 
-/**
- * Execute a queued telegram_cmd payload — best-effort handlers
- */
+async function loadVane() {
+  const tries = [
+    './vaneAnswer.js',
+    '../lib/vaneAnswer.js',
+    './lib/vaneAnswer.js',
+  ];
+  for (const p of tries) {
+    try {
+      return await import(p);
+    } catch (_) {}
+  }
+  return null;
+}
+
+async function jinaBrowse(url) {
+  const u = String(url || '').trim();
+  if (!u) return '';
+  const target = u.startsWith('http') ? u : 'https://' + u;
+  const res = await fetch('https://r.jina.ai/' + target, {
+    headers: { Accept: 'text/markdown' },
+  });
+  return (await res.text()).slice(0, 3500);
+}
+
 export async function executeTelegramCmd(payload) {
   const text = String(payload?.text || '').trim();
   const chatId = payload?.chatId;
   if (!text) return { ok: false, error: 'empty text' };
 
-  // Lightweight built-in: researchdeep / browse style via vane if present
   try {
     if (/^\/researchdeep\b/i.test(text) || /^\/askweb\b/i.test(text)) {
-      const q = text.replace(/^\/\S+\s*/, '').trim();
-      let reply = 'Worker processed: ' + text.slice(0, 80);
-      try {
-        const vane = await import('./vaneAnswer.js');
-        if (vane?.answerWeb) {
-          const r = await vane.answerWeb(q || text);
-          reply = typeof r === 'string' ? r : JSON.stringify(r).slice(0, 3500);
-        } else if (vane?.default?.answer) {
-          const r = await vane.default.answer(q);
-          reply = String(r).slice(0, 3500);
+      const q = text.replace(/^\/\S+\s*/, '').trim() || text;
+      let reply = '';
+      const vane = await loadVane();
+      if (vane) {
+        try {
+          const fn =
+            vane.askWithCitations ||
+            vane.answerWeb ||
+            vane.default?.askWithCitations ||
+            vane.default?.answerWeb ||
+            vane.answer ||
+            vane.default?.answer;
+          if (typeof fn === 'function') {
+            const r = await fn(q, { focus: 'web' });
+            if (typeof r === 'string') reply = r;
+            else if (r?.answer) reply = r.answer + (r.footer ? '\n\n' + r.footer : '');
+            else if (r?.text) reply = r.text;
+            else if (r?.ok && r?.text) reply = r.text;
+            else reply = JSON.stringify(r).slice(0, 3000);
+          }
+        } catch (e) {
+          reply = '';
+          console.error('vane err', e.message);
         }
-      } catch (e) {
-        reply = 'Worker note: vane unavailable — ' + String(e.message || e).slice(0, 120);
       }
-      await telegramSend(chatId, '🛰 Hull B\n' + reply);
-      return { ok: true, result: { reply: reply.slice(0, 500) } };
+      if (!reply) {
+        // Fallback: Tavily if key present
+        const tk = process.env.TAVILY_API_KEY;
+        if (tk) {
+          try {
+            const tr = await fetch('https://api.tavily.com/search', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                api_key: tk,
+                query: q,
+                max_results: 5,
+                search_depth: 'basic',
+              }),
+            });
+            const tj = await tr.json();
+            const lines = (tj.results || [])
+              .slice(0, 5)
+              .map(
+                (r, i) =>
+                  i +
+                  1 +
+                  '. ' +
+                  (r.title || '') +
+                  '\n' +
+                  String(r.content || '').slice(0, 200) +
+                  '\n' +
+                  (r.url || '')
+              );
+            reply =
+              '🔬 Hull B research (Tavily)\n\n' +
+              lines.join('\n\n') +
+              '\n\nQuery: ' +
+              q;
+          } catch (e) {
+            reply = 'Tavily fallback failed: ' + String(e.message || e);
+          }
+        } else {
+          reply =
+            'Hull B: no vane module and no TAVILY_API_KEY.\n' +
+            'Upload hull-b/lib/vaneAnswer.js + vaneSearch.js + set TAVILY_API_KEY.\n' +
+            'Query was: ' +
+            q;
+        }
+      }
+      await telegramSend(chatId, '🛰 Hull B\n' + String(reply).slice(0, 3800));
+      return { ok: true, result: { reply: String(reply).slice(0, 300) } };
     }
 
     if (/^\/browse\b/i.test(text)) {
       const url = text.replace(/^\/browse\s*/i, '').trim();
-      let body = '';
-      try {
-        const res = await fetch('https://r.jina.ai/http://' + url.replace(/^https?:\/\//, ''), {
-          headers: { Accept: 'text/markdown' },
-        });
-        body = (await res.text()).slice(0, 3000);
-      } catch (e) {
-        body = 'browse error: ' + String(e.message || e);
-      }
+      let body = await jinaBrowse(url);
+      if (!body) body = 'empty browse result';
       await telegramSend(chatId, '🛰 Hull B browse\n' + body.slice(0, 3500));
       return { ok: true, result: { len: body.length } };
     }
 
-    // Generic ack for other heavy cmds until specialized handlers exist
     await telegramSend(
       chatId,
-      '🛰 Hull B received:\n' +
-        text.slice(0, 200) +
-        '\n\n(Worker stub — wire specialized libs here as needed)'
+      '🛰 Hull B received:\n' + text.slice(0, 300) + '\n\n(stub handler)'
     );
-    return { ok: true, result: { stub: true, text: text.slice(0, 100) } };
+    return { ok: true, result: { stub: true } };
   } catch (e) {
-    await telegramSend(chatId, '❌ Hull B: ' + String(e.message || e).slice(0, 200));
+    await telegramSend(
+      chatId,
+      '❌ Hull B: ' + String(e.message || e).slice(0, 200)
+    );
     return { ok: false, error: String(e.message || e) };
   }
 }
@@ -152,7 +221,7 @@ export async function processQueue(max = 3) {
         out = { ok: true, result: { skipped: true, kind: job.kind } };
       }
       await finishJob(job.id, out);
-      results.push({ id: job.id, ...out });
+      results.push({ id: job.id, status: out.ok ? 'done' : 'failed' });
     } catch (e) {
       await finishJob(job.id, { ok: false, error: e.message || String(e) });
       results.push({ id: job.id, ok: false, error: e.message });
@@ -165,7 +234,8 @@ export function assertHullSecret(req) {
   const secret = process.env.HULL_SHARED_SECRET || process.env.CRON_SECRET || '';
   if (!secret) return false;
   const q = req.query?.secret || '';
-  const h = req.headers?.['x-hull-secret'] || req.headers?.['x-cron-secret'] || '';
+  const h =
+    req.headers?.['x-hull-secret'] || req.headers?.['x-cron-secret'] || '';
   return q === secret || h === secret;
 }
 
