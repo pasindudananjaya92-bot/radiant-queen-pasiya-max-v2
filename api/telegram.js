@@ -3624,6 +3624,84 @@ function buildBot() {
   // v4000 C3 — PDF/TXT RAG upload (caption must include /docadd)
   
   // C5: reliable GitHub upload — caption "gh path/to/file" or "/ghpath path"
+  
+  // HOTFIX2: GitHub upload MUST reply — caption "gh path" or "/ghpath path"
+  bot.on('document', async (ctx, next) => {
+    const cap = String(ctx.message?.caption || '').trim();
+    const ghMatch = cap.match(/^(?:\/)?(?:gh|ghpath|github)\s+(\S+)/i);
+    if (!ghMatch) {
+      if (typeof next === 'function') return next();
+      return;
+    }
+    try {
+      const uid = String(ctx.from?.id || '');
+      const admin = String(
+        (typeof ADMIN_ID !== 'undefined' && ADMIN_ID) ||
+          process.env.ADMIN_ID ||
+          process.env.FOUNDER_ID ||
+          ''
+      ).trim();
+      if (admin && uid !== admin) {
+        await ctx.reply('👑 Founder-only.');
+        return;
+      }
+      const destPath = ghMatch[1].replace(/^\//, '');
+      const doc = ctx.message.document;
+      if (!doc) {
+        await ctx.reply('No document.');
+        return;
+      }
+      await ctx.reply('📤 Uploading `' + destPath + '` (' + (doc.file_size || 0) + 'b)…');
+      if (doc.file_size && doc.file_size > 4.5 * 1024 * 1024) {
+        await ctx.reply('Max ~4.5MB.');
+        return;
+      }
+      const link = await ctx.telegram.getFileLink(doc.file_id);
+      const res = await fetch(String(link.href || link));
+      if (!res.ok) {
+        await ctx.reply('Download failed: HTTP ' + res.status);
+        return;
+      }
+      const buf = Buffer.from(await res.arrayBuffer());
+      const text = buf.toString('utf8');
+      let githubPutFile, quickSyntaxGate;
+      try {
+        const mod = await import('../lib/ghUploadLite.js');
+        githubPutFile = mod.githubPutFile;
+        quickSyntaxGate = mod.quickSyntaxGate;
+      } catch (e) {
+        await ctx.reply(
+          '❌ lib/ghUploadLite.js missing or broken: ' +
+            String(e.message || e).slice(0, 200) +
+            '\nUpload that file to GitHub first (manual).'
+        );
+        return;
+      }
+      const gate = quickSyntaxGate(text, destPath);
+      if (!gate.ok) {
+        await ctx.reply('🛡 Blocked: ' + gate.error);
+        return;
+      }
+      const r = await githubPutFile({
+        path: destPath,
+        content: text,
+        message: 'bot gh: ' + destPath,
+      });
+      await ctx.reply(
+        '✅ Uploaded `' +
+          destPath +
+          '`' +
+          (r.commit ? '\ncommit ' + String(r.commit).slice(0, 7) : '') +
+          (r.url ? '\n' + r.url : '')
+      );
+    } catch (e) {
+      try {
+        await ctx.reply('❌ gh upload: ' + String(e.message || e).slice(0, 400));
+      } catch (_) {}
+    }
+  });
+
+
   bot.on('document', async (ctx, next) => {
     try {
       const cap = String(ctx.message?.caption || '').trim();
@@ -8086,6 +8164,36 @@ bot.command('commands', async (ctx) => {
     );
   });
 
+
+
+  
+  bot.command(['ghtest'], async (ctx) => {
+    try {
+      const uid = String(ctx.from?.id || '');
+      const admin = String(process.env.ADMIN_ID || process.env.FOUNDER_ID || '').trim();
+      if (admin && uid !== admin) return ctx.reply('👑 Founder-only.');
+      const hasTok = !!process.env.GITHUB_TOKEN;
+      const repo = process.env.GITHUB_REPO || '(missing)';
+      let modOk = false, modErr = '';
+      try {
+        await import('../lib/ghUploadLite.js');
+        modOk = true;
+      } catch (e) {
+        modErr = String(e.message || e);
+      }
+      await ctx.reply(
+        '🧪 GH TEST\n' +
+          'GITHUB_TOKEN: ' + (hasTok ? 'YES' : 'NO') + '\n' +
+          'GITHUB_REPO: ' + repo + '\n' +
+          'ghUploadLite: ' + (modOk ? 'OK' : 'FAIL ' + modErr) + '\n' +
+          'Your id: ' + uid + '\n' +
+          'ADMIN_ID: ' + admin + '\n' +
+          'Caption test: send any .js with caption:\ngh lib/test-upload.txt'
+      );
+    } catch (e) {
+      await ctx.reply('ghtest error: ' + String(e.message || e));
+    }
+  });
 
 
   bot.command(['ghpath', 'gh', 'ghu'], async (ctx) => {
