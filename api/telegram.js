@@ -3140,7 +3140,7 @@ async function buildBot() {
         '/secreport', '/panopticon', '/sec', '/checkvulns', '/vulns', '/osv',
         '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile', '/cron', '/mem', '/memory', '/memgraph', '/jarvis', '/deploy', '/redeploy', '/env', '/venv', '/shell', '/piston', '/exec', '/forgepage', '/canvas', '/nightly', '/constitution', '/architect', '/godarchitect', '/legion', '/omni', '/omniscience', '/revenue', '/chain', '/replicate', '/neuralmemory', '/neural', '/nmem', '/logs', '/logradar',
         '/review', '/prreview', '/secrets', '/leakscan', '/dbslow', '/db',
-        '/domain', '/watchdog', '/sandbox', '/weekly', '/digest', '/clubweekly', '/selfheal', '/heal', '/omniprompt', '/echo', '/research', '/deepmind', '/radar', '/power', '/ph', '/browse', '/scantext', '/omniask', '/seal', '/chronosv', '/expect', '/asknews', '/doc', '/doclist', '/docask', '/docdel', '/docadd', '/researchdeep', '/researchstatus', '/researchlist', '/cachestats', '/cache', '/debug', '/askweb', '/vane', '/webask', '/askreddit', '/askscholar', '/askacademic', '/askyt', '/askyoutube',
+        '/domain', '/watchdog', '/sandbox', '/weekly', '/digest', '/clubweekly', '/selfheal', '/heal', '/omniprompt', '/echo', '/research', '/deepmind', '/radar', '/power', '/ph', '/browse', '/scantext', '/omniask', '/seal', '/chronosv', '/expect', '/patchlog', '/healcheck', '/doctor', '/asknews', '/doc', '/doclist', '/docask', '/docdel', '/docadd', '/researchdeep', '/researchstatus', '/researchlist', '/cachestats', '/cache', '/debug', '/askweb', '/vane', '/webask', '/askreddit', '/askscholar', '/askacademic', '/askyt', '/askyoutube',
       ]);
       if (!founderCmds.has(cmd)) return next();
 
@@ -3246,7 +3246,23 @@ async function buildBot() {
 
 
 
-      const arg = text.replace(/^\/\S+\s*/, '').trim();
+      
+      // v5000 Phase C — patchlog / healcheck (diagnose only, no auto-push)
+      if (cmd === '/patchlog' || cmd === '/healcheck' || cmd === '/doctor') {
+        try {
+          const { handlePhaseCRoute } = await import('../lib/v5000CRoutes.js');
+          const out = await handlePhaseCRoute({ cmd, text, ctx, supabase, bot });
+          if (out) {
+            await ctx.reply(String(out).slice(0, 4000));
+            return;
+          }
+        } catch (e) {
+          await ctx.reply('phaseC: ' + String(e.message || e).slice(0, 300));
+          return;
+        }
+      }
+
+const arg = text.replace(/^\/\S+\s*/, '').trim();
 
       if (cmd === '/swarm') {
         const swarm = await import('../lib/swarm.js');
