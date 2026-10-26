@@ -14,7 +14,7 @@ import {
   firebaseTriadPing,
 } from '../lib/fortress.js';
 import { intentLedgerMiddleware } from '../lib/intentLedger.js';
-import { createPrometheusCatch, runPrometheus } from '../lib/autoFixer.js';
+import { createPrometheusCatch, runPrometheus } from '../lib/autoFixer.js'; // PROMETHEUS_KILL_MARKER — catch no longer calls these
 import { isV2000Command, handleV2000 } from '../lib/v2000Routes.js';
 import { handleV4000 } from '../lib/v4000Routes.js';
 import { handlePhaseADebug } from '../lib/phaseADebug.js';
@@ -19275,7 +19275,7 @@ bot.command('commands', async (ctx) => {
     return next();
   });
 
-  const prometheusHandler = createPrometheusCatch(bot);
+  // EMERGENCY: Prometheus fully disconnected from bot.catch
   bot.catch(async (err, ctx) => {
     console.error('telegram bot error', err);
     try {
@@ -19283,15 +19283,14 @@ bot.command('commands', async (ctx) => {
       await reportError(err, 'bot.catch');
     } catch (_) {}
     try {
-      await prometheusHandler(err, ctx);
-    } catch (e2) {
-      console.error('prometheus catch', e2);
-      try {
-        if (ctx && typeof isAdmin === 'function' && isAdmin(ctx)) {
-          await ctx.reply('Radar caught error:\n' + String(err?.message || err).slice(0, 200));
-        }
-      } catch (_) {}
-    }
+      const admin = String(process.env.ADMIN_ID || '').trim();
+      const from = String(ctx?.from?.id || '');
+      if (admin && from === admin && ctx?.reply) {
+        await ctx
+          .reply('⚠️ ' + String(err?.message || err).slice(0, 280))
+          .catch(() => {});
+      }
+    } catch (_) {}
   });
   return bot;
 }
