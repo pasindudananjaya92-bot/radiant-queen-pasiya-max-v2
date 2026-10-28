@@ -1,21 +1,3 @@
-/**
- * api/cron.js — CONSOLIDATED cron router (Vercel Hobby ≤12 functions)
- *
- * Usage:
- *   /api/cron?job=ghost&secret=...
- *   /api/cron?job=track&secret=...
- *   /api/cron?job=watch&secret=...
- *   /api/cron?job=reminders&secret=...
- *   /api/cron?job=digest&secret=...
- *   /api/cron?job=all&secret=...   (ghost+track+watch only — light)
- *
- * Legacy paths (via vercel.json rewrite → this file):
- *   /api/cron-ghost → job=ghost
- *   /api/cron-track → job=track
- *   /api/cron-watch → job=watch
- *   /api/cron-reminders → job=reminders
- *   /api/cron-digest → job=digest
- */
 import { createClient } from '@supabase/supabase-js';
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
@@ -54,6 +36,9 @@ function detectJob(req) {
   if (url.includes('cron-watch')) return 'watch';
   if (url.includes('cron-reminders') || url.includes('cron-reminder')) return 'reminders';
   if (url.includes('cron-digest')) return 'digest';
+  if (url.includes('cron-shadow')) return 'shadow';
+  if (url.includes('cron-hull')) return 'hullpoll';
+  if (url.includes('cron-dna')) return 'dna';
   return 'help';
 }
 
@@ -400,7 +385,6 @@ async function jobDigest(client) {
     }
     return { job: 'digest', tg: true, emails };
   } catch (e) {
-    // fallback: founder-only short digest without resendMail
     if (ADMIN_ID) {
       await tgSend(ADMIN_ID, '📬 DIGEST tick @ ' + new Date().toISOString() + '\n(resendMail optional)');
     }
@@ -408,9 +392,7 @@ async function jobDigest(client) {
   }
 }
 
-
 async function jobNewsPodcast(client) {
-  // Deliver text morning digest to subscribers; voice generated on-demand via /news_podcast
   const raw = await getSetting(client, 'news_podcast_subs');
   let subs = [];
   try {
@@ -448,24 +430,6 @@ async function jobNewsPodcast(client) {
   return { job: 'news_podcast', sent, subs: subs.length };
 }
 
-
-  // v4000 C4 deep research queue
-  if (job === 'research' || job === 'researchdeep') {
-    const secret = process.env.CRON_SECRET || '';
-    const q = (req.query && req.query.secret) || req.headers['x-cron-secret'] || '';
-    if (secret && String(q) !== String(secret)) {
-      return res.status(401).json({ error: 'unauthorized' });
-    }
-    try {
-      const { processPendingResearchJobs } = await import('../lib/searchJobs.js');
-      const results = await processPendingResearchJobs(2);
-      return res.status(200).json({ ok: true, job: 'research', results });
-    } catch (e) {
-      return res.status(500).json({ ok: false, error: String(e.message || e) });
-    }
-  }
-
-
 export default async function handler(req, res) {
   if (!authorized(req)) {
     res.status(401).json({ ok: false, error: 'unauthorized' });
@@ -478,7 +442,7 @@ export default async function handler(req, res) {
   if (job === 'help') {
     res.status(200).json({
       ok: true,
-      jobs: ['ghost', 'track', 'watch', 'reminders', 'digest', 'news_podcast', 'all'],
+      jobs: ['ghost', 'track', 'watch', 'reminders', 'digest', 'news_podcast', 'shadow', 'hullpoll', 'dna', 'all', 'phaseg'],
       example: '/api/cron?job=ghost&secret=CRON_SECRET',
     });
     return;
@@ -487,6 +451,25 @@ export default async function handler(req, res) {
   if (!client && job !== 'help') {
     res.status(500).json({ ok: false, error: 'no supabase' });
     return;
+  }
+
+  // v4000 C4 deep research queue
+  if (job === 'research' || job === 'researchdeep') {
+    const secret = process.env.CRON_SECRET || '';
+    const q = (req.query && req.query.secret) || req.headers['x-cron-secret'] || '';
+    if (secret && String(q) !== String(secret)) {
+      res.status(401).json({ error: 'unauthorized' });
+      return;
+    }
+    try {
+      const { processPendingResearchJobs } = await import('../lib/searchJobs.js');
+      const results = await processPendingResearchJobs(2);
+      res.status(200).json({ ok: true, job: 'research', results });
+      return;
+    } catch (e) {
+      res.status(500).json({ ok: false, error: String(e.message || e) });
+      return;
+    }
   }
 
   try {
@@ -522,6 +505,30 @@ export default async function handler(req, res) {
       res.status(200).json({ ok: true, ...(await jobNewsPodcast(client)) });
       return;
     }
+
+    if (job === 'shadow' || job === 'shadowdue' || job === 'shadow_due') {
+      const { jobShadowDue } = await import('../lib/cronPhaseG.js');
+      res.status(200).json({ ok: true, ...(await jobShadowDue()) });
+      return;
+    }
+    if (job === 'hullpoll' || job === 'hull' || job === 'worker') {
+      const { jobHullPoll } = await import('../lib/cronPhaseG.js');
+      res.status(200).json({ ok: true, ...(await jobHullPoll()) });
+      return;
+    }
+    if (job === 'dna' || job === 'errordna' || job === 'dna_digest') {
+      const { jobDnaDigest } = await import('../lib/cronPhaseG.js');
+      res.status(200).json({ ok: true, ...(await jobDnaDigest()) });
+      return;
+    }
+    if (job === 'phaseg' || job === 'g') {
+      const g = await import('../lib/cronPhaseG.js');
+      const shadow = await g.jobShadowDue();
+      const hull = await g.jobHullPoll();
+      res.status(200).json({ ok: true, job: 'phaseg', shadow, hull });
+      return;
+    }
+
     res.status(400).json({ ok: false, error: 'unknown job: ' + job });
   } catch (e) {
     res.status(500).json({ ok: false, error: String(e.message || e) });
