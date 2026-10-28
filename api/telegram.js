@@ -73,7 +73,7 @@ async function ensureLibs() {
   }
   try {
     const pA = await import('../lib/phaseADebug.js');
-    handlePhaseADebug = pA.handlePhaseADebug || handlePhaseADebug;
+    handlePhaseADebug = pA.handlePhaseADebug || pA.handleDebug || handlePhaseADebug;
   } catch (e) {
     console.error('phaseADebug load', e?.message || e);
   }
@@ -3167,7 +3167,18 @@ async function buildBot() {
           return;
         }
       }
-      try {
+            // Never send /debug to Hull B or AI
+      if (/^\/debug(?:@\w+)?(\s|$)/i.test(String(text || '').trim())) {
+        try {
+          const msg = await handlePhaseADebug({ text, ctx });
+          if (msg) { await ctx.reply(String(msg).slice(0, 4000)); return; }
+        } catch (e) {
+          await ctx.reply('debug: ' + String(e && e.message ? e.message : e).slice(0, 300));
+          return;
+        }
+      }
+
+try {
         const { maybeRouteHeavy } = await import('../lib/hullRouter.js');
         const routed = await maybeRouteHeavy({ text, ctx });
         if (routed) {
@@ -3176,6 +3187,20 @@ async function buildBot() {
         }
       } catch (e) {
         /* fall through to local handlers */
+      }
+
+// V6000 exclusive /debug gate — BEFORE heavy route / AI (never hallucinate doctor)
+      if (/^\/debug(?:@\w+)?(\s|$)/i.test(String(text || '').trim())) {
+        try {
+          const msg = await handlePhaseADebug({ text, ctx });
+          if (msg) {
+            await ctx.reply(String(msg).slice(0, 4000));
+            return;
+          }
+        } catch (e) {
+          await ctx.reply('debug: ' + String(e && e.message ? e.message : e).slice(0, 300));
+          return;
+        }
       }
 
 // v4000 Vane search + Phase C debug/surgeon
@@ -3205,7 +3230,7 @@ async function buildBot() {
         try {
           
         // Phase A debug intercept (file/apply/reject/pending)
-        if (/^\/debug(?:@\w+)?\s+(file|apply|reject|pending|help)\b/i.test(text) || text.trim() === '/debug') {
+        if (/^\/debug(?:@\w+)?(?:\s+(file|apply|reject|pending|help|doctor|discard|drop)\b|\s*$)/i.test(text.trim()) || /^\/debug(?:@\w+)?\s*$/i.test(text.trim())) {
           try {
             const msg = await handlePhaseADebug({ text, ctx });
             if (msg) { await ctx.reply(String(msg).slice(0, 4000)); return; }
