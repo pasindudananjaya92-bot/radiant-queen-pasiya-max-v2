@@ -3140,7 +3140,7 @@ async function buildBot() {
         '/secreport', '/panopticon', '/sec', '/checkvulns', '/vulns', '/osv',
         '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile', '/cron', '/mem', '/memory', '/memgraph', '/jarvis', '/deploy', '/redeploy', '/env', '/venv', '/shell', '/piston', '/exec', '/forgepage', '/canvas', '/nightly', '/constitution', '/architect', '/godarchitect', '/legion', '/omni', '/omniscience', '/revenue', '/chain', '/replicate', '/neuralmemory', '/neural', '/nmem', '/logs', '/logradar',
         '/review', '/prreview', '/secrets', '/leakscan', '/dbslow', '/db',
-        '/domain', '/watchdog', '/sandbox', '/weekly', '/digest', '/clubweekly', '/selfheal', '/heal', '/omniprompt', '/echo', '/research', '/deepmind', '/radar', '/power', '/ph', '/browse', '/scantext', '/omniask', '/seal', '/chronosv', '/expect', '/patchlog', '/healcheck', '/doctor', '/hull', '/hulljobs', '/hullops', '/shadow', '/errordna', '/dna', '/asknews', '/doc', '/doclist', '/docask', '/docdel', '/docadd', '/researchdeep', '/researchstatus', '/researchlist', '/cachestats', '/cache', '/debug', '/askweb', '/vane', '/webask', '/askreddit', '/askscholar', '/askacademic', '/askyt', '/askyoutube',
+        '/domain', '/watchdog', '/sandbox', '/weekly', '/digest', '/clubweekly', '/selfheal', '/heal', '/omniprompt', '/echo', '/research', '/deepmind', '/radar', '/power', '/ph', '/browse', '/scantext', '/omniask', '/seal', '/chronosv', '/expect', '/patchlog', '/healcheck', '/doctor', '/hull', '/hulljobs', '/hullops', '/shadow', '/phasef', '/v5000', '/errordna', '/dna', '/asknews', '/doc', '/doclist', '/docask', '/docdel', '/docadd', '/researchdeep', '/researchstatus', '/researchlist', '/cachestats', '/cache', '/debug', '/askweb', '/vane', '/webask', '/askreddit', '/askscholar', '/askacademic', '/askyt', '/askyoutube',
       ]);
       if (!founderCmds.has(cmd)) return next();
 
@@ -3277,6 +3277,26 @@ async function buildBot() {
       
       
       // Phase E — Shadow Twin + Hull ops (ping/wake/retry)
+      
+      // Phase F seal / status
+      if (cmd === '/seal' || cmd === '/phasef' || cmd === '/v5000') {
+        try {
+          const { handlePhaseFRoute } = await import('../lib/phaseFRoutes.js');
+          const out = await handlePhaseFRoute({ cmd, text, ctx });
+          if (out) {
+            await ctx.reply(String(out).slice(0, 4000));
+            return;
+          }
+        } catch (e) {
+          try {
+            const { autoLogError } = await import('../lib/errorDna.js');
+            await autoLogError(e, cmd, 'lib/phaseFRoutes.js');
+          } catch (_) {}
+          await ctx.reply('phaseF: ' + String(e.message || e).slice(0, 300));
+          return;
+        }
+      }
+
       if (cmd === '/shadow' || cmd === '/hullops') {
         try {
           const { handlePhaseERoute } = await import('../lib/phaseERoutes.js');
@@ -3286,6 +3306,10 @@ async function buildBot() {
             return;
           }
         } catch (e) {
+          try {
+            const { autoLogError } = await import('../lib/errorDna.js');
+            await autoLogError(e, cmd, 'lib/phaseERoutes.js');
+          } catch (_) {}
           await ctx.reply('phaseE: ' + String(e.message || e).slice(0, 300));
           return;
         }
@@ -16040,18 +16064,17 @@ bot.command('commands', async (ctx) => {
 
   bot.command(['shadow'], async (ctx) => {
     try {
-      const { requireFounder } = await import('../lib/devAuth.js');
-      if (!(await requireFounder(ctx, ADMIN_ID))) return;
-      await ctx.reply(
-        '👻 /shadow — test clone\n' +
-          'Free path:\n' +
-          '1) GitHub branch: /git branch shadow-test\n' +
-          '2) Vercel Preview auto-builds on PR\n' +
-          '3) Supabase: use separate project or branching (Pro) — free alt: second free Supabase project as staging\n' +
-          'Never point shadow at production SERVICE_ROLE.'
-      );
+      const text = ctx.message?.text || '/shadow';
+      const cmd = '/shadow';
+      const { handlePhaseERoute } = await import('../lib/phaseERoutes.js');
+      const out = await handlePhaseERoute({ cmd, text, ctx });
+      if (out) await ctx.reply(String(out).slice(0, 4000));
     } catch (err) {
-      await ctx.reply('shadow: ' + String(err?.message || err).slice(0, 120));
+      try {
+        const { autoLogError } = await import('../lib/errorDna.js');
+        await autoLogError(err, '/shadow', 'lib/shadowTwin.js');
+      } catch (_) {}
+      await ctx.reply('shadow: ' + String(err?.message || err).slice(0, 200));
     }
   });
 
