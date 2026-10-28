@@ -3140,7 +3140,7 @@ async function buildBot() {
         '/secreport', '/panopticon', '/sec', '/checkvulns', '/vulns', '/osv',
         '/prfix', '/browse', '/spider', '/git', '/forgedrop', '/dropfile', '/cron', '/mem', '/memory', '/memgraph', '/jarvis', '/deploy', '/redeploy', '/env', '/venv', '/shell', '/piston', '/exec', '/forgepage', '/canvas', '/nightly', '/constitution', '/architect', '/godarchitect', '/legion', '/omni', '/omniscience', '/revenue', '/chain', '/replicate', '/neuralmemory', '/neural', '/nmem', '/logs', '/logradar',
         '/review', '/prreview', '/secrets', '/leakscan', '/dbslow', '/db',
-        '/domain', '/watchdog', '/sandbox', '/weekly', '/digest', '/clubweekly', '/selfheal', '/heal', '/omniprompt', '/echo', '/research', '/deepmind', '/radar', '/power', '/ph', '/browse', '/scantext', '/omniask', '/seal', '/chronosv', '/expect', '/patchlog', '/healcheck', '/doctor', '/hull', '/hulljobs', '/hullops', '/shadow', '/phasef', '/v5000', '/cronjobs', '/phaseg', '/errordna', '/dna', '/asknews', '/doc', '/doclist', '/docask', '/docdel', '/docadd', '/researchdeep', '/researchstatus', '/researchlist', '/cachestats', '/cache', '/debug', '/askweb', '/vane', '/webask', '/askreddit', '/askscholar', '/askacademic', '/askyt', '/askyoutube',
+        '/domain', '/watchdog', '/sandbox', '/weekly', '/digest', '/clubweekly', '/selfheal', '/heal', '/omniprompt', '/echo', '/research', '/deepmind', '/radar', '/power', '/ph', '/browse', '/scantext', '/omniask', '/seal', '/chronosv', '/expect', '/patchlog', '/healcheck', '/doctor', '/hull', '/hulljobs', '/hullops', '/shadow', '/phasef', '/v5000', '/cronjobs', '/phaseg', '/surgeon', '/skill', '/skills', '/v6000', '/errordna', '/dna', '/asknews', '/doc', '/doclist', '/docask', '/docdel', '/docadd', '/researchdeep', '/researchstatus', '/researchlist', '/cachestats', '/cache', '/debug', '/askweb', '/vane', '/webask', '/askreddit', '/askscholar', '/askacademic', '/askyt', '/askyoutube',
       ]);
       if (!founderCmds.has(cmd)) return next();
 
@@ -3279,6 +3279,25 @@ async function buildBot() {
       // Phase E — Shadow Twin + Hull ops (ping/wake/retry)
       
       
+      
+      if (cmd === '/surgeon' || cmd === '/skill' || cmd === '/skills' || cmd === '/v6000') {
+        try {
+          const { handleV6000Route } = await import('../lib/v6000Routes.js');
+          const out = await handleV6000Route({ cmd, text, ctx });
+          if (out) {
+            await ctx.reply(String(out).slice(0, 4000));
+            return;
+          }
+        } catch (e) {
+          try {
+            const { autoLogError } = await import('../lib/errorDna.js');
+            await autoLogError(e, cmd, 'lib/v6000Routes.js');
+          } catch (_) {}
+          await ctx.reply('v6000: ' + String(e.message || e).slice(0, 300));
+          return;
+        }
+      }
+
       if (cmd === '/cronjobs' || cmd === '/phaseg') {
         try {
           const { handlePhaseGRoute } = await import('../lib/phaseGRoutes.js');
