@@ -73,7 +73,16 @@ async function ensureLibs() {
   }
   try {
     const pA = await import('../lib/phaseADebug.js');
-    handlePhaseADebug = pA.handlePhaseADebug || pA.handleDebug || handlePhaseADebug;
+    const pAmod = pA.default || pA;
+    handlePhaseADebug =
+      pA.handlePhaseADebug ||
+      pAmod.handlePhaseADebug ||
+      pA.handleDebug ||
+      pAmod.handleDebug ||
+      handlePhaseADebug;
+    if (typeof handlePhaseADebug !== 'function') {
+      handlePhaseADebug = async () => 'debug: phaseADebug failed to load';
+    }
   } catch (e) {
     console.error('phaseADebug load', e?.message || e);
   }
@@ -3128,6 +3137,30 @@ async function buildBot() {
 
   
   // === ULTIMATE P1: hard-route founder system commands (never fall through to AI) ===
+
+  /* DEBUG_ABSOLUTE_GATE — must run before any AI / legacy debug */
+  bot.use(async (ctx, next) => {
+    try {
+      const t = String(ctx.message?.text || ctx.update?.message?.text || '').trim();
+      if (/^\/debug(?:@\w+)?(\s|$)/i.test(t)) {
+        await ensureLibs();
+        const msg = await handlePhaseADebug({ text: t, ctx });
+        if (msg != null && msg !== '') {
+          await ctx.reply(String(msg).slice(0, 4000));
+          return;
+        }
+        await ctx.reply('debug: handler returned empty — check lib/phaseADebug.js export');
+        return;
+      }
+    } catch (e) {
+      try {
+        await ctx.reply('debug-gate: ' + String(e && e.message ? e.message : e).slice(0, 300));
+      } catch (_) {}
+      return;
+    }
+    return next();
+  });
+
   bot.use(async (ctx, next) => {
     try {
       const text = String(ctx.message?.text || '').trim();
@@ -3170,8 +3203,10 @@ async function buildBot() {
             // Never send /debug to Hull B or AI
       if (/^\/debug(?:@\w+)?(\s|$)/i.test(String(text || '').trim())) {
         try {
+          await ensureLibs();
           const msg = await handlePhaseADebug({ text, ctx });
-          if (msg) { await ctx.reply(String(msg).slice(0, 4000)); return; }
+          await ctx.reply(String(msg || 'debug: empty handler').slice(0, 4000));
+          return;
         } catch (e) {
           await ctx.reply('debug: ' + String(e && e.message ? e.message : e).slice(0, 300));
           return;
@@ -3274,9 +3309,9 @@ try {
       }
       if (cmd === '/debug') {
         try {
-          const { handleDebug } = await import('../lib/debugLite.js');
-          const out = await handleDebug({ text, ctx });
-          await ctx.reply(String(out).slice(0, 4000));
+          await ensureLibs();
+          const out = await handlePhaseADebug({ text, ctx });
+          await ctx.reply(String(out || 'debug: empty').slice(0, 4000));
           return;
         } catch (e) {
           await ctx.reply('debug: ' + String(e.message || e).slice(0, 300));
