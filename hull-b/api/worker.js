@@ -1,50 +1,39 @@
 /**
- * Hull B worker endpoint — ONE serverless function
- * Deploy this project as Hull B (second Vercel project).
- * Auth: HULL_SHARED_SECRET or CRON_SECRET
+ * Hull B worker endpoint — V6000 skills
  */
-import {
-  processQueue,
-  executeTelegramCmd,
-  assertHullSecret,
-} from '../lib/hullWorker.js';
+import { handleWorkerRequest } from '../lib/hullWorker.js';
 
-export const config = { maxDuration: 60 };
+function auth(req) {
+  const secret =
+    process.env.HULL_SHARED_SECRET || process.env.CRON_SECRET || '';
+  if (!secret) return true;
+  const h =
+    req.headers['x-hull-secret'] ||
+    req.headers['authorization'] ||
+    '';
+  const q = req.query?.secret || '';
+  if (String(q) === secret) return true;
+  if (String(h) === secret) return true;
+  if (String(h).replace(/^Bearer\s+/i, '') === secret) return true;
+  return false;
+}
 
 export default async function handler(req, res) {
+  if (req.method === 'GET') {
+    return res.status(200).json({
+      ok: true,
+      role: process.env.HULL_ROLE || 'worker',
+      skills: ['research', 'shadow_due', 'syntax_check', 'shell_py', 'dna_digest', 'browse'],
+    });
+  }
+  if (!auth(req)) {
+    return res.status(401).json({ ok: false, error: 'unauthorized' });
+  }
   try {
-    if (req.method !== 'POST' && req.method !== 'GET') {
-      return res.status(405).json({ error: 'POST or GET' });
-    }
-    // GET health
-    if (req.method === 'GET') {
-      return res.status(200).json({
-        ok: true,
-        role: process.env.HULL_ROLE || 'worker',
-        ts: Date.now(),
-      });
-    }
-    if (!assertHullSecret(req)) {
-      return res.status(401).json({ error: 'unauthorized' });
-    }
-    const body =
-      typeof req.body === 'string'
-        ? JSON.parse(req.body || '{}')
-        : req.body || {};
-    const action = body.action || 'process';
-
-    if (action === 'run' && body.text) {
-      const out = await executeTelegramCmd({
-        text: body.text,
-        chatId: body.chatId,
-        userId: body.userId,
-      });
-      return res.status(200).json(out);
-    }
-
-    const results = await processQueue(Number(body.max || 3));
-    return res.status(200).json({ ok: true, processed: results.length, results });
+    const body = typeof req.body === 'object' && req.body ? req.body : {};
+    const out = await handleWorkerRequest(body);
+    return res.status(200).json(out);
   } catch (e) {
-    return res.status(500).json({ error: String(e.message || e).slice(0, 300) });
+    return res.status(500).json({ ok: false, error: String(e.message || e) });
   }
 }
