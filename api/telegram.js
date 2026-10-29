@@ -18927,6 +18927,20 @@ bot.command('commands', async (ctx) => {
 
     if (text.startsWith('/')) return;
 
+    // Tool awareness — map NL to real bot commands (founder DM / private)
+    try {
+      if (ctx.chat?.type === 'private') {
+        const { toolAwareReply } = await import('../lib/toolAware.js');
+        const tip = toolAwareReply(text);
+        if (tip) {
+          await ctx.reply(tip);
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('toolAware', e?.message || e);
+    }
+
     // Anti-link moderation (groups only)
     if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
       const gKey = String(ctx.chat.id);
