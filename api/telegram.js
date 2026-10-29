@@ -3138,27 +3138,55 @@ async function buildBot() {
   
   // === ULTIMATE P1: hard-route founder system commands (never fall through to AI) ===
 
-  /* DEBUG_ABSOLUTE_GATE — must run before any AI / legacy debug */
+  /* DEBUG_ABSOLUTE_GATE — /debug NEVER reaches AI; doctor is INLINE (no import) */
   bot.use(async (ctx, next) => {
     try {
       const t = String(ctx.message?.text || ctx.update?.message?.text || '').trim();
-      if (/^\/debug(?:@\w+)?(\s|$)/i.test(t)) {
-        await ensureLibs();
-        const msg = await handlePhaseADebug({ text: t, ctx });
-        if (msg != null && msg !== '') {
-          await ctx.reply(String(msg).slice(0, 4000));
-          return;
-        }
-        await ctx.reply('debug: handler returned empty — check lib/phaseADebug.js export');
+      if (!/^\/debug(?:@\w+)?(\s|$)/i.test(t)) return next();
+
+      const rest = t.replace(/^\/debug(?:@\w+)?\s*/i, '').trim();
+      const low = rest.toLowerCase();
+
+      // INLINE doctor — zero dependency on phaseADebug load
+      if (!rest || low === 'doctor' || low.startsWith('doctor ')) {
+        const yn = (k) => (process.env[k] ? 'YES' : 'NO');
+        const doc = [
+          '🩺 DEBUG DOCTOR · INLINE-GATE',
+          '',
+          'build: V6000-INLINE-GATE',
+          'gate: DEBUG_ABSOLUTE_GATE (telegram.js)',
+          'ai: BLOCKED for /debug',
+          '',
+          'ENV',
+          '  BOT_TOKEN: ' + yn('BOT_TOKEN'),
+          '  ADMIN_ID: ' + yn('ADMIN_ID'),
+          '  SUPABASE_URL: ' + yn('SUPABASE_URL'),
+          '  SUPABASE_SERVICE_ROLE_KEY: ' + (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY ? 'YES' : 'NO'),
+          '  GITHUB_TOKEN: ' + yn('GITHUB_TOKEN'),
+          '  GITHUB_REPO: ' + (process.env.GITHUB_REPO || '—'),
+          '  GROQ_API_KEY: ' + yn('GROQ_API_KEY'),
+          '',
+          'If you see this block, routing is fixed.',
+        ].join('\n');
+        await ctx.reply(doc);
         return;
       }
+
+      // All other /debug* via phaseADebug (after ensureLibs)
+      try {
+        await ensureLibs();
+        const msg = await handlePhaseADebug({ text: t, ctx });
+        await ctx.reply(String(msg || 'debug: empty from phaseADebug').slice(0, 4000));
+      } catch (e) {
+        await ctx.reply('debug: ' + String(e && e.message ? e.message : e).slice(0, 300));
+      }
+      return;
     } catch (e) {
       try {
         await ctx.reply('debug-gate: ' + String(e && e.message ? e.message : e).slice(0, 300));
       } catch (_) {}
       return;
     }
-    return next();
   });
 
   bot.use(async (ctx, next) => {
