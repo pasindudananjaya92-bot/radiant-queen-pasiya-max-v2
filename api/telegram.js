@@ -18927,9 +18927,15 @@ bot.command('commands', async (ctx) => {
 
     if (text.startsWith('/')) return;
 
-    // Tool awareness — map NL to real bot commands (founder DM / private)
+    // Agent-1: NL → EXECUTE tools (founder private). Else Tool Awareness tip.
     try {
       if (ctx.chat?.type === 'private') {
+        const { tryAgentExecute } = await import('../lib/agentExecute.js');
+        const executed = await tryAgentExecute({ text, ctx });
+        if (executed) {
+          await ctx.reply(String(executed).slice(0, 4000));
+          return;
+        }
         const { toolAwareReply } = await import('../lib/toolAware.js');
         const tip = toolAwareReply(text);
         if (tip) {
@@ -18938,7 +18944,7 @@ bot.command('commands', async (ctx) => {
         }
       }
     } catch (e) {
-      console.error('toolAware', e?.message || e);
+      console.error('agentExecute/toolAware', e?.message || e);
     }
 
     // Anti-link moderation (groups only)
