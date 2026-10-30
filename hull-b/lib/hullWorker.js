@@ -1,5 +1,5 @@
 /**
- * Hull worker — claim queue jobs + run V6000 skills
+ * Hull worker — Agent-9.2
  */
 function sb() {
   const url = process.env.SUPABASE_URL;
@@ -20,10 +20,10 @@ async function rest(path, opts = {}) {
       'Content-Type': 'application/json',
       Prefer: opts.prefer || 'return=representation',
     },
-    body: opts.body,
+    body: opts.body || undefined,
   });
   const text = await res.text();
-  let json = null;
+  let json;
   try {
     json = text ? JSON.parse(text) : null;
   } catch (_) {
@@ -70,14 +70,46 @@ export async function finishJob(id, { ok, result, error }) {
 
 export async function processJob(job) {
   const kind = String(
-    job.kind || job.type || job.skill || (job.payload && job.payload.skill) || 'research'
-  ).toLowerCase();
+    job.kind ||
+      job.type ||
+      job.skill ||
+      (job.payload && (job.payload.skill || job.payload.kind)) ||
+      'research'
+  )
+    .toLowerCase()
+    .trim()
+    .replace(/^\//, '')
+    .split(/\s+/)[0];
+
+  let payload = job.payload || job.input || {};
+  if (typeof payload === 'string') {
+    try {
+      payload = JSON.parse(payload);
+    } catch (_) {
+      payload = { query: payload };
+    }
+  }
+  payload = {
+    ...payload,
+    query:
+      payload.query ||
+      payload.q ||
+      payload.topic ||
+      payload.text ||
+      job.query ||
+      job.topic ||
+      '',
+  };
+
   try {
     const skills = await import('./hullSkills.js');
     const result = await skills.processSkillJob({
       ...job,
       kind,
-      payload: job.payload || job.input || { query: job.query },
+      skill: kind,
+      payload,
+      query: payload.query,
+      topic: payload.topic || payload.query,
     });
     await finishJob(job.id, { ok: true, result });
     return { ok: true, result };
@@ -87,7 +119,6 @@ export async function processJob(job) {
   }
 }
 
-/** HTTP entry for Hull B /api/worker */
 export async function handleWorkerRequest(body = {}) {
   const action = String(body.action || 'poll').toLowerCase();
   if (action === 'skills') {
@@ -99,7 +130,24 @@ export async function handleWorkerRequest(body = {}) {
     const result = await runSkill(body.skill || body.kind, body.payload || body);
     return { ok: true, result };
   }
-  // default poll
+  if (action === 'process' && body.jobId) {
+    const rows = await rest(
+      'rq_hull_jobs?id=eq.' + encodeURIComponent(body.jobId) + '&select=*&limit=1'
+    );
+    const job = Array.isArray(rows) ? rows[0] : null;
+    if (!job) return { ok: false, error: 'job not found' };
+    if (job.status === 'queued') {
+      await rest('rq_hull_jobs?id=eq.' + encodeURIComponent(job.id), {
+        method: 'PATCH',
+        prefer: 'return=minimal',
+        body: JSON.stringify({
+          status: 'running',
+          started_at: new Date().toISOString(),
+        }),
+      });
+    }
+    return await processJob(job);
+  }
   const job = await claimNextJob();
   if (!job) return { ok: true, processed: 0, results: [] };
   const r = await processJob(job);
