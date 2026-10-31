@@ -1,23 +1,3 @@
-/**
- * api/cron.js — CONSOLIDATED cron router (Vercel Hobby ≤12 functions)
- *
- * Usage:
- *   /api/cron?job=ghost&secret=...
- *   /api/cron?job=track&secret=...
- *   /api/cron?job=watch&secret=...
- *   /api/cron?job=reminders&secret=...
- *   /api/cron?job=digest&secret=...
- *   /api/cron?job=all&secret=...   (ghost+track+watch only — light)
- *   /api/cron?job=swarmdigest&secret=...  (Agent-11 schedules + aggregate)
- *   /api/cron?job=shadow|hullpoll|dna|phaseg&secret=...
- *
- * Legacy paths (via vercel.json rewrite → this file):
- *   /api/cron-ghost → job=ghost
- *   /api/cron-track → job=track
- *   /api/cron-watch → job=watch
- *   /api/cron-reminders → job=reminders
- *   /api/cron-digest → job=digest
- */
 import { createClient } from '@supabase/supabase-js';
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
@@ -481,6 +461,37 @@ export default async function handler(req, res) {
   }
 
   try {
+    // v4000 C4 deep research queue
+    if (job === 'research' || job === 'researchdeep') {
+      const secret = process.env.CRON_SECRET || '';
+      const q = (req.query && req.query.secret) || req.headers['x-cron-secret'] || '';
+      if (secret && String(q) !== String(secret)) {
+        res.status(401).json({ error: 'unauthorized' });
+        return;
+      }
+      try {
+        const { processPendingResearchJobs } = await import('../lib/searchJobs.js');
+        const results = await processPendingResearchJobs(2);
+        res.status(200).json({ ok: true, job: 'research', results });
+        return;
+      } catch (e) {
+        res.status(500).json({ ok: false, error: String(e.message || e) });
+        return;
+      }
+    }
+
+    if (job === 'socialdigest' || job === 'social_digest' || job === 'social') {
+      try {
+        const mod = await import('../lib/socialPathA.js');
+        const r = await mod.jobSocialDigest();
+        res.status(200).json(r);
+        return;
+      } catch (e) {
+        res.status(200).json({ ok: false, job: 'socialdigest', error: String(e.message || e) });
+        return;
+      }
+    }
+
     if (job === 'ghost') {
       res.status(200).json({ ok: true, ...(await jobGhost(client)) });
       return;
@@ -564,25 +575,6 @@ export default async function handler(req, res) {
           });
           return;
         }
-      }
-    }
-
-    // Handle research jobs
-    if (job === 'research' || job === 'researchdeep') {
-      const secret = process.env.CRON_SECRET || '';
-      const q = (req.query && req.query.secret) || req.headers['x-cron-secret'] || '';
-      if (secret && String(q) !== String(secret)) {
-        res.status(401).json({ error: 'unauthorized' });
-        return;
-      }
-      try {
-        const { processPendingResearchJobs } = await import('../lib/searchJobs.js');
-        const results = await processPendingResearchJobs(2);
-        res.status(200).json({ ok: true, job: 'research', results });
-        return;
-      } catch (e) {
-        res.status(500).json({ ok: false, error: String(e.message || e) });
-        return;
       }
     }
 
