@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
+<title>PasiyaOS Hub · Seal Freeze</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0c;
+    --card: #14141a;
+    --gold: #c9a227;
+    --text: #f2f2f5;
+    --muted: #8b8b9a;
+    --line: #2a2a35;
+    --ok: #3dd68c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 16px;
+    padding-bottom: 40px;
+  }
+  h1 { font-size: 1.25rem; margin: 0 0 4px; color: var(--gold); }
+  .sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 16px; }
+  .badge {
+    display: inline-block;
+    background: #1a2e22;
+    color: var(--ok);
+    border: 1px solid #2a5a40;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    margin-bottom: 16px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  @media (min-width: 520px) { .grid { grid-template-columns: 1fr 1fr 1fr; } }
+  a.card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px;
+    min-height: 96px;
+    transition: border-color .15s, transform .1s;
+  }
+  a.card:active { transform: scale(0.98); }
+  a.card:hover { border-color: var(--gold); }
+  .icon { font-size: 1.5rem; margin-bottom: 6px; }
+  .title { font-weight: 600; font-size: 0.95rem; }
+  .desc { color: var(--muted); font-size: 0.75rem; margin-top: 4px; line-height: 1.3; }
+  .tools {
+    margin-top: 18px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px;
+  }
+  .tools h2 { font-size: 0.9rem; color: var(--gold); margin: 0 0 10px; }
+  .cmd {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.78rem;
+    background: #0d0d12;
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin: 6px 0;
+    border: 1px solid var(--line);
+    word-break: break-all;
+  }
+  footer {
+    margin-top: 20px;
+    color: var(--muted);
+    font-size: 0.72rem;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+  <h1>PasiyaOS Hub</h1>
+  <div class="sub">Radiant Queen · Production Stable · Agent-16 seal</div>
+  <div class="badge">● SEAL FREEZE · Core green</div>
+
+  <div class="grid" id="grid">
+    <a class="card" href="./desktop.html">
+      <div class="icon">🖥</div>
+      <div class="title">Desktop</div>
+      <div class="desc">PasiyaOS PC shell · apps · MAX LAB</div>
+    </a>
+    <a class="card" href="./phone.html">
+      <div class="icon">📱</div>
+      <div class="title">Phone</div>
+      <div class="desc">iOS-style shell · widgets · CC</div>
+    </a>
+    <a class="card" href="./build.html">
+      <div class="icon">🤖</div>
+      <div class="title">Builder</div>
+      <div class="desc">Natural language → actions</div>
+    </a>
+    <a class="card" href="./desktop.html?open=explorer">
+      <div class="icon">📁</div>
+      <div class="title">Files</div>
+      <div class="desc">Deep-link Explorer</div>
+    </a>
+    <a class="card" href="./desktop.html?open=terminal">
+      <div class="icon">⌨</div>
+      <div class="title">Terminal</div>
+      <div class="desc">Deep-link Terminal VFS</div>
+    </a>
+    <a class="card" href="./phone.html?open=notes">
+      <div class="icon">📝</div>
+      <div class="title">Notes</div>
+      <div class="desc">Phone Notes deep-link</div>
+    </a>
+  </div>
+
+  <div class="tools">
+    <h2>Tool-Aware (chat commands)</h2>
+    <div class="cmd">seal · prod status · cron health</div>
+    <div class="cmd">repos · skill hash test · social help</div>
+    <div class="cmd">swarm schedules · macro seal-check</div>
+    <div class="cmd">/debug doctor · /ping</div>
+  </div>
+
+  <footer>
+    No new API routes · Vercel ≤12 functions · Prometheus OFF<br/>
+    Hub v1 · Seal Freeze docs in README.md
+  </footer>
+
+<script>
+(function () {
+  try {
+    var tg = window.Telegram && window.Telegram.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      if (tg.setHeaderColor) tg.setHeaderColor('#0a0a0c');
+      if (tg.setBackgroundColor) tg.setBackgroundColor('#0a0a0c');
+    }
+  } catch (e) {}
+  // Deep-link from query: ?go=desktop|phone|build
+  try {
+    var q = new URLSearchParams(location.search);
+    var go = (q.get('go') || q.get('open') || '').toLowerCase();
+    if (go === 'desktop' || go === 'pc') location.replace('./desktop.html');
+    else if (go === 'phone' || go === 'mobile') location.replace('./phone.html');
+    else if (go === 'build' || go === 'builder') location.replace('./build.html');
+  } catch (e2) {}
+})();
+</script>
+</body>
+</html>
