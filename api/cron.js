@@ -1,3 +1,24 @@
+/**
+ * api/cron.js — CONSOLIDATED cron router (Vercel Hobby ≤12 functions)
+ *
+ * Usage:
+ *   /api/cron?job=ghost&secret=...
+ *   /api/cron?job=track&secret=...
+ *   /api/cron?job=watch&secret=...
+ *   /api/cron?job=reminders&secret=...
+ *   /api/cron?job=digest&secret=...
+ *   /api/cron?job=all&secret=...   (ghost+track+watch only — light)
+ *   /api/cron?job=swarmdigest&secret=...
+ *   /api/cron?job=keepalive&secret=...  (StrideClub / external keep-awake)
+ *   /api/cron?job=shadow|hullpoll|dna|phaseg&secret=...
+ *
+ * Legacy paths (via vercel.json rewrite → this file):
+ *   /api/cron-ghost → job=ghost
+ *   /api/cron-track → job=track
+ *   /api/cron-watch → job=watch
+ *   /api/cron-reminders → job=reminders
+ *   /api/cron-digest → job=digest
+ */
 import { createClient } from '@supabase/supabase-js';
 
 const BOT_TOKEN = process.env.BOT_TOKEN || '';
@@ -488,6 +509,18 @@ export default async function handler(req, res) {
         return;
       } catch (e) {
         res.status(200).json({ ok: false, job: 'socialdigest', error: String(e.message || e) });
+        return;
+      }
+    }
+
+    if (job === 'keepalive' || job === 'keep_alive' || job === 'stride' || job === 'ping_sites') {
+      try {
+        const mod = await import('../lib/keepAlive.js');
+        const r = await mod.jobKeepAlive();
+        res.status(200).json(r);
+        return;
+      } catch (e) {
+        res.status(200).json({ ok: false, job: 'keepalive', error: String(e.message || e) });
         return;
       }
     }
