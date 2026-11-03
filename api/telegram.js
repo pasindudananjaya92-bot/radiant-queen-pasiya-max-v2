@@ -17002,6 +17002,19 @@ bot.command('commands', async (ctx) => {
       }
 
       if (!path) {
+        // Not a GitHub upload — try Agent router (vault upload, etc.)
+        try {
+          if (captionRaw) {
+            const { tryAgentExecute } = await import('../lib/agentExecute.js');
+            const executed = await tryAgentExecute({ text: captionRaw, ctx });
+            if (executed) {
+              await ctx.reply(String(executed).slice(0, 4000), { parse_mode: 'Markdown' });
+              return;
+            }
+          }
+        } catch (e) {
+          console.error('document agentExecute', e?.message || e);
+        }
         // Not an upload intent — ignore quietly (do not dump file, do not AI)
         return;
       }
@@ -17049,6 +17062,24 @@ bot.command('commands', async (ctx) => {
       try {
         await ctx.reply('document upload failed: ' + String(err?.message || err).slice(0, 150));
       } catch (_) {}
+    }
+  });
+
+  // ——— Photo handler → Agent router (vault upload, etc.) ———
+  bot.on('photo', async (ctx) => {
+    try {
+      if (!isAdmin(ctx)) return;
+      if (ctx.chat?.type !== 'private') return;
+      const captionRaw = String(ctx.message?.caption || '').trim();
+      if (!captionRaw) return;
+      // Let agent router handle vault upload / other caption commands
+      const { tryAgentExecute } = await import('../lib/agentExecute.js');
+      const executed = await tryAgentExecute({ text: captionRaw, ctx });
+      if (executed) {
+        await ctx.reply(String(executed).slice(0, 4000), { parse_mode: 'Markdown' });
+      }
+    } catch (e) {
+      console.error('photo agentExecute', e?.message || e);
     }
   });
 
