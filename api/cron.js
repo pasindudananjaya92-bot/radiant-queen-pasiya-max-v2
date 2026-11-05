@@ -61,6 +61,8 @@ function detectJob(req) {
   if (url.includes('cron-hull')) return 'hullpoll';
   if (url.includes('cron-dna')) return 'dna';
   if (url.includes('cron-swarm')) return 'swarmdigest';
+  if (url.includes('nightscan') || url.includes('night-scan')) return 'nightscan';
+  if (url.includes('morningbrief') || url.includes('morning-brief')) return 'morningbrief';
   return 'help';
 }
 
@@ -468,14 +470,14 @@ export default async function handler(req, res) {
   if (job === 'help') {
     res.status(200).json({
       ok: true,
-      jobs: ['ghost', 'track', 'watch', 'reminders', 'digest', 'news_podcast', 'shadow', 'hullpoll', 'dna', 'all', 'phaseg', 'swarmdigest'],
+      jobs: ['ghost', 'track', 'watch', 'reminders', 'digest', 'news_podcast', 'shadow', 'hullpoll', 'dna', 'all', 'phaseg', 'swarmdigest', 'nightscan', 'morningbrief', 'nightops'],
       example: '/api/cron?job=ghost&secret=CRON_SECRET',
     });
     return;
   }
 
   // swarmdigest uses its own fetch client in lib/ — allow without createClient
-  const noClientOk = job === 'help' || job === 'swarmdigest' || job === 'swarm_digest' || job === 'swarm' || job === 'swarmcron' || job === 'shadow' || job === 'hullpoll' || job === 'dna' || job === 'phaseg' || job === 'g' || job === 'shadowdue' || job === 'shadow_due' || job === 'hull' || job === 'worker' || job === 'errordna' || job === 'dna_digest';
+  const noClientOk = job === 'help' || job === 'nightscan' || job === 'morningbrief' || job === 'nightops' || job === 'swarmdigest' || job === 'swarm_digest' || job === 'swarm' || job === 'swarmcron' || job === 'shadow' || job === 'hullpoll' || job === 'dna' || job === 'phaseg' || job === 'g' || job === 'shadowdue' || job === 'shadow_due' || job === 'hull' || job === 'worker' || job === 'errordna' || job === 'dna_digest';
   if (!client && !noClientOk) {
     res.status(500).json({ ok: false, error: 'no supabase' });
     return;
@@ -573,7 +575,32 @@ export default async function handler(req, res) {
       res.status(200).json({ ok: true, ...(await jobDnaDigest()) });
       return;
     }
+    if (job === 'nightscan' || job === 'night_scan' || job === 'nightcollect') {
+      const { runNightScan } = await import('../lib/nightOperator.js');
+      const r = await runNightScan({ alertOnFail: true });
+      return res.status(200).json({ ok: true, job: 'nightscan', allOk: r.allOk, ts: r.ts });
+    }
+
+    if (job === 'morningbrief' || job === 'morning_brief' || job === 'nightbrief') {
+      const { runMorningBrief } = await import('../lib/nightOperator.js');
+      const r = await runMorningBrief({});
+      return res.status(200).json({ ok: r.ok, job: 'morningbrief', voice: r.voiceResult?.ok || false });
+    }
+
+    if (job === 'nightops' || job === 'night_ops') {
+      const phase = String(req.query?.phase || '').toLowerCase();
+      if (phase === 'brief' || phase === 'morning') {
+        const { runMorningBrief } = await import('../lib/nightOperator.js');
+        const r = await runMorningBrief({});
+        return res.status(200).json({ ok: r.ok, job: 'nightops', phase: 'brief' });
+      }
+      const { runNightScan } = await import('../lib/nightOperator.js');
+      const r = await runNightScan({ alertOnFail: true });
+      return res.status(200).json({ ok: true, job: 'nightops', phase: 'scan', allOk: r.allOk });
+    }
+
     if (job === 'phaseg' || job === 'g') {
+
       const g = await import('../lib/cronPhaseG.js');
       const shadow = await g.jobShadowDue();
       const hull = await g.jobHullPoll();
