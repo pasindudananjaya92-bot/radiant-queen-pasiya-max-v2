@@ -63,6 +63,7 @@ function detectJob(req) {
   if (url.includes('cron-swarm')) return 'swarmdigest';
   if (url.includes('nightscan') || url.includes('night-scan')) return 'nightscan';
   if (url.includes('morningbrief') || url.includes('morning-brief')) return 'morningbrief';
+  if (url.includes('thinkworker') || url.includes('think-worker') || url.includes('hullb')) return 'thinkworker';
   return 'help';
 }
 
@@ -470,14 +471,14 @@ export default async function handler(req, res) {
   if (job === 'help') {
     res.status(200).json({
       ok: true,
-      jobs: ['ghost', 'track', 'watch', 'reminders', 'digest', 'news_podcast', 'shadow', 'hullpoll', 'dna', 'all', 'phaseg', 'swarmdigest', 'nightscan', 'morningbrief', 'nightops'],
+      jobs: ['ghost', 'track', 'watch', 'reminders', 'digest', 'news_podcast', 'shadow', 'hullpoll', 'dna', 'all', 'phaseg', 'swarmdigest', 'nightscan', 'morningbrief', 'nightops', 'thinkworker'],
       example: '/api/cron?job=ghost&secret=CRON_SECRET',
     });
     return;
   }
 
   // swarmdigest uses its own fetch client in lib/ — allow without createClient
-  const noClientOk = job === 'help' || job === 'nightscan' || job === 'morningbrief' || job === 'nightops' || job === 'swarmdigest' || job === 'swarm_digest' || job === 'swarm' || job === 'swarmcron' || job === 'shadow' || job === 'hullpoll' || job === 'dna' || job === 'phaseg' || job === 'g' || job === 'shadowdue' || job === 'shadow_due' || job === 'hull' || job === 'worker' || job === 'errordna' || job === 'dna_digest';
+  const noClientOk = job === 'help' || job === 'thinkworker' || job === 'think_worker' || job === 'hullb' || job === 'nightscan' || job === 'morningbrief' || job === 'nightops' || job === 'swarmdigest' || job === 'swarm_digest' || job === 'swarm' || job === 'swarmcron' || job === 'shadow' || job === 'hullpoll' || job === 'dna' || job === 'phaseg' || job === 'g' || job === 'shadowdue' || job === 'shadow_due' || job === 'hull' || job === 'worker' || job === 'errordna' || job === 'dna_digest';
   if (!client && !noClientOk) {
     res.status(500).json({ ok: false, error: 'no supabase' });
     return;
@@ -575,7 +576,14 @@ export default async function handler(req, res) {
       res.status(200).json({ ok: true, ...(await jobDnaDigest()) });
       return;
     }
+    if (job === 'thinkworker' || job === 'think_worker' || job === 'hullb' || job === 'thinkqueue') {
+      const { processThinkQueue } = await import('../lib/hullBManager.js');
+      const results = await processThinkQueue(1);
+      return res.status(200).json({ ok: true, job: 'thinkworker', results });
+    }
+
     if (job === 'nightscan' || job === 'night_scan' || job === 'nightcollect') {
+
       const { runNightScan } = await import('../lib/nightOperator.js');
       const r = await runNightScan({ alertOnFail: true });
       return res.status(200).json({ ok: true, job: 'nightscan', allOk: r.allOk, ts: r.ts });
