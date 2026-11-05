@@ -2779,6 +2779,15 @@ Persona mode: ${personaId}
 Official links when asked:
 ${LINKS}`;
 
+  // Self-awareness: real stack (never hallucinate React/MongoDB/etc.)
+  let selfAwarenessBlock = '';
+  try {
+    const sp = await import('../lib/systemPrompt.js');
+    selfAwarenessBlock = (sp.getSelfAwarenessBlock || sp.default?.getSelfAwarenessBlock || (() => ''))();
+  } catch (e) {
+    console.error('systemPrompt load', e?.message || e);
+  }
+
   // P2: short conversation memory
   let memoryBlock = '';
   const memUserId = ctx?.from?.id;
@@ -2788,9 +2797,11 @@ ${LINKS}`;
       memoryBlock = await loadMemoryBlock(supabase, memUserId, 8);
     }
   } catch (_) {}
-  const systemInstruction = memoryBlock
-    ? systemInstructionBase + '\n\nRecent chat memory:\n' + memoryBlock
-    : systemInstructionBase;
+  const systemInstruction = (
+    systemInstructionBase +
+    (selfAwarenessBlock ? '\n\n' + selfAwarenessBlock : '') +
+    (memoryBlock ? '\n\nRecent chat memory:\n' + memoryBlock : '')
+  );
 
   async function rememberTurn(userText, assistantText) {
     try {
