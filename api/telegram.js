@@ -18811,6 +18811,23 @@ bot.command('commands', async (ctx) => {
         return;
       }
       const transcript = stt.text.slice(0, 2000);
+
+      // Voice Brain: founder private voice → agent commands (health, vault, make, mem, ...)
+      try {
+        if (isAdmin(ctx) && ctx.chat?.type === 'private' && transcript) {
+          const { tryAgentExecute } = await import('../lib/agentExecute.js');
+          const executed = await tryAgentExecute({ text: transcript, ctx });
+          if (executed) {
+            await ctx.reply(
+              '🎙 ' + transcript.slice(0, 400) + '\n\n' + String(executed).slice(0, 3500)
+            );
+            return;
+          }
+        }
+      } catch (e) {
+        console.error('voice agentExecute', e?.message || e);
+      }
+
       const out = await generateReply(
         'User spoke (voice transcript):\n' +
           transcript +
