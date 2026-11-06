@@ -19689,6 +19689,10 @@ bot.command('commands', async (ctx) => {
   bot.catch(async (err, ctx) => {
     console.error('telegram bot error', err);
     try {
+      const { ensureSentry } = await import('../lib/sentryInit.js');
+      await ensureSentry();
+    } catch (_) {}
+    try {
       const { reportError } = await import('../lib/errorRadar.js');
       await reportError(err, 'bot.catch');
     } catch (_) {}
@@ -19706,6 +19710,12 @@ bot.command('commands', async (ctx) => {
 }
 
 export default async function handler(req, res) {
+  // Optional Sentry (no-op without SENTRY_DSN)
+  try {
+    const { ensureSentry } = await import('../lib/sentryInit.js');
+    await ensureSentry();
+  } catch (_) {}
+
   try {
     if (req.method === 'GET') {
       try {
@@ -19770,10 +19780,18 @@ export default async function handler(req, res) {
       await instance.handleUpdate(req.body || {});
     } catch (e) {
       console.error('handleUpdate', e);
+      try {
+        const { reportError } = await import('../lib/errorRadar.js');
+        await reportError(e, 'handleUpdate');
+      } catch (_) {}
     }
     return res.status(200).json({ ok: true });
   } catch (err) {
     console.error('telegram webhook', err);
+    try {
+      const { reportError } = await import('../lib/errorRadar.js');
+      await reportError(err, 'telegram.webhook');
+    } catch (_) {}
     try {
       return res.status(200).json({ ok: false, error: String(err && err.message ? err.message : err) });
     } catch (_) {
