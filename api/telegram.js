@@ -1660,32 +1660,44 @@ function siGuideHomeKeyboard() {
   return Markup.inlineKeyboard([
     [
       Markup.button.callback('🤖 AI කතා', 'si_cat_ai'),
+      Markup.button.callback('🧠 Think/Hull B', 'si_cat_think'),
+    ],
+    [
+      Markup.button.callback('📦 God Pack', 'si_cat_god'),
+      Markup.button.callback('⚙️ Ops මෙහෙයුම්', 'si_cat_ops'),
+    ],
+    [
+      Markup.button.callback('💚 Health', 'si_cat_health'),
+      Markup.button.callback('🐛 Sentry', 'si_cat_sentry'),
+    ],
+    [
       Markup.button.callback('💰 Gold', 'si_cat_gold'),
-    ],
-    [
       Markup.button.callback('⛅ කාලගුණය', 'si_cat_weather'),
+    ],
+    [
       Markup.button.callback('🧮 ගණන්/මුදල්', 'si_cat_math'),
-    ],
-    [
       Markup.button.callback('👥 Group Admin', 'si_cat_group'),
+    ],
+    [
       Markup.button.callback('🏃 දිවීම Stride', 'si_cat_run'),
-    ],
-    [
       Markup.button.callback('🧰 Tools', 'si_cat_tools'),
+    ],
+    [
       Markup.button.callback('📚 ඉගෙනීම', 'si_cat_learn'),
-    ],
-    [
       Markup.button.callback('📝 මගේ ලැයිස්තු', 'si_cat_personal'),
+    ],
+    [
       Markup.button.callback('🔐 රහස් මෙවලම්', 'si_cat_crypto'),
-    ],
-    [
       Markup.button.callback('⚙️ System', 'si_cat_system'),
-      Markup.button.callback('🤖 මගේ Bot', 'si_cat_tenant'),
     ],
     [
-      Markup.button.callback('🔗 Links / Invite', 'si_cat_links'),
-      Markup.button.callback('🏠 ප්‍රධාන මෙනුව', 'menu_home'),
+      Markup.button.callback('🤖 මගේ Bot', 'si_cat_tenant'),
+      Markup.button.callback('🔗 Links', 'si_cat_links'),
     ],
+    [
+      Markup.button.callback('📋 සියලු විධාන', 'si_cat_allcmds'),
+    ],
+    [Markup.button.callback('🏠 Main menu', 'menu_home')],
   ]);
 }
 
@@ -1702,14 +1714,82 @@ function siGuideIntroText() {
   return (
     `🔟 සිංහල සම්පූර්ණ GUIDE\n\n` +
     `මෙය බොට් එකේ හැම කොටසක්ම සරල සිංහලෙන්.\n` +
-    `පහත බොත්තම් වලින් කාණ්ඩයක් තෝරන්න.\n` +
-    `කාණ්ඩයක් තුළ විධානය කුමක්ද කියලා පැහැදිලිව තියෙනවා.\n\n` +
+    `පහත බොත්තම් වලින් කාණ්ඩයක් තෝරන්න.\n\n` +
+    `අලුතින් එකතු වූවා:\n` +
+    `• Think / Hull B — සාක්ෂි සහිත සිතීම\n` +
+    `• God Pack — ගොනු, මතක, ලේඛන AI\n` +
+    `• Ops — Make, Snap, Cron, රාත්‍රී මුරකරු\n` +
+    `• Sentry — දෝෂ ලැයිස්තු / විසඳීම\n` +
+    `• Health — පද්ධති සෞඛ්‍ය\n\n` +
     `ඉංග්‍රීසි නොදන්නත් කමක් නැහැ.\n` +
     `බොත්තම් ඔබන්න හෝ /si ටයිප් කරන්න.`
   );
 }
 
 const SI_CAT = {
+
+  think: (
+    `🧠 Think / Hull B — සාක්ෂි සහිත සිතීම\n\n` +
+    `බොට් එක ලේඛන, මතක, සෞඛ්‍ය බලලා උත්තර දෙනවා. නොදන්නවා නම් බොරු නොකියයි.\n\n` +
+    `think මගේ ප්‍රශ්නය — සාමාන්‍ය ගැඹුරු ප්‍රශ්නය\n` +
+    `think bg ප්‍රශ්නය — පසුබිම්ව run වෙලා පස්සේ DM\n` +
+    `think sync ප්‍රශ්නය — දැන්ම උත්තර\n` +
+    `think worker — queue එක දැන් process කරන්න\n` +
+    `think jobs — රැකියා ලැයිස්තු\n` +
+    `think last — අවසාන trace\n` +
+    `think diag — queue/RLS පරීක්ෂා\n\n` +
+    `උදා: think What was net profit in the finance doc?`
+  ),
+  god: (
+    `📦 God Pack — ගොනු · මතක · ලේඛන\n\n` +
+    `*Vault (ගොනු ගබඩාව)*\n` +
+    `vault list — ගොනු බලන්න\n` +
+    `ගොනුවක් යවලා caption: vault upload\n\n` +
+    `*Memory (මතක)*\n` +
+    `mem remember මගේ සටහන — මතක තියාගන්න\n` +
+    `mem search වචන — සොයන්න\n` +
+    `mem list — ලැයිස්තු\n\n` +
+    `*Document AI*\n` +
+    `PDF/TXT යවලා caption: doc analyze\n` +
+    `doc ask ප්‍රශ්නය — ලේඛනයෙන් උත්තර\n` +
+    `doc list · doc summary`
+  ),
+  ops: (
+    `⚙️ Ops — මෙහෙයුම්\n\n` +
+    `*Make.com*\n` +
+    `make list · make run · make run keepalive\n\n` +
+    `*SnapDeploy*\n` +
+    `snap list · snap status · snap wake\n\n` +
+    `*Cron*\n` +
+    `cron list · cron create Title | URL | 0 2 * * *\n\n` +
+    `*Night Operator (රාත්‍රී)*\n` +
+    `night scan — රාත්‍රී පරීක්ෂා\n` +
+    `night report — උදේ briefing\n` +
+    `voice on / voice off — හඬ briefing\n\n` +
+    `cache … — Upstash (තිබේ නම්)`
+  ),
+  health: (
+    `💚 Health — පද්ධති සෞඛ්‍ය\n\n` +
+    `health — Vercel, Supabase, Make, Snap, Cron බලන්න\n` +
+    `/status — කෙටි තත්ත්වය\n` +
+    `/ping — ජීවමානද\n\n` +
+    `හරිත/OK නම් පද්ධතිය හොඳයි.`
+  ),
+  sentry: (
+    `🐛 Sentry — දෝෂ පාලනය\n\n` +
+    `වෙබ් එකට නොගොස් බොට් එකෙන් දෝෂ බලන්න.\n\n` +
+    `sentry status — සබඳතාව\n` +
+    `sentry issues — නොවිසඳුණු දෝෂ\n` +
+    `sentry issue අංකය — විස්තර\n` +
+    `sentry resolve අංකය — විසඳු ලෙස සලකුණු\n\n` +
+    `(Founder only · API token ඕන)`
+  ),
+  allcmds: (
+    `📋 සියලු විධාන\n\n` +
+    `සම්පූර්ණ ලැයිස්තුවට private chat එකේ ටයිප් කරන්න:\n` +
+    `commands\n\n` +
+    `හෝ මෙම GUIDE එකේ කාණ්ඩ බොත්තම් භාවිතා කරන්න.`
+  ),
   system: (
     `⚙️ SYSTEM — පද්ධතිය\n\n` +
     `/start — බොට් එක පටන් ගන්න / මෙනුව\n` +
@@ -1721,7 +1801,9 @@ const SI_CAT = {
     `/about — බොට් ගැන කෙටි කතාව\n` +
     `/id — ඔබේ Telegram ID එක\n` +
     `/status — තත්ත්වය\n` +
-    `/commands — විධාන ලැයිස්තුව`
+    `commands — සම්පූර්ණ විධාන ලැයිස්තුව\n` +
+    `health — පද්ධති සෞඛ්‍ය (God Health)\n` +
+    `/si — මේ සිංහල GUIDE`
   ),
   gold: (
     `💰 GOLD — රන් ලකුණු\n\n` +
@@ -1832,11 +1914,11 @@ const SI_CAT = {
     `🤖 AI කතා කිරීම\n\n` +
     `1) ප්‍රශ්නය සෘජුව ටයිප් කරන්න\n` +
     `2) හෝ මෙනුවෙන් 1️⃣ AI ඔබන්න\n` +
-    `3) රූපයක් යවන්න — vision විශ්ලේෂණය\n` +
-    `4) හඬ පණිවිඩයක් — voice\n\n` +
-    `AI නැවතී නම්:\n` +
-    `/tools බලන්න — නොමිලේ මෙවලම් තවමත් වැඩ කරයි.\n\n` +
-    `Gold වියදම් වේ — /balance /prices`
+    `3) රූපයක් යවන්න — vision\n` +
+    `4) හඬ පණිවිඩය — කතා කරන්න (Voice Brain)\n` +
+    `5) ගැඹුරු ප්‍රශ්න — Think කාණ්ඩය බලන්න\n\n` +
+    `AI නැවතී නම් /tools බලන්න.\n` +
+    `Gold — /balance /prices`
   ),
   tenant: (
     `🤖 මගේ Bot (Tenant)\n\n` +
@@ -18328,6 +18410,12 @@ bot.command('commands', async (ctx) => {
     await uiReply(ctx, body.slice(0, 4000), siBackKeyboard());
   }
 
+  bot.action('si_cat_think', (ctx) => replySiCat(ctx, 'think'));
+  bot.action('si_cat_god', (ctx) => replySiCat(ctx, 'god'));
+  bot.action('si_cat_ops', (ctx) => replySiCat(ctx, 'ops'));
+  bot.action('si_cat_health', (ctx) => replySiCat(ctx, 'health'));
+  bot.action('si_cat_sentry', (ctx) => replySiCat(ctx, 'sentry'));
+  bot.action('si_cat_allcmds', (ctx) => replySiCat(ctx, 'allcmds'));
   bot.action('si_cat_system', (ctx) => replySiCat(ctx, 'system'));
   bot.action('si_cat_gold', (ctx) => replySiCat(ctx, 'gold'));
   bot.action('si_cat_weather', (ctx) => replySiCat(ctx, 'weather'));
