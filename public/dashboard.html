@@ -85,6 +85,16 @@
     .userchip img { width: 28px; height: 28px; border-radius: 50%; }
     .divider { height: 1px; background: var(--border); margin: 16px 0; }
     #tg-login { min-height: 44px; }
+
+    button .spin {
+      display: inline-block; width: 12px; height: 12px; margin-right: 6px;
+      border: 2px solid rgba(255,255,255,.25); border-top-color: #fff;
+      border-radius: 50%; vertical-align: -1px;
+      animation: rqspin .7s linear infinite;
+    }
+    @keyframes rqspin { to { transform: rotate(360deg); } }
+    button.busy { opacity: .75; pointer-events: none; }
+
   </style>
 </head>
 <body>
@@ -342,8 +352,11 @@
 
     document.getElementById('unlock').onclick = async () => {
       err.textContent = '';
+      const unlockBtn = document.getElementById('unlock');
       const s = document.getElementById('secret').value.trim();
       if (!s) { err.textContent = 'Enter DASH_SECRET or use Telegram login'; return; }
+      unlockBtn.disabled = true;
+      unlockBtn.innerHTML = '<span class="spin"></span>Unlocking…';
       sessionStorage.setItem(SEC_KEY, s);
       sessionStorage.removeItem(TG_KEY);
       try {
@@ -352,20 +365,49 @@
       } catch (e) {
         sessionStorage.removeItem(SEC_KEY);
         err.textContent = e.message || String(e);
+      } finally {
+        unlockBtn.disabled = false;
+        unlockBtn.textContent = 'Unlock with secret';
       }
     };
 
+    const ACTION_LABELS = {
+      think_worker: '▶ Run Think Worker',
+      night_run: '🌙 Night Run',
+      voice_on: '🎙 Voice ON',
+      voice_off: '🔇 Voice OFF',
+    };
+
+    function setActionsBusy(busy, activeBtn, label) {
+      ['btnWorker','btnNight','btnVoiceOn','btnVoiceOff'].forEach((id) => {
+        const b = document.getElementById(id);
+        if (!b) return;
+        b.disabled = !!busy;
+        b.classList.toggle('busy', !!busy);
+      });
+      if (activeBtn) {
+        if (busy) {
+          activeBtn.dataset.prevHtml = activeBtn.innerHTML;
+          activeBtn.innerHTML = '<span class="spin"></span>' + (label || 'Running…');
+        } else if (activeBtn.dataset.prevHtml) {
+          activeBtn.innerHTML = activeBtn.dataset.prevHtml;
+          delete activeBtn.dataset.prevHtml;
+        }
+      }
+    }
+
     async function runAction(action, btn) {
-      btn.disabled = true;
+      if (btn.disabled) return;
+      setActionsBusy(true, btn, 'Running…');
       try {
         const r = await api(action, 'POST', {});
-        toast(action + ' · ok');
+        toast((ACTION_LABELS[action] || action) + ' · ok');
         await load();
         return r;
       } catch (e) {
         toast(e.message || String(e));
       } finally {
-        btn.disabled = false;
+        setActionsBusy(false, btn);
       }
     }
 
