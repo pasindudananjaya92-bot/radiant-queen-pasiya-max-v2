@@ -5,146 +5,103 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Radiant Queen · Command Center</title>
   <meta name="theme-color" content="#0b0f1a" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #070a12;
-      --panel: rgba(18, 24, 40, 0.72);
-      --panel-solid: #121828;
-      --border: rgba(255,255,255,0.08);
-      --text: #e8eefc;
-      --muted: #8b9bb8;
-      --accent: #7c5cff;
-      --accent2: #2dd4bf;
-      --good: #34d399;
-      --warn: #fbbf24;
-      --bad: #f87171;
-      --shadow: 0 20px 50px rgba(0,0,0,0.45);
-      --radius: 18px;
+      --bg: #070a12; --panel: rgba(18,24,40,.75); --border: rgba(255,255,255,.08);
+      --text: #e8eefc; --muted: #8b9bb8; --accent: #7c5cff; --accent2: #2dd4bf;
+      --good: #34d399; --bad: #f87171; --radius: 18px;
+      --shadow: 0 20px 50px rgba(0,0,0,.45);
     }
     * { box-sizing: border-box; }
     body {
-      margin: 0;
-      min-height: 100vh;
-      font-family: 'IBM Plex Sans', system-ui, sans-serif;
-      color: var(--text);
-      background:
-        radial-gradient(1200px 600px at 10% -10%, rgba(124,92,255,0.25), transparent 55%),
-        radial-gradient(900px 500px at 100% 0%, rgba(45,212,191,0.12), transparent 50%),
-        var(--bg);
+      margin: 0; min-height: 100vh; font-family: 'IBM Plex Sans', system-ui, sans-serif; color: var(--text);
+      background: radial-gradient(1200px 600px at 10% -10%, rgba(124,92,255,.25), transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, rgba(45,212,191,.12), transparent 50%), var(--bg);
     }
     .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px 48px; }
-    header {
-      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
-      gap: 12px; margin-bottom: 22px;
-    }
+    header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
     .brand { display: flex; align-items: center; gap: 12px; }
     .logo {
       width: 42px; height: 42px; border-radius: 12px;
       background: linear-gradient(135deg, var(--accent), var(--accent2));
-      display: grid; place-items: center; font-weight: 700; font-size: 18px;
-      box-shadow: 0 8px 24px rgba(124,92,255,0.35);
+      display: grid; place-items: center; font-weight: 700; box-shadow: 0 8px 24px rgba(124,92,255,.35);
     }
-    h1 { margin: 0; font-size: 1.25rem; letter-spacing: -0.02em; }
-    .sub { color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
-    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-    button, .btn {
-      border: 1px solid var(--border);
-      background: rgba(255,255,255,0.04);
-      color: var(--text);
-      border-radius: 12px;
-      padding: 10px 14px;
-      font: 600 0.85rem 'IBM Plex Sans', sans-serif;
-      cursor: pointer;
-      transition: 0.15s ease;
+    h1 { margin: 0; font-size: 1.2rem; }
+    .sub { color: var(--muted); font-size: .85rem; margin-top: 2px; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    button {
+      border: 1px solid var(--border); background: rgba(255,255,255,.04); color: var(--text);
+      border-radius: 12px; padding: 10px 14px; font: 600 .85rem 'IBM Plex Sans', sans-serif; cursor: pointer;
     }
-    button:hover { border-color: rgba(124,92,255,0.5); background: rgba(124,92,255,0.12); }
-    button.primary {
-      background: linear-gradient(135deg, #6d4dff, #3b82f6);
-      border: none;
-    }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(12, 1fr);
-      gap: 14px;
-    }
+    button:hover { border-color: rgba(124,92,255,.5); background: rgba(124,92,255,.12); }
+    button.primary { background: linear-gradient(135deg, #6d4dff, #3b82f6); border: none; }
+    button.danger { border-color: rgba(248,113,113,.35); }
+    button:disabled { opacity: .5; cursor: wait; }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; }
     .card {
-      grid-column: span 12;
-      background: var(--panel);
-      backdrop-filter: blur(16px);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 16px 18px;
-      box-shadow: var(--shadow);
+      grid-column: span 12; background: var(--panel); backdrop-filter: blur(16px);
+      border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow);
     }
     @media (min-width: 720px) {
-      .card.span4 { grid-column: span 4; }
-      .card.span6 { grid-column: span 6; }
-      .card.span8 { grid-column: span 8; }
-      .card.span12 { grid-column: span 12; }
+      .span4 { grid-column: span 4; } .span6 { grid-column: span 6; } .span8 { grid-column: span 8; }
     }
     .card h2 {
-      margin: 0 0 12px;
-      font-size: 0.78rem;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--muted);
-      font-weight: 600;
+      margin: 0 0 12px; font-size: .75rem; text-transform: uppercase; letter-spacing: .08em;
+      color: var(--muted); font-weight: 600;
     }
-    .stat-row { display: flex; flex-wrap: wrap; gap: 10px; }
+    .stat-row, .btn-row { display: flex; flex-wrap: wrap; gap: 10px; }
     .pill {
-      display: inline-flex; align-items: center; gap: 8px;
-      padding: 8px 12px; border-radius: 999px;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid var(--border);
-      font-size: 0.85rem;
+      display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px;
+      background: rgba(255,255,255,.04); border: 1px solid var(--border); font-size: .85rem;
     }
-    .dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: var(--muted);
-    }
-    .dot.ok { background: var(--good); box-shadow: 0 0 10px rgba(52,211,153,0.6); }
-    .dot.bad { background: var(--bad); box-shadow: 0 0 10px rgba(248,113,113,0.5); }
-    .dot.warn { background: var(--warn); }
-    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+    .dot.ok { background: var(--good); box-shadow: 0 0 10px rgba(52,211,153,.6); }
+    .dot.bad { background: var(--bad); }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
     th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
-    th { color: var(--muted); font-weight: 500; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
-    .mono { font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; }
+    th { color: var(--muted); font-weight: 500; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
+    .mono { font-family: 'IBM Plex Mono', monospace; font-size: .78rem; }
     .muted { color: var(--muted); }
-    .preview { color: var(--text); opacity: 0.9; }
     #gate {
-      max-width: 420px; margin: 12vh auto; padding: 28px;
-      background: var(--panel); border: 1px solid var(--border);
-      border-radius: 20px; box-shadow: var(--shadow);
+      max-width: 440px; margin: 10vh auto; padding: 28px; background: var(--panel);
+      border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow);
     }
+    #gate p { color: var(--muted); font-size: .9rem; line-height: 1.45; }
     #gate input {
-      width: 100%; padding: 12px 14px; margin: 12px 0 16px;
-      border-radius: 12px; border: 1px solid var(--border);
-      background: rgba(0,0,0,0.35); color: var(--text);
-      font: 500 0.95rem 'IBM Plex Mono', monospace;
+      width: 100%; padding: 12px 14px; margin: 8px 0 12px; border-radius: 12px;
+      border: 1px solid var(--border); background: rgba(0,0,0,.35); color: var(--text);
+      font: 500 .95rem 'IBM Plex Mono', monospace;
     }
-    #gate p { color: var(--muted); font-size: 0.9rem; line-height: 1.45; }
-    #err { color: var(--bad); min-height: 1.2em; font-size: 0.85rem; }
-    .footer { margin-top: 18px; color: var(--muted); font-size: 0.75rem; text-align: center; }
-    .badge {
-      font-size: 0.7rem; padding: 3px 8px; border-radius: 999px;
-      background: rgba(124,92,255,0.2); color: #c4b5fd; font-weight: 600;
+    #err { color: var(--bad); min-height: 1.2em; font-size: .85rem; margin-top: 8px; }
+    #toast {
+      position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+      background: #1a2238; border: 1px solid var(--border); padding: 12px 18px; border-radius: 12px;
+      display: none; z-index: 50; max-width: 90vw; font-size: .9rem; box-shadow: var(--shadow);
     }
+    .footer { margin-top: 18px; color: var(--muted); font-size: .75rem; text-align: center; }
+    .badge { font-size: .7rem; padding: 3px 8px; border-radius: 999px; background: rgba(124,92,255,.2); color: #c4b5fd; font-weight: 600; }
+    .userchip { display: flex; align-items: center; gap: 8px; font-size: .85rem; }
+    .userchip img { width: 28px; height: 28px; border-radius: 50%; }
+    .divider { height: 1px; background: var(--border); margin: 16px 0; }
+    #tg-login { min-height: 44px; }
   </style>
 </head>
 <body>
   <div id="gate">
-    <div class="brand" style="margin-bottom:8px">
+    <div class="brand" style="margin-bottom:10px">
       <div class="logo">RQ</div>
       <div>
         <h1>Command Center</h1>
-        <div class="sub">Radiant Queen OS · Phase 1</div>
+        <div class="sub">Phase 2 · Telegram Login</div>
       </div>
     </div>
-    <p>Enter your <strong>DASH_SECRET</strong> (same value as Vercel env). Stored only in this browser session.</p>
-    <input id="secret" type="password" placeholder="DASH_SECRET" autocomplete="current-password" />
-    <button class="primary" id="unlock" style="width:100%">Unlock dashboard</button>
+    <p>Sign in with Telegram as the <strong>Founder</strong> account. Only your Telegram ID is allowed.</p>
+    <div id="tg-login"></div>
+    <div class="divider"></div>
+    <p class="muted" style="margin:0 0 8px">Fallback (optional): DASH_SECRET</p>
+    <input id="secret" type="password" placeholder="DASH_SECRET (optional)" />
+    <button class="primary" id="unlock" style="width:100%">Unlock with secret</button>
     <div id="err"></div>
   </div>
 
@@ -158,13 +115,25 @@
         </div>
       </div>
       <div class="actions">
+        <div class="userchip" id="userchip"></div>
         <span class="badge" id="liveBadge">LIVE</span>
         <button id="refresh">Refresh</button>
-        <button id="logout">Lock</button>
+        <button id="logout" class="danger">Lock</button>
       </div>
     </header>
 
     <div class="grid">
+      <section class="card span12">
+        <h2>Controls</h2>
+        <div class="btn-row">
+          <button class="primary" id="btnWorker">▶ Run Think Worker</button>
+          <button id="btnNight">🌙 Night Run</button>
+          <button id="btnVoiceOn">🎙 Voice ON</button>
+          <button id="btnVoiceOff">🔇 Voice OFF</button>
+        </div>
+        <p class="muted" style="margin:10px 0 0;font-size:.8rem">Write actions · founder session required</p>
+      </section>
+
       <section class="card span12">
         <h2>System health</h2>
         <div class="stat-row" id="healthRow">—</div>
@@ -192,132 +161,141 @@
           </table>
         </div>
       </section>
-
       <section class="card span4">
         <h2>Latest memories</h2>
         <div id="memList" class="muted">—</div>
       </section>
-
       <section class="card span12">
         <h2>Night reports</h2>
         <div id="nightList" class="muted">—</div>
       </section>
     </div>
-
-    <div class="footer">
-      Hull B · Vercel + Supabase · Read-only Phase 1 ·
-      <span class="mono" id="ts"></span>
-    </div>
+    <div class="footer">Phase 2 · Telegram auth · Hull B · <span class="mono" id="ts"></span></div>
   </div>
+  <div id="toast"></div>
 
   <script>
     const gate = document.getElementById('gate');
     const app = document.getElementById('app');
     const err = document.getElementById('err');
-    const KEY = 'rq_dash_secret';
+    const toastEl = document.getElementById('toast');
+    const TG_KEY = 'rq_tg_auth';
+    const SEC_KEY = 'rq_dash_secret';
 
-    function secret() {
-      return sessionStorage.getItem(KEY) || '';
+    // Set your bot username WITHOUT @  — also overridable via /api/dash?action=config
+    let BOT_USERNAME = localStorage.getItem('rq_bot_username') || 'PasiyaMaxQueen_bot';
+
+    function toast(msg) {
+      toastEl.textContent = msg;
+      toastEl.style.display = 'block';
+      setTimeout(() => { toastEl.style.display = 'none'; }, 3200);
     }
 
-    function apiBase() {
-      // same origin: /api/dash
-      return '/api/dash';
+    function getTg() {
+      try { return JSON.parse(sessionStorage.getItem(TG_KEY) || 'null'); } catch { return null; }
+    }
+    function setTg(obj) {
+      sessionStorage.setItem(TG_KEY, JSON.stringify(obj));
+      sessionStorage.removeItem(SEC_KEY);
+    }
+    function getSecret() { return sessionStorage.getItem(SEC_KEY) || ''; }
+
+    function authHeaders() {
+      const h = { 'Content-Type': 'application/json' };
+      const tg = getTg();
+      if (tg && tg.hash) {
+        h['X-Telegram-Auth'] = btoa(unescape(encodeURIComponent(JSON.stringify(tg))));
+      }
+      const s = getSecret();
+      if (s) {
+        h['Authorization'] = 'Bearer ' + s;
+        h['X-Dash-Secret'] = s;
+      }
+      return h;
     }
 
-    async function api(action) {
-      const s = secret();
-      const url = apiBase() + '?action=' + encodeURIComponent(action) + '&secret=' + encodeURIComponent(s);
-      const res = await fetch(url, {
-        headers: { Authorization: 'Bearer ' + s, 'X-Dash-Secret': s },
-        cache: 'no-store',
-      });
+    function apiUrl(action) {
+      let url = '/api/dash?action=' + encodeURIComponent(action);
+      const s = getSecret();
+      if (s) url += '&secret=' + encodeURIComponent(s);
+      return url;
+    }
+
+    async function api(action, method = 'GET', body) {
+      const opts = { method, headers: authHeaders(), cache: 'no-store' };
+      if (method === 'POST' && body) opts.body = JSON.stringify(body);
+      const res = await fetch(apiUrl(action), opts);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
       return data;
     }
 
     function esc(s) {
-      return String(s || '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+      return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
-
-    function dot(ok) {
-      return '<span class="dot ' + (ok ? 'ok' : 'bad') + '"></span>';
-    }
+    function dot(ok) { return '<span class="dot ' + (ok ? 'ok' : 'bad') + '"></span>'; }
 
     function render(data) {
       const health = data.health || {};
-      const checks = health.checks || health.items || [];
+      const checks = health.checks || [];
       const row = document.getElementById('healthRow');
-      if (Array.isArray(checks) && checks.length) {
-        row.innerHTML = checks.map((c) =>
-          '<span class="pill">' + dot(!!c.ok) + '<span>' + esc(c.name) +
-          ' <span class="muted">' + esc(c.detail || '') + '</span></span></span>'
-        ).join('');
-      } else {
-        row.innerHTML = '<span class="pill">' + dot(!!health.ok) + ' Health</span>';
-      }
+      row.innerHTML = checks.length
+        ? checks.map(c => '<span class="pill">' + dot(!!c.ok) + esc(c.name) +
+            ' <span class="muted">' + esc(c.detail || '') + '</span></span>').join('')
+        : '<span class="pill">' + dot(!!health.ok) + ' Health</span>';
 
       const q = data.queue || {};
       document.getElementById('queueStats').innerHTML =
-        'queued: <b>' + (q.queued ?? 0) + '</b><br>' +
-        'running: <b>' + (q.running ?? 0) + '</b><br>' +
-        'done (page): <b>' + (q.done ?? 0) + '</b>';
+        'queued: <b>' + (q.queued ?? 0) + '</b><br>running: <b>' + (q.running ?? 0) +
+        '</b><br>done: <b>' + (q.done ?? 0) + '</b>';
 
       const mem = data.mem || {};
       document.getElementById('memStats').innerHTML =
         'recent: <b>' + (mem.count ?? (mem.memories || []).length) + '</b>';
 
-      const night = data.night || {};
-      const reports = night.reports || [];
-      document.getElementById('nightStats').innerHTML =
-        reports.length
-          ? ('last: <b>' + esc(reports[0].phase || '?') + '</b><br><span class="muted">' +
-            esc((reports[0].created_at || '').slice(0, 19)) + '</span>')
-          : 'no reports yet';
+      const reports = (data.night && data.night.reports) || [];
+      document.getElementById('nightStats').innerHTML = reports.length
+        ? ('last: <b>' + esc(reports[0].phase) + '</b><br><span class="muted">' +
+            esc(String(reports[0].created_at || '').slice(0, 19)) + '</span>')
+        : 'no reports';
 
-      const jobs = (q.recent || []);
-      const jb = document.getElementById('jobsBody');
-      if (!jobs.length) {
-        jb.innerHTML = '<tr><td colspan="4" class="muted">No jobs</td></tr>';
-      } else {
-        jb.innerHTML = jobs.map((j) =>
-          '<tr>' +
-          '<td class="mono">#' + esc(j.id) + '</td>' +
-          '<td>' + esc(j.status) + '</td>' +
-          '<td class="preview">' + esc(String(j.prompt || '').slice(0, 80)) + '</td>' +
-          '<td class="muted mono">' + esc(String(j.created_at || j.updated_at || '').slice(0, 19)) + '</td>' +
-          '</tr>'
-        ).join('');
-      }
+      const jobs = q.recent || [];
+      document.getElementById('jobsBody').innerHTML = jobs.length
+        ? jobs.map(j => '<tr><td class="mono">#' + esc(j.id) + '</td><td>' + esc(j.status) +
+            '</td><td>' + esc(String(j.prompt || '').slice(0, 80)) + '</td><td class="muted mono">' +
+            esc(String(j.created_at || '').slice(0, 19)) + '</td></tr>').join('')
+        : '<tr><td colspan="4" class="muted">No jobs</td></tr>';
 
-      const ml = document.getElementById('memList');
       const mems = mem.memories || [];
-      ml.innerHTML = mems.length
-        ? mems.map((m) =>
-            '<div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)">' +
-            '<div class="preview">' + esc(m.preview) + '</div>' +
-            '<div class="muted mono">' + esc(String(m.created_at || '').slice(0, 19)) + '</div></div>'
-          ).join('')
+      document.getElementById('memList').innerHTML = mems.length
+        ? mems.map(m => '<div style="margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:8px">' +
+            '<div>' + esc(m.preview) + '</div><div class="muted mono">' +
+            esc(String(m.created_at || '').slice(0, 19)) + '</div></div>').join('')
         : 'No memories';
 
-      const nl = document.getElementById('nightList');
-      nl.innerHTML = reports.length
-        ? reports.map((r) =>
-            '<div style="margin-bottom:12px">' +
-            '<div><b>' + esc(r.phase) + '</b> <span class="muted mono">' +
-            esc(String(r.created_at || '').slice(0, 19)) + '</span></div>' +
-            '<div class="preview">' + esc(r.preview) + '</div></div>'
-          ).join('')
+      document.getElementById('nightList').innerHTML = reports.length
+        ? reports.map(r => '<div style="margin-bottom:12px"><b>' + esc(r.phase) + '</b> <span class="muted mono">' +
+            esc(String(r.created_at || '').slice(0, 19)) + '</span><div>' + esc(r.preview) + '</div></div>').join('')
         : 'No night reports';
 
       const sys = data.system || {};
       document.getElementById('meta').textContent =
-        (sys.name || 'Radiant Queen') + ' · ' + (sys.hull || 'Hull B') + ' · ' + (sys.agents || '');
-      document.getElementById('ts').textContent = data.ts || new Date().toISOString();
+        (sys.name || 'Radiant Queen') + ' · ' + (sys.hull || 'Hull B');
+      document.getElementById('ts').textContent = data.ts || '';
+    }
+
+    function showApp(user) {
+      gate.hidden = true;
+      app.hidden = false;
+      const chip = document.getElementById('userchip');
+      if (user && user.username) {
+        chip.innerHTML = (user.photo_url ? '<img src="' + esc(user.photo_url) + '" alt="">' : '') +
+          '<span>@' + esc(user.username) + '</span>';
+      } else if (user && user.id) {
+        chip.innerHTML = '<span class="mono">id ' + esc(user.id) + '</span>';
+      } else {
+        chip.innerHTML = '<span class="muted">secret session</span>';
+      }
     }
 
     async function load() {
@@ -327,38 +305,101 @@
       document.getElementById('liveBadge').textContent = 'LIVE';
     }
 
-    document.getElementById('unlock').onclick = async () => {
+    // Called by Telegram Login Widget
+    window.onTelegramAuth = async function (user) {
       err.textContent = '';
-      const s = document.getElementById('secret').value.trim();
-      if (!s) { err.textContent = 'Enter secret'; return; }
-      sessionStorage.setItem(KEY, s);
       try {
+        // Server-side verify
+        const res = await fetch('/api/dash?action=auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ telegram: user }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.error || 'Telegram auth failed');
+        setTg(user);
         await load();
-        gate.hidden = true;
-        app.hidden = false;
+        showApp(data.user || user);
+        toast('Signed in as founder');
       } catch (e) {
-        sessionStorage.removeItem(KEY);
         err.textContent = e.message || String(e);
       }
     };
 
-    document.getElementById('refresh').onclick = () => load().catch((e) => alert(e.message));
+    function injectTelegramWidget() {
+      const box = document.getElementById('tg-login');
+      box.innerHTML = '';
+      const s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://telegram.org/js/telegram-widget.js?22';
+      s.setAttribute('data-telegram-login', BOT_USERNAME);
+      s.setAttribute('data-size', 'large');
+      s.setAttribute('data-radius', '12');
+      s.setAttribute('data-onauth', 'onTelegramAuth(user)');
+      s.setAttribute('data-request-access', 'write');
+      box.appendChild(s);
+    }
+
+    document.getElementById('unlock').onclick = async () => {
+      err.textContent = '';
+      const s = document.getElementById('secret').value.trim();
+      if (!s) { err.textContent = 'Enter DASH_SECRET or use Telegram login'; return; }
+      sessionStorage.setItem(SEC_KEY, s);
+      sessionStorage.removeItem(TG_KEY);
+      try {
+        await load();
+        showApp(null);
+      } catch (e) {
+        sessionStorage.removeItem(SEC_KEY);
+        err.textContent = e.message || String(e);
+      }
+    };
+
+    async function runAction(action, btn) {
+      btn.disabled = true;
+      try {
+        const r = await api(action, 'POST', {});
+        toast(action + ' · ok');
+        await load();
+        return r;
+      } catch (e) {
+        toast(e.message || String(e));
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    document.getElementById('btnWorker').onclick = (e) => runAction('think_worker', e.target);
+    document.getElementById('btnNight').onclick = (e) => runAction('night_run', e.target);
+    document.getElementById('btnVoiceOn').onclick = (e) => runAction('voice_on', e.target);
+    document.getElementById('btnVoiceOff').onclick = (e) => runAction('voice_off', e.target);
+    document.getElementById('refresh').onclick = () => load().catch((e) => toast(e.message));
     document.getElementById('logout').onclick = () => {
-      sessionStorage.removeItem(KEY);
+      sessionStorage.removeItem(TG_KEY);
+      sessionStorage.removeItem(SEC_KEY);
       location.reload();
     };
 
-    // Auto-unlock if session present
-    if (secret()) {
-      load().then(() => {
-        gate.hidden = true;
-        app.hidden = false;
-      }).catch(() => sessionStorage.removeItem(KEY));
-    }
+    // Bootstrap: fetch bot username if API allows, else use default
+    (async () => {
+      try {
+        const r = await fetch('/api/dash?action=config').then((x) => x.json()).catch(() => null);
+        // config requires auth in our API — skip if 401
+      } catch (_) {}
+      injectTelegramWidget();
+      if (getTg() || getSecret()) {
+        try {
+          await load();
+          showApp(getTg());
+        } catch (_) {
+          sessionStorage.removeItem(TG_KEY);
+          sessionStorage.removeItem(SEC_KEY);
+        }
+      }
+    })();
 
-    // Auto refresh every 45s
     setInterval(() => {
-      if (!app.hidden && secret()) load().catch(() => {});
+      if (!app.hidden && (getTg() || getSecret())) load().catch(() => {});
     }, 45000);
   </script>
 </body>
