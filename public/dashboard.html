@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Radiant Queen · Command Center</title>
+  <meta name="theme-color" content="#0b0f1a" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #070a12;
+      --panel: rgba(18, 24, 40, 0.72);
+      --panel-solid: #121828;
+      --border: rgba(255,255,255,0.08);
+      --text: #e8eefc;
+      --muted: #8b9bb8;
+      --accent: #7c5cff;
+      --accent2: #2dd4bf;
+      --good: #34d399;
+      --warn: #fbbf24;
+      --bad: #f87171;
+      --shadow: 0 20px 50px rgba(0,0,0,0.45);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: 'IBM Plex Sans', system-ui, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, rgba(124,92,255,0.25), transparent 55%),
+        radial-gradient(900px 500px at 100% 0%, rgba(45,212,191,0.12), transparent 50%),
+        var(--bg);
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px 48px; }
+    header {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+      gap: 12px; margin-bottom: 22px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .logo {
+      width: 42px; height: 42px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: grid; place-items: center; font-weight: 700; font-size: 18px;
+      box-shadow: 0 8px 24px rgba(124,92,255,0.35);
+    }
+    h1 { margin: 0; font-size: 1.25rem; letter-spacing: -0.02em; }
+    .sub { color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    button, .btn {
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      border-radius: 12px;
+      padding: 10px 14px;
+      font: 600 0.85rem 'IBM Plex Sans', sans-serif;
+      cursor: pointer;
+      transition: 0.15s ease;
+    }
+    button:hover { border-color: rgba(124,92,255,0.5); background: rgba(124,92,255,0.12); }
+    button.primary {
+      background: linear-gradient(135deg, #6d4dff, #3b82f6);
+      border: none;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 14px;
+    }
+    .card {
+      grid-column: span 12;
+      background: var(--panel);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      box-shadow: var(--shadow);
+    }
+    @media (min-width: 720px) {
+      .card.span4 { grid-column: span 4; }
+      .card.span6 { grid-column: span 6; }
+      .card.span8 { grid-column: span 8; }
+      .card.span12 { grid-column: span 12; }
+    }
+    .card h2 {
+      margin: 0 0 12px;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .stat-row { display: flex; flex-wrap: wrap; gap: 10px; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 12px; border-radius: 999px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+    .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--muted);
+    }
+    .dot.ok { background: var(--good); box-shadow: 0 0 10px rgba(52,211,153,0.6); }
+    .dot.bad { background: var(--bad); box-shadow: 0 0 10px rgba(248,113,113,0.5); }
+    .dot.warn { background: var(--warn); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    th { color: var(--muted); font-weight: 500; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
+    .mono { font-family: 'IBM Plex Mono', monospace; font-size: 0.78rem; }
+    .muted { color: var(--muted); }
+    .preview { color: var(--text); opacity: 0.9; }
+    #gate {
+      max-width: 420px; margin: 12vh auto; padding: 28px;
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 20px; box-shadow: var(--shadow);
+    }
+    #gate input {
+      width: 100%; padding: 12px 14px; margin: 12px 0 16px;
+      border-radius: 12px; border: 1px solid var(--border);
+      background: rgba(0,0,0,0.35); color: var(--text);
+      font: 500 0.95rem 'IBM Plex Mono', monospace;
+    }
+    #gate p { color: var(--muted); font-size: 0.9rem; line-height: 1.45; }
+    #err { color: var(--bad); min-height: 1.2em; font-size: 0.85rem; }
+    .footer { margin-top: 18px; color: var(--muted); font-size: 0.75rem; text-align: center; }
+    .badge {
+      font-size: 0.7rem; padding: 3px 8px; border-radius: 999px;
+      background: rgba(124,92,255,0.2); color: #c4b5fd; font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div id="gate">
+    <div class="brand" style="margin-bottom:8px">
+      <div class="logo">RQ</div>
+      <div>
+        <h1>Command Center</h1>
+        <div class="sub">Radiant Queen OS · Phase 1</div>
+      </div>
+    </div>
+    <p>Enter your <strong>DASH_SECRET</strong> (same value as Vercel env). Stored only in this browser session.</p>
+    <input id="secret" type="password" placeholder="DASH_SECRET" autocomplete="current-password" />
+    <button class="primary" id="unlock" style="width:100%">Unlock dashboard</button>
+    <div id="err"></div>
+  </div>
+
+  <div class="wrap" id="app" hidden>
+    <header>
+      <div class="brand">
+        <div class="logo">RQ</div>
+        <div>
+          <h1>Radiant Queen · Command Center</h1>
+          <div class="sub" id="meta">Loading…</div>
+        </div>
+      </div>
+      <div class="actions">
+        <span class="badge" id="liveBadge">LIVE</span>
+        <button id="refresh">Refresh</button>
+        <button id="logout">Lock</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <section class="card span12">
+        <h2>System health</h2>
+        <div class="stat-row" id="healthRow">—</div>
+      </section>
+
+      <section class="card span4">
+        <h2>Think queue</h2>
+        <div id="queueStats" class="mono">—</div>
+      </section>
+      <section class="card span4">
+        <h2>Memory</h2>
+        <div id="memStats" class="mono">—</div>
+      </section>
+      <section class="card span4">
+        <h2>Night Operator</h2>
+        <div id="nightStats" class="mono">—</div>
+      </section>
+
+      <section class="card span8">
+        <h2>Recent think jobs</h2>
+        <div style="overflow:auto">
+          <table>
+            <thead><tr><th>ID</th><th>Status</th><th>Prompt</th><th>When</th></tr></thead>
+            <tbody id="jobsBody"><tr><td colspan="4" class="muted">—</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card span4">
+        <h2>Latest memories</h2>
+        <div id="memList" class="muted">—</div>
+      </section>
+
+      <section class="card span12">
+        <h2>Night reports</h2>
+        <div id="nightList" class="muted">—</div>
+      </section>
+    </div>
+
+    <div class="footer">
+      Hull B · Vercel + Supabase · Read-only Phase 1 ·
+      <span class="mono" id="ts"></span>
+    </div>
+  </div>
+
+  <script>
+    const gate = document.getElementById('gate');
+    const app = document.getElementById('app');
+    const err = document.getElementById('err');
+    const KEY = 'rq_dash_secret';
+
+    function secret() {
+      return sessionStorage.getItem(KEY) || '';
+    }
+
+    function apiBase() {
+      // same origin: /api/dash
+      return '/api/dash';
+    }
+
+    async function api(action) {
+      const s = secret();
+      const url = apiBase() + '?action=' + encodeURIComponent(action) + '&secret=' + encodeURIComponent(s);
+      const res = await fetch(url, {
+        headers: { Authorization: 'Bearer ' + s, 'X-Dash-Secret': s },
+        cache: 'no-store',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      return data;
+    }
+
+    function esc(s) {
+      return String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function dot(ok) {
+      return '<span class="dot ' + (ok ? 'ok' : 'bad') + '"></span>';
+    }
+
+    function render(data) {
+      const health = data.health || {};
+      const checks = health.checks || health.items || [];
+      const row = document.getElementById('healthRow');
+      if (Array.isArray(checks) && checks.length) {
+        row.innerHTML = checks.map((c) =>
+          '<span class="pill">' + dot(!!c.ok) + '<span>' + esc(c.name) +
+          ' <span class="muted">' + esc(c.detail || '') + '</span></span></span>'
+        ).join('');
+      } else {
+        row.innerHTML = '<span class="pill">' + dot(!!health.ok) + ' Health</span>';
+      }
+
+      const q = data.queue || {};
+      document.getElementById('queueStats').innerHTML =
+        'queued: <b>' + (q.queued ?? 0) + '</b><br>' +
+        'running: <b>' + (q.running ?? 0) + '</b><br>' +
+        'done (page): <b>' + (q.done ?? 0) + '</b>';
+
+      const mem = data.mem || {};
+      document.getElementById('memStats').innerHTML =
+        'recent: <b>' + (mem.count ?? (mem.memories || []).length) + '</b>';
+
+      const night = data.night || {};
+      const reports = night.reports || [];
+      document.getElementById('nightStats').innerHTML =
+        reports.length
+          ? ('last: <b>' + esc(reports[0].phase || '?') + '</b><br><span class="muted">' +
+            esc((reports[0].created_at || '').slice(0, 19)) + '</span>')
+          : 'no reports yet';
+
+      const jobs = (q.recent || []);
+      const jb = document.getElementById('jobsBody');
+      if (!jobs.length) {
+        jb.innerHTML = '<tr><td colspan="4" class="muted">No jobs</td></tr>';
+      } else {
+        jb.innerHTML = jobs.map((j) =>
+          '<tr>' +
+          '<td class="mono">#' + esc(j.id) + '</td>' +
+          '<td>' + esc(j.status) + '</td>' +
+          '<td class="preview">' + esc(String(j.prompt || '').slice(0, 80)) + '</td>' +
+          '<td class="muted mono">' + esc(String(j.created_at || j.updated_at || '').slice(0, 19)) + '</td>' +
+          '</tr>'
+        ).join('');
+      }
+
+      const ml = document.getElementById('memList');
+      const mems = mem.memories || [];
+      ml.innerHTML = mems.length
+        ? mems.map((m) =>
+            '<div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border)">' +
+            '<div class="preview">' + esc(m.preview) + '</div>' +
+            '<div class="muted mono">' + esc(String(m.created_at || '').slice(0, 19)) + '</div></div>'
+          ).join('')
+        : 'No memories';
+
+      const nl = document.getElementById('nightList');
+      nl.innerHTML = reports.length
+        ? reports.map((r) =>
+            '<div style="margin-bottom:12px">' +
+            '<div><b>' + esc(r.phase) + '</b> <span class="muted mono">' +
+            esc(String(r.created_at || '').slice(0, 19)) + '</span></div>' +
+            '<div class="preview">' + esc(r.preview) + '</div></div>'
+          ).join('')
+        : 'No night reports';
+
+      const sys = data.system || {};
+      document.getElementById('meta').textContent =
+        (sys.name || 'Radiant Queen') + ' · ' + (sys.hull || 'Hull B') + ' · ' + (sys.agents || '');
+      document.getElementById('ts').textContent = data.ts || new Date().toISOString();
+    }
+
+    async function load() {
+      document.getElementById('liveBadge').textContent = '…';
+      const data = await api('overview');
+      render(data);
+      document.getElementById('liveBadge').textContent = 'LIVE';
+    }
+
+    document.getElementById('unlock').onclick = async () => {
+      err.textContent = '';
+      const s = document.getElementById('secret').value.trim();
+      if (!s) { err.textContent = 'Enter secret'; return; }
+      sessionStorage.setItem(KEY, s);
+      try {
+        await load();
+        gate.hidden = true;
+        app.hidden = false;
+      } catch (e) {
+        sessionStorage.removeItem(KEY);
+        err.textContent = e.message || String(e);
+      }
+    };
+
+    document.getElementById('refresh').onclick = () => load().catch((e) => alert(e.message));
+    document.getElementById('logout').onclick = () => {
+      sessionStorage.removeItem(KEY);
+      location.reload();
+    };
+
+    // Auto-unlock if session present
+    if (secret()) {
+      load().then(() => {
+        gate.hidden = true;
+        app.hidden = false;
+      }).catch(() => sessionStorage.removeItem(KEY));
+    }
+
+    // Auto refresh every 45s
+    setInterval(() => {
+      if (!app.hidden && secret()) load().catch(() => {});
+    }, 45000);
+  </script>
+</body>
+</html>
