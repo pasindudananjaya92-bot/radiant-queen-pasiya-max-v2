@@ -591,16 +591,29 @@ export default async function handler(req, res) {
 
     if (job === 'morningbrief' || job === 'morning_brief' || job === 'nightbrief') {
       const { runMorningBrief } = await import('../lib/nightOperator.js');
-      const r = await runMorningBrief({});
-      return res.status(200).json({ ok: r.ok, job: 'morningbrief', voice: r.voiceResult?.ok || false });
+      // cronMode: text first, short TTS budget — always 200 if text delivered (cron-job.org green)
+      const r = await runMorningBrief({ cron: true, voiceTimeoutMs: 3500 });
+      return res.status(200).json({
+        ok: true,
+        job: 'morningbrief',
+        text: !!(r && r.ok),
+        voice: !!(r && r.voiceResult && r.voiceResult.ok),
+        voice_error: r?.voiceResult?.error || null,
+      });
     }
 
     if (job === 'nightops' || job === 'night_ops') {
       const phase = String(req.query?.phase || '').toLowerCase();
       if (phase === 'brief' || phase === 'morning') {
         const { runMorningBrief } = await import('../lib/nightOperator.js');
-        const r = await runMorningBrief({});
-        return res.status(200).json({ ok: r.ok, job: 'nightops', phase: 'brief' });
+        const r = await runMorningBrief({ cron: true, voiceTimeoutMs: 3500 });
+        return res.status(200).json({
+          ok: true,
+          job: 'nightops',
+          phase: 'brief',
+          text: !!(r && r.ok),
+          voice: !!(r && r.voiceResult && r.voiceResult.ok),
+        });
       }
       const { runNightScan } = await import('../lib/nightOperator.js');
       const r = await runNightScan({ alertOnFail: true });
