@@ -364,6 +364,8 @@ async function actionOverview() {
     cron,
     usage,
     alerts,
+    shadow: await actionShadowList().catch((e) => ({ ok: false, error: e.message, tasks: [] })),
+    brain: await actionBrainList().catch((e) => ({ ok: false, error: e.message, items: [] })),
   };
 }
 
@@ -528,6 +530,59 @@ async function actionDashThink(q) {
 }
 
 
+
+async function actionShadowList() {
+  const sm = await import('../lib/shadowManager.js');
+  const tasks = await sm.listTasks({ status: 'pending', limit: 30 });
+  return { ok: true, tasks };
+}
+async function actionShadowAdd(text) {
+  const sm = await import('../lib/shadowManager.js');
+  const row = await sm.addTask(text);
+  return { ok: true, task: row };
+}
+async function actionShadowMorning() {
+  const sm = await import('../lib/shadowManager.js');
+  return await sm.runMorningReport({ sendTelegram: true });
+}
+async function actionShadowDone(id) {
+  const sm = await import('../lib/shadowManager.js');
+  await sm.setTaskStatus(id, 'done');
+  return { ok: true, id };
+}
+async function actionShadowDelete(id) {
+  const sm = await import('../lib/shadowManager.js');
+  await sm.setTaskStatus(id, 'cancelled');
+  return { ok: true, id };
+}
+async function actionBrainList() {
+  const bm = await import('../lib/brainManager.js');
+  const items = await bm.listBrain(20);
+  // mask secrets for list
+  const safe = items.map((x) => ({
+    ...x,
+    value_masked: x.sensitivity === 'secret' ? '***' : x.value,
+    value: x.sensitivity === 'secret' ? '***' : x.value,
+  }));
+  return { ok: true, items: safe };
+}
+async function actionBrainRemember(key, value) {
+  const bm = await import('../lib/brainManager.js');
+  const row = await bm.remember({ key_display: key, value });
+  return { ok: true, item: row };
+}
+async function actionBrainForget(q) {
+  const bm = await import('../lib/brainManager.js');
+  const row = await bm.forget(q);
+  return { ok: true, deleted: row };
+}
+async function actionBrainRecall(q) {
+  const bm = await import('../lib/brainManager.js');
+  const row = await bm.recall(q);
+  return { ok: true, item: row };
+}
+
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -607,6 +662,12 @@ export default async function handler(req, res) {
       if (action === 'alerts') {
         return json(res, 200, await actionAlerts());
       }
+      if (action === 'shadow' || action === 'shadow_list') {
+        return json(res, 200, await actionShadowList());
+      }
+      if (action === 'brain' || action === 'brain_list') {
+        return json(res, 200, await actionBrainList());
+      }
       return json(res, 200, await actionOverview());
     }
 
@@ -640,6 +701,33 @@ export default async function handler(req, res) {
       }
       if (action === 'god_heal' || action === 'emergency_heal') {
         return json(res, 200, await actionGodHeal());
+      }
+      if (action === 'shadow_add') {
+        const body = parseBody(req);
+        return json(res, 200, await actionShadowAdd(body.text || body.task || ''));
+      }
+      if (action === 'shadow_morning') {
+        return json(res, 200, await actionShadowMorning());
+      }
+      if (action === 'shadow_done') {
+        const body = parseBody(req);
+        return json(res, 200, await actionShadowDone(body.id || req.query?.id));
+      }
+      if (action === 'shadow_delete') {
+        const body = parseBody(req);
+        return json(res, 200, await actionShadowDelete(body.id || req.query?.id));
+      }
+      if (action === 'brain_remember') {
+        const body = parseBody(req);
+        return json(res, 200, await actionBrainRemember(body.key || body.key_display, body.value));
+      }
+      if (action === 'brain_forget') {
+        const body = parseBody(req);
+        return json(res, 200, await actionBrainForget(body.q || body.key || body.id));
+      }
+      if (action === 'brain_recall') {
+        const body = parseBody(req);
+        return json(res, 200, await actionBrainRecall(body.q || body.key));
       }
       if (action === 'alerts_seen') {
         return json(res, 200, await actionAlertsSeen());
