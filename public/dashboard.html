@@ -34,7 +34,7 @@
     .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
     .card{grid-column:span 12;background:var(--panel);backdrop-filter:blur(14px);border:1px solid var(--border);
       border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)}
-    @media(min-width:800px){.span4{grid-column:span 4}.span5{grid-column:span 5}.span7{grid-column:span 7}.span8{grid-column:span 8}}
+    @media(min-width:800px){.span4{grid-column:span 4}.span5{grid-column:span 5}.span6{grid-column:span 6}.span7{grid-column:span 7}.span8{grid-column:span 8}}
     .card h2{margin:0 0 10px;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
     .stat-row,.btn-row{display:flex;flex-wrap:wrap;gap:8px}
     .pill{display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border-radius:999px;
@@ -117,6 +117,34 @@
         </div>
       </section>
 
+
+      <section class="card span6">
+        <h2>Queen Shadow</h2>
+        <div class="btn-row" style="margin-bottom:8px">
+          <button class="primary" id="btnShadowMorning">☀️ RUN MORNING REPORT NOW</button>
+        </div>
+        <form id="shadowForm" style="display:flex;gap:8px;margin-bottom:10px">
+          <input id="shadowInput" placeholder="shadow task…" style="flex:1;padding:10px;border-radius:12px;border:1px solid var(--border);background:rgba(0,0,0,.35);color:var(--text)" />
+          <button type="submit">Add</button>
+        </form>
+        <div id="shadowList" class="muted">—</div>
+      </section>
+
+      <section class="card span6">
+        <h2>Second Brain</h2>
+        <form id="brainForm" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+          <input id="brainKey" placeholder="key (e.g. Wifi Password)" style="flex:1;min-width:120px;padding:10px;border-radius:12px;border:1px solid var(--border);background:rgba(0,0,0,.35);color:var(--text)" />
+          <input id="brainVal" placeholder="value" style="flex:1;min-width:120px;padding:10px;border-radius:12px;border:1px solid var(--border);background:rgba(0,0,0,.35);color:var(--text)" />
+          <button class="primary" type="submit">Remember</button>
+        </form>
+        <form id="brainSearchForm" style="display:flex;gap:8px;margin-bottom:10px">
+          <input id="brainSearch" placeholder="what is my …" style="flex:1;padding:10px;border-radius:12px;border:1px solid var(--border);background:rgba(0,0,0,.35);color:var(--text)" />
+          <button type="submit">Ask</button>
+        </form>
+        <div id="brainAnswer" class="muted" style="margin-bottom:8px"></div>
+        <div id="brainList" class="muted">—</div>
+      </section>
+
       <section class="card span12" id="alertPanel">
         <h2>Alert center</h2>
         <div id="alertList" class="muted">—</div>
@@ -177,7 +205,7 @@
         <div id="memList" class="muted">—</div>
       </section>
     </div>
-    <div class="footer">Phase 4 · PWA · Hull B · <span class="mono" id="ts"></span></div>
+    <div class="footer">Phase 5 · Shadow + Brain · PWA · Hull B · <span class="mono" id="ts"></span></div>
   </div>
   <div id="toast"></div>
 
@@ -310,6 +338,30 @@ function render(data){
   const sys=data.system||{};
   document.getElementById('meta').textContent=(sys.name||'Radiant Queen')+' · '+(sys.hull||'Hull B');
   document.getElementById('ts').textContent=data.ts||'';
+
+  // Phase 5 shadow + brain
+  const sh = data.shadow || {};
+  const st = sh.tasks || [];
+  const sl = document.getElementById('shadowList');
+  if (sl) {
+    if (!st.length) sl.innerHTML = 'No pending shadow tasks.';
+    else sl.innerHTML = st.map(t => '<div style="margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:6px">'+
+      '<span class="mono">'+esc(String(t.id).slice(0,8))+'</span> · '+esc(t.raw_text)+
+      ' <button data-sh="done" data-id="'+esc(t.id)+'">Done</button> '+
+      '<button data-sh="del" data-id="'+esc(t.id)+'" class="danger">Del</button></div>').join('');
+  }
+  const br = data.brain || {};
+  const bi = br.items || [];
+  const bl = document.getElementById('brainList');
+  if (bl) {
+    if (!bi.length) bl.innerHTML = 'Second Brain empty.';
+    else bl.innerHTML = bi.map(x => {
+      const val = x.sensitivity==='secret' ? '<span class="reveal" data-full="***">***</span>' : esc(String(x.value).slice(0,80));
+      return '<div style="margin-bottom:8px"><b>'+esc(x.key_display)+'</b> = '+val+
+        ' <button data-br="forget" data-key="'+esc(x.key_display)+'" class="danger">Forget</button></div>';
+    }).join('');
+  }
+
 }
 
 async function load(){
@@ -360,6 +412,50 @@ async function runAction(action,btn,body){
   }catch(e){toast(e.message||String(e));alert(e.message||String(e))}
   finally{if(btn){btn.disabled=false;btn.innerHTML=btn.dataset.prev||btn.textContent}}
 }
+
+
+document.getElementById('btnShadowMorning').onclick=e=>runAction('shadow_morning',e.target);
+document.getElementById('shadowForm').onsubmit=async e=>{
+  e.preventDefault();
+  const input=document.getElementById('shadowInput');
+  const text=input.value.trim(); if(!text) return;
+  try{ await api('shadow_add','POST',{text}); input.value=''; toast('Shadow saved'); await load(); }
+  catch(err){toast(err.message)}
+};
+document.getElementById('shadowList').addEventListener('click',async ev=>{
+  const btn=ev.target.closest('button[data-sh]'); if(!btn) return;
+  const id=btn.getAttribute('data-id');
+  const op=btn.getAttribute('data-sh');
+  try{
+    await api(op==='done'?'shadow_done':'shadow_delete','POST',{id});
+    toast(op+' ok'); await load();
+  }catch(err){toast(err.message)}
+});
+document.getElementById('brainForm').onsubmit=async e=>{
+  e.preventDefault();
+  const key=document.getElementById('brainKey').value.trim();
+  const value=document.getElementById('brainVal').value.trim();
+  if(!key||!value) return;
+  try{ await api('brain_remember','POST',{key,value}); toast('Remembered'); document.getElementById('brainVal').value=''; await load(); }
+  catch(err){toast(err.message)}
+};
+document.getElementById('brainSearchForm').onsubmit=async e=>{
+  e.preventDefault();
+  const q=document.getElementById('brainSearch').value.trim();
+  if(!q) return;
+  try{
+    const r=await api('brain_recall','POST',{q});
+    const el=document.getElementById('brainAnswer');
+    if(!r.item) el.textContent="I don't have that in Second Brain yet.";
+    else el.textContent=r.item.key_display+': '+r.item.value;
+  }catch(err){toast(err.message)}
+};
+document.getElementById('brainList').addEventListener('click',async ev=>{
+  const btn=ev.target.closest('button[data-br]'); if(!btn) return;
+  const key=btn.getAttribute('data-key');
+  try{ await api('brain_forget','POST',{key}); toast('Forgot'); await load(); }
+  catch(err){toast(err.message)}
+});
 
 document.getElementById('btnGodHeal').onclick=e=>runAction('god_heal',e.target);
 document.getElementById('btnNight').onclick=e=>runAction('night_run',e.target);
