@@ -281,13 +281,19 @@ async function actionOverview() {
     actionMem(5),
   ]);
   const list = jobs.jobs || [];
+  let cron = { ok: false, jobs: [], error: null };
+  try {
+    cron = await actionCronList();
+  } catch (e) {
+    cron = { ok: false, jobs: [], error: e.message || String(e) };
+  }
   return {
     ok: true,
     ts: new Date().toISOString(),
     system: {
       name: 'Radiant Queen OS',
       hull: 'Hull B (Vercel + cron)',
-      agents: '20–27 · God Pack · Think · Night · Sentry · Dash P2',
+      agents: '20–27 · God Pack · Think · Night · Sentry · Dash P3 Cron',
     },
     health,
     queue: {
@@ -298,6 +304,7 @@ async function actionOverview() {
     },
     night,
     mem,
+    cron,
   };
 }
 
@@ -341,6 +348,60 @@ async function actionNightRun() {
     voice: r?.brief?.voiceResult?.ok || false,
   };
 }
+
+
+async function actionCronList() {
+  const cm = await import('../lib/cronManager.js');
+  const jobs = await cm.listJobs();
+  const mapped = (jobs || []).map((j) => {
+    const id = j.jobId ?? j.job_id ?? j.id;
+    const last = j.lastStatus;
+    let health = 'unknown';
+    if (j.enabled === false) health = 'disabled';
+    else if (last === 1 || last === 200 || last === 201 || last === 204) health = 'ok';
+    else if (last == null || last === 0) health = 'pending';
+    else if (last >= 400 || last === 2 || last === 3) health = 'fail';
+    else health = 'warn';
+    return {
+      id,
+      title: j.title || 'untitled',
+      enabled: j.enabled !== false,
+      lastStatus: last,
+      health,
+      nextExecution: j.nextExecution
+        ? new Date(j.nextExecution * 1000).toISOString()
+        : null,
+      url: String(j.url || '').slice(0, 240),
+      emoji: typeof cm.statusEmoji === 'function' ? cm.statusEmoji(j) : '',
+    };
+  });
+  return { ok: true, count: mapped.length, jobs: mapped };
+}
+
+async function actionCronEnable(id) {
+  const cm = await import('../lib/cronManager.js');
+  await cm.enableJob(id);
+  return { ok: true, action: 'cron_enable', id };
+}
+
+async function actionCronDisable(id) {
+  const cm = await import('../lib/cronManager.js');
+  await cm.disableJob(id);
+  return { ok: true, action: 'cron_disable', id };
+}
+
+async function actionCronDelete(id) {
+  const cm = await import('../lib/cronManager.js');
+  await cm.deleteJob(id);
+  return { ok: true, action: 'cron_delete', id };
+}
+
+async function actionCronHeal() {
+  const cm = await import('../lib/cronManager.js');
+  const r = await cm.healJobs({});
+  return { ok: true, action: 'cron_heal', ...r };
+}
+
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -390,6 +451,9 @@ export default async function handler(req, res) {
           founder_gated: founderIds().size > 0,
         });
       }
+      if (action === 'cron' || action === 'crons' || action === 'cron_list') {
+        return json(res, 200, await actionCronList());
+      }
       return json(res, 200, await actionOverview());
     }
 
@@ -402,10 +466,37 @@ export default async function handler(req, res) {
       if (action === 'night_run' || action === 'night') {
         return json(res, 200, await actionNightRun());
       }
+      const body = parseBody(req);
+      const id = body.id || body.jobId || req.query?.id;
+      if (action === 'cron_enable' || action === 'cron_on') {
+        if (!id) return json(res, 400, { ok: false, error: 'id required' });
+        return json(res, 200, await actionCronEnable(id));
+      }
+      if (action === 'cron_disable' || action === 'cron_off') {
+        if (!id) return json(res, 400, { ok: false, error: 'id required' });
+        return json(res, 200, await actionCronDisable(id));
+      }
+      if (action === 'cron_delete') {
+        if (!id) return json(res, 400, { ok: false, error: 'id required' });
+        return json(res, 200, await actionCronDelete(id));
+      }
+      if (action === 'cron_heal') {
+        return json(res, 200, await actionCronHeal());
+      }
       return json(res, 400, {
         ok: false,
         error: 'unknown POST action',
-        actions: ['think_worker', 'voice_on', 'voice_off', 'night_run', 'auth'],
+        actions: [
+          'think_worker',
+          'voice_on',
+          'voice_off',
+          'night_run',
+          'cron_enable',
+          'cron_disable',
+          'cron_delete',
+          'cron_heal',
+          'auth',
+        ],
       });
     }
 
