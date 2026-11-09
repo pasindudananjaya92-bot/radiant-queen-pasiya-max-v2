@@ -98,8 +98,31 @@ function dashSecretOk(req) {
 }
 
 function parseBody(req) {
-  if (req.body && typeof req.body === 'object') return req.body;
+  const b = req.body;
+  if (b && typeof b === 'object' && !Buffer.isBuffer(b)) return b;
+  if (typeof b === 'string' && b.trim()) {
+    try { return JSON.parse(b); } catch (_) { return {}; }
+  }
+  if (Buffer.isBuffer(b)) {
+    try { return JSON.parse(b.toString('utf8') || '{}'); } catch (_) { return {}; }
+  }
   return {};
+}
+
+function pickJobId(req, body) {
+  const candidates = [
+    body?.id,
+    body?.jobId,
+    body?.job_id,
+    req.query?.id,
+    req.query?.jobId,
+    req.query?.job_id,
+  ];
+  for (const c of candidates) {
+    if (c === undefined || c === null || c === '') continue;
+    return String(c).trim();
+  }
+  return '';
 }
 
 function getTelegramAuth(req) {
@@ -380,20 +403,23 @@ async function actionCronList() {
 
 async function actionCronEnable(id) {
   const cm = await import('../lib/cronManager.js');
-  await cm.enableJob(id);
-  return { ok: true, action: 'cron_enable', id };
+  const jobId = String(id).trim();
+  await cm.enableJob(jobId);
+  return { ok: true, action: 'cron_enable', id: jobId };
 }
 
 async function actionCronDisable(id) {
   const cm = await import('../lib/cronManager.js');
-  await cm.disableJob(id);
-  return { ok: true, action: 'cron_disable', id };
+  const jobId = String(id).trim();
+  await cm.disableJob(jobId);
+  return { ok: true, action: 'cron_disable', id: jobId };
 }
 
 async function actionCronDelete(id) {
   const cm = await import('../lib/cronManager.js');
-  await cm.deleteJob(id);
-  return { ok: true, action: 'cron_delete', id };
+  const jobId = String(id).trim();
+  await cm.deleteJob(jobId);
+  return { ok: true, action: 'cron_delete', id: jobId };
 }
 
 async function actionCronHeal() {
@@ -467,21 +493,40 @@ export default async function handler(req, res) {
         return json(res, 200, await actionNightRun());
       }
       const body = parseBody(req);
-      const id = body.id || body.jobId || req.query?.id;
+      const id = pickJobId(req, body);
       if (action === 'cron_enable' || action === 'cron_on') {
-        if (!id) return json(res, 400, { ok: false, error: 'id required' });
-        return json(res, 200, await actionCronEnable(id));
+        if (!id) return json(res, 400, { ok: false, error: 'id required (body.id or ?id=)' });
+        try {
+          const r = await actionCronEnable(id);
+          return json(res, 200, r);
+        } catch (e) {
+          return json(res, 500, { ok: false, error: e.message || String(e), action: 'cron_enable', id });
+        }
       }
       if (action === 'cron_disable' || action === 'cron_off') {
-        if (!id) return json(res, 400, { ok: false, error: 'id required' });
-        return json(res, 200, await actionCronDisable(id));
+        if (!id) return json(res, 400, { ok: false, error: 'id required (body.id or ?id=)' });
+        try {
+          const r = await actionCronDisable(id);
+          return json(res, 200, r);
+        } catch (e) {
+          return json(res, 500, { ok: false, error: e.message || String(e), action: 'cron_disable', id });
+        }
       }
       if (action === 'cron_delete') {
-        if (!id) return json(res, 400, { ok: false, error: 'id required' });
-        return json(res, 200, await actionCronDelete(id));
+        if (!id) return json(res, 400, { ok: false, error: 'id required (body.id or ?id=)' });
+        try {
+          const r = await actionCronDelete(id);
+          return json(res, 200, r);
+        } catch (e) {
+          return json(res, 500, { ok: false, error: e.message || String(e), action: 'cron_delete', id });
+        }
       }
       if (action === 'cron_heal') {
-        return json(res, 200, await actionCronHeal());
+        try {
+          return json(res, 200, await actionCronHeal());
+        } catch (e) {
+          return json(res, 500, { ok: false, error: e.message || String(e), action: 'cron_heal' });
+        }
       }
       return json(res, 400, {
         ok: false,
