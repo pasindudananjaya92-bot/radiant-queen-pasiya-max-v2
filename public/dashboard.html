@@ -3,129 +3,102 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Radiant Queen · Command Center</title>
+  <title>Radiant Queen OS</title>
   <meta name="theme-color" content="#0b0f1a" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icon-queen.svg" />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg: #070a12; --panel: rgba(18,24,40,.75); --border: rgba(255,255,255,.08);
-      --text: #e8eefc; --muted: #8b9bb8; --accent: #7c5cff; --accent2: #2dd4bf;
-      --good: #34d399; --bad: #f87171; --radius: 18px;
-      --shadow: 0 20px 50px rgba(0,0,0,.45);
+      --bg:#070a12; --panel:rgba(18,24,40,.78); --border:rgba(255,255,255,.08);
+      --text:#e8eefc; --muted:#8b9bb8; --good:#34d399; --bad:#f87171; --warn:#fbbf24;
+      --radius:16px; --shadow:0 18px 48px rgba(0,0,0,.45);
     }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; min-height: 100vh; font-family: 'IBM Plex Sans', system-ui, sans-serif; color: var(--text);
-      background: radial-gradient(1200px 600px at 10% -10%, rgba(124,92,255,.25), transparent 55%),
-        radial-gradient(900px 500px at 100% 0%, rgba(45,212,191,.12), transparent 50%), var(--bg);
-    }
-    .wrap { max-width: 1100px; margin: 0 auto; padding: 20px 16px 48px; }
-    header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
-    .brand { display: flex; align-items: center; gap: 12px; }
-    .logo {
-      width: 42px; height: 42px; border-radius: 12px;
-      background: linear-gradient(135deg, var(--accent), var(--accent2));
-      display: grid; place-items: center; font-weight: 700; box-shadow: 0 8px 24px rgba(124,92,255,.35);
-    }
-    h1 { margin: 0; font-size: 1.2rem; }
-    .sub { color: var(--muted); font-size: .85rem; margin-top: 2px; }
-    .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-    button {
-      border: 1px solid var(--border); background: rgba(255,255,255,.04); color: var(--text);
-      border-radius: 12px; padding: 10px 14px; font: 600 .85rem 'IBM Plex Sans', sans-serif; cursor: pointer;
-    }
-    button:hover { border-color: rgba(124,92,255,.5); background: rgba(124,92,255,.12); }
-    button.primary { background: linear-gradient(135deg, #6d4dff, #3b82f6); border: none; }
-    button.danger { border-color: rgba(248,113,113,.35); }
-    button:disabled { opacity: .5; cursor: wait; }
-    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; }
-    .card {
-      grid-column: span 12; background: var(--panel); backdrop-filter: blur(16px);
-      border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow);
-    }
-    @media (min-width: 720px) {
-      .span4 { grid-column: span 4; } .span6 { grid-column: span 6; } .span8 { grid-column: span 8; }
-    }
-    .card h2 {
-      margin: 0 0 12px; font-size: .75rem; text-transform: uppercase; letter-spacing: .08em;
-      color: var(--muted); font-weight: 600;
-    }
-    .stat-row, .btn-row { display: flex; flex-wrap: wrap; gap: 10px; }
-    .pill {
-      display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px;
-      background: rgba(255,255,255,.04); border: 1px solid var(--border); font-size: .85rem;
-    }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-    .dot.ok { background: var(--good); box-shadow: 0 0 10px rgba(52,211,153,.6); }
-    .dot.bad { background: var(--bad); }
-    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
-    th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--border); vertical-align: top; }
-    th { color: var(--muted); font-weight: 500; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
-    .mono { font-family: 'IBM Plex Mono', monospace; font-size: .78rem; }
-    .muted { color: var(--muted); }
-    #gate {
-      max-width: 440px; margin: 10vh auto; padding: 28px; background: var(--panel);
-      border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow);
-    }
-    #gate p { color: var(--muted); font-size: .9rem; line-height: 1.45; }
-    #gate input {
-      width: 100%; padding: 12px 14px; margin: 8px 0 12px; border-radius: 12px;
-      border: 1px solid var(--border); background: rgba(0,0,0,.35); color: var(--text);
-      font: 500 .95rem 'IBM Plex Mono', monospace;
-    }
-    #err { color: var(--bad); min-height: 1.2em; font-size: .85rem; margin-top: 8px; }
-    #toast {
-      position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
-      background: #1a2238; border: 1px solid var(--border); padding: 12px 18px; border-radius: 12px;
-      display: none; z-index: 50; max-width: 90vw; font-size: .9rem; box-shadow: var(--shadow);
-    }
-    .footer { margin-top: 18px; color: var(--muted); font-size: .75rem; text-align: center; }
-    .badge { font-size: .7rem; padding: 3px 8px; border-radius: 999px; background: rgba(124,92,255,.2); color: #c4b5fd; font-weight: 600; }
-    .userchip { display: flex; align-items: center; gap: 8px; font-size: .85rem; }
-    .userchip img { width: 28px; height: 28px; border-radius: 50%; }
-    .divider { height: 1px; background: var(--border); margin: 16px 0; }
-    #tg-login { min-height: 44px; }
-
-    button .spin {
-      display: inline-block; width: 12px; height: 12px; margin-right: 6px;
-      border: 2px solid rgba(255,255,255,.25); border-top-color: #fff;
-      border-radius: 50%; vertical-align: -1px;
-      animation: rqspin .7s linear infinite;
-    }
-    @keyframes rqspin { to { transform: rotate(360deg); } }
-    button.busy { opacity: .75; pointer-events: none; }
-
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--text);
+      background:radial-gradient(1000px 500px at 10% -10%,rgba(124,92,255,.22),transparent 55%),var(--bg)}
+    .wrap{max-width:1100px;margin:0 auto;padding:16px 14px 56px}
+    header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
+    .brand{display:flex;align-items:center;gap:10px}
+    .logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#7c5cff,#2dd4bf);
+      display:grid;place-items:center;font-size:20px;box-shadow:0 8px 22px rgba(124,92,255,.35)}
+    h1{margin:0;font-size:1.1rem}
+    .sub{color:var(--muted);font-size:.8rem}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    button{border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);
+      border-radius:12px;padding:9px 12px;font:600 .82rem 'IBM Plex Sans',sans-serif;cursor:pointer}
+    button:hover{border-color:rgba(124,92,255,.5)}
+    button.primary{background:linear-gradient(135deg,#6d4dff,#3b82f6);border:none}
+    button.danger{border-color:rgba(248,113,113,.35)}
+    button:disabled{opacity:.6;pointer-events:none}
+    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+    .card{grid-column:span 12;background:var(--panel);backdrop-filter:blur(14px);border:1px solid var(--border);
+      border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)}
+    @media(min-width:800px){.span4{grid-column:span 4}.span5{grid-column:span 5}.span7{grid-column:span 7}.span8{grid-column:span 8}}
+    .card h2{margin:0 0 10px;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+    .stat-row,.btn-row{display:flex;flex-wrap:wrap;gap:8px}
+    .pill{display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border-radius:999px;
+      background:rgba(255,255,255,.04);border:1px solid var(--border);font-size:.82rem}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+    .dot.ok{background:var(--good);box-shadow:0 0 10px rgba(52,211,153,.55)}
+    .dot.bad{background:var(--bad)}
+    .dot.warn{background:var(--warn)}
+    table{width:100%;border-collapse:collapse;font-size:.82rem}
+    th,td{text-align:left;padding:7px 5px;border-bottom:1px solid var(--border);vertical-align:top}
+    th{color:var(--muted);font-size:.7rem;text-transform:uppercase}
+    .mono{font-family:'IBM Plex Mono',monospace;font-size:.75rem}
+    .muted{color:var(--muted)}
+    #gate{max-width:420px;margin:8vh auto;padding:24px;background:var(--panel);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow)}
+    #gate input[type=password]{width:100%;padding:11px 12px;margin:8px 0;border-radius:12px;border:1px solid var(--border);
+      background:rgba(0,0,0,.35);color:var(--text);font:500 .9rem 'IBM Plex Mono',monospace}
+    #gate label{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.85rem;margin:8px 0}
+    #err{color:var(--bad);min-height:1.1em;font-size:.82rem}
+    #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#1a2238;border:1px solid var(--border);
+      padding:11px 16px;border-radius:12px;display:none;z-index:60;max-width:92vw;font-size:.88rem;box-shadow:var(--shadow)}
+    .badge{font-size:.68rem;padding:3px 8px;border-radius:999px;background:rgba(124,92,255,.2);color:#c4b5fd;font-weight:600}
+    .badge.hot{background:rgba(248,113,113,.2);color:#fca5a5}
+    button .spin{display:inline-block;width:11px;height:11px;margin-right:6px;border:2px solid rgba(255,255,255,.25);
+      border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite}
+    @keyframes sp{to{transform:rotate(360deg)}}
+    #chatLog{height:280px;overflow:auto;border:1px solid var(--border);border-radius:12px;padding:10px;background:rgba(0,0,0,.25);margin-bottom:10px}
+    .bubble{margin:0 0 10px;padding:8px 10px;border-radius:12px;max-width:95%;font-size:.88rem;line-height:1.35}
+    .bubble.user{background:rgba(124,92,255,.2);margin-left:auto}
+    .bubble.bot{background:rgba(255,255,255,.05)}
+    .chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+    .chip{font-size:.68rem;padding:2px 7px;border-radius:999px;background:rgba(45,212,191,.15);color:#5eead4}
+    #chatForm{display:flex;gap:8px}
+    #chatForm input{flex:1;padding:11px;border-radius:12px;border:1px solid var(--border);background:rgba(0,0,0,.35);color:var(--text)}
+    .bar{height:8px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden;margin:4px 0 8px}
+    .bar>i{display:block;height:100%;background:linear-gradient(90deg,#7c5cff,#2dd4bf)}
+    #alertPanel{display:none;margin-top:0}
+    #alertPanel.open{display:block}
+    .footer{margin-top:14px;text-align:center;color:var(--muted);font-size:.72rem}
   </style>
 </head>
 <body>
   <div id="gate">
     <div class="brand" style="margin-bottom:10px">
-      <div class="logo">RQ</div>
-      <div>
-        <h1>Command Center</h1>
-        <div class="sub">Phase 2 · Telegram Login</div>
-      </div>
+      <div class="logo">👑</div>
+      <div><h1>Radiant Queen OS</h1><div class="sub">Phase 4 · Command Center</div></div>
     </div>
-    <p>Sign in with Telegram as the <strong>Founder</strong> account. Only your Telegram ID is allowed.</p>
-    <div id="tg-login"></div>
-    <div class="divider"></div>
-    <p class="muted" style="margin:0 0 8px">Fallback (optional): DASH_SECRET</p>
-    <input id="secret" type="password" placeholder="DASH_SECRET (optional)" />
-    <button class="primary" id="unlock" style="width:100%">Unlock with secret</button>
+    <p class="muted" style="font-size:.9rem">Enter <strong>DASH_SECRET</strong>. Enable Remember Me for 30-day session.</p>
+    <input id="secret" type="password" placeholder="DASH_SECRET" />
+    <label><input type="checkbox" id="remember" checked /> Remember me (30 days)</label>
+    <button class="primary" id="unlock" style="width:100%">Unlock</button>
     <div id="err"></div>
   </div>
 
   <div class="wrap" id="app" hidden>
     <header>
       <div class="brand">
-        <div class="logo">RQ</div>
+        <div class="logo">👑</div>
         <div>
-          <h1>Radiant Queen · Command Center</h1>
+          <h1>Radiant Queen OS</h1>
           <div class="sub" id="meta">Loading…</div>
         </div>
       </div>
       <div class="actions">
-        <div class="userchip" id="userchip"></div>
+        <button id="btnBell" title="Alerts">🔔 <span class="badge" id="alertBadge" hidden>0</span></button>
         <span class="badge" id="liveBadge">LIVE</span>
         <button id="refresh">Refresh</button>
         <button id="logout" class="danger">Lock</button>
@@ -134,14 +107,37 @@
 
     <div class="grid">
       <section class="card span12">
-        <h2>Controls</h2>
+        <h2>God buttons</h2>
         <div class="btn-row">
-          <button class="primary" id="btnWorker">▶ Run Think Worker</button>
-          <button id="btnNight">🌙 Night Run</button>
+          <button class="primary" id="btnGodHeal">🔥 Emergency Heal</button>
+          <button id="btnNight">🌙 Night Report Now</button>
+          <button id="btnWorker">▶ Think Worker</button>
           <button id="btnVoiceOn">🎙 Voice ON</button>
           <button id="btnVoiceOff">🔇 Voice OFF</button>
         </div>
-        <p class="muted" style="margin:10px 0 0;font-size:.8rem">Write actions · founder session required</p>
+      </section>
+
+      <section class="card span12" id="alertPanel">
+        <h2>Alert center</h2>
+        <div id="alertList" class="muted">—</div>
+        <button id="btnAlertsSeen" style="margin-top:8px">Mark all seen</button>
+      </section>
+
+      <section class="card span7">
+
+        <h2>Live chat</h2>
+        <div id="chatLog"></div>
+        <form id="chatForm">
+          <button type="button" id="btnMic" title="Voice input">🎤</button>
+          <input id="chatInput" placeholder="Message or think your question…" autocomplete="off" />
+          <button class="primary" type="submit">Send</button>
+        </form>
+        <p class="muted" style="margin:8px 0 0;font-size:.75rem">Prefix with <span class="mono">think </span> for Evidence Engine · Mic = browser speech</p>
+      </section>
+
+      <section class="card span5">
+        <h2>API usage (last logs)</h2>
+        <div id="usageBox" class="muted">—</div>
       </section>
 
       <section class="card span12">
@@ -149,17 +145,22 @@
         <div class="stat-row" id="healthRow">—</div>
       </section>
 
-      <section class="card span4">
-        <h2>Think queue</h2>
-        <div id="queueStats" class="mono">—</div>
-      </section>
-      <section class="card span4">
-        <h2>Memory</h2>
-        <div id="memStats" class="mono">—</div>
-      </section>
-      <section class="card span4">
-        <h2>Night Operator</h2>
-        <div id="nightStats" class="mono">—</div>
+      <section class="card span4"><h2>Think queue</h2><div id="queueStats" class="mono">—</div></section>
+      <section class="card span4"><h2>Memory</h2><div id="memStats" class="mono">—</div></section>
+      <section class="card span4"><h2>Night Operator</h2><div id="nightStats" class="mono">—</div></section>
+
+      <section class="card span12">
+        <h2>Cron Manager</h2>
+        <div class="btn-row" style="margin-bottom:10px">
+          <button id="btnCronRefresh">↻ Refresh crons</button>
+          <button id="btnCronHeal">🛠 Heal disabled</button>
+        </div>
+        <div style="overflow:auto">
+          <table>
+            <thead><tr><th>Status</th><th>ID</th><th>Title</th><th>Last</th><th>Next</th><th>Actions</th></tr></thead>
+            <tbody id="cronBody"><tr><td colspan="6" class="muted">—</td></tr></tbody>
+          </table>
+        </div>
       </section>
 
       <section class="card span8">
@@ -175,389 +176,257 @@
         <h2>Latest memories</h2>
         <div id="memList" class="muted">—</div>
       </section>
-      
-      <section class="card span12">
-        <h2>Cron Manager · cron-job.org</h2>
-        <div class="btn-row" style="margin-bottom:12px">
-          <button id="btnCronRefresh">↻ Refresh crons</button>
-          <button id="btnCronHeal">🛠 Heal disabled</button>
-        </div>
-        <div style="overflow:auto">
-          <table>
-            <thead>
-              <tr>
-                <th>Status</th>
-                <th>ID</th>
-                <th>Title</th>
-                <th>Last</th>
-                <th>Next (UTC)</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="cronBody">
-              <tr><td colspan="6" class="muted">—</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <p class="muted" style="margin:10px 0 0;font-size:.78rem">
-          Enable / Disable instant · Delete asks confirm · Needs CRONJOB_API_KEY
-        </p>
-      </section>
-
-<section class="card span12">
-        <h2>Night reports</h2>
-        <div id="nightList" class="muted">—</div>
-      </section>
     </div>
-    <div class="footer">Phase 3 · Cron Manager · Hull B · <span class="mono" id="ts"></span></div>
+    <div class="footer">Phase 4 · PWA · Hull B · <span class="mono" id="ts"></span></div>
   </div>
   <div id="toast"></div>
 
-  <script>
-    const gate = document.getElementById('gate');
-    const app = document.getElementById('app');
-    const err = document.getElementById('err');
-    const toastEl = document.getElementById('toast');
-    const TG_KEY = 'rq_tg_auth';
-    const SEC_KEY = 'rq_dash_secret';
+<script>
+const gate=document.getElementById('gate'), app=document.getElementById('app');
+const err=document.getElementById('err'), toastEl=document.getElementById('toast');
+const SEC_KEY='rq_dash_secret', TOK_KEY='rq_dash_session_token';
 
-    // Set your bot username WITHOUT @  — also overridable via /api/dash?action=config
-    let BOT_USERNAME = localStorage.getItem('rq_bot_username') || 'PasiyaMaxQueen_bot';
+function toast(m){toastEl.textContent=m;toastEl.style.display='block';setTimeout(()=>toastEl.style.display='none',3200)}
+function getSecret(){return sessionStorage.getItem(SEC_KEY)||''}
+function getToken(){return localStorage.getItem(TOK_KEY)||sessionStorage.getItem(TOK_KEY)||''}
+function setSecret(s){sessionStorage.setItem(SEC_KEY,s)}
+function setToken(t,persist){if(persist)localStorage.setItem(TOK_KEY,t);else sessionStorage.setItem(TOK_KEY,t)}
+function clearAuth(){sessionStorage.removeItem(SEC_KEY);sessionStorage.removeItem(TOK_KEY);localStorage.removeItem(TOK_KEY)}
 
-    function toast(msg) {
-      toastEl.textContent = msg;
-      toastEl.style.display = 'block';
-      setTimeout(() => { toastEl.style.display = 'none'; }, 3200);
+function authHeaders(){
+  const h={'Content-Type':'application/json'};
+  const s=getSecret(); if(s){h['Authorization']='Bearer '+s;h['X-Dash-Secret']=s}
+  const t=getToken(); if(t){h['Authorization']='Bearer '+t}
+  return h;
+}
+function apiUrl(action){
+  let url='/api/dash?action='+encodeURIComponent(action);
+  const s=getSecret(); if(s) url+='&secret='+encodeURIComponent(s);
+  const t=getToken(); if(t) url+='&session='+encodeURIComponent(t);
+  return url;
+}
+async function api(action,method='GET',body){
+  const opts={method,headers:authHeaders(),cache:'no-store'};
+  if(method==='POST') opts.body=JSON.stringify(body||{});
+  const res=await fetch(apiUrl(action),opts);
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok||data.ok===false) throw new Error(data.error||('HTTP '+res.status));
+  return data;
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function dot(ok){return '<span class="dot '+(ok?'ok':'bad')+'"></span>'}
+
+function renderUsage(usage){
+  const box=document.getElementById('usageBox');
+  const by=usage&&usage.byTool||{};
+  const keys=Object.keys(by);
+  if(!keys.length){box.innerHTML=usage&&usage.error?esc(usage.error):'No usage logs yet — fills as tools run.';return}
+  const max=Math.max(...keys.map(k=>by[k].total),1);
+  box.innerHTML=keys.map(k=>{
+    const v=by[k]; const pct=Math.round(100*v.total/max);
+    return '<div><div class="mono">'+esc(k)+' · '+v.ok+'ok/'+v.fail+'fail · avg '+v.avg_ms+'ms</div>'+
+      '<div class="bar"><i style="width:'+pct+'%"></i></div></div>';
+  }).join('');
+}
+
+function renderAlerts(alerts){
+  const list=alerts&&alerts.alerts||[];
+  const unseen=alerts&&alerts.unseen||0;
+  const badge=document.getElementById('alertBadge');
+  if(unseen>0){badge.hidden=false;badge.textContent=String(unseen);badge.classList.add('hot')}
+  else {badge.hidden=true;badge.classList.remove('hot')}
+  const el=document.getElementById('alertList');
+  if(!list.length){el.innerHTML='No alerts';return}
+  el.innerHTML=list.map(a=>'<div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border)">'+
+    '<span class="dot '+(a.severity==='critical'?'bad':a.severity==='warn'?'warn':'ok')+'"></span> '+
+    '<b>'+esc(a.title)+'</b> <span class="muted mono">'+esc(a.source)+'</span>'+
+    '<div class="muted">'+esc(a.body||'')+'</div></div>').join('');
+}
+
+function renderChatHistory(messages){
+  const log=document.getElementById('chatLog');
+  if(!messages||!messages.length){log.innerHTML='<div class="muted">No history yet.</div>';return}
+  log.innerHTML=messages.map(m=>{
+    const cls=m.role==='user'?'user':'bot';
+    const tools=(m.tools||[]).map(t=>'<span class="chip">'+esc(t)+'</span>').join('');
+    const meta=[m.trust!=null?'Trust '+m.trust:'', m.latency_ms!=null?m.latency_ms+'ms':''].filter(Boolean).join(' · ');
+    return '<div class="bubble '+cls+'">'+esc(m.content)+
+      (tools?'<div class="chips">'+tools+'</div>':'')+
+      (meta?'<div class="muted mono" style="margin-top:4px">'+esc(meta)+'</div>':'')+
+      '</div>';
+  }).join('');
+  log.scrollTop=log.scrollHeight;
+}
+
+function appendChat(role,content,tools,trust,ms){
+  const log=document.getElementById('chatLog');
+  const cls=role==='user'?'user':'bot';
+  const toolHtml=(tools||[]).map(t=>'<span class="chip">'+esc(t)+'</span>').join('');
+  const meta=[trust!=null?'Trust '+trust:'', ms!=null?ms+'ms':''].filter(Boolean).join(' · ');
+  log.innerHTML+=('<div class="bubble '+cls+'">'+esc(content)+
+    (toolHtml?'<div class="chips">'+toolHtml+'</div>':'')+
+    (meta?'<div class="muted mono" style="margin-top:4px">'+esc(meta)+'</div>':'')+'</div>');
+  log.scrollTop=log.scrollHeight;
+}
+
+function render(data){
+  const health=data.health||{}; const checks=health.checks||[];
+  document.getElementById('healthRow').innerHTML=checks.length
+    ?checks.map(c=>'<span class="pill">'+dot(!!c.ok)+esc(c.name)+' <span class="muted">'+esc(c.detail||'')+'</span></span>').join('')
+    :'<span class="pill">'+dot(!!health.ok)+' Health</span>';
+  const q=data.queue||{};
+  document.getElementById('queueStats').innerHTML='queued: <b>'+(q.queued||0)+'</b><br>running: <b>'+(q.running||0)+'</b><br>done: <b>'+(q.done||0)+'</b>';
+  const mem=data.mem||{};
+  document.getElementById('memStats').innerHTML='recent: <b>'+(mem.count||(mem.memories||[]).length)+'</b>';
+  const reports=(data.night&&data.night.reports)||[];
+  document.getElementById('nightStats').innerHTML=reports.length
+    ?('last: <b>'+esc(reports[0].phase)+'</b><br><span class="muted">'+esc(String(reports[0].created_at||'').slice(0,19))+'</span>')
+    :'no reports';
+  const jobs=q.recent||[];
+  document.getElementById('jobsBody').innerHTML=jobs.length
+    ?jobs.map(j=>'<tr><td class="mono">#'+esc(j.id)+'</td><td>'+esc(j.status)+'</td><td>'+esc(String(j.prompt||'').slice(0,80))+'</td><td class="muted mono">'+esc(String(j.created_at||'').slice(0,19))+'</td></tr>').join('')
+    :'<tr><td colspan="4" class="muted">No jobs</td></tr>';
+  const mems=mem.memories||[];
+  document.getElementById('memList').innerHTML=mems.length
+    ?mems.map(m=>'<div style="margin-bottom:8px"><div>'+esc(m.preview)+'</div><div class="muted mono">'+esc(String(m.created_at||'').slice(0,19))+'</div></div>').join('')
+    :'No memories';
+
+  const cron=data.cron||{}; const cj=cron.jobs||[]; const cb=document.getElementById('cronBody');
+  if(cron.error) cb.innerHTML='<tr><td colspan="6" class="muted">'+esc(cron.error)+'</td></tr>';
+  else if(!cj.length) cb.innerHTML='<tr><td colspan="6" class="muted">No cron jobs</td></tr>';
+  else cb.innerHTML=cj.map(j=>{
+    const next=j.nextExecution?String(j.nextExecution).replace('T',' ').slice(0,16):'—';
+    const st=j.health==='ok'?'ok':(j.health==='fail'||j.health==='warn'?'bad':'');
+    return '<tr><td><span class="dot '+st+'"></span> '+(j.enabled?'ON':'OFF')+'</td>'+
+      '<td class="mono">#'+esc(j.id)+'</td><td>'+esc(j.title)+'</td>'+
+      '<td class="mono">'+esc(j.lastStatus==null?'—':j.lastStatus)+'</td>'+
+      '<td class="mono muted">'+esc(next)+'</td><td class="btn-row">'+
+      (j.enabled?'<button data-cron="disable" data-id="'+esc(j.id)+'">Disable</button>':'<button data-cron="enable" data-id="'+esc(j.id)+'">Enable</button>')+
+      '<button data-cron="delete" data-id="'+esc(j.id)+'" class="danger">Delete</button></td></tr>';
+  }).join('');
+
+  renderUsage(data.usage);
+  renderAlerts(data.alerts);
+  const sys=data.system||{};
+  document.getElementById('meta').textContent=(sys.name||'Radiant Queen')+' · '+(sys.hull||'Hull B');
+  document.getElementById('ts').textContent=data.ts||'';
+}
+
+async function load(){
+  document.getElementById('liveBadge').textContent='…';
+  const data=await api('overview');
+  render(data);
+  document.getElementById('liveBadge').textContent='LIVE';
+  try{
+    const h=await api('chat_history');
+    if(h.messages) renderChatHistory(h.messages);
+  }catch(_){}
+}
+
+function showApp(){gate.hidden=true;app.hidden=false}
+
+document.getElementById('unlock').onclick=async()=>{
+  err.textContent='';
+  const s=document.getElementById('secret').value.trim();
+  const remember=document.getElementById('remember').checked;
+  if(!s){err.textContent='Enter DASH_SECRET';return}
+  const btn=document.getElementById('unlock');
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span>Unlocking…';
+  try{
+    setSecret(s);
+    if(remember){
+      const r=await fetch('/api/dash?action=session_login',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({secret:s})
+      }).then(x=>x.json());
+      if(r.ok&&r.token) setToken(r.token,true);
     }
+    await load();
+    showApp();
+  }catch(e){
+    clearAuth();
+    err.textContent=e.message||String(e);
+  }finally{
+    btn.disabled=false;btn.textContent='Unlock';
+  }
+};
 
-    function getTg() {
-      try { return JSON.parse(sessionStorage.getItem(TG_KEY) || 'null'); } catch { return null; }
-    }
-    function setTg(obj) {
-      sessionStorage.setItem(TG_KEY, JSON.stringify(obj));
-      sessionStorage.removeItem(SEC_KEY);
-    }
-    function getSecret() { return sessionStorage.getItem(SEC_KEY) || ''; }
+async function runAction(action,btn,body){
+  if(btn){btn.disabled=true;const prev=btn.innerHTML;btn.dataset.prev=prev;btn.innerHTML='<span class="spin"></span>…'}
+  try{
+    await api(action,'POST',body||{});
+    toast(action+' · ok');
+    await load();
+  }catch(e){toast(e.message||String(e));alert(e.message||String(e))}
+  finally{if(btn){btn.disabled=false;btn.innerHTML=btn.dataset.prev||btn.textContent}}
+}
 
-    function authHeaders() {
-      const h = { 'Content-Type': 'application/json' };
-      const tg = getTg();
-      if (tg && tg.hash) {
-        h['X-Telegram-Auth'] = btoa(unescape(encodeURIComponent(JSON.stringify(tg))));
-      }
-      const s = getSecret();
-      if (s) {
-        h['Authorization'] = 'Bearer ' + s;
-        h['X-Dash-Secret'] = s;
-      }
-      return h;
-    }
+document.getElementById('btnGodHeal').onclick=e=>runAction('god_heal',e.target);
+document.getElementById('btnNight').onclick=e=>runAction('night_run',e.target);
+document.getElementById('btnWorker').onclick=e=>runAction('think_worker',e.target);
+document.getElementById('btnVoiceOn').onclick=e=>runAction('voice_on',e.target);
+document.getElementById('btnVoiceOff').onclick=e=>runAction('voice_off',e.target);
+document.getElementById('btnCronHeal').onclick=e=>runAction('cron_heal',e.target);
+document.getElementById('btnCronRefresh').onclick=async e=>{e.target.disabled=true;try{await load();toast('Crons refreshed')}catch(err){toast(err.message)}finally{e.target.disabled=false}};
+document.getElementById('refresh').onclick=()=>load().catch(e=>toast(e.message));
+document.getElementById('logout').onclick=async()=>{
+  try{await api('session_logout','POST',{})}catch(_){}
+  clearAuth();location.reload();
+};
+document.getElementById('btnBell').onclick=()=>document.getElementById('alertPanel').classList.toggle('open');
+document.getElementById('btnAlertsSeen').onclick=e=>runAction('alerts_seen',e.target);
 
-    function apiUrl(action) {
-      let url = '/api/dash?action=' + encodeURIComponent(action);
-      const s = getSecret();
-      if (s) url += '&secret=' + encodeURIComponent(s);
-      return url;
-    }
+document.getElementById('cronBody').addEventListener('click',async ev=>{
+  const btn=ev.target.closest('button[data-cron]'); if(!btn||btn.disabled) return;
+  const op=btn.getAttribute('data-cron'); const id=btn.getAttribute('data-id');
+  if(op==='delete'&&!confirm('Delete cron #'+id+'?')) return;
+  const action=op==='enable'?'cron_enable':op==='disable'?'cron_disable':'cron_delete';
+  btn.disabled=true;const prev=btn.innerHTML;btn.innerHTML='<span class="spin"></span>…';
+  try{
+    let url=apiUrl(action)+'&id='+encodeURIComponent(id);
+    const res=await fetch(url,{method:'POST',headers:authHeaders(),body:JSON.stringify({id:id,jobId:id})});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok||data.ok===false){alert(data.error||('HTTP '+res.status));throw new Error(data.error||'fail')}
+    toast(op+' #'+id+' · ok'); await load();
+  }catch(e){toast(e.message);btn.disabled=false;btn.innerHTML=prev}
+});
 
-    async function api(action, method = 'GET', body) {
-      const opts = { method, headers: authHeaders(), cache: 'no-store' };
-      if (method === 'POST' && body) opts.body = JSON.stringify(body);
-      const res = await fetch(apiUrl(action), opts);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
-      return data;
-    }
+document.getElementById('chatForm').onsubmit=async e=>{
+  e.preventDefault();
+  const input=document.getElementById('chatInput');
+  const text=input.value.trim(); if(!text) return;
+  input.value='';
+  appendChat('user',text);
+  try{
+    const r=await api('chat','POST',{message:text});
+    appendChat('bot',r.text||'',r.tools||[],r.trust,r.latency_ms);
+  }catch(err){appendChat('bot','Error: '+(err.message||String(err)))}
+};
 
-    function esc(s) {
-      return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    }
-    function dot(ok) { return '<span class="dot ' + (ok ? 'ok' : 'bad') + '"></span>'; }
+document.getElementById('btnMic').onclick=()=>{
+  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){toast('Speech not supported on this browser');return}
+  const rec=new SR(); rec.lang='en-US'; rec.interimResults=false;
+  rec.onresult=ev=>{
+    const t=ev.results[0][0].transcript;
+    const input=document.getElementById('chatInput');
+    input.value=(input.value+' '+t).trim();
+  };
+  rec.onerror=()=>toast('Mic error');
+  rec.start();
+  toast('Listening…');
+};
 
-    function render(data) {
-      const health = data.health || {};
-      const checks = health.checks || [];
-      const row = document.getElementById('healthRow');
-      row.innerHTML = checks.length
-        ? checks.map(c => '<span class="pill">' + dot(!!c.ok) + esc(c.name) +
-            ' <span class="muted">' + esc(c.detail || '') + '</span></span>').join('')
-        : '<span class="pill">' + dot(!!health.ok) + ' Health</span>';
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('/sw.js').catch(()=>{});
+}
 
-      const q = data.queue || {};
-      document.getElementById('queueStats').innerHTML =
-        'queued: <b>' + (q.queued ?? 0) + '</b><br>running: <b>' + (q.running ?? 0) +
-        '</b><br>done: <b>' + (q.done ?? 0) + '</b>';
-
-      const mem = data.mem || {};
-      document.getElementById('memStats').innerHTML =
-        'recent: <b>' + (mem.count ?? (mem.memories || []).length) + '</b>';
-
-      const reports = (data.night && data.night.reports) || [];
-      document.getElementById('nightStats').innerHTML = reports.length
-        ? ('last: <b>' + esc(reports[0].phase) + '</b><br><span class="muted">' +
-            esc(String(reports[0].created_at || '').slice(0, 19)) + '</span>')
-        : 'no reports';
-
-      const jobs = q.recent || [];
-      document.getElementById('jobsBody').innerHTML = jobs.length
-        ? jobs.map(j => '<tr><td class="mono">#' + esc(j.id) + '</td><td>' + esc(j.status) +
-            '</td><td>' + esc(String(j.prompt || '').slice(0, 80)) + '</td><td class="muted mono">' +
-            esc(String(j.created_at || '').slice(0, 19)) + '</td></tr>').join('')
-        : '<tr><td colspan="4" class="muted">No jobs</td></tr>';
-
-      const mems = mem.memories || [];
-      document.getElementById('memList').innerHTML = mems.length
-        ? mems.map(m => '<div style="margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:8px">' +
-            '<div>' + esc(m.preview) + '</div><div class="muted mono">' +
-            esc(String(m.created_at || '').slice(0, 19)) + '</div></div>').join('')
-        : 'No memories';
-
-      document.getElementById('nightList').innerHTML = reports.length
-        ? reports.map(r => '<div style="margin-bottom:12px"><b>' + esc(r.phase) + '</b> <span class="muted mono">' +
-            esc(String(r.created_at || '').slice(0, 19)) + '</span><div>' + esc(r.preview) + '</div></div>').join('')
-        : 'No night reports';
-
-      const sys = data.system || {};
-      document.getElementById('meta').textContent =
-        (sys.name || 'Radiant Queen') + ' · ' + (sys.hull || 'Hull B');
-      document.getElementById('ts').textContent = data.ts || '';
-
-      // Cron table
-      const cron = data.cron || {};
-      const cj = cron.jobs || [];
-      const cb = document.getElementById('cronBody');
-      if (cb) {
-        if (cron.error) {
-          cb.innerHTML = '<tr><td colspan="6" class="muted">Cron API: ' + esc(cron.error) + '</td></tr>';
-        } else if (!cj.length) {
-          cb.innerHTML = '<tr><td colspan="6" class="muted">No cron jobs (or CRONJOB_API_KEY missing)</td></tr>';
-        } else {
-          cb.innerHTML = cj.map((j) => {
-            const next = j.nextExecution ? String(j.nextExecution).replace('T',' ').slice(0,16) : '—';
-            const st = j.health === 'ok' ? 'ok' : (j.health === 'fail' || j.health === 'warn' ? 'bad' : '');
-            const enLabel = j.enabled ? 'ON' : 'OFF';
-            return '<tr>' +
-              '<td><span class="dot ' + st + '"></span> ' + esc(j.emoji || '') + ' ' + esc(enLabel) + '</td>' +
-              '<td class="mono">#' + esc(j.id) + '</td>' +
-              '<td>' + esc(j.title) + '<div class="muted mono" style="font-size:.7rem">' + esc(String(j.url||'').slice(0,60)) + '</div></td>' +
-              '<td class="mono">' + esc(j.lastStatus == null ? '—' : j.lastStatus) + '</td>' +
-              '<td class="mono muted">' + esc(next) + '</td>' +
-              '<td class="btn-row">' +
-                (j.enabled
-                  ? '<button data-cron="disable" data-id="' + esc(j.id) + '">Disable</button>'
-                  : '<button data-cron="enable" data-id="' + esc(j.id) + '">Enable</button>') +
-                '<button data-cron="delete" data-id="' + esc(j.id) + '" class="danger">Delete</button>' +
-              '</td></tr>';
-          }).join('');
-        }
-      }
-
-    }
-
-    function showApp(user) {
-      gate.hidden = true;
-      app.hidden = false;
-      const chip = document.getElementById('userchip');
-      if (user && user.username) {
-        chip.innerHTML = (user.photo_url ? '<img src="' + esc(user.photo_url) + '" alt="">' : '') +
-          '<span>@' + esc(user.username) + '</span>';
-      } else if (user && user.id) {
-        chip.innerHTML = '<span class="mono">id ' + esc(user.id) + '</span>';
-      } else {
-        chip.innerHTML = '<span class="muted">secret session</span>';
-      }
-    }
-
-    async function load() {
-      document.getElementById('liveBadge').textContent = '…';
-      const data = await api('overview');
-      render(data);
-      document.getElementById('liveBadge').textContent = 'LIVE';
-    }
-
-    // Called by Telegram Login Widget
-    window.onTelegramAuth = async function (user) {
-      err.textContent = '';
-      try {
-        // Server-side verify
-        const res = await fetch('/api/dash?action=auth', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ telegram: user }),
-        });
-        const data = await res.json();
-        if (!res.ok || !data.ok) throw new Error(data.error || 'Telegram auth failed');
-        setTg(user);
-        await load();
-        showApp(data.user || user);
-        toast('Signed in as founder');
-      } catch (e) {
-        err.textContent = e.message || String(e);
-      }
-    };
-
-    function injectTelegramWidget() {
-      const box = document.getElementById('tg-login');
-      box.innerHTML = '';
-      const s = document.createElement('script');
-      s.async = true;
-      s.src = 'https://telegram.org/js/telegram-widget.js?22';
-      s.setAttribute('data-telegram-login', BOT_USERNAME);
-      s.setAttribute('data-size', 'large');
-      s.setAttribute('data-radius', '12');
-      s.setAttribute('data-onauth', 'onTelegramAuth(user)');
-      s.setAttribute('data-request-access', 'write');
-      box.appendChild(s);
-    }
-
-    document.getElementById('unlock').onclick = async () => {
-      err.textContent = '';
-      const unlockBtn = document.getElementById('unlock');
-      const s = document.getElementById('secret').value.trim();
-      if (!s) { err.textContent = 'Enter DASH_SECRET or use Telegram login'; return; }
-      unlockBtn.disabled = true;
-      unlockBtn.innerHTML = '<span class="spin"></span>Unlocking…';
-      sessionStorage.setItem(SEC_KEY, s);
-      sessionStorage.removeItem(TG_KEY);
-      try {
-        await load();
-        showApp(null);
-      } catch (e) {
-        sessionStorage.removeItem(SEC_KEY);
-        err.textContent = e.message || String(e);
-      } finally {
-        unlockBtn.disabled = false;
-        unlockBtn.textContent = 'Unlock with secret';
-      }
-    };
-
-    const ACTION_LABELS = {
-      think_worker: '▶ Run Think Worker',
-      night_run: '🌙 Night Run',
-      voice_on: '🎙 Voice ON',
-      voice_off: '🔇 Voice OFF',
-      cron_heal: '🛠 Heal crons',
-    };
-
-    function setActionsBusy(busy, activeBtn, label) {
-      ['btnWorker','btnNight','btnVoiceOn','btnVoiceOff'].forEach((id) => {
-        const b = document.getElementById(id);
-        if (!b) return;
-        b.disabled = !!busy;
-        b.classList.toggle('busy', !!busy);
-      });
-      if (activeBtn) {
-        if (busy) {
-          activeBtn.dataset.prevHtml = activeBtn.innerHTML;
-          activeBtn.innerHTML = '<span class="spin"></span>' + (label || 'Running…');
-        } else if (activeBtn.dataset.prevHtml) {
-          activeBtn.innerHTML = activeBtn.dataset.prevHtml;
-          delete activeBtn.dataset.prevHtml;
-        }
-      }
-    }
-
-    async function runAction(action, btn) {
-      if (btn.disabled) return;
-      setActionsBusy(true, btn, 'Running…');
-      try {
-        const r = await api(action, 'POST', {});
-        toast((ACTION_LABELS[action] || action) + ' · ok');
-        await load();
-        return r;
-      } catch (e) {
-        toast(e.message || String(e));
-      } finally {
-        setActionsBusy(false, btn);
-      }
-    }
-
-
-    document.getElementById('btnCronRefresh').onclick = async (e) => {
-      const btn = e.target;
-      btn.disabled = true;
-      try {
-        await load();
-        toast('Crons refreshed');
-      } catch (err) { toast(err.message || String(err)); }
-      finally { btn.disabled = false; }
-    };
-    document.getElementById('btnCronHeal').onclick = (e) => runAction('cron_heal', e.target);
-
-    document.getElementById('cronBody').addEventListener('click', async (ev) => {
-      const btn = ev.target.closest('button[data-cron]');
-      if (!btn || btn.disabled) return;
-      const op = btn.getAttribute('data-cron');
-      const id = btn.getAttribute('data-id');
-      if (!op || !id) {
-        toast('Missing job id');
-        alert('Missing job id on button');
-        return;
-      }
-      if (op === 'delete') {
-        if (!confirm('Delete cron #' + id + '? This cannot be undone.')) return;
-      }
-      const action = op === 'enable' ? 'cron_enable' : op === 'disable' ? 'cron_disable' : 'cron_delete';
-      btn.disabled = true;
-      const prev = btn.innerHTML;
-      btn.innerHTML = '<span class="spin"></span>…';
-      try {
-        let url = apiUrl(action);
-        url += (url.includes('?') ? '&' : '?') + 'id=' + encodeURIComponent(id);
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: authHeaders(),
-          cache: 'no-store',
-          body: JSON.stringify({ id: id, jobId: id }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || data.ok === false) {
-          const msg = data.error || ('HTTP ' + res.status);
-          console.error('cron action failed', action, id, data);
-          alert('Cron ' + op + ' failed:\n' + msg);
-          throw new Error(msg);
-        }
-        toast((op === 'enable' ? 'Enabled' : op === 'disable' ? 'Disabled' : 'Deleted') + ' #' + id);
-        await load();
-      } catch (e) {
-        toast(e.message || String(e));
-        btn.disabled = false;
-        btn.innerHTML = prev;
-      }
-    });
-
-    document.getElementById('btnWorker').onclick = (e) => runAction('think_worker', e.target);
-    document.getElementById('btnNight').onclick = (e) => runAction('night_run', e.target);
-    document.getElementById('btnVoiceOn').onclick = (e) => runAction('voice_on', e.target);
-    document.getElementById('btnVoiceOff').onclick = (e) => runAction('voice_off', e.target);
-    document.getElementById('refresh').onclick = () => load().catch((e) => toast(e.message));
-    document.getElementById('logout').onclick = () => {
-      sessionStorage.removeItem(TG_KEY);
-      sessionStorage.removeItem(SEC_KEY);
-      location.reload();
-    };
-
-    // Bootstrap: fetch bot username if API allows, else use default
-    (async () => {
-      try {
-        const r = await fetch('/api/dash?action=config').then((x) => x.json()).catch(() => null);
-        // config requires auth in our API — skip if 401
-      } catch (_) {}
-      injectTelegramWidget();
-      if (getTg() || getSecret()) {
-        try {
-          await load();
-          showApp(getTg());
-        } catch (_) {
-          sessionStorage.removeItem(TG_KEY);
-          sessionStorage.removeItem(SEC_KEY);
-        }
-      }
-    })();
-
-    setInterval(() => {
-      if (!app.hidden && (getTg() || getSecret())) load().catch(() => {});
-    }, 45000);
-  </script>
+(async()=>{
+  if(getToken()||getSecret()){
+    try{await load();showApp()}catch(_){clearAuth()}
+  }
+})();
+setInterval(()=>{if(!app.hidden)load().catch(()=>{})},45000);
+</script>
 </body>
 </html>
