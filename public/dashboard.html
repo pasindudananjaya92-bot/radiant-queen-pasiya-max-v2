@@ -175,12 +175,41 @@
         <h2>Latest memories</h2>
         <div id="memList" class="muted">—</div>
       </section>
+      
       <section class="card span12">
+        <h2>Cron Manager · cron-job.org</h2>
+        <div class="btn-row" style="margin-bottom:12px">
+          <button id="btnCronRefresh">↻ Refresh crons</button>
+          <button id="btnCronHeal">🛠 Heal disabled</button>
+        </div>
+        <div style="overflow:auto">
+          <table>
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>ID</th>
+                <th>Title</th>
+                <th>Last</th>
+                <th>Next (UTC)</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="cronBody">
+              <tr><td colspan="6" class="muted">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="muted" style="margin:10px 0 0;font-size:.78rem">
+          Enable / Disable instant · Delete asks confirm · Needs CRONJOB_API_KEY
+        </p>
+      </section>
+
+<section class="card span12">
         <h2>Night reports</h2>
         <div id="nightList" class="muted">—</div>
       </section>
     </div>
-    <div class="footer">Phase 2 · Telegram auth · Hull B · <span class="mono" id="ts"></span></div>
+    <div class="footer">Phase 3 · Cron Manager · Hull B · <span class="mono" id="ts"></span></div>
   </div>
   <div id="toast"></div>
 
@@ -292,6 +321,37 @@
       document.getElementById('meta').textContent =
         (sys.name || 'Radiant Queen') + ' · ' + (sys.hull || 'Hull B');
       document.getElementById('ts').textContent = data.ts || '';
+
+      // Cron table
+      const cron = data.cron || {};
+      const cj = cron.jobs || [];
+      const cb = document.getElementById('cronBody');
+      if (cb) {
+        if (cron.error) {
+          cb.innerHTML = '<tr><td colspan="6" class="muted">Cron API: ' + esc(cron.error) + '</td></tr>';
+        } else if (!cj.length) {
+          cb.innerHTML = '<tr><td colspan="6" class="muted">No cron jobs (or CRONJOB_API_KEY missing)</td></tr>';
+        } else {
+          cb.innerHTML = cj.map((j) => {
+            const next = j.nextExecution ? String(j.nextExecution).replace('T',' ').slice(0,16) : '—';
+            const st = j.health === 'ok' ? 'ok' : (j.health === 'fail' || j.health === 'warn' ? 'bad' : '');
+            const enLabel = j.enabled ? 'ON' : 'OFF';
+            return '<tr>' +
+              '<td><span class="dot ' + st + '"></span> ' + esc(j.emoji || '') + ' ' + esc(enLabel) + '</td>' +
+              '<td class="mono">#' + esc(j.id) + '</td>' +
+              '<td>' + esc(j.title) + '<div class="muted mono" style="font-size:.7rem">' + esc(String(j.url||'').slice(0,60)) + '</div></td>' +
+              '<td class="mono">' + esc(j.lastStatus == null ? '—' : j.lastStatus) + '</td>' +
+              '<td class="mono muted">' + esc(next) + '</td>' +
+              '<td class="btn-row">' +
+                (j.enabled
+                  ? '<button data-cron="disable" data-id="' + esc(j.id) + '">Disable</button>'
+                  : '<button data-cron="enable" data-id="' + esc(j.id) + '">Enable</button>') +
+                '<button data-cron="delete" data-id="' + esc(j.id) + '" class="danger">Delete</button>' +
+              '</td></tr>';
+          }).join('');
+        }
+      }
+
     }
 
     function showApp(user) {
@@ -376,6 +436,7 @@
       night_run: '🌙 Night Run',
       voice_on: '🎙 Voice ON',
       voice_off: '🔇 Voice OFF',
+      cron_heal: '🛠 Heal crons',
     };
 
     function setActionsBusy(busy, activeBtn, label) {
