@@ -472,6 +472,60 @@
       }
     }
 
+
+    document.getElementById('btnCronRefresh').onclick = async (e) => {
+      const btn = e.target;
+      btn.disabled = true;
+      try {
+        await load();
+        toast('Crons refreshed');
+      } catch (err) { toast(err.message || String(err)); }
+      finally { btn.disabled = false; }
+    };
+    document.getElementById('btnCronHeal').onclick = (e) => runAction('cron_heal', e.target);
+
+    document.getElementById('cronBody').addEventListener('click', async (ev) => {
+      const btn = ev.target.closest('button[data-cron]');
+      if (!btn || btn.disabled) return;
+      const op = btn.getAttribute('data-cron');
+      const id = btn.getAttribute('data-id');
+      if (!op || !id) {
+        toast('Missing job id');
+        alert('Missing job id on button');
+        return;
+      }
+      if (op === 'delete') {
+        if (!confirm('Delete cron #' + id + '? This cannot be undone.')) return;
+      }
+      const action = op === 'enable' ? 'cron_enable' : op === 'disable' ? 'cron_disable' : 'cron_delete';
+      btn.disabled = true;
+      const prev = btn.innerHTML;
+      btn.innerHTML = '<span class="spin"></span>…';
+      try {
+        let url = apiUrl(action);
+        url += (url.includes('?') ? '&' : '?') + 'id=' + encodeURIComponent(id);
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: authHeaders(),
+          cache: 'no-store',
+          body: JSON.stringify({ id: id, jobId: id }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.ok === false) {
+          const msg = data.error || ('HTTP ' + res.status);
+          console.error('cron action failed', action, id, data);
+          alert('Cron ' + op + ' failed:\n' + msg);
+          throw new Error(msg);
+        }
+        toast((op === 'enable' ? 'Enabled' : op === 'disable' ? 'Disabled' : 'Deleted') + ' #' + id);
+        await load();
+      } catch (e) {
+        toast(e.message || String(e));
+        btn.disabled = false;
+        btn.innerHTML = prev;
+      }
+    });
+
     document.getElementById('btnWorker').onclick = (e) => runAction('think_worker', e.target);
     document.getElementById('btnNight').onclick = (e) => runAction('night_run', e.target);
     document.getElementById('btnVoiceOn').onclick = (e) => runAction('voice_on', e.target);
