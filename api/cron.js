@@ -471,7 +471,7 @@ export default async function handler(req, res) {
   if (job === 'help') {
     res.status(200).json({
       ok: true,
-      jobs: ['ghost', 'track', 'watch', 'reminders', 'digest', 'news_podcast', 'shadow', 'hullpoll', 'dna', 'all', 'phaseg', 'swarmdigest', 'nightscan', 'morningbrief', 'nightops', 'thinkworker'],
+      jobs: ['ghost', 'track', 'watch', 'reminders', 'digest', 'news_podcast', 'shadow', 'hullpoll', 'dna', 'all', 'phaseg', 'swarmdigest', 'nightscan', 'morningbrief', 'shadowmorning', 'nightops', 'thinkworker'],
       example: '/api/cron?job=ghost&secret=CRON_SECRET',
     });
     return;
@@ -587,6 +587,13 @@ export default async function handler(req, res) {
       const { runNightScan } = await import('../lib/nightOperator.js');
       const r = await runNightScan({ alertOnFail: true });
       return res.status(200).json({ ok: true, job: 'nightscan', allOk: r.allOk, ts: r.ts });
+    }
+
+    
+    if (job === 'shadowmorning' || job === 'shadow_morning' || job === 'queenshadow') {
+      const { runMorningReport } = await import('../lib/shadowManager.js');
+      const r = await runMorningReport({ sendTelegram: true });
+      return res.status(200).json({ ok: true, job: 'shadowmorning', empty: !!r.empty, task_count: r.task_count || 0 });
     }
 
     if (job === 'morningbrief' || job === 'morning_brief' || job === 'nightbrief') {
