@@ -156,7 +156,7 @@ function getTelegramAuth(req) {
   return null;
 }
 
-function authorize(req) {
+async function authorize(req) {
   // 1) Telegram widget session
   const tg = getTelegramAuth(req);
   if (tg && tg.hash) {
@@ -164,7 +164,31 @@ function authorize(req) {
     if (v.ok) return { ok: true, method: 'telegram', user: v.user };
     return { ok: false, error: v.error || 'telegram auth failed', id: v.id };
   }
-  // 2) Fallback shared secret (Phase 1)
+  // 2) Remember-Me session token (cookie or Bearer session)
+  try {
+    const sess = await import('../lib/dashboardSession.js');
+    let token = '';
+    const h = String(req.headers?.authorization || '');
+    if (h.toLowerCase().startsWith('bearer ') && h.slice(7).includes('.')) {
+      token = h.slice(7).trim();
+    }
+    if (!token) token = sess.readCookieToken(req);
+    const qTok = String(req.query?.session || '').trim();
+    if (!token && qTok) token = qTok;
+    if (token) {
+      const v = sess.verifySessionToken(token);
+      if (v.ok) {
+        return {
+          ok: true,
+          method: 'session',
+          user: { id: String([...founderIds()][0] || 'founder'), username: 'session' },
+          exp: v.payload?.exp,
+        };
+      }
+    }
+  } catch (_) {}
+
+  // 3) Fallback shared secret (Phase 1)
   if (dashSecretOk(req)) {
     return {
       ok: true,
@@ -310,13 +334,23 @@ async function actionOverview() {
   } catch (e) {
     cron = { ok: false, jobs: [], error: e.message || String(e) };
   }
+  let usage = { ok: false, byTool: {}, rows: [] };
+  let alerts = { ok: false, alerts: [], unseen: 0 };
+  try {
+    const st = await import('../lib/dashboardStats.js');
+    usage = await st.usageSummary(30);
+  } catch (_) {}
+  try {
+    const al = await import('../lib/dashboardAlerts.js');
+    alerts = await al.collectLiveAlerts();
+  } catch (_) {}
   return {
     ok: true,
     ts: new Date().toISOString(),
     system: {
       name: 'Radiant Queen OS',
       hull: 'Hull B (Vercel + cron)',
-      agents: '20–27 · God Pack · Think · Night · Sentry · Dash P3 Cron',
+      agents: 'Dash P4 · Chat · PWA · God Buttons · Alerts',
     },
     health,
     queue: {
@@ -328,6 +362,8 @@ async function actionOverview() {
     night,
     mem,
     cron,
+    usage,
+    alerts,
   };
 }
 
@@ -429,6 +465,69 @@ async function actionCronHeal() {
 }
 
 
+
+async function actionChat(message) {
+  const mod = await import('../lib/dashboardChat.js');
+  return mod.handleChat(message);
+}
+
+async function actionChatHistory() {
+  const mod = await import('../lib/dashboardChat.js');
+  return mod.listMessages(50);
+}
+
+async function actionUsage() {
+  const mod = await import('../lib/dashboardStats.js');
+  return mod.usageSummary(40);
+}
+
+async function actionAlerts() {
+  const mod = await import('../lib/dashboardAlerts.js');
+  return mod.collectLiveAlerts();
+}
+
+async function actionAlertsSeen() {
+  const mod = await import('../lib/dashboardAlerts.js');
+  return mod.markAlertsSeen();
+}
+
+async function actionSessionLogin() {
+  const mod = await import('../lib/dashboardSession.js');
+  const token = mod.createSessionToken('founder');
+  return { ok: true, token, cookie: mod.sessionCookie(token), days: Number(process.env.DASH_SESSION_DAYS || 30) };
+}
+
+async function actionGodHeal() {
+  const out = { health: null, cron_heal: null, snap: null };
+  try {
+    const hm = await import('../lib/healthManager.js');
+    if (typeof hm.runFullCheck === 'function') out.health = await hm.runFullCheck();
+  } catch (e) {
+    out.health = { ok: false, error: e.message };
+  }
+  try {
+    const cm = await import('../lib/cronManager.js');
+    out.cron_heal = await cm.healJobs({});
+  } catch (e) {
+    out.cron_heal = { ok: false, error: e.message };
+  }
+  try {
+    const snap = await import('../lib/snapDeployManager.js');
+    if (typeof snap.wakeAll === 'function') out.snap = await snap.wakeAll();
+    else if (typeof snap.listContainers === 'function') out.snap = { list: await snap.listContainers() };
+    else out.snap = { note: 'snap manager present — use bot snap wake' };
+  } catch (e) {
+    out.snap = { ok: false, error: e.message || 'snap unavailable' };
+  }
+  return { ok: true, action: 'god_heal', ...out };
+}
+
+async function actionDashThink(q) {
+  const mod = await import('../lib/dashboardChat.js');
+  return mod.handleChat('think ' + String(q || '').trim());
+}
+
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -453,7 +552,26 @@ export default async function handler(req, res) {
     return json(res, 200, { ok: true, user: v.user, method: 'telegram' });
   }
 
-  const auth = authorize(req);
+  // Pre-auth: session_login with body.secret or query secret
+  const preAction = String(req.query?.action || '').toLowerCase();
+  if (req.method === 'POST' && (preAction === 'session_login' || preAction === 'remember')) {
+    const body = parseBody(req);
+    const sec = String(process.env.DASH_SECRET || '').trim();
+    const provided =
+      body.secret ||
+      req.query?.secret ||
+      (String(req.headers?.authorization || '').toLowerCase().startsWith('bearer ')
+        ? String(req.headers.authorization).slice(7).trim()
+        : '');
+    if (!sec || provided !== sec) {
+      return json(res, 401, { ok: false, error: 'invalid DASH_SECRET' });
+    }
+    const r = await actionSessionLogin();
+    res.setHeader('Set-Cookie', r.cookie);
+    return json(res, 200, { ok: true, token: r.token, days: r.days });
+  }
+
+  const auth = await authorize(req);
   if (!auth.ok) {
     return json(res, 401, {
       ok: false,
@@ -480,10 +598,52 @@ export default async function handler(req, res) {
       if (action === 'cron' || action === 'crons' || action === 'cron_list') {
         return json(res, 200, await actionCronList());
       }
+      if (action === 'chat_history' || action === 'history') {
+        return json(res, 200, await actionChatHistory());
+      }
+      if (action === 'usage' || action === 'stats') {
+        return json(res, 200, await actionUsage());
+      }
+      if (action === 'alerts') {
+        return json(res, 200, await actionAlerts());
+      }
       return json(res, 200, await actionOverview());
     }
 
     if (req.method === 'POST') {
+      if (action === 'session_login' || action === 'remember') {
+        if (!dashSecretOk(req) && !(await authorize(req)).ok) {
+          // allow body.secret
+          const body = parseBody(req);
+          const sec = String(process.env.DASH_SECRET || '').trim();
+          if (!sec || body.secret !== sec) {
+            return json(res, 401, { ok: false, error: 'unauthorized for session' });
+          }
+        }
+        const r = await actionSessionLogin();
+        res.setHeader('Set-Cookie', r.cookie);
+        return json(res, 200, { ok: true, token: r.token, days: r.days });
+      }
+      if (action === 'session_logout') {
+        const sess = await import('../lib/dashboardSession.js');
+        res.setHeader('Set-Cookie', sess.clearSessionCookie());
+        return json(res, 200, { ok: true });
+      }
+      if (action === 'chat') {
+        const body = parseBody(req);
+        const msg = body.message || body.text || body.q || '';
+        return json(res, 200, await actionChat(msg));
+      }
+      if (action === 'think' || action === 'dash_think') {
+        const body = parseBody(req);
+        return json(res, 200, await actionDashThink(body.q || body.message || body.text || ''));
+      }
+      if (action === 'god_heal' || action === 'emergency_heal') {
+        return json(res, 200, await actionGodHeal());
+      }
+      if (action === 'alerts_seen') {
+        return json(res, 200, await actionAlertsSeen());
+      }
       if (action === 'think_worker' || action === 'worker') {
         return json(res, 200, await actionThinkWorker());
       }
@@ -531,17 +691,7 @@ export default async function handler(req, res) {
       return json(res, 400, {
         ok: false,
         error: 'unknown POST action',
-        actions: [
-          'think_worker',
-          'voice_on',
-          'voice_off',
-          'night_run',
-          'cron_enable',
-          'cron_disable',
-          'cron_delete',
-          'cron_heal',
-          'auth',
-        ],
+        actions: ['chat','think','god_heal','session_login','think_worker','voice_on','voice_off','night_run','cron_enable','cron_disable','cron_delete','cron_heal','alerts_seen','auth'],
       });
     }
 
