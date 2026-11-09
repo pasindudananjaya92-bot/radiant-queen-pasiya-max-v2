@@ -1,0 +1,18 @@
+{
+  "name": "Radiant Queen OS",
+  "short_name": "Queen OS",
+  "description": "Radiant Queen Command Center",
+  "start_url": "/dashboard.html",
+  "display": "standalone",
+  "background_color": "#070a12",
+  "theme_color": "#0b0f1a",
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/icon-queen.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
