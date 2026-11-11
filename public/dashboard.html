@@ -77,7 +77,7 @@
   <div id="gate">
     <div class="brand" style="margin-bottom:12px">
       <div class="logo">👑</div>
-      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">Private Platform · P6A+B</div></div>
+      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">Private Platform · P6C Bank · P6F APK</div></div>
     </div>
     <input id="secret" type="password" placeholder="DASH_SECRET" />
     <label><input type="checkbox" id="remember" checked /> Remember me (30 days)</label>
@@ -133,8 +133,29 @@
       </section>
 
       <!-- BANK placeholder -->
-      <section class="world soon" data-world="bank">
-        <div class="card"><h2>Private Bank</h2><p class="muted">P6C — Money graph + bill inbox. Shell ready.</p></div>
+      <section class="world" data-world="bank">
+        <div class="card">
+          <h2>Private Bank</h2>
+          <div style="font-size:1.6rem;font-weight:700;margin-bottom:4px" id="bankTotal">Rs.0</div>
+          <div class="muted" style="font-size:.8rem;margin-bottom:12px" id="bankMeta">Last 30 days</div>
+          <div id="bankChart" style="display:flex;align-items:flex-end;gap:3px;height:80px;margin-bottom:12px"></div>
+          <div class="row" id="bankCats" style="margin-bottom:12px"></div>
+        </div>
+        <div class="card">
+          <h2>Add expense / bill</h2>
+          <form id="bankForm">
+            <input class="field" id="bankAmount" type="number" step="0.01" placeholder="Amount (e.g. 2500)" />
+            <input class="field" id="bankMerchant" placeholder="Merchant (e.g. Keells)" />
+            <input class="field" id="bankNote" placeholder="Note (optional)" />
+            <input class="field" id="bankCategory" placeholder="Category (optional: groceries)" />
+            <button class="primary" type="submit" style="width:100%">Save to Bank + Brain</button>
+          </form>
+          <p class="muted" style="font-size:.72rem;margin:8px 0 0">Also: type bill text like <span class="mono">2500 Keells</span> in note field</p>
+        </div>
+        <div class="card">
+          <h2>Recent transactions</h2>
+          <div id="bankList" class="muted">—</div>
+        </div>
       </section>
 
       <!-- SHADOW -->
@@ -205,10 +226,19 @@
             </table>
           </div>
         </div>
+        
         <div class="card">
           <h2>APK Forge</h2>
-          <p class="muted">P6F — GitHub Actions private APK. Shell ready.</p>
+          <div id="apkStatus" class="muted">—</div>
+          <div class="row" style="margin-top:10px">
+            <button id="btnApkRefresh">↻ Refresh status</button>
+            <a id="apkActionsLink" href="#" target="_blank" rel="noopener" style="color:#c4b5fd;font-size:.85rem;align-self:center">Open GitHub Actions</a>
+          </div>
+          <p class="muted" style="font-size:.72rem;margin:10px 0 0">
+            Set repo variable <span class="mono">QUEEN_PWA_URL</span> · Actions builds APK on every push to main · Download artifact <span class="mono">queen-os-apk</span>
+          </p>
         </div>
+
       </section>
     </div>
 
@@ -332,6 +362,54 @@ function renderCron(cron){
   }).join('');
 }
 
+
+function renderBank(summary, txs){
+  const total=summary&&summary.total!=null?summary.total:0;
+  document.getElementById('bankTotal').textContent='Rs.'+Number(total).toLocaleString();
+  document.getElementById('bankMeta').textContent=(summary&&summary.count||0)+' txs · last '+(summary&&summary.days||30)+' days';
+  const series=(summary&&summary.series)||[];
+  const max=Math.max(...series.map(s=>s.total),1);
+  document.getElementById('bankChart').innerHTML=series.map(s=>{
+    const h=Math.max(4, Math.round(76*s.total/max));
+    return '<div title="'+esc(s.date)+': '+s.total+'" style="flex:1;height:'+h+'px;background:linear-gradient(180deg,#7c5cff,#2dd4bf);border-radius:3px 3px 0 0;opacity:'+(s.total?1:0.25)+'"></div>';
+  }).join('');
+  const cats=summary&&summary.byCategory||{};
+  document.getElementById('bankCats').innerHTML=Object.keys(cats).length
+    ?Object.keys(cats).map(k=>'<span class="pill">'+esc(k)+': Rs.'+Number(cats[k]).toLocaleString()+'</span>').join('')
+    :'<span class="muted">No categories yet</span>';
+  const list=txs||[];
+  document.getElementById('bankList').innerHTML=list.length
+    ?list.map(t=>'<div style="padding:8px 0;border-bottom:1px solid var(--border)"><b>Rs.'+esc(t.amount)+'</b> · '+esc(t.merchant||t.note||'—')+
+      ' <span class="muted mono">'+esc(t.category)+' · '+esc(String(t.tx_date).slice(0,10))+'</span> '+
+      '<button class="danger" data-bank-del="'+esc(t.id)+'" style="padding:4px 8px;font-size:.72rem">Del</button></div>').join('')
+    :'No transactions yet.';
+}
+function renderApk(a){
+  const el=document.getElementById('apkStatus');
+  if(!a){el.textContent='—';return}
+  if(!a.configured){
+    el.innerHTML=esc(a.message||'Not configured')+'<br><span class="mono">PWA: '+esc(a.pwa_url||'')+'</span>';
+  } else if(a.has_run){
+    el.innerHTML='Status: <b>'+esc(a.status)+'</b> · Conclusion: <b>'+esc(a.conclusion||'—')+'</b><br>'+
+      esc(a.display_title||'')+'<br><span class="mono">'+esc(String(a.updated_at||'').slice(0,19))+'</span><br>'+
+      esc(a.artifact_hint||'');
+  } else {
+    el.textContent=a.message||a.error||JSON.stringify(a);
+  }
+  const link=document.getElementById('apkActionsLink');
+  if(a.actions_url){link.href=a.actions_url;link.style.display='inline'}
+  else if(a.html_url){link.href=a.html_url}
+}
+
+async function loadBank(){
+  const s=await api('bank_summary');
+  const l=await api('bank_list');
+  renderBank(s,l.transactions||[]);
+}
+async function loadApk(){
+  try{const a=await api('apk_status');renderApk(a)}catch(e){document.getElementById('apkStatus').textContent=e.message}
+}
+
 function renderHealth(health){
   const checks=(health&&health.checks)||[];
   document.getElementById('healthRow').innerHTML=checks.length
@@ -387,6 +465,8 @@ async function boot(){
   await loadChatReal();
   await loadBrain();
   await loadFortress();
+  try{await loadBank()}catch(_){}
+  try{await loadApk()}catch(_){}
 }
 
 document.getElementById('unlock').onclick=async()=>{
@@ -500,6 +580,32 @@ document.getElementById('cronBody').onclick=async e=>{
     await loadOverview();
   }catch(err){toast(err.message)}
 };
+
+
+document.getElementById('bankForm').onsubmit=async e=>{
+  e.preventDefault();
+  const amount=document.getElementById('bankAmount').value.trim();
+  const merchant=document.getElementById('bankMerchant').value.trim();
+  const note=document.getElementById('bankNote').value.trim();
+  const category=document.getElementById('bankCategory').value.trim();
+  try{
+    if(amount){
+      await api('bank_add','POST',{amount,merchant,note,category:category||undefined});
+    } else if(note){
+      await api('bank_bill','POST',{text:note});
+    } else { toast('Enter amount'); return; }
+    document.getElementById('bankAmount').value='';
+    document.getElementById('bankNote').value='';
+    toast('Saved to Bank');
+    await loadBank();
+  }catch(err){toast(err.message)}
+};
+document.getElementById('bankList').onclick=async e=>{
+  const b=e.target.closest('[data-bank-del]'); if(!b) return;
+  if(!confirm('Delete transaction?')) return;
+  try{await api('bank_delete','POST',{id:b.getAttribute('data-bank-del')});await loadBank()}catch(err){toast(err.message)}
+};
+document.getElementById('btnApkRefresh').onclick=()=>loadApk().then(()=>toast('APK status refreshed'));
 
 if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
 
