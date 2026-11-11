@@ -1,1 +1,44 @@
+name: Build Queen OS APK
 
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Create Gradle wrapper
+        working-directory: apk-wrapper/android
+        run: |
+          gradle wrapper --gradle-version 8.2.1
+          chmod +x gradlew
+
+      - name: Build debug APK
+        working-directory: apk-wrapper/android
+        env:
+          QUEEN_PWA_URL: ${{ vars.QUEEN_PWA_URL || secrets.QUEEN_PWA_URL }}
+          VERSION_CODE: ${{ github.run_number }}
+          VERSION_NAME: 1.0.${{ github.run_number }}
+        run: |
+          if [ -z "$QUEEN_PWA_URL" ]; then
+            echo "QUEEN_PWA_URL missing — set GitHub Actions variable to https://YOUR.vercel.app/dashboard.html"
+            export QUEEN_PWA_URL="https://example.vercel.app/dashboard.html"
+          fi
+          ./gradlew assembleDebug --stacktrace
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: queen-os-apk
+          path: apk-wrapper/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: warn
