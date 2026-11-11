@@ -1,30 +1,57 @@
+# Queen OS — Private APK (WebView shell around PWA)
+# Fixed: no android-actions/setup-android (conflicts on ubuntu-latest)
 name: Build Queen OS APK
 
 on:
   push:
     branches: [main, master]
+    paths:
+      - "apk-wrapper/**"
+      - ".github/workflows/build-queen-apk.yml"
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    timeout-minutes: 30
 
-      - uses: actions/setup-java@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: android-actions/setup-android@v3
-
-      - name: Create Gradle wrapper
-        working-directory: apk-wrapper/android
+      - name: Install Android command-line tools
         run: |
-          gradle wrapper --gradle-version 8.2.1
-          chmod +x gradlew
+          ANDROID_HOME="$HOME/android-sdk"
+          mkdir -p "$ANDROID_HOME/cmdline-tools"
+          curl -fsSL https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -o /tmp/cmdline-tools.zip
+          unzip -q /tmp/cmdline-tools.zip -d "$ANDROID_HOME/cmdline-tools"
+          rm -rf "$ANDROID_HOME/cmdline-tools/latest"
+          mv "$ANDROID_HOME/cmdline-tools/cmdline-tools" "$ANDROID_HOME/cmdline-tools/latest"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
 
-      - name: Build debug APK
+      - name: Accept licenses + install platform 34
+        run: |
+          set +e
+          yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses > /tmp/sdk-licenses.txt 2>&1
+          set -e
+          sdkmanager --sdk_root="$ANDROID_HOME" \
+            "platform-tools" \
+            "platforms;android-34" \
+            "build-tools;34.0.0"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Write local.properties + build debug APK
         working-directory: apk-wrapper/android
         env:
           QUEEN_PWA_URL: ${{ vars.QUEEN_PWA_URL || secrets.QUEEN_PWA_URL }}
@@ -32,13 +59,18 @@ jobs:
           VERSION_NAME: 1.0.${{ github.run_number }}
         run: |
           if [ -z "$QUEEN_PWA_URL" ]; then
-            echo "QUEEN_PWA_URL missing — set GitHub Actions variable to https://YOUR.vercel.app/dashboard.html"
-            export QUEEN_PWA_URL="https://example.vercel.app/dashboard.html"
+            export QUEEN_PWA_URL="https://radiant-queen-pasiya-max-v2.vercel.app/dashboard.html"
+            echo "WARN: QUEEN_PWA_URL not set — using default $QUEEN_PWA_URL"
           fi
-          ./gradlew assembleDebug --stacktrace
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          echo "Building APK for PWA: $QUEEN_PWA_URL"
+          gradle wrapper --gradle-version 8.2.1
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace --no-daemon
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
         with:
           name: queen-os-apk
           path: apk-wrapper/android/app/build/outputs/apk/**/*.apk
-          if-no-files-found: warn
+          if-no-files-found: error 
