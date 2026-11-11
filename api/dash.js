@@ -366,6 +366,8 @@ async function actionOverview() {
     alerts,
     shadow: await actionShadowList().catch((e) => ({ ok: false, error: e.message, tasks: [] })),
     brain: await actionBrainList().catch((e) => ({ ok: false, error: e.message, items: [] })),
+    bank: await actionBankSummary().catch((e) => ({ ok: false, error: e.message })),
+    apk: await actionApkStatus().catch((e) => ({ ok: false, error: e.message })),
   };
 }
 
@@ -628,6 +630,41 @@ async function actionBrainProReveal(key) {
 }
 
 
+
+async function actionBankSummary() {
+  const b = await import('../lib/bankManager.js');
+  return b.summary(30);
+}
+async function actionBankList() {
+  const b = await import('../lib/bankManager.js');
+  return { ok: true, transactions: await b.listTransactions(50) };
+}
+async function actionBankAdd(body) {
+  const b = await import('../lib/bankManager.js');
+  const row = await b.addTransaction(body || {});
+  return { ok: true, transaction: row };
+}
+async function actionBankDelete(id) {
+  const b = await import('../lib/bankManager.js');
+  await b.deleteTransaction(id);
+  return { ok: true, id };
+}
+async function actionBankBill(body) {
+  const b = await import('../lib/bankManager.js');
+  let payload = body || {};
+  if (payload.text && !payload.amount) {
+    const parsed = b.parseBillText(payload.text);
+    if (parsed) payload = { ...payload, ...parsed };
+  }
+  const row = await b.addTransaction({ ...payload, source: payload.source || 'bill' });
+  return { ok: true, transaction: row };
+}
+async function actionApkStatus() {
+  const a = await import('../lib/apkStatus.js');
+  return a.getApkStatus();
+}
+
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -729,6 +766,15 @@ export default async function handler(req, res) {
       if (action === 'chat_pro_history' || action === 'chat_history_pro') {
         return json(res, 200, await actionChatProHistory(Number(req.query?.limit || 100), req.query?.before));
       }
+      if (action === 'bank' || action === 'bank_summary') {
+        return json(res, 200, await actionBankSummary());
+      }
+      if (action === 'bank_list' || action === 'bank_tx') {
+        return json(res, 200, await actionBankList());
+      }
+      if (action === 'apk' || action === 'apk_status') {
+        return json(res, 200, await actionApkStatus());
+      }
       return json(res, 200, await actionOverview());
     }
 
@@ -808,6 +854,18 @@ export default async function handler(req, res) {
       if (action === 'job_enqueue') {
         const body = parseBody(req);
         return json(res, 200, await actionJobEnqueue(body.type || 'generic', body.input || body));
+      }
+      if (action === 'bank_add' || action === 'bank_tx_add') {
+        const body = parseBody(req);
+        return json(res, 200, await actionBankAdd(body));
+      }
+      if (action === 'bank_delete' || action === 'bank_tx_delete') {
+        const body = parseBody(req);
+        return json(res, 200, await actionBankDelete(body.id || req.query?.id));
+      }
+      if (action === 'bank_bill' || action === 'bank_bill_ingest') {
+        const body = parseBody(req);
+        return json(res, 200, await actionBankBill(body));
       }
       if (action === 'alerts_seen') {
         return json(res, 200, await actionAlertsSeen());
