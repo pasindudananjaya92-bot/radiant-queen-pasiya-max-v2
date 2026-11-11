@@ -350,7 +350,7 @@ async function actionOverview() {
     system: {
       name: 'Radiant Queen OS',
       hull: 'Hull B (Vercel + cron)',
-      agents: 'Dash P4 · Chat · PWA · God Buttons · Alerts',
+      agents: 'Queen OS 50x · P6AB · Chat Pro · Brain Pro',
     },
     health,
     queue: {
@@ -583,6 +583,51 @@ async function actionBrainRecall(q) {
 }
 
 
+
+async function actionJobsList() {
+  const j = await import('../lib/platformJobs.js');
+  return { ok: true, jobs: await j.listJobs(25) };
+}
+async function actionJobGet(id) {
+  const j = await import('../lib/platformJobs.js');
+  const job = await j.getJob(id);
+  return { ok: !!job, job };
+}
+async function actionJobEnqueue(type, input) {
+  const j = await import('../lib/platformJobs.js');
+  const job = await j.enqueueJob(type, input || {});
+  return { ok: true, job };
+}
+async function actionEvents() {
+  const j = await import('../lib/platformJobs.js');
+  return { ok: true, events: await j.listEvents(30) };
+}
+async function actionChatProHistory(limit, before) {
+  const c = await import('../lib/chatPro.js');
+  return c.history(limit || 100, before || null);
+}
+async function actionChatProSend(message) {
+  const c = await import('../lib/chatPro.js');
+  return c.send(message);
+}
+async function actionChatProClear() {
+  const c = await import('../lib/chatPro.js');
+  return c.clearHistory();
+}
+async function actionBrainProList() {
+  const b = await import('../lib/brainPro.js');
+  return { ok: true, items: await b.listMasked(40) };
+}
+async function actionBrainProSearch(q) {
+  const b = await import('../lib/brainPro.js');
+  return { ok: true, items: await b.search(q, 30) };
+}
+async function actionBrainProReveal(key) {
+  const b = await import('../lib/brainPro.js');
+  return b.reveal(key);
+}
+
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -668,6 +713,22 @@ export default async function handler(req, res) {
       if (action === 'brain' || action === 'brain_list') {
         return json(res, 200, await actionBrainList());
       }
+      if (action === 'brain_pro' || action === 'brain_pro_list') {
+        return json(res, 200, await actionBrainProList());
+      }
+      if (action === 'jobs' || action === 'platform_jobs') {
+        return json(res, 200, await actionJobsList());
+      }
+      if (action === 'job' || action === 'job_status') {
+        const id = req.query?.id;
+        return json(res, 200, await actionJobGet(id));
+      }
+      if (action === 'events' || action === 'activity') {
+        return json(res, 200, await actionEvents());
+      }
+      if (action === 'chat_pro_history' || action === 'chat_history_pro') {
+        return json(res, 200, await actionChatProHistory(Number(req.query?.limit || 100), req.query?.before));
+      }
       return json(res, 200, await actionOverview());
     }
 
@@ -728,6 +789,25 @@ export default async function handler(req, res) {
       if (action === 'brain_recall') {
         const body = parseBody(req);
         return json(res, 200, await actionBrainRecall(body.q || body.key));
+      }
+      if (action === 'brain_pro_search') {
+        const body = parseBody(req);
+        return json(res, 200, await actionBrainProSearch(body.q || body.query || ''));
+      }
+      if (action === 'brain_reveal' || action === 'brain_pro_reveal') {
+        const body = parseBody(req);
+        return json(res, 200, await actionBrainProReveal(body.key || body.id || body.q));
+      }
+      if (action === 'chat_pro' || action === 'chat_pro_send') {
+        const body = parseBody(req);
+        return json(res, 200, await actionChatProSend(body.message || body.text || ''));
+      }
+      if (action === 'chat_pro_clear') {
+        return json(res, 200, await actionChatProClear());
+      }
+      if (action === 'job_enqueue') {
+        const body = parseBody(req);
+        return json(res, 200, await actionJobEnqueue(body.type || 'generic', body.input || body));
       }
       if (action === 'alerts_seen') {
         return json(res, 200, await actionAlertsSeen());
