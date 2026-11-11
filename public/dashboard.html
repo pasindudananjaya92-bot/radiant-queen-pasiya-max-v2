@@ -2,527 +2,518 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Radiant Queen OS</title>
-  <meta name="theme-color" content="#0b0f1a" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+  <title>Queen OS 50x</title>
+  <meta name="theme-color" content="#070a12" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" href="/icon-queen.svg" />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg:#070a12; --panel:rgba(18,24,40,.78); --border:rgba(255,255,255,.08);
-      --text:#e8eefc; --muted:#8b9bb8; --good:#34d399; --bad:#f87171; --warn:#fbbf24;
-      --radius:16px; --shadow:0 18px 48px rgba(0,0,0,.45);
+      --bg:#070a12; --panel:rgba(16,22,36,.92); --border:rgba(255,255,255,.08);
+      --text:#e8eefc; --muted:#8b9bb8; --accent:#7c5cff; --accent2:#2dd4bf;
+      --good:#34d399; --bad:#f87171; --warn:#fbbf24;
+      --tab-h:64px; --safe-b:env(safe-area-inset-bottom,0px);
     }
-    *{box-sizing:border-box}
-    body{margin:0;min-height:100vh;font-family:'IBM Plex Sans',system-ui,sans-serif;color:var(--text);
-      background:radial-gradient(1000px 500px at 10% -10%,rgba(124,92,255,.22),transparent 55%),var(--bg)}
-    .wrap{max-width:1100px;margin:0 auto;padding:16px 14px 56px}
-    header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px}
-    .brand{display:flex;align-items:center;gap:10px}
-    .logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#7c5cff,#2dd4bf);
-      display:grid;place-items:center;font-size:20px;box-shadow:0 8px 22px rgba(124,92,255,.35)}
-    h1{margin:0;font-size:1.1rem}
-    .sub{color:var(--muted);font-size:.8rem}
-    .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-    button{border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);
-      border-radius:12px;padding:9px 12px;font:600 .82rem 'IBM Plex Sans',sans-serif;cursor:pointer}
-    button:hover{border-color:rgba(124,92,255,.5)}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',system-ui,sans-serif}
+    body{background:radial-gradient(900px 420px at 50% -10%,rgba(124,92,255,.2),transparent 60%),var(--bg)}
+    #gate{max-width:400px;margin:10vh auto;padding:24px;background:var(--panel);border:1px solid var(--border);border-radius:20px}
+    #gate input{width:100%;padding:12px;margin:8px 0;border-radius:12px;border:1px solid var(--border);background:#0a0e18;color:var(--text)}
+    #gate label{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:.85rem;margin:8px 0}
+    button{border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--text);border-radius:12px;padding:10px 14px;font:600 .84rem 'IBM Plex Sans',sans-serif;cursor:pointer}
     button.primary{background:linear-gradient(135deg,#6d4dff,#3b82f6);border:none}
     button.danger{border-color:rgba(248,113,113,.35)}
-    button:disabled{opacity:.6;pointer-events:none}
-    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
-    .card{grid-column:span 12;background:var(--panel);backdrop-filter:blur(14px);border:1px solid var(--border);
-      border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow)}
-    @media(min-width:800px){.span4{grid-column:span 4}.span5{grid-column:span 5}.span6{grid-column:span 6}.span7{grid-column:span 7}.span8{grid-column:span 8}}
-    .card h2{margin:0 0 10px;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
-    .stat-row,.btn-row{display:flex;flex-wrap:wrap;gap:8px}
-    .pill{display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border-radius:999px;
-      background:rgba(255,255,255,.04);border:1px solid var(--border);font-size:.82rem}
+    button:disabled{opacity:.55}
+    #err{color:var(--bad);font-size:.82rem;min-height:1.2em}
+    #app{display:none;height:100%;flex-direction:column}
+    #app.show{display:flex}
+    .top{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px;gap:8px}
+    .brand{display:flex;align-items:center;gap:10px}
+    .logo{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;background:linear-gradient(135deg,var(--accent),var(--accent2));font-size:18px}
+    .top h1{margin:0;font-size:1rem}
+    .sub{color:var(--muted);font-size:.72rem}
+    .top-actions{display:flex;gap:6px;align-items:center}
+    .badge{font-size:.65rem;padding:3px 7px;border-radius:99px;background:rgba(124,92,255,.22);color:#c4b5fd;font-weight:600}
+    .main{flex:1;overflow:auto;padding:0 12px calc(var(--tab-h) + var(--safe-b) + 12px)}
+    .world{display:none;animation:fade .2s ease}
+    .world.active{display:block}
+    @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px}
+    .card h2{margin:0 0 10px;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+    .row{display:flex;flex-wrap:wrap;gap:8px}
+    .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:99px;border:1px solid var(--border);font-size:.8rem;background:rgba(255,255,255,.03)}
     .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
-    .dot.ok{background:var(--good);box-shadow:0 0 10px rgba(52,211,153,.55)}
-    .dot.bad{background:var(--bad)}
-    .dot.warn{background:var(--warn)}
-    table{width:100%;border-collapse:collapse;font-size:.82rem}
-    th,td{text-align:left;padding:7px 5px;border-bottom:1px solid var(--border);vertical-align:top}
-    th{color:var(--muted);font-size:.7rem;text-transform:uppercase}
+    .dot.ok{background:var(--good)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
     .mono{font-family:'IBM Plex Mono',monospace;font-size:.75rem}
     .muted{color:var(--muted)}
-    #gate{max-width:420px;margin:8vh auto;padding:24px;background:var(--panel);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow)}
-    #gate input[type=password]{width:100%;padding:11px 12px;margin:8px 0;border-radius:12px;border:1px solid var(--border);
-      background:rgba(0,0,0,.35);color:var(--text);font:500 .9rem 'IBM Plex Mono',monospace}
-    #gate label{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.85rem;margin:8px 0}
-    #err{color:var(--bad);min-height:1.1em;font-size:.82rem}
-    #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#1a2238;border:1px solid var(--border);
-      padding:11px 16px;border-radius:12px;display:none;z-index:60;max-width:92vw;font-size:.88rem;box-shadow:var(--shadow)}
-    .badge{font-size:.68rem;padding:3px 8px;border-radius:999px;background:rgba(124,92,255,.2);color:#c4b5fd;font-weight:600}
-    .badge.hot{background:rgba(248,113,113,.2);color:#fca5a5}
-    button .spin{display:inline-block;width:11px;height:11px;margin-right:6px;border:2px solid rgba(255,255,255,.25);
-      border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite}
-    @keyframes sp{to{transform:rotate(360deg)}}
-    #chatLog{height:280px;overflow:auto;border:1px solid var(--border);border-radius:12px;padding:10px;background:rgba(0,0,0,.25);margin-bottom:10px}
-    .bubble{margin:0 0 10px;padding:8px 10px;border-radius:12px;max-width:95%;font-size:.88rem;line-height:1.35}
-    .bubble.user{background:rgba(124,92,255,.2);margin-left:auto}
+    .tabs{position:fixed;left:0;right:0;bottom:0;height:calc(var(--tab-h) + var(--safe-b));padding-bottom:var(--safe-b);
+      background:rgba(8,11,20,.94);backdrop-filter:blur(16px);border-top:1px solid var(--border);
+      display:flex;justify-content:space-around;align-items:flex-start;padding-top:6px;z-index:40}
+    .tab{flex:1;background:none;border:none;color:var(--muted);font-size:.62rem;font-weight:600;padding:4px 2px;display:flex;flex-direction:column;align-items:center;gap:2px}
+    .tab .ico{font-size:1.05rem;line-height:1.2}
+    .tab.on{color:#c4b5fd}
+    #chatLog{height:calc(100vh - 220px);min-height:280px;overflow:auto;border:1px solid var(--border);border-radius:14px;padding:10px;background:rgba(0,0,0,.28);margin-bottom:10px}
+    .bubble{margin:0 0 10px;padding:9px 11px;border-radius:14px;max-width:92%;font-size:.9rem;line-height:1.4;white-space:pre-wrap;word-break:break-word}
+    .bubble.user{background:rgba(124,92,255,.22);margin-left:auto}
     .bubble.bot{background:rgba(255,255,255,.05)}
-    .chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
-    .chip{font-size:.68rem;padding:2px 7px;border-radius:999px;background:rgba(45,212,191,.15);color:#5eead4}
-    #chatForm{display:flex;gap:8px}
-    #chatForm input{flex:1;padding:11px;border-radius:12px;border:1px solid var(--border);background:rgba(0,0,0,.35);color:var(--text)}
-    .bar{height:8px;border-radius:99px;background:rgba(255,255,255,.06);overflow:hidden;margin:4px 0 8px}
-    .bar>i{display:block;height:100%;background:linear-gradient(90deg,#7c5cff,#2dd4bf)}
-    #alertPanel{display:none;margin-top:0}
-    #alertPanel.open{display:block}
-    .footer{margin-top:14px;text-align:center;color:var(--muted);font-size:.72rem}
+    .chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+    .chip{font-size:.68rem;padding:2px 7px;border-radius:99px;background:rgba(45,212,191,.14);color:#5eead4}
+    .composer{display:flex;gap:8px;align-items:flex-end}
+    .composer textarea{flex:1;min-height:44px;max-height:140px;resize:vertical;padding:11px;border-radius:14px;border:1px solid var(--border);background:#0a0e18;color:var(--text);font:400 .9rem 'IBM Plex Sans',sans-serif}
+    input.field{width:100%;padding:11px;border-radius:12px;border:1px solid var(--border);background:#0a0e18;color:var(--text);margin:0 0 8px}
+    #toast{position:fixed;left:50%;bottom:calc(var(--tab-h) + 16px + var(--safe-b));transform:translateX(-50%);background:#151c30;border:1px solid var(--border);padding:10px 14px;border-radius:12px;display:none;z-index:50;max-width:92vw;font-size:.86rem}
+    table{width:100%;border-collapse:collapse;font-size:.8rem}
+    th,td{text-align:left;padding:7px 4px;border-bottom:1px solid var(--border);vertical-align:top}
+    th{color:var(--muted);font-size:.68rem;text-transform:uppercase}
+    .spin{display:inline-block;width:11px;height:11px;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;margin-right:6px}
+    @keyframes sp{to{transform:rotate(360deg)}}
+    .soon{opacity:.75}
+    .reveal-btn{font-size:.72rem;padding:4px 8px}
   </style>
 </head>
 <body>
   <div id="gate">
-    <div class="brand" style="margin-bottom:10px">
+    <div class="brand" style="margin-bottom:12px">
       <div class="logo">👑</div>
-      <div><h1>Radiant Queen OS</h1><div class="sub">Phase 4 · Command Center</div></div>
+      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">Private Platform · P6A+B</div></div>
     </div>
-    <p class="muted" style="font-size:.9rem">Enter <strong>DASH_SECRET</strong>. Enable Remember Me for 30-day session.</p>
     <input id="secret" type="password" placeholder="DASH_SECRET" />
     <label><input type="checkbox" id="remember" checked /> Remember me (30 days)</label>
-    <button class="primary" id="unlock" style="width:100%">Unlock</button>
+    <button class="primary" id="unlock" style="width:100%">Enter Platform</button>
     <div id="err"></div>
   </div>
 
-  <div class="wrap" id="app" hidden>
-    <header>
+  <div id="app">
+    <div class="top">
       <div class="brand">
         <div class="logo">👑</div>
         <div>
-          <h1>Radiant Queen OS</h1>
-          <div class="sub" id="meta">Loading…</div>
+          <h1 id="worldTitle">Chat</h1>
+          <div class="sub" id="meta">Queen OS</div>
         </div>
       </div>
-      <div class="actions">
-        <button id="btnBell" title="Alerts">🔔 <span class="badge" id="alertBadge" hidden>0</span></button>
+      <div class="top-actions">
         <span class="badge" id="liveBadge">LIVE</span>
-        <button id="refresh">Refresh</button>
-        <button id="logout" class="danger">Lock</button>
+        <button id="btnRefresh" style="padding:8px 10px">↻</button>
+        <button id="btnLock" class="danger" style="padding:8px 10px">Lock</button>
       </div>
-    </header>
+    </div>
 
-    <div class="grid">
-      <section class="card span12">
-        <h2>God buttons</h2>
-        <div class="btn-row">
-          <button class="primary" id="btnGodHeal">🔥 Emergency Heal</button>
-          <button id="btnNight">🌙 Night Report Now</button>
-          <button id="btnWorker">▶ Think Worker</button>
-          <button id="btnVoiceOn">🎙 Voice ON</button>
-          <button id="btnVoiceOff">🔇 Voice OFF</button>
+    <div class="main">
+      <!-- CHAT -->
+      <section class="world active" data-world="chat">
+        <div class="card" style="padding-bottom:10px">
+          <div class="row" style="margin-bottom:8px">
+            <button id="btnLoadMore" style="padding:6px 10px">↑ Older</button>
+            <button id="btnClearChat" class="danger" style="padding:6px 10px">Clear</button>
+          </div>
+          <div id="chatLog"></div>
+          <form id="chatForm" class="composer">
+            <textarea id="chatInput" rows="2" placeholder="Message… (think … for Evidence Engine)"></textarea>
+            <button class="primary" type="submit">Send</button>
+          </form>
+          <p class="muted" style="font-size:.72rem;margin:8px 0 0">No 4096 limit in Platform · full history in Supabase</p>
         </div>
       </section>
 
-
-      <section class="card span6">
-        <h2>Queen Shadow</h2>
-        <div class="btn-row" style="margin-bottom:8px">
-          <button class="primary" id="btnShadowMorning">☀️ RUN MORNING REPORT NOW</button>
-        </div>
-        <form id="shadowForm" style="display:flex;gap:8px;margin-bottom:10px">
-          <input id="shadowInput" placeholder="shadow task…" style="flex:1;padding:10px;border-radius:12px;border:1px solid var(--border);background:rgba(0,0,0,.35);color:var(--text)" />
-          <button type="submit">Add</button>
-        </form>
-        <div id="shadowList" class="muted">—</div>
-      </section>
-
-      <section class="card span6">
-        <h2>Second Brain</h2>
-        <form id="brainForm" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
-          <input id="brainKey" placeholder="key (e.g. Wifi Password)" style="flex:1;min-width:120px;padding:10px;border-radius:12px;border:1px solid var(--border);background:rgba(0,0,0,.35);color:var(--text)" />
-          <input id="brainVal" placeholder="value" style="flex:1;min-width:120px;padding:10px;border-radius:12px;border:1px solid var(--border);background:rgba(0,0,0,.35);color:var(--text)" />
-          <button class="primary" type="submit">Remember</button>
-        </form>
-        <form id="brainSearchForm" style="display:flex;gap:8px;margin-bottom:10px">
-          <input id="brainSearch" placeholder="what is my …" style="flex:1;padding:10px;border-radius:12px;border:1px solid var(--border);background:rgba(0,0,0,.35);color:var(--text)" />
-          <button type="submit">Ask</button>
-        </form>
-        <div id="brainAnswer" class="muted" style="margin-bottom:8px"></div>
-        <div id="brainList" class="muted">—</div>
-      </section>
-
-      <section class="card span12" id="alertPanel">
-        <h2>Alert center</h2>
-        <div id="alertList" class="muted">—</div>
-        <button id="btnAlertsSeen" style="margin-top:8px">Mark all seen</button>
-      </section>
-
-      <section class="card span7">
-
-        <h2>Live chat</h2>
-        <div id="chatLog"></div>
-        <form id="chatForm">
-          <button type="button" id="btnMic" title="Voice input">🎤</button>
-          <input id="chatInput" placeholder="Message or think your question…" autocomplete="off" />
-          <button class="primary" type="submit">Send</button>
-        </form>
-        <p class="muted" style="margin:8px 0 0;font-size:.75rem">Prefix with <span class="mono">think </span> for Evidence Engine · Mic = browser speech</p>
-      </section>
-
-      <section class="card span5">
-        <h2>API usage (last logs)</h2>
-        <div id="usageBox" class="muted">—</div>
-      </section>
-
-      <section class="card span12">
-        <h2>System health</h2>
-        <div class="stat-row" id="healthRow">—</div>
-      </section>
-
-      <section class="card span4"><h2>Think queue</h2><div id="queueStats" class="mono">—</div></section>
-      <section class="card span4"><h2>Memory</h2><div id="memStats" class="mono">—</div></section>
-      <section class="card span4"><h2>Night Operator</h2><div id="nightStats" class="mono">—</div></section>
-
-      <section class="card span12">
-        <h2>Cron Manager</h2>
-        <div class="btn-row" style="margin-bottom:10px">
-          <button id="btnCronRefresh">↻ Refresh crons</button>
-          <button id="btnCronHeal">🛠 Heal disabled</button>
-        </div>
-        <div style="overflow:auto">
-          <table>
-            <thead><tr><th>Status</th><th>ID</th><th>Title</th><th>Last</th><th>Next</th><th>Actions</th></tr></thead>
-            <tbody id="cronBody"><tr><td colspan="6" class="muted">—</td></tr></tbody>
-          </table>
+      <!-- BRAIN -->
+      <section class="world" data-world="brain">
+        <div class="card">
+          <h2>Second Brain Pro</h2>
+          <input class="field" id="brainSearch" placeholder="Search keys…" />
+          <form id="brainAdd" class="row" style="margin-bottom:10px">
+            <input class="field" id="brainKey" placeholder="Key" style="flex:1;margin:0;min-width:100px" />
+            <input class="field" id="brainVal" placeholder="Value" style="flex:1;margin:0;min-width:100px" />
+            <button class="primary" type="submit">Save</button>
+          </form>
+          <div id="brainList" class="muted">—</div>
         </div>
       </section>
 
-      <section class="card span8">
-        <h2>Recent think jobs</h2>
-        <div style="overflow:auto">
-          <table>
-            <thead><tr><th>ID</th><th>Status</th><th>Prompt</th><th>When</th></tr></thead>
-            <tbody id="jobsBody"><tr><td colspan="4" class="muted">—</td></tr></tbody>
-          </table>
+      <!-- BANK placeholder -->
+      <section class="world soon" data-world="bank">
+        <div class="card"><h2>Private Bank</h2><p class="muted">P6C — Money graph + bill inbox. Shell ready.</p></div>
+      </section>
+
+      <!-- SHADOW -->
+      <section class="world" data-world="shadow">
+        <div class="card">
+          <h2>Shadow Army</h2>
+          <div class="row" style="margin-bottom:10px">
+            <button class="primary" id="btnShadowMorning">☀️ Morning Report</button>
+          </div>
+          <form id="shadowForm" class="row" style="margin-bottom:10px">
+            <input class="field" id="shadowInput" placeholder="New shadow task…" style="flex:1;margin:0" />
+            <button type="submit">Add</button>
+          </form>
+          <div id="shadowList" class="muted">—</div>
         </div>
       </section>
-      <section class="card span4">
-        <h2>Latest memories</h2>
-        <div id="memList" class="muted">—</div>
+
+      <!-- DRIVE placeholder -->
+      <section class="world soon" data-world="drive">
+        <div class="card"><h2>Queen Drive</h2><p class="muted">P6D — Vault files + search. Shell ready.</p></div>
+      </section>
+
+      <!-- MAIL placeholder -->
+      <section class="world soon" data-world="mail">
+        <div class="card"><h2>Mail + Voice</h2><p class="muted">P6E — Resend + TTS jobs. Shell ready.</p></div>
+      </section>
+
+      <!-- FORTRESS -->
+      <section class="world" data-world="fortress">
+        <div class="card">
+          <h2>Fortress</h2>
+          <p class="muted" style="margin-top:0">Session + job queue foundation.</p>
+          <div class="row" style="margin-bottom:10px">
+            <button id="btnTestJob">Enqueue test job</button>
+            <button id="btnEvents">Refresh activity</button>
+          </div>
+          <h2>Platform jobs</h2>
+          <div id="jobsList" class="mono muted">—</div>
+          <h2 style="margin-top:14px">Activity</h2>
+          <div id="eventsList" class="muted">—</div>
+        </div>
+        <div class="card">
+          <h2>System health</h2>
+          <div class="row" id="healthRow">—</div>
+        </div>
+      </section>
+
+      <!-- MORE / HQ -->
+      <section class="world" data-world="more">
+        <div class="card">
+          <h2>Command Center</h2>
+          <div class="row">
+            <button class="primary" id="btnGodHeal">🔥 Heal</button>
+            <button id="btnNight">🌙 Night</button>
+            <button id="btnWorker">▶ Worker</button>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Cron</h2>
+          <div class="row" style="margin-bottom:8px">
+            <button id="btnCronRefresh">↻</button>
+            <button id="btnCronHeal">Heal crons</button>
+          </div>
+          <div style="overflow:auto">
+            <table>
+              <thead><tr><th>St</th><th>Title</th><th>Last</th><th></th></tr></thead>
+              <tbody id="cronBody"><tr><td colspan="4" class="muted">—</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <h2>APK Forge</h2>
+          <p class="muted">P6F — GitHub Actions private APK. Shell ready.</p>
+        </div>
       </section>
     </div>
-    <div class="footer">Phase 5 · Shadow + Brain · PWA · Hull B · <span class="mono" id="ts"></span></div>
+
+    <nav class="tabs" id="tabs">
+      <button class="tab on" data-world="chat"><span class="ico">💬</span>Chat</button>
+      <button class="tab" data-world="brain"><span class="ico">🧠</span>Brain</button>
+      <button class="tab" data-world="bank"><span class="ico">🏦</span>Bank</button>
+      <button class="tab" data-world="shadow"><span class="ico">🌑</span>Shadow</button>
+      <button class="tab" data-world="drive"><span class="ico">📁</span>Drive</button>
+      <button class="tab" data-world="mail"><span class="ico">✉️</span>Mail</button>
+      <button class="tab" data-world="fortress"><span class="ico">🛡</span>Fort</button>
+      <button class="tab" data-world="more"><span class="ico">⚡</span>More</button>
+    </nav>
   </div>
   <div id="toast"></div>
 
 <script>
-const gate=document.getElementById('gate'), app=document.getElementById('app');
-const err=document.getElementById('err'), toastEl=document.getElementById('toast');
 const SEC_KEY='rq_dash_secret', TOK_KEY='rq_dash_session_token';
+const titles={chat:'Chat',brain:'Second Brain',bank:'Private Bank',shadow:'Shadow Army',drive:'Queen Drive',mail:'Mail + Voice',fortress:'Fortress',more:'Command Center'};
+let chatBefore=null;
 
-function toast(m){toastEl.textContent=m;toastEl.style.display='block';setTimeout(()=>toastEl.style.display='none',3200)}
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2800)}
 function getSecret(){return sessionStorage.getItem(SEC_KEY)||''}
 function getToken(){return localStorage.getItem(TOK_KEY)||sessionStorage.getItem(TOK_KEY)||''}
 function setSecret(s){sessionStorage.setItem(SEC_KEY,s)}
-function setToken(t,persist){if(persist)localStorage.setItem(TOK_KEY,t);else sessionStorage.setItem(TOK_KEY,t)}
+function setToken(t,p){if(p)localStorage.setItem(TOK_KEY,t);else sessionStorage.setItem(TOK_KEY,t)}
 function clearAuth(){sessionStorage.removeItem(SEC_KEY);sessionStorage.removeItem(TOK_KEY);localStorage.removeItem(TOK_KEY)}
-
 function authHeaders(){
   const h={'Content-Type':'application/json'};
   const s=getSecret(); if(s){h['Authorization']='Bearer '+s;h['X-Dash-Secret']=s}
-  const t=getToken(); if(t){h['Authorization']='Bearer '+t}
+  const t=getToken(); if(t) h['Authorization']='Bearer '+t;
   return h;
 }
-function apiUrl(action){
-  let url='/api/dash?action='+encodeURIComponent(action);
-  const s=getSecret(); if(s) url+='&secret='+encodeURIComponent(s);
-  const t=getToken(); if(t) url+='&session='+encodeURIComponent(t);
-  return url;
+function apiUrl(a){
+  let u='/api/dash?action='+encodeURIComponent(a);
+  const s=getSecret(); if(s) u+='&secret='+encodeURIComponent(s);
+  const t=getToken(); if(t) u+='&session='+encodeURIComponent(t);
+  return u;
 }
-async function api(action,method='GET',body){
-  const opts={method,headers:authHeaders(),cache:'no-store'};
-  if(method==='POST') opts.body=JSON.stringify(body||{});
-  const res=await fetch(apiUrl(action),opts);
-  const data=await res.json().catch(()=>({}));
-  if(!res.ok||data.ok===false) throw new Error(data.error||('HTTP '+res.status));
-  return data;
+async function api(a,method='GET',body){
+  const o={method,headers:authHeaders(),cache:'no-store'};
+  if(method==='POST') o.body=JSON.stringify(body||{});
+  const r=await fetch(apiUrl(a),o);
+  const d=await r.json().catch(()=>({}));
+  if(!r.ok||d.ok===false) throw new Error(d.error||('HTTP '+r.status));
+  return d;
 }
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-function dot(ok){return '<span class="dot '+(ok?'ok':'bad')+'"></span>'}
 
-function renderUsage(usage){
-  const box=document.getElementById('usageBox');
-  const by=usage&&usage.byTool||{};
-  const keys=Object.keys(by);
-  if(!keys.length){box.innerHTML=usage&&usage.error?esc(usage.error):'No usage logs yet — fills as tools run.';return}
-  const max=Math.max(...keys.map(k=>by[k].total),1);
-  box.innerHTML=keys.map(k=>{
-    const v=by[k]; const pct=Math.round(100*v.total/max);
-    return '<div><div class="mono">'+esc(k)+' · '+v.ok+'ok/'+v.fail+'fail · avg '+v.avg_ms+'ms</div>'+
-      '<div class="bar"><i style="width:'+pct+'%"></i></div></div>';
-  }).join('');
+function showWorld(name){
+  document.querySelectorAll('.world').forEach(w=>w.classList.toggle('active',w.dataset.world===name));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.world===name));
+  document.getElementById('worldTitle').textContent=titles[name]||name;
+  try{localStorage.setItem('rq_world',name)}catch(_){}
 }
 
-function renderAlerts(alerts){
-  const list=alerts&&alerts.alerts||[];
-  const unseen=alerts&&alerts.unseen||0;
-  const badge=document.getElementById('alertBadge');
-  if(unseen>0){badge.hidden=false;badge.textContent=String(unseen);badge.classList.add('hot')}
-  else {badge.hidden=true;badge.classList.remove('hot')}
-  const el=document.getElementById('alertList');
-  if(!list.length){el.innerHTML='No alerts';return}
-  el.innerHTML=list.map(a=>'<div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border)">'+
-    '<span class="dot '+(a.severity==='critical'?'bad':a.severity==='warn'?'warn':'ok')+'"></span> '+
-    '<b>'+esc(a.title)+'</b> <span class="muted mono">'+esc(a.source)+'</span>'+
-    '<div class="muted">'+esc(a.body||'')+'</div></div>').join('');
-}
+document.getElementById('tabs').onclick=e=>{
+  const t=e.target.closest('.tab'); if(!t) return;
+  showWorld(t.dataset.world);
+};
 
-function renderChatHistory(messages){
+function renderChat(messages,append){
   const log=document.getElementById('chatLog');
-  if(!messages||!messages.length){log.innerHTML='<div class="muted">No history yet.</div>';return}
-  log.innerHTML=messages.map(m=>{
+  const html=(messages||[]).map(m=>{
     const cls=m.role==='user'?'user':'bot';
     const tools=(m.tools||[]).map(t=>'<span class="chip">'+esc(t)+'</span>').join('');
-    const meta=[m.trust!=null?'Trust '+m.trust:'', m.latency_ms!=null?m.latency_ms+'ms':''].filter(Boolean).join(' · ');
-    return '<div class="bubble '+cls+'">'+esc(m.content)+
-      (tools?'<div class="chips">'+tools+'</div>':'')+
-      (meta?'<div class="muted mono" style="margin-top:4px">'+esc(meta)+'</div>':'')+
-      '</div>';
+    const meta=[m.trust!=null?'Trust '+m.trust:'',m.latency_ms!=null?m.latency_ms+'ms':''].filter(Boolean).join(' · ');
+    return '<div class="bubble '+cls+'">'+esc(m.content)+(tools?'<div class="chips">'+tools+'</div>':'')+(meta?'<div class="muted mono" style="margin-top:4px">'+esc(meta)+'</div>':'')+'</div>';
   }).join('');
-  log.scrollTop=log.scrollHeight;
+  if(append) log.innerHTML=html+log.innerHTML;
+  else { log.innerHTML=html||'<div class="muted">No messages yet.</div>'; log.scrollTop=log.scrollHeight; }
 }
 
-function appendChat(role,content,tools,trust,ms){
+function appendBubble(role,content,tools,trust,ms){
   const log=document.getElementById('chatLog');
-  const cls=role==='user'?'user':'bot';
-  const toolHtml=(tools||[]).map(t=>'<span class="chip">'+esc(t)+'</span>').join('');
-  const meta=[trust!=null?'Trust '+trust:'', ms!=null?ms+'ms':''].filter(Boolean).join(' · ');
-  log.innerHTML+=('<div class="bubble '+cls+'">'+esc(content)+
-    (toolHtml?'<div class="chips">'+toolHtml+'</div>':'')+
-    (meta?'<div class="muted mono" style="margin-top:4px">'+esc(meta)+'</div>':'')+'</div>');
+  const toolsH=(tools||[]).map(t=>'<span class="chip">'+esc(t)+'</span>').join('');
+  const meta=[trust!=null?'Trust '+trust:'',ms!=null?ms+'ms':''].filter(Boolean).join(' · ');
+  log.innerHTML+='<div class="bubble '+(role==='user'?'user':'bot')+'">'+esc(content)+(toolsH?'<div class="chips">'+toolsH+'</div>':'')+(meta?'<div class="muted mono" style="margin-top:4px">'+esc(meta)+'</div>':'')+'</div>';
   log.scrollTop=log.scrollHeight;
 }
 
-function render(data){
-  const health=data.health||{}; const checks=health.checks||[];
-  document.getElementById('healthRow').innerHTML=checks.length
-    ?checks.map(c=>'<span class="pill">'+dot(!!c.ok)+esc(c.name)+' <span class="muted">'+esc(c.detail||'')+'</span></span>').join('')
-    :'<span class="pill">'+dot(!!health.ok)+' Health</span>';
-  const q=data.queue||{};
-  document.getElementById('queueStats').innerHTML='queued: <b>'+(q.queued||0)+'</b><br>running: <b>'+(q.running||0)+'</b><br>done: <b>'+(q.done||0)+'</b>';
-  const mem=data.mem||{};
-  document.getElementById('memStats').innerHTML='recent: <b>'+(mem.count||(mem.memories||[]).length)+'</b>';
-  const reports=(data.night&&data.night.reports)||[];
-  document.getElementById('nightStats').innerHTML=reports.length
-    ?('last: <b>'+esc(reports[0].phase)+'</b><br><span class="muted">'+esc(String(reports[0].created_at||'').slice(0,19))+'</span>')
-    :'no reports';
-  const jobs=q.recent||[];
-  document.getElementById('jobsBody').innerHTML=jobs.length
-    ?jobs.map(j=>'<tr><td class="mono">#'+esc(j.id)+'</td><td>'+esc(j.status)+'</td><td>'+esc(String(j.prompt||'').slice(0,80))+'</td><td class="muted mono">'+esc(String(j.created_at||'').slice(0,19))+'</td></tr>').join('')
-    :'<tr><td colspan="4" class="muted">No jobs</td></tr>';
-  const mems=mem.memories||[];
-  document.getElementById('memList').innerHTML=mems.length
-    ?mems.map(m=>'<div style="margin-bottom:8px"><div>'+esc(m.preview)+'</div><div class="muted mono">'+esc(String(m.created_at||'').slice(0,19))+'</div></div>').join('')
-    :'No memories';
-
-  const cron=data.cron||{}; const cj=cron.jobs||[]; const cb=document.getElementById('cronBody');
-  if(cron.error) cb.innerHTML='<tr><td colspan="6" class="muted">'+esc(cron.error)+'</td></tr>';
-  else if(!cj.length) cb.innerHTML='<tr><td colspan="6" class="muted">No cron jobs</td></tr>';
-  else cb.innerHTML=cj.map(j=>{
-    const next=j.nextExecution?String(j.nextExecution).replace('T',' ').slice(0,16):'—';
-    const st=j.health==='ok'?'ok':(j.health==='fail'||j.health==='warn'?'bad':'');
-    return '<tr><td><span class="dot '+st+'"></span> '+(j.enabled?'ON':'OFF')+'</td>'+
-      '<td class="mono">#'+esc(j.id)+'</td><td>'+esc(j.title)+'</td>'+
-      '<td class="mono">'+esc(j.lastStatus==null?'—':j.lastStatus)+'</td>'+
-      '<td class="mono muted">'+esc(next)+'</td><td class="btn-row">'+
-      (j.enabled?'<button data-cron="disable" data-id="'+esc(j.id)+'">Disable</button>':'<button data-cron="enable" data-id="'+esc(j.id)+'">Enable</button>')+
-      '<button data-cron="delete" data-id="'+esc(j.id)+'" class="danger">Delete</button></td></tr>';
-  }).join('');
-
-  renderUsage(data.usage);
-  renderAlerts(data.alerts);
-  const sys=data.system||{};
-  document.getElementById('meta').textContent=(sys.name||'Radiant Queen')+' · '+(sys.hull||'Hull B');
-  document.getElementById('ts').textContent=data.ts||'';
-
-  // Phase 5 shadow + brain
-  const sh = data.shadow || {};
-  const st = sh.tasks || [];
-  const sl = document.getElementById('shadowList');
-  if (sl) {
-    if (!st.length) sl.innerHTML = 'No pending shadow tasks.';
-    else sl.innerHTML = st.map(t => '<div style="margin-bottom:8px;border-bottom:1px solid var(--border);padding-bottom:6px">'+
-      '<span class="mono">'+esc(String(t.id).slice(0,8))+'</span> · '+esc(t.raw_text)+
-      ' <button data-sh="done" data-id="'+esc(t.id)+'">Done</button> '+
-      '<button data-sh="del" data-id="'+esc(t.id)+'" class="danger">Del</button></div>').join('');
-  }
-  const br = data.brain || {};
-  const bi = br.items || [];
-  const bl = document.getElementById('brainList');
-  if (bl) {
-    if (!bi.length) bl.innerHTML = 'Second Brain empty.';
-    else bl.innerHTML = bi.map(x => {
-      const val = x.sensitivity==='secret' ? '<span class="reveal" data-full="***">***</span>' : esc(String(x.value).slice(0,80));
-      return '<div style="margin-bottom:8px"><b>'+esc(x.key_display)+'</b> = '+val+
-        ' <button data-br="forget" data-key="'+esc(x.key_display)+'" class="danger">Forget</button></div>';
-    }).join('');
-  }
-
+function renderBrain(items){
+  const el=document.getElementById('brainList');
+  if(!items||!items.length){el.innerHTML='Empty.';return}
+  el.innerHTML=items.map(x=>'<div style="padding:8px 0;border-bottom:1px solid var(--border)">'+
+    '<b>'+esc(x.key_display)+'</b> = <span class="mono">'+esc(x.value)+'</span> '+
+    (x.masked||x.sensitivity==='secret'?'<button class="reveal-btn" data-reveal="'+esc(x.key_display)+'">Reveal</button>':'')+
+    ' <button class="danger reveal-btn" data-forget="'+esc(x.key_display)+'">Forget</button></div>').join('');
 }
 
-async function load(){
+function renderShadow(tasks){
+  const el=document.getElementById('shadowList');
+  if(!tasks||!tasks.length){el.innerHTML='No pending tasks.';return}
+  el.innerHTML=tasks.map(t=>'<div style="padding:8px 0;border-bottom:1px solid var(--border)">'+
+    '<span class="mono">'+esc(String(t.id).slice(0,8))+'</span> · '+esc(t.raw_text)+
+    ' <button data-sh="done" data-id="'+esc(t.id)+'">Done</button></div>').join('');
+}
+
+function renderJobs(jobs){
+  const el=document.getElementById('jobsList');
+  if(!jobs||!jobs.length){el.textContent='No jobs yet.';return}
+  el.innerHTML=jobs.map(j=>'#'+esc(String(j.id).slice(0,8))+' · '+esc(j.type)+' · '+esc(j.status)+' · '+esc(String(j.created_at||'').slice(0,19))).join('<br>');
+}
+
+function renderEvents(events){
+  const el=document.getElementById('eventsList');
+  if(!events||!events.length){el.textContent='No events.';return}
+  el.innerHTML=events.map(e=>'<div style="margin-bottom:6px"><span class="mono">'+esc(String(e.created_at||'').slice(0,19))+'</span> · <b>'+esc(e.type)+'</b></div>').join('');
+}
+
+function renderCron(cron){
+  const cb=document.getElementById('cronBody');
+  const jobs=(cron&&cron.jobs)||[];
+  if(cron&&cron.error){cb.innerHTML='<tr><td colspan="4">'+esc(cron.error)+'</td></tr>';return}
+  if(!jobs.length){cb.innerHTML='<tr><td colspan="4" class="muted">No jobs</td></tr>';return}
+  cb.innerHTML=jobs.map(j=>{
+    const st=j.health==='ok'?'ok':(j.health==='fail'||j.health==='warn'?'bad':'');
+    return '<tr><td><span class="dot '+st+'"></span></td><td>'+esc(j.title)+'<div class="mono muted">#'+esc(j.id)+'</div></td><td class="mono">'+esc(j.lastStatus==null?'—':j.lastStatus)+'</td><td>'+
+      (j.enabled?'<button data-cron="disable" data-id="'+esc(j.id)+'">Off</button>':'<button data-cron="enable" data-id="'+esc(j.id)+'">On</button>')+
+      '</td></tr>';
+  }).join('');
+}
+
+function renderHealth(health){
+  const checks=(health&&health.checks)||[];
+  document.getElementById('healthRow').innerHTML=checks.length
+    ?checks.map(c=>'<span class="pill"><span class="dot '+(c.ok?'ok':'bad')+'"></span>'+esc(c.name)+'</span>').join('')
+    :'—';
+}
+
+async function loadChat(){
+  const h=await api('chat_pro_history&limit=50'.split('&')[0]==='chat_pro_history'? 'chat_pro_history' : 'chat_pro_history');
+  // fix: use proper action
+}
+async function loadChatReal(){
+  const h=await api('chat_pro_history');
+  const msgs=h.messages||[];
+  chatBefore=msgs.length?msgs[0].created_at:null;
+  renderChat(msgs,false);
+}
+
+async function loadOverview(){
   document.getElementById('liveBadge').textContent='…';
   const data=await api('overview');
-  render(data);
+  renderHealth(data.health);
+  renderShadow((data.shadow&&data.shadow.tasks)||[]);
+  renderCron(data.cron);
+  document.getElementById('meta').textContent=(data.system&&data.system.name)||'Queen OS';
   document.getElementById('liveBadge').textContent='LIVE';
-  try{
-    const h=await api('chat_history');
-    if(h.messages) renderChatHistory(h.messages);
-  }catch(_){}
+  return data;
 }
 
-function showApp(){gate.hidden=true;app.hidden=false}
+async function loadBrain(q){
+  if(q){
+    const r=await api('brain_pro_search','POST',{q});
+    renderBrain(r.items||[]);
+  } else {
+    const r=await api('brain_pro');
+    renderBrain(r.items||[]);
+  }
+}
+
+async function loadFortress(){
+  try{
+    const j=await api('jobs');
+    renderJobs(j.jobs||[]);
+  }catch(e){document.getElementById('jobsList').textContent=e.message}
+  try{
+    const ev=await api('events');
+    renderEvents(ev.events||[]);
+  }catch(e){document.getElementById('eventsList').textContent=e.message}
+}
+
+async function boot(){
+  await loadOverview();
+  await loadChatReal();
+  await loadBrain();
+  await loadFortress();
+}
 
 document.getElementById('unlock').onclick=async()=>{
-  err.textContent='';
+  const err=document.getElementById('err'); err.textContent='';
   const s=document.getElementById('secret').value.trim();
-  const remember=document.getElementById('remember').checked;
   if(!s){err.textContent='Enter DASH_SECRET';return}
   const btn=document.getElementById('unlock');
-  btn.disabled=true;btn.innerHTML='<span class="spin"></span>Unlocking…';
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span>…';
   try{
     setSecret(s);
-    if(remember){
-      const r=await fetch('/api/dash?action=session_login',{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({secret:s})
-      }).then(x=>x.json());
+    if(document.getElementById('remember').checked){
+      const r=await fetch('/api/dash?action=session_login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:s})}).then(x=>x.json());
       if(r.ok&&r.token) setToken(r.token,true);
     }
-    await load();
-    showApp();
-  }catch(e){
-    clearAuth();
-    err.textContent=e.message||String(e);
-  }finally{
-    btn.disabled=false;btn.textContent='Unlock';
-  }
+    await boot();
+    document.getElementById('gate').style.display='none';
+    document.getElementById('app').classList.add('show');
+    const w=localStorage.getItem('rq_world')||'chat';
+    showWorld(w);
+  }catch(e){clearAuth();err.textContent=e.message||String(e)}
+  finally{btn.disabled=false;btn.textContent='Enter Platform'}
 };
 
-async function runAction(action,btn,body){
-  if(btn){btn.disabled=true;const prev=btn.innerHTML;btn.dataset.prev=prev;btn.innerHTML='<span class="spin"></span>…'}
-  try{
-    await api(action,'POST',body||{});
-    toast(action+' · ok');
-    await load();
-  }catch(e){toast(e.message||String(e));alert(e.message||String(e))}
-  finally{if(btn){btn.disabled=false;btn.innerHTML=btn.dataset.prev||btn.textContent}}
-}
-
-
-document.getElementById('btnShadowMorning').onclick=e=>runAction('shadow_morning',e.target);
-document.getElementById('shadowForm').onsubmit=async e=>{
-  e.preventDefault();
-  const input=document.getElementById('shadowInput');
-  const text=input.value.trim(); if(!text) return;
-  try{ await api('shadow_add','POST',{text}); input.value=''; toast('Shadow saved'); await load(); }
-  catch(err){toast(err.message)}
-};
-document.getElementById('shadowList').addEventListener('click',async ev=>{
-  const btn=ev.target.closest('button[data-sh]'); if(!btn) return;
-  const id=btn.getAttribute('data-id');
-  const op=btn.getAttribute('data-sh');
-  try{
-    await api(op==='done'?'shadow_done':'shadow_delete','POST',{id});
-    toast(op+' ok'); await load();
-  }catch(err){toast(err.message)}
-});
-document.getElementById('brainForm').onsubmit=async e=>{
-  e.preventDefault();
-  const key=document.getElementById('brainKey').value.trim();
-  const value=document.getElementById('brainVal').value.trim();
-  if(!key||!value) return;
-  try{ await api('brain_remember','POST',{key,value}); toast('Remembered'); document.getElementById('brainVal').value=''; await load(); }
-  catch(err){toast(err.message)}
-};
-document.getElementById('brainSearchForm').onsubmit=async e=>{
-  e.preventDefault();
-  const q=document.getElementById('brainSearch').value.trim();
-  if(!q) return;
-  try{
-    const r=await api('brain_recall','POST',{q});
-    const el=document.getElementById('brainAnswer');
-    if(!r.item) el.textContent="I don't have that in Second Brain yet.";
-    else el.textContent=r.item.key_display+': '+r.item.value;
-  }catch(err){toast(err.message)}
-};
-document.getElementById('brainList').addEventListener('click',async ev=>{
-  const btn=ev.target.closest('button[data-br]'); if(!btn) return;
-  const key=btn.getAttribute('data-key');
-  try{ await api('brain_forget','POST',{key}); toast('Forgot'); await load(); }
-  catch(err){toast(err.message)}
-});
-
-document.getElementById('btnGodHeal').onclick=e=>runAction('god_heal',e.target);
-document.getElementById('btnNight').onclick=e=>runAction('night_run',e.target);
-document.getElementById('btnWorker').onclick=e=>runAction('think_worker',e.target);
-document.getElementById('btnVoiceOn').onclick=e=>runAction('voice_on',e.target);
-document.getElementById('btnVoiceOff').onclick=e=>runAction('voice_off',e.target);
-document.getElementById('btnCronHeal').onclick=e=>runAction('cron_heal',e.target);
-document.getElementById('btnCronRefresh').onclick=async e=>{e.target.disabled=true;try{await load();toast('Crons refreshed')}catch(err){toast(err.message)}finally{e.target.disabled=false}};
-document.getElementById('refresh').onclick=()=>load().catch(e=>toast(e.message));
-document.getElementById('logout').onclick=async()=>{
-  try{await api('session_logout','POST',{})}catch(_){}
-  clearAuth();location.reload();
-};
-document.getElementById('btnBell').onclick=()=>document.getElementById('alertPanel').classList.toggle('open');
-document.getElementById('btnAlertsSeen').onclick=e=>runAction('alerts_seen',e.target);
-
-document.getElementById('cronBody').addEventListener('click',async ev=>{
-  const btn=ev.target.closest('button[data-cron]'); if(!btn||btn.disabled) return;
-  const op=btn.getAttribute('data-cron'); const id=btn.getAttribute('data-id');
-  if(op==='delete'&&!confirm('Delete cron #'+id+'?')) return;
-  const action=op==='enable'?'cron_enable':op==='disable'?'cron_disable':'cron_delete';
-  btn.disabled=true;const prev=btn.innerHTML;btn.innerHTML='<span class="spin"></span>…';
-  try{
-    let url=apiUrl(action)+'&id='+encodeURIComponent(id);
-    const res=await fetch(url,{method:'POST',headers:authHeaders(),body:JSON.stringify({id:id,jobId:id})});
-    const data=await res.json().catch(()=>({}));
-    if(!res.ok||data.ok===false){alert(data.error||('HTTP '+res.status));throw new Error(data.error||'fail')}
-    toast(op+' #'+id+' · ok'); await load();
-  }catch(e){toast(e.message);btn.disabled=false;btn.innerHTML=prev}
-});
+document.getElementById('btnLock').onclick=async()=>{try{await api('session_logout','POST',{})}catch(_){}
+  clearAuth();location.reload()};
+document.getElementById('btnRefresh').onclick=()=>boot().then(()=>toast('Refreshed')).catch(e=>toast(e.message));
 
 document.getElementById('chatForm').onsubmit=async e=>{
   e.preventDefault();
   const input=document.getElementById('chatInput');
   const text=input.value.trim(); if(!text) return;
   input.value='';
-  appendChat('user',text);
+  appendBubble('user',text);
   try{
-    const r=await api('chat','POST',{message:text});
-    appendChat('bot',r.text||'',r.tools||[],r.trust,r.latency_ms);
-  }catch(err){appendChat('bot','Error: '+(err.message||String(err)))}
+    const r=await api('chat_pro','POST',{message:text});
+    appendBubble('bot',r.text||'',r.tools,r.trust,r.latency_ms);
+  }catch(err){appendBubble('bot','Error: '+err.message)}
+};
+document.getElementById('btnLoadMore').onclick=async()=>{
+  try{
+    let url=apiUrl('chat_pro_history')+'&limit=50';
+    if(chatBefore) url+='&before='+encodeURIComponent(chatBefore);
+    const r=await fetch(url,{headers:authHeaders()}).then(x=>x.json());
+    if(!r.ok) throw new Error(r.error||'fail');
+    const msgs=r.messages||[];
+    if(msgs.length){chatBefore=msgs[0].created_at;renderChat(msgs,true)}
+    else toast('No older messages');
+  }catch(e){toast(e.message)}
+};
+document.getElementById('btnClearChat').onclick=async()=>{
+  if(!confirm('Clear platform chat history?')) return;
+  try{await api('chat_pro_clear','POST',{});await loadChatReal();toast('Cleared')}catch(e){toast(e.message)}
 };
 
-document.getElementById('btnMic').onclick=()=>{
-  const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){toast('Speech not supported on this browser');return}
-  const rec=new SR(); rec.lang='en-US'; rec.interimResults=false;
-  rec.onresult=ev=>{
-    const t=ev.results[0][0].transcript;
-    const input=document.getElementById('chatInput');
-    input.value=(input.value+' '+t).trim();
-  };
-  rec.onerror=()=>toast('Mic error');
-  rec.start();
-  toast('Listening…');
+document.getElementById('brainSearch').oninput=e=>{
+  const q=e.target.value.trim();
+  clearTimeout(window.__brT);
+  window.__brT=setTimeout(()=>loadBrain(q).catch(err=>toast(err.message)),300);
+};
+document.getElementById('brainAdd').onsubmit=async e=>{
+  e.preventDefault();
+  const key=document.getElementById('brainKey').value.trim();
+  const value=document.getElementById('brainVal').value.trim();
+  if(!key||!value) return;
+  try{await api('brain_remember','POST',{key,value});document.getElementById('brainVal').value='';await loadBrain();toast('Saved')}catch(err){toast(err.message)}
+};
+document.getElementById('brainList').onclick=async e=>{
+  const rev=e.target.closest('[data-reveal]');
+  const forg=e.target.closest('[data-forget]');
+  if(rev){
+    try{
+      const r=await api('brain_reveal','POST',{key:rev.getAttribute('data-reveal')});
+      if(r.item) alert(r.item.key_display+':\n'+r.item.value);
+    }catch(err){toast(err.message)}
+  }
+  if(forg){
+    try{await api('brain_forget','POST',{key:forg.getAttribute('data-forget')});await loadBrain();toast('Forgot')}catch(err){toast(err.message)}
+  }
 };
 
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.register('/sw.js').catch(()=>{});
-}
+document.getElementById('shadowForm').onsubmit=async e=>{
+  e.preventDefault();
+  const t=document.getElementById('shadowInput').value.trim(); if(!t) return;
+  try{await api('shadow_add','POST',{text:t});document.getElementById('shadowInput').value='';await loadOverview();toast('Shadow saved')}catch(err){toast(err.message)}
+};
+document.getElementById('btnShadowMorning').onclick=async e=>{
+  e.target.disabled=true;
+  try{await api('shadow_morning','POST',{});toast('Morning report sent');await loadOverview()}catch(err){toast(err.message)}
+  finally{e.target.disabled=false}
+};
+document.getElementById('shadowList').onclick=async e=>{
+  const b=e.target.closest('[data-sh]'); if(!b) return;
+  try{await api('shadow_done','POST',{id:b.getAttribute('data-id')});await loadOverview()}catch(err){toast(err.message)}
+};
+
+document.getElementById('btnTestJob').onclick=async()=>{
+  try{const r=await api('job_enqueue','POST',{type:'test_ping',input:{ts:Date.now()}});toast('Job '+String(r.job.id).slice(0,8));await loadFortress()}catch(e){toast(e.message)}
+};
+document.getElementById('btnEvents').onclick=()=>loadFortress().then(()=>toast('Activity refreshed'));
+
+document.getElementById('btnGodHeal').onclick=async e=>{e.target.disabled=true;try{await api('god_heal','POST',{});toast('Heal ok')}catch(err){toast(err.message)}finally{e.target.disabled=false}};
+document.getElementById('btnNight').onclick=async e=>{e.target.disabled=true;try{await api('night_run','POST',{});toast('Night ok')}catch(err){toast(err.message)}finally{e.target.disabled=false}};
+document.getElementById('btnWorker').onclick=async e=>{e.target.disabled=true;try{await api('think_worker','POST',{});toast('Worker ok')}catch(err){toast(err.message)}finally{e.target.disabled=false}};
+document.getElementById('btnCronHeal').onclick=async()=>{try{await api('cron_heal','POST',{});toast('Cron heal');await loadOverview()}catch(e){toast(e.message)}};
+document.getElementById('btnCronRefresh').onclick=()=>loadOverview().then(()=>toast('Cron refreshed'));
+document.getElementById('cronBody').onclick=async e=>{
+  const b=e.target.closest('[data-cron]'); if(!b) return;
+  const op=b.getAttribute('data-cron'); const id=b.getAttribute('data-id');
+  try{
+    await fetch(apiUrl(op==='enable'?'cron_enable':'cron_disable')+'&id='+encodeURIComponent(id),{method:'POST',headers:authHeaders(),body:JSON.stringify({id})}).then(async r=>{const d=await r.json();if(!r.ok||d.ok===false)throw new Error(d.error||'fail')});
+    await loadOverview();
+  }catch(err){toast(err.message)}
+};
+
+if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
 
 (async()=>{
   if(getToken()||getSecret()){
-    try{await load();showApp()}catch(_){clearAuth()}
+    try{
+      await boot();
+      document.getElementById('gate').style.display='none';
+      document.getElementById('app').classList.add('show');
+      showWorld(localStorage.getItem('rq_world')||'chat');
+    }catch(_){clearAuth()}
   }
 })();
-setInterval(()=>{if(!app.hidden)load().catch(()=>{})},45000);
+setInterval(()=>{if(document.getElementById('app').classList.contains('show')) loadOverview().catch(()=>{})},60000);
 </script>
 </body>
 </html>
