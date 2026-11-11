@@ -1,0 +1,40 @@
+plugins {
+  id 'com.android.application'
+}
+
+def queenUrl = System.getenv("QUEEN_PWA_URL") ?: project.findProperty("QUEEN_PWA_URL") ?: "https://example.vercel.app/dashboard.html"
+
+android {
+  namespace 'com.queenos.app'
+  compileSdk 34
+
+  defaultConfig {
+    applicationId "com.queenos.app"
+    minSdk 24
+    targetSdk 34
+    versionCode Integer.parseInt(System.getenv("VERSION_CODE") ?: "1")
+    versionName System.getenv("VERSION_NAME") ?: "1.0.0"
+    buildConfigField "String", "PWA_URL", "\"${queenUrl}\""
+  }
+
+  buildTypes {
+    release {
+      minifyEnabled false
+    }
+    debug {
+      applicationIdSuffix ".debug"
+    }
+  }
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
+  }
+  buildFeatures {
+    buildConfig true
+  }
+}
+
+dependencies {
+  implementation 'androidx.appcompat:appcompat:1.6.1'
+  implementation 'com.google.android.material:material:1.11.0'
+}
