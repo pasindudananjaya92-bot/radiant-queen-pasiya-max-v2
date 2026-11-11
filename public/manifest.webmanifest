@@ -1,18 +1,10 @@
 {
-  "name": "Radiant Queen OS",
+  "name": "Queen OS 50x",
   "short_name": "Queen OS",
-  "description": "Radiant Queen Command Center",
+  "description": "Private Command Platform",
   "start_url": "/dashboard.html",
   "display": "standalone",
   "background_color": "#070a12",
-  "theme_color": "#0b0f1a",
-  "lang": "en",
-  "icons": [
-    {
-      "src": "/icon-queen.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    }
-  ]
+  "theme_color": "#070a12",
+  "icons": [{ "src": "/icon-queen.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
 }
