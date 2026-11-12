@@ -596,16 +596,17 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, job: 'shadowmorning', empty: !!r.empty, task_count: r.task_count || 0 });
     }
 
-    if (job === 'morningbrief' || job === 'morning_brief' || job === 'nightbrief') {
-      const { runMorningBrief } = await import('../lib/nightOperator.js');
-      // cronMode: text first, short TTS budget — always 200 if text delivered (cron-job.org green)
-      const r = await runMorningBrief({ cron: true, voiceTimeoutMs: 3500 });
+    if (job === 'morningbrief' || job === 'morning_brief' || job === 'nightbrief' || job === 'morningpack' || job === 'morning_pack') {
+      // Phase 7 — Merged Morning Pack (Shadow + Health + Bank + Weather)
+      const { runMergedMorning } = await import('../lib/morningPack.js');
+      const r = await runMergedMorning({ sendTelegram: true, voice: true });
       return res.status(200).json({
         ok: true,
-        job: 'morningbrief',
-        text: !!(r && r.ok),
-        voice: !!(r && r.voiceResult && r.voiceResult.ok),
-        voice_error: r?.voiceResult?.error || null,
+        job: 'morningpack',
+        text: true,
+        voice: !!(r.voice && r.voice.ok),
+        voice_error: r.voice && r.voice.error ? r.voice.error : null,
+        send_ok: !!(r.send && r.send.ok),
       });
     }
 
