@@ -186,8 +186,22 @@
       </section>
 
       <!-- MAIL placeholder -->
-      <section class="world soon" data-world="mail">
-        <div class="card"><h2>Mail + Voice</h2><p class="muted">P6E — Resend + TTS jobs. Shell ready.</p></div>
+      <section class="world" data-world="mail">
+        <div class="card">
+          <h2>Queen Mail</h2>
+          <p class="muted" style="margin-top:0">Resend API · set RESEND_API_KEY + FOUNDER_EMAIL</p>
+          <div id="mailStatus" class="muted" style="margin-bottom:10px">—</div>
+          <input class="field" id="mailSubject" placeholder="Subject" value="Queen OS Report" />
+          <textarea id="mailBody" class="field" rows="4" placeholder="Email body..." style="width:100%;min-height:100px;padding:11px;border-radius:12px;border:1px solid var(--border);background:#0a0e18;color:var(--text)"></textarea>
+          <button class="primary" id="btnMailSend" style="width:100%;margin-top:8px">📧 Send Email</button>
+        </div>
+        <div class="card">
+          <h2>Queen Voice</h2>
+          <p class="muted" style="margin-top:0">TTS via existing ttsManager (Google/Edge fallback)</p>
+          <textarea id="voiceText" class="field" rows="3" placeholder="Text to speak..." style="width:100%;min-height:80px;padding:11px;border-radius:12px;border:1px solid var(--border);background:#0a0e18;color:var(--text)"></textarea>
+          <button class="primary" id="btnVoiceSpeak" style="width:100%;margin-top:8px">🔊 Generate Voice</button>
+          <div id="voiceResult" class="muted" style="margin-top:10px"></div>
+        </div>
       </section>
 
       <!-- FORTRESS -->
@@ -371,19 +385,42 @@ function renderCron(cron){
 
 
 
+
+async function loadMailStatus(){
+  try{
+    const r=await api('mail_status');
+    const el=document.getElementById('mailStatus');
+    if(!el) return;
+    el.innerHTML=r.configured
+      ?('Resend: <b style="color:var(--good)">ready</b> · to: '+esc(r.to||'(set FOUNDER_EMAIL)'))
+      :('Resend: <b style="color:var(--warn)">not configured</b> — add RESEND_API_KEY');
+  }catch(e){
+    const el=document.getElementById('mailStatus');
+    if(el) el.textContent=e.message;
+  }
+}
+
 function renderDrive(files){
   const el=document.getElementById('driveList');
   if(!el) return;
-  if(!files||!files.length){el.textContent='Drive empty.';return}
-  el.innerHTML=files.map(f=>'<div style="padding:8px 0;border-bottom:1px solid var(--border)">'+
-    '<b>'+esc(f.name)+'</b> '+
-    (f.size!=null?'<span class="muted mono">'+esc(String(f.size))+' B</span> ':'')+
-    '<button data-drive-open="'+esc(f.name)+'" style="padding:4px 8px;font-size:.72rem">Open</button> '+
-    '<button class="danger" data-drive-del="'+esc(f.name)+'" style="padding:4px 8px;font-size:.72rem">Del</button></div>').join('');
+  if(!files||!files.length){el.innerHTML='<span class="muted">No files in vault bucket yet. Upload via Telegram: caption <span class="mono">vault upload</span></span>';return}
+  el.innerHTML='<div class="muted" style="margin-bottom:8px">'+files.length+' file(s)</div>'+files.map(f=>{
+    const path=f.path||f.name;
+    const size=f.size!=null?(' · '+Math.round(Number(f.size)/1024)+' KB'):'';
+    return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">'+
+    '<b>'+esc(path)+'</b><span class="muted mono">'+esc(size)+'</span><br>'+
+    '<button data-drive-open="'+esc(path)+'" style="padding:4px 8px;font-size:.72rem;margin-top:4px">Open</button> '+
+    '<button class="danger" data-drive-del="'+esc(path)+'" style="padding:4px 8px;font-size:.72rem">Del</button></div>';
+  }).join('');
 }
 async function loadDrive(){
-  const r=await api('drive_list');
-  renderDrive(r.files||[]);
+  try{
+    const r=await api('drive_list');
+    const files=r.files||[];
+    renderDrive(files);
+    if(r.error) toast(r.error);
+    else if(!files.length) toast('Drive empty (bucket: '+(r.bucket||'vault')+')');
+  }catch(e){toast('Drive: '+e.message);renderDrive([]);}
 }
 
 function renderBank(summary, txs){
@@ -491,6 +528,7 @@ async function boot(){
   try{await loadBank()}catch(_){}
   try{await loadApk()}catch(_){}
   try{await loadDrive()}catch(_){}
+  try{await loadMailStatus()}catch(_){}
 }
 
 document.getElementById('unlock').onclick=async()=>{
@@ -630,6 +668,38 @@ document.getElementById('bankList').onclick=async e=>{
   try{await api('bank_delete','POST',{id:b.getAttribute('data-bank-del')});await loadBank()}catch(err){toast(err.message)}
 };
 document.getElementById('btnApkRefresh').onclick=()=>loadApk().then(()=>toast('APK status refreshed'));
+
+
+document.getElementById('btnMailSend')&&(document.getElementById('btnMailSend').onclick=async()=>{
+  const btn=document.getElementById('btnMailSend');
+  btn.disabled=true;btn.textContent='Sending…';
+  try{
+    const subject=document.getElementById('mailSubject').value.trim();
+    const text=document.getElementById('mailBody').value.trim();
+    const r=await api('mail_send','POST',{subject,text});
+    if(r.ok) toast('Email sent → '+(r.to||''));
+    else toast(r.error||'send failed');
+  }catch(e){toast(e.message)}
+  finally{btn.disabled=false;btn.textContent='📧 Send Email'}
+});
+document.getElementById('btnVoiceSpeak')&&(document.getElementById('btnVoiceSpeak').onclick=async()=>{
+  const btn=document.getElementById('btnVoiceSpeak');
+  const text=document.getElementById('voiceText').value.trim();
+  if(!text){toast('Enter text');return}
+  btn.disabled=true;btn.textContent='Generating…';
+  try{
+    const r=await api('voice_speak','POST',{text});
+    const el=document.getElementById('voiceResult');
+    if(r.ok&&r.url){
+      el.innerHTML='Provider: '+esc(r.provider||'tts')+' · <a href="'+esc(r.url)+'" target="_blank" rel="noopener" style="color:#c4b5fd">Play / Download</a>';
+      toast('Voice ready');
+    } else if(r.ok){
+      el.textContent=r.note||r.preview||'Voice generated';
+      toast('Voice generated');
+    } else toast(r.error||'TTS failed');
+  }catch(e){toast(e.message)}
+  finally{btn.disabled=false;btn.textContent='🔊 Generate Voice'}
+});
 
 if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
 
