@@ -19074,6 +19074,29 @@ bot.command('commands', async (ctx) => {
 
     if (text.startsWith('/')) return;
 
+    // Wave 11A: Mission Control MUST never reach Gemini/AI
+    try {
+      const t0 = String(text || '').trim().replace(/^\//, '');
+      if (/^(swarm|nation|corps|mission|missions)\b/i.test(t0)) {
+        try {
+          const missionRoutes = await import('../lib/missionRoutes.js');
+          const out = await missionRoutes.tryHandle(t0, ctx);
+          await ctx.reply(String(out != null ? out : '❌ Mission Control empty — check SQL + missionControl.js').slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(String(out != null ? out : 'Mission Control empty').replace(/[*_`]/g, '').slice(0, 4000));
+          });
+          return;
+        } catch (me) {
+          await ctx.reply('❌ Mission Control error: ' + (me?.message || me));
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('missionRoutes telegram gate', e?.message || e);
+    }
+
     // Agent-1: NL → EXECUTE tools (founder private). Else Tool Awareness tip.
     try {
       if (ctx.chat?.type === 'private') {
@@ -19081,6 +19104,12 @@ bot.command('commands', async (ctx) => {
         const executed = await tryAgentExecute({ text, ctx });
         if (executed) {
           await ctx.reply(String(executed).slice(0, 4000));
+          return;
+        }
+        // Second fence: if agentExecute returned null but text is mission-family, still block AI
+        const t1 = String(text || '').trim().replace(/^\//, '');
+        if (/^(swarm|nation|corps|mission|missions)\b/i.test(t1)) {
+          await ctx.reply('❌ Mission route miss inside agentExecute. Re-upload lib/missionRoutes.js + lib/agentExecute.js');
           return;
         }
         const { toolAwareReply } = await import('../lib/toolAware.js');
@@ -19092,6 +19121,11 @@ bot.command('commands', async (ctx) => {
       }
     } catch (e) {
       console.error('agentExecute/toolAware', e?.message || e);
+      const t2 = String(text || '').trim();
+      if (/^(swarm|nation|corps|mission|missions)\b/i.test(t2)) {
+        await ctx.reply('❌ agentExecute error for mission cmd: ' + (e?.message || e));
+        return;
+      }
     }
 
     // Anti-link moderation (groups only)
