@@ -174,8 +174,15 @@
       </section>
 
       <!-- DRIVE placeholder -->
-      <section class="world soon" data-world="drive">
-        <div class="card"><h2>Queen Drive</h2><p class="muted">P6D — Vault files + search. Shell ready.</p></div>
+      <section class="world" data-world="drive">
+        <div class="card">
+          <h2>Queen Drive</h2>
+          <p class="muted" style="margin-top:0">Supabase Vault files · same storage as Telegram vault</p>
+          <div class="row" style="margin-bottom:10px">
+            <button class="primary" id="btnDriveRefresh">↻ Refresh</button>
+          </div>
+          <div id="driveList" class="muted">—</div>
+        </div>
       </section>
 
       <!-- MAIL placeholder -->
@@ -363,6 +370,22 @@ function renderCron(cron){
 }
 
 
+
+function renderDrive(files){
+  const el=document.getElementById('driveList');
+  if(!el) return;
+  if(!files||!files.length){el.textContent='Drive empty.';return}
+  el.innerHTML=files.map(f=>'<div style="padding:8px 0;border-bottom:1px solid var(--border)">'+
+    '<b>'+esc(f.name)+'</b> '+
+    (f.size!=null?'<span class="muted mono">'+esc(String(f.size))+' B</span> ':'')+
+    '<button data-drive-open="'+esc(f.name)+'" style="padding:4px 8px;font-size:.72rem">Open</button> '+
+    '<button class="danger" data-drive-del="'+esc(f.name)+'" style="padding:4px 8px;font-size:.72rem">Del</button></div>').join('');
+}
+async function loadDrive(){
+  const r=await api('drive_list');
+  renderDrive(r.files||[]);
+}
+
 function renderBank(summary, txs){
   const total=summary&&summary.total!=null?summary.total:0;
   document.getElementById('bankTotal').textContent='Rs.'+Number(total).toLocaleString();
@@ -467,6 +490,7 @@ async function boot(){
   await loadFortress();
   try{await loadBank()}catch(_){}
   try{await loadApk()}catch(_){}
+  try{await loadDrive()}catch(_){}
 }
 
 document.getElementById('unlock').onclick=async()=>{
