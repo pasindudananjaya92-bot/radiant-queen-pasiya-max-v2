@@ -3,85 +3,64 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-  <title>Queen OS 50x · Fix3</title>
+  <title>Queen OS 50x · v4</title>
   <meta name="theme-color" content="#070a12" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="icon" href="/icon-queen.svg" />
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <style>
-    :root {
-      --bg:#070a12; --panel:rgba(16,22,36,.92); --border:rgba(255,255,255,.08);
-      --text:#e8eefc; --muted:#8b9bb8; --accent:#7c5cff; --accent2:#2dd4bf;
-      --good:#34d399; --bad:#f87171; --warn:#fbbf24;
-      --tab-h:64px; --safe-b:env(safe-area-inset-bottom,0px);
-    }
+    :root{--bg:#070a12;--panel:rgba(16,22,36,.94);--border:rgba(255,255,255,.08);--text:#e8eefc;--muted:#8b9bb8;--accent:#7c5cff;--good:#34d399;--bad:#f87171;--tab-h:64px;--safe:env(safe-area-inset-bottom,0px)}
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-    html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',system-ui,sans-serif}
+    html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,sans-serif}
     body{background:radial-gradient(900px 420px at 50% -10%,rgba(124,92,255,.2),transparent 60%),var(--bg)}
     #gate{max-width:400px;margin:10vh auto;padding:24px;background:var(--panel);border:1px solid var(--border);border-radius:20px}
-    #gate input{width:100%;padding:12px;margin:8px 0;border-radius:12px;border:1px solid var(--border);background:#0a0e18;color:var(--text)}
+    #gate input[type=password]{width:100%;padding:12px;margin:8px 0;border-radius:12px;border:1px solid var(--border);background:#0a0e18;color:var(--text)}
     #gate label{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:.85rem;margin:8px 0}
-    button{border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--text);border-radius:12px;padding:10px 14px;font:600 .84rem 'IBM Plex Sans',sans-serif;cursor:pointer}
+    button{border:1px solid var(--border);background:rgba(255,255,255,.06);color:var(--text);border-radius:12px;padding:10px 14px;font-weight:600;font-size:.84rem;cursor:pointer}
     button.primary{background:linear-gradient(135deg,#6d4dff,#3b82f6);border:none}
-    button.danger{border-color:rgba(248,113,113,.35)}
+    button.danger{border-color:rgba(248,113,113,.4)}
     button:disabled{opacity:.55}
-    #err{color:var(--bad);font-size:.82rem;min-height:1.2em}
+    #err{color:var(--bad);font-size:.82rem;min-height:1.2em;margin-top:8px}
     #app{display:none;height:100%;flex-direction:column}
     #app.show{display:flex}
     .top{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 8px;gap:8px}
     .brand{display:flex;align-items:center;gap:10px}
-    .logo{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;background:linear-gradient(135deg,var(--accent),var(--accent2));font-size:18px}
+    .logo{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;background:linear-gradient(135deg,#7c5cff,#2dd4bf);font-size:18px}
     .top h1{margin:0;font-size:1rem}
     .sub{color:var(--muted);font-size:.72rem}
-    .top-actions{display:flex;gap:6px;align-items:center}
-    .badge{font-size:.65rem;padding:3px 7px;border-radius:99px;background:rgba(124,92,255,.22);color:#c4b5fd;font-weight:600}
-    .main{flex:1;overflow:auto;padding:0 12px calc(var(--tab-h) + var(--safe-b) + 12px)}
-    .world{display:none;animation:fade .2s ease}
+    .main{flex:1;overflow:auto;padding:0 12px calc(var(--tab-h) + var(--safe) + 12px)}
+    .world{display:none}
     .world.active{display:block}
-    @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
     .card{background:var(--panel);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px}
     .card h2{margin:0 0 10px;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
     .row{display:flex;flex-wrap:wrap;gap:8px}
-    .pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:99px;border:1px solid var(--border);font-size:.8rem;background:rgba(255,255,255,.03)}
-    .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
-    .dot.ok{background:var(--good)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
-    .mono{font-family:'IBM Plex Mono',monospace;font-size:.75rem}
+    .field{width:100%;padding:11px;border-radius:12px;border:1px solid var(--border);background:#0a0e18;color:var(--text);margin:0 0 8px}
+    textarea.field{min-height:90px;resize:vertical}
     .muted{color:var(--muted)}
-    .tabs{position:fixed;left:0;right:0;bottom:0;height:calc(var(--tab-h) + var(--safe-b));padding-bottom:var(--safe-b);
-      background:rgba(8,11,20,.94);backdrop-filter:blur(16px);border-top:1px solid var(--border);
-      display:flex;justify-content:space-around;align-items:flex-start;padding-top:6px;z-index:40}
-    .tab{flex:1;background:none;border:none;color:var(--muted);font-size:.62rem;font-weight:600;padding:4px 2px;display:flex;flex-direction:column;align-items:center;gap:2px}
-    .tab .ico{font-size:1.05rem;line-height:1.2}
+    .mono{font-family:ui-monospace,monospace;font-size:.75rem}
+    .tabs{position:fixed;left:0;right:0;bottom:0;height:calc(var(--tab-h) + var(--safe));padding-bottom:var(--safe);background:rgba(8,11,20,.95);border-top:1px solid var(--border);display:flex;justify-content:space-around;align-items:flex-start;padding-top:6px;z-index:40}
+    .tab{flex:1;background:none;border:none;color:var(--muted);font-size:.6rem;font-weight:600;padding:4px 2px;display:flex;flex-direction:column;align-items:center;gap:2px}
     .tab.on{color:#c4b5fd}
-    #chatLog{height:calc(100vh - 220px);min-height:280px;overflow:auto;border:1px solid var(--border);border-radius:14px;padding:10px;background:rgba(0,0,0,.28);margin-bottom:10px}
+    #chatLog{height:calc(100vh - 230px);min-height:240px;overflow:auto;border:1px solid var(--border);border-radius:14px;padding:10px;background:rgba(0,0,0,.28);margin-bottom:10px}
     .bubble{margin:0 0 10px;padding:9px 11px;border-radius:14px;max-width:92%;font-size:.9rem;line-height:1.4;white-space:pre-wrap;word-break:break-word}
     .bubble.user{background:rgba(124,92,255,.22);margin-left:auto}
     .bubble.bot{background:rgba(255,255,255,.05)}
-    .chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
-    .chip{font-size:.68rem;padding:2px 7px;border-radius:99px;background:rgba(45,212,191,.14);color:#5eead4}
     .composer{display:flex;gap:8px;align-items:flex-end}
-    .composer textarea{flex:1;min-height:44px;max-height:140px;resize:vertical;padding:11px;border-radius:14px;border:1px solid var(--border);background:#0a0e18;color:var(--text);font:400 .9rem 'IBM Plex Sans',sans-serif}
-    input.field{width:100%;padding:11px;border-radius:12px;border:1px solid var(--border);background:#0a0e18;color:var(--text);margin:0 0 8px}
-    #toast{position:fixed;left:50%;bottom:calc(var(--tab-h) + 16px + var(--safe-b));transform:translateX(-50%);background:#151c30;border:1px solid var(--border);padding:10px 14px;border-radius:12px;display:none;z-index:50;max-width:92vw;font-size:.86rem}
-    table{width:100%;border-collapse:collapse;font-size:.8rem}
-    th,td{text-align:left;padding:7px 4px;border-bottom:1px solid var(--border);vertical-align:top}
-    th{color:var(--muted);font-size:.68rem;text-transform:uppercase}
+    .composer textarea{flex:1;min-height:44px;max-height:120px;resize:vertical;padding:11px;border-radius:14px;border:1px solid var(--border);background:#0a0e18;color:var(--text)}
+    #toast{position:fixed;left:50%;bottom:calc(var(--tab-h) + 16px + var(--safe));transform:translateX(-50%);background:#151c30;border:1px solid var(--border);padding:10px 14px;border-radius:12px;display:none;z-index:50;max-width:92vw;font-size:.86rem}
     .spin{display:inline-block;width:11px;height:11px;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;margin-right:6px}
     @keyframes sp{to{transform:rotate(360deg)}}
-    .soon{opacity:.75}
-    .reveal-btn{font-size:.72rem;padding:4px 8px}
   </style>
 </head>
 <body>
   <div id="gate">
     <div class="brand" style="margin-bottom:12px">
       <div class="logo">👑</div>
-      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">Private Platform · Drive · Mail · Voice · Fix3</div></div>
+      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">v4 · Drive · Mail · Voice · Telegram parity</div></div>
     </div>
-    <input id="secret" type="password" placeholder="DASH_SECRET" />
+    <input id="secret" type="password" placeholder="DASH_SECRET" autocomplete="current-password" />
     <label><input type="checkbox" id="remember" checked /> Remember me (30 days)</label>
-    <button class="primary" id="unlock" style="width:100%">Enter Platform</button>
+    <button type="button" class="primary" id="unlock" style="width:100%">Enter Platform</button>
     <div id="err"></div>
   </div>
 
@@ -89,41 +68,30 @@
     <div class="top">
       <div class="brand">
         <div class="logo">👑</div>
-        <div>
-          <h1 id="worldTitle">Chat</h1>
-          <div class="sub" id="meta">Queen OS</div>
-        </div>
+        <div><h1 id="worldTitle">Chat</h1><div class="sub" id="meta">Queen OS</div></div>
       </div>
-      <div class="top-actions">
-        <span class="badge" id="liveBadge">LIVE</span>
-        <button id="btnRefresh" style="padding:8px 10px">↻</button>
-        <button id="btnLock" class="danger" style="padding:8px 10px">Lock</button>
+      <div class="row">
+        <button type="button" id="btnRefresh" style="padding:8px 10px">↻</button>
+        <button type="button" id="btnLock" class="danger" style="padding:8px 10px">Lock</button>
       </div>
     </div>
 
     <div class="main">
-      <!-- CHAT -->
       <section class="world active" data-world="chat">
-        <div class="card" style="padding-bottom:10px">
-          <div class="row" style="margin-bottom:8px">
-            <button id="btnLoadMore" style="padding:6px 10px">↑ Older</button>
-            <button id="btnClearChat" class="danger" style="padding:6px 10px">Clear</button>
-          </div>
+        <div class="card">
           <div id="chatLog"></div>
           <form id="chatForm" class="composer">
-            <textarea id="chatInput" rows="2" placeholder="Message… (think … for Evidence Engine)"></textarea>
+            <textarea id="chatInput" rows="2" placeholder="Message… or think …"></textarea>
             <button class="primary" type="submit">Send</button>
           </form>
-          <p class="muted" style="font-size:.72rem;margin:8px 0 0">No 4096 limit in Platform · full history in Supabase</p>
         </div>
       </section>
 
-      <!-- BRAIN -->
       <section class="world" data-world="brain">
         <div class="card">
-          <h2>Second Brain Pro</h2>
-          <input class="field" id="brainSearch" placeholder="Search keys…" />
-          <form id="brainAdd" class="row" style="margin-bottom:10px">
+          <h2>Second Brain</h2>
+          <input class="field" id="brainSearch" placeholder="Search…" />
+          <form id="brainAdd" class="row">
             <input class="field" id="brainKey" placeholder="Key" style="flex:1;margin:0;min-width:100px" />
             <input class="field" id="brainVal" placeholder="Value" style="flex:1;margin:0;min-width:100px" />
             <button class="primary" type="submit">Save</button>
@@ -132,642 +100,389 @@
         </div>
       </section>
 
-      <!-- BANK placeholder -->
       <section class="world" data-world="bank">
         <div class="card">
           <h2>Private Bank</h2>
-          <div style="font-size:1.6rem;font-weight:700;margin-bottom:4px" id="bankTotal">Rs.0</div>
-          <div class="muted" style="font-size:.8rem;margin-bottom:12px" id="bankMeta">Last 30 days</div>
-          <div id="bankChart" style="display:flex;align-items:flex-end;gap:3px;height:80px;margin-bottom:12px"></div>
-          <div class="row" id="bankCats" style="margin-bottom:12px"></div>
+          <div style="font-size:1.5rem;font-weight:700" id="bankTotal">Rs.0</div>
+          <div class="muted" id="bankMeta" style="margin-bottom:10px">—</div>
+          <div id="bankChart" style="display:flex;align-items:flex-end;gap:3px;height:70px;margin-bottom:10px"></div>
         </div>
         <div class="card">
-          <h2>Add expense / bill</h2>
+          <h2>Add expense</h2>
           <form id="bankForm">
-            <input class="field" id="bankAmount" type="number" step="0.01" placeholder="Amount (e.g. 2500)" />
-            <input class="field" id="bankMerchant" placeholder="Merchant (e.g. Keells)" />
-            <input class="field" id="bankNote" placeholder="Note (optional)" />
-            <input class="field" id="bankCategory" placeholder="Category (optional: groceries)" />
-            <button class="primary" type="submit" style="width:100%">Save to Bank + Brain</button>
+            <input class="field" id="bankAmount" type="number" step="0.01" placeholder="Amount" />
+            <input class="field" id="bankMerchant" placeholder="Merchant" />
+            <input class="field" id="bankNote" placeholder="Note" />
+            <button class="primary" type="submit" style="width:100%">Save</button>
           </form>
-          <p class="muted" style="font-size:.72rem;margin:8px 0 0">Also: type bill text like <span class="mono">2500 Keells</span> in note field</p>
         </div>
         <div class="card">
-          <h2>Recent transactions</h2>
+          <h2>Recent</h2>
           <div id="bankList" class="muted">—</div>
         </div>
       </section>
 
-      <!-- SHADOW -->
       <section class="world" data-world="shadow">
         <div class="card">
           <h2>Shadow Army</h2>
-          <div class="row" style="margin-bottom:10px">
-            <button class="primary" id="btnShadowMorning">☀️ Morning Report</button>
-          </div>
-          <form id="shadowForm" class="row" style="margin-bottom:10px">
-            <input class="field" id="shadowInput" placeholder="New shadow task…" style="flex:1;margin:0" />
+          <button type="button" class="primary" id="btnShadowMorning">☀️ Morning Report</button>
+          <form id="shadowForm" class="row" style="margin-top:10px">
+            <input class="field" id="shadowInput" placeholder="New task…" style="flex:1;margin:0" />
             <button type="submit">Add</button>
           </form>
-          <div id="shadowList" class="muted">—</div>
+          <div id="shadowList" class="muted" style="margin-top:10px">—</div>
         </div>
       </section>
 
-      <!-- DRIVE placeholder -->
       <section class="world" data-world="drive">
         <div class="card">
           <h2>Queen Drive</h2>
-          <p class="muted" style="margin-top:0">Supabase Vault files · same storage as Telegram vault</p>
-          <div class="row" style="margin-bottom:10px">
-            <button class="primary" id="btnDriveRefresh">↻ Refresh</button>
-          </div>
-          <div id="driveList" class="muted">—</div>
+          <p class="muted" style="margin-top:0">Bucket: vault · Telegram: <span class="mono">drive list</span></p>
+          <button type="button" class="primary" id="btnDriveRefresh">↻ Refresh files</button>
+          <div id="driveList" class="muted" style="margin-top:12px">—</div>
         </div>
       </section>
 
-      <!-- MAIL placeholder -->
-            <section class="world" data-world="mail">
+      <section class="world" data-world="mail">
         <div class="card">
           <h2>Queen Mail</h2>
-          <p class="muted" style="margin-top:0">Resend API · RESEND_API_KEY + FOUNDER_EMAIL</p>
-          <div id="mailStatus" class="muted" style="margin-bottom:10px">—</div>
+          <p class="muted" style="margin-top:0">Telegram: <span class="mono">mail test</span></p>
+          <div id="mailStatus" class="muted" style="margin-bottom:8px">—</div>
           <input class="field" id="mailSubject" placeholder="Subject" value="Queen OS Report" />
-          <textarea id="mailBody" rows="4" placeholder="Email body..." style="width:100%;min-height:110px;padding:11px;border-radius:12px;border:1px solid var(--border);background:#0a0e18;color:var(--text);margin-bottom:8px"></textarea>
-          <button class="primary" id="btnMailSend" style="width:100%">📧 Send Email</button>
+          <textarea class="field" id="mailBody" placeholder="Email body…"></textarea>
+          <button type="button" class="primary" id="btnMailSend" style="width:100%">📧 Send Email</button>
         </div>
         <div class="card">
           <h2>Queen Voice</h2>
-          <p class="muted" style="margin-top:0">Text-to-speech · Play link after generate</p>
-          <textarea id="voiceText" rows="3" placeholder="Text to speak..." style="width:100%;min-height:90px;padding:11px;border-radius:12px;border:1px solid var(--border);background:#0a0e18;color:var(--text);margin-bottom:8px"></textarea>
-          <button class="primary" id="btnVoiceSpeak" style="width:100%">🔊 Generate Voice</button>
+          <p class="muted" style="margin-top:0">Telegram: <span class="mono">tts hello world</span></p>
+          <textarea class="field" id="voiceText" placeholder="Text to speak…"></textarea>
+          <button type="button" class="primary" id="btnVoiceSpeak" style="width:100%">🔊 Generate Voice</button>
           <div id="voiceResult" class="muted" style="margin-top:10px"></div>
         </div>
       </section>
 
-      <!-- FORTRESS -->
-      <section class="world" data-world="fortress">
-        <div class="card">
-          <h2>Fortress</h2>
-          <p class="muted" style="margin-top:0">Session + job queue foundation.</p>
-          <div class="row" style="margin-bottom:10px">
-            <button id="btnTestJob">Enqueue test job</button>
-            <button id="btnEvents">Refresh activity</button>
-          </div>
-          <h2>Platform jobs</h2>
-          <div id="jobsList" class="mono muted">—</div>
-          <h2 style="margin-top:14px">Activity</h2>
-          <div id="eventsList" class="muted">—</div>
-        </div>
-        <div class="card">
-          <h2>System health</h2>
-          <div class="row" id="healthRow">—</div>
-        </div>
-      </section>
-
-      <!-- MORE / HQ -->
       <section class="world" data-world="more">
         <div class="card">
           <h2>Command Center</h2>
           <div class="row">
-            <button class="primary" id="btnGodHeal">🔥 Heal</button>
-            <button id="btnNight">🌙 Night</button>
-            <button id="btnWorker">▶ Worker</button>
+            <button type="button" class="primary" id="btnGodHeal">🔥 Heal</button>
+            <button type="button" id="btnNight">🌙 Night</button>
+            <button type="button" id="btnWorker">▶ Worker</button>
           </div>
         </div>
         <div class="card">
-          <h2>Cron</h2>
-          <div class="row" style="margin-bottom:8px">
-            <button id="btnCronRefresh">↻</button>
-            <button id="btnCronHeal">Heal crons</button>
-          </div>
-          <div style="overflow:auto">
-            <table>
-              <thead><tr><th>St</th><th>Title</th><th>Last</th><th></th></tr></thead>
-              <tbody id="cronBody"><tr><td colspan="4" class="muted">—</td></tr></tbody>
-            </table>
-          </div>
+          <h2>Fortress / Health</h2>
+          <div id="healthRow" class="muted">—</div>
         </div>
-        
-        <div class="card">
-          <h2>APK Forge</h2>
-          <div id="apkStatus" class="muted">—</div>
-          <div class="row" style="margin-top:10px">
-            <button id="btnApkRefresh">↻ Refresh status</button>
-            <a id="apkActionsLink" href="#" target="_blank" rel="noopener" style="color:#c4b5fd;font-size:.85rem;align-self:center">Open GitHub Actions</a>
-          </div>
-          <p class="muted" style="font-size:.72rem;margin:10px 0 0">
-            Set repo variable <span class="mono">QUEEN_PWA_URL</span> · Actions builds APK on every push to main · Download artifact <span class="mono">queen-os-apk</span>
-          </p>
-        </div>
-
       </section>
     </div>
 
     <nav class="tabs" id="tabs">
-      <button class="tab on" data-world="chat"><span class="ico">💬</span>Chat</button>
-      <button class="tab" data-world="brain"><span class="ico">🧠</span>Brain</button>
-      <button class="tab" data-world="bank"><span class="ico">🏦</span>Bank</button>
-      <button class="tab" data-world="shadow"><span class="ico">🌑</span>Shadow</button>
-      <button class="tab" data-world="drive"><span class="ico">📁</span>Drive</button>
-      <button class="tab" data-world="mail"><span class="ico">✉️</span>Mail</button>
-      <button class="tab" data-world="fortress"><span class="ico">🛡</span>Fort</button>
-      <button class="tab" data-world="more"><span class="ico">⚡</span>More</button>
+      <button type="button" class="tab on" data-world="chat"><span>💬</span>Chat</button>
+      <button type="button" class="tab" data-world="brain"><span>🧠</span>Brain</button>
+      <button type="button" class="tab" data-world="bank"><span>🏦</span>Bank</button>
+      <button type="button" class="tab" data-world="shadow"><span>🌑</span>Shadow</button>
+      <button type="button" class="tab" data-world="drive"><span>📁</span>Drive</button>
+      <button type="button" class="tab" data-world="mail"><span>✉️</span>Mail</button>
+      <button type="button" class="tab" data-world="more"><span>⚡</span>More</button>
     </nav>
   </div>
   <div id="toast"></div>
 
 <script>
-const SEC_KEY='rq_dash_secret', TOK_KEY='rq_dash_session_token';
-const titles={chat:'Chat',brain:'Second Brain',bank:'Private Bank',shadow:'Shadow Army',drive:'Queen Drive',mail:'Mail + Voice',fortress:'Fortress',more:'Command Center'};
-let chatBefore=null;
+(function(){
+  var SEC_KEY='rq_dash_secret', TOK_KEY='rq_dash_session_token';
+  var titles={chat:'Chat',brain:'Second Brain',bank:'Private Bank',shadow:'Shadow Army',drive:'Queen Drive',mail:'Mail + Voice',more:'Command Center'};
 
-function toast(m){const t=document.getElementById('toast');t.textContent=m;t.style.display='block';setTimeout(()=>t.style.display='none',2800)}
-function getSecret(){return sessionStorage.getItem(SEC_KEY)||''}
-function getToken(){return localStorage.getItem(TOK_KEY)||sessionStorage.getItem(TOK_KEY)||''}
-function setSecret(s){sessionStorage.setItem(SEC_KEY,s)}
-function setToken(t,p){if(p)localStorage.setItem(TOK_KEY,t);else sessionStorage.setItem(TOK_KEY,t)}
-function clearAuth(){sessionStorage.removeItem(SEC_KEY);sessionStorage.removeItem(TOK_KEY);localStorage.removeItem(TOK_KEY)}
-function authHeaders(){
-  const h={'Content-Type':'application/json'};
-  const s=getSecret(); if(s){h['Authorization']='Bearer '+s;h['X-Dash-Secret']=s}
-  const t=getToken(); if(t) h['Authorization']='Bearer '+t;
-  return h;
-}
-function apiUrl(a){
-  let u='/api/dash?action='+encodeURIComponent(a);
-  const s=getSecret(); if(s) u+='&secret='+encodeURIComponent(s);
-  const t=getToken(); if(t) u+='&session='+encodeURIComponent(t);
-  return u;
-}
-async function api(a,method='GET',body){
-  const o={method,headers:authHeaders(),cache:'no-store'};
-  if(method==='POST') o.body=JSON.stringify(body||{});
-  const r=await fetch(apiUrl(a),o);
-  const d=await r.json().catch(()=>({}));
-  if(!r.ok||d.ok===false) throw new Error(d.error||('HTTP '+r.status));
-  return d;
-}
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+  function $(id){ return document.getElementById(id); }
+  function toast(m){ var t=$('toast'); t.textContent=m; t.style.display='block'; setTimeout(function(){ t.style.display='none'; }, 2800); }
+  function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function getSecret(){ return sessionStorage.getItem(SEC_KEY)||''; }
+  function getToken(){ return localStorage.getItem(TOK_KEY)||sessionStorage.getItem(TOK_KEY)||''; }
+  function setSecret(s){ sessionStorage.setItem(SEC_KEY,s); }
+  function setToken(t,p){ if(p) localStorage.setItem(TOK_KEY,t); else sessionStorage.setItem(TOK_KEY,t); }
+  function clearAuth(){ sessionStorage.removeItem(SEC_KEY); sessionStorage.removeItem(TOK_KEY); localStorage.removeItem(TOK_KEY); }
 
-function showWorld(name){
-  document.querySelectorAll('.world').forEach(w=>w.classList.toggle('active',w.dataset.world===name));
-  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.world===name));
-  document.getElementById('worldTitle').textContent=titles[name]||name;
-  try{localStorage.setItem('rq_world',name)}catch(_){}
-}
-
-document.getElementById('tabs').onclick=e=>{
-  const t=e.target.closest('.tab'); if(!t) return;
-  showWorld(t.dataset.world);
-};
-
-function renderChat(messages,append){
-  const log=document.getElementById('chatLog');
-  const html=(messages||[]).map(m=>{
-    const cls=m.role==='user'?'user':'bot';
-    const tools=(m.tools||[]).map(t=>'<span class="chip">'+esc(t)+'</span>').join('');
-    const meta=[m.trust!=null?'Trust '+m.trust:'',m.latency_ms!=null?m.latency_ms+'ms':''].filter(Boolean).join(' · ');
-    return '<div class="bubble '+cls+'">'+esc(m.content)+(tools?'<div class="chips">'+tools+'</div>':'')+(meta?'<div class="muted mono" style="margin-top:4px">'+esc(meta)+'</div>':'')+'</div>';
-  }).join('');
-  if(append) log.innerHTML=html+log.innerHTML;
-  else { log.innerHTML=html||'<div class="muted">No messages yet.</div>'; log.scrollTop=log.scrollHeight; }
-}
-
-function appendBubble(role,content,tools,trust,ms){
-  const log=document.getElementById('chatLog');
-  const toolsH=(tools||[]).map(t=>'<span class="chip">'+esc(t)+'</span>').join('');
-  const meta=[trust!=null?'Trust '+trust:'',ms!=null?ms+'ms':''].filter(Boolean).join(' · ');
-  log.innerHTML+='<div class="bubble '+(role==='user'?'user':'bot')+'">'+esc(content)+(toolsH?'<div class="chips">'+toolsH+'</div>':'')+(meta?'<div class="muted mono" style="margin-top:4px">'+esc(meta)+'</div>':'')+'</div>';
-  log.scrollTop=log.scrollHeight;
-}
-
-function renderBrain(items){
-  const el=document.getElementById('brainList');
-  if(!items||!items.length){el.innerHTML='Empty.';return}
-  el.innerHTML=items.map(x=>'<div style="padding:8px 0;border-bottom:1px solid var(--border)">'+
-    '<b>'+esc(x.key_display)+'</b> = <span class="mono">'+esc(x.value)+'</span> '+
-    (x.masked||x.sensitivity==='secret'?'<button class="reveal-btn" data-reveal="'+esc(x.key_display)+'">Reveal</button>':'')+
-    ' <button class="danger reveal-btn" data-forget="'+esc(x.key_display)+'">Forget</button></div>').join('');
-}
-
-function renderShadow(tasks){
-  const el=document.getElementById('shadowList');
-  if(!tasks||!tasks.length){el.innerHTML='No pending tasks.';return}
-  el.innerHTML=tasks.map(t=>'<div style="padding:8px 0;border-bottom:1px solid var(--border)">'+
-    '<span class="mono">'+esc(String(t.id).slice(0,8))+'</span> · '+esc(t.raw_text)+
-    ' <button data-sh="done" data-id="'+esc(t.id)+'">Done</button></div>').join('');
-}
-
-function renderJobs(jobs){
-  const el=document.getElementById('jobsList');
-  if(!jobs||!jobs.length){el.textContent='No jobs yet.';return}
-  el.innerHTML=jobs.map(j=>'#'+esc(String(j.id).slice(0,8))+' · '+esc(j.type)+' · '+esc(j.status)+' · '+esc(String(j.created_at||'').slice(0,19))).join('<br>');
-}
-
-function renderEvents(events){
-  const el=document.getElementById('eventsList');
-  if(!events||!events.length){el.textContent='No events.';return}
-  el.innerHTML=events.map(e=>'<div style="margin-bottom:6px"><span class="mono">'+esc(String(e.created_at||'').slice(0,19))+'</span> · <b>'+esc(e.type)+'</b></div>').join('');
-}
-
-function renderCron(cron){
-  const cb=document.getElementById('cronBody');
-  const jobs=(cron&&cron.jobs)||[];
-  if(cron&&cron.error){cb.innerHTML='<tr><td colspan="4">'+esc(cron.error)+'</td></tr>';return}
-  if(!jobs.length){cb.innerHTML='<tr><td colspan="4" class="muted">No jobs</td></tr>';return}
-  cb.innerHTML=jobs.map(j=>{
-    const st=j.health==='ok'?'ok':(j.health==='fail'||j.health==='warn'?'bad':'');
-    return '<tr><td><span class="dot '+st+'"></span></td><td>'+esc(j.title)+'<div class="mono muted">#'+esc(j.id)+'</div></td><td class="mono">'+esc(j.lastStatus==null?'—':j.lastStatus)+'</td><td>'+
-      (j.enabled?'<button data-cron="disable" data-id="'+esc(j.id)+'">Off</button>':'<button data-cron="enable" data-id="'+esc(j.id)+'">On</button>')+
-      '</td></tr>';
-  }).join('');
-}
-
-
-
-
-async function loadMailStatus(){
-  try{
-    const r=await api('mail_status');
-    const el=document.getElementById('mailStatus');
-    if(!el) return;
-    el.innerHTML=r.configured
-      ?('Resend: <b style="color:var(--good)">ready</b> · to: '+esc(r.to||'(set FOUNDER_EMAIL)'))
-      :('Resend: <b style="color:var(--warn)">not configured</b> — add RESEND_API_KEY');
-  }catch(e){
-    const el=document.getElementById('mailStatus');
-    if(el) el.textContent=e.message;
+  function authHeaders(){
+    var h={'Content-Type':'application/json'};
+    var s=getSecret(); if(s){ h['Authorization']='Bearer '+s; h['X-Dash-Secret']=s; }
+    var t=getToken(); if(t) h['Authorization']='Bearer '+t;
+    return h;
   }
-}
-
-function renderDrive(files){
-  const el=document.getElementById('driveList');
-  if(!el) return;
-  if(!files||!files.length){
-    el.innerHTML='<span class="muted">No files found in bucket <b>vault</b>. Upload via Telegram caption <span class="mono">vault upload</span>.</span>';
-    return;
+  function apiUrl(a){
+    var u='/api/dash?action='+encodeURIComponent(a);
+    var s=getSecret(); if(s) u+='&secret='+encodeURIComponent(s);
+    var t=getToken(); if(t) u+='&session='+encodeURIComponent(t);
+    return u;
   }
-  el.innerHTML='<div class="muted" style="margin-bottom:8px">'+files.length+' file(s)</div>'+files.map(f=>{
-    const path=f.path||f.name||'';
-    const kb=f.size!=null?(Math.round(Number(f.size)/1024)+' KB'):'';
-    return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">'+
-      '<b>'+esc(path)+'</b> <span class="muted mono">'+esc(kb)+'</span><br>'+
-      '<button type="button" data-drive-open="'+esc(path)+'" style="padding:4px 8px;font-size:.72rem;margin-top:4px">Open</button> '+
-      '<button type="button" class="danger" data-drive-del="'+esc(path)+'" style="padding:4px 8px;font-size:.72rem">Del</button></div>';
-  }).join('');
-}
-async function loadDrive(){
-  const el=document.getElementById('driveList');
-  if(el) el.textContent='Loading…';
-  try{
-    const r=await api('drive_list');
-    if(r.ok===false) throw new Error(r.error||'drive failed');
-    renderDrive(r.files||[]);
-    return r;
-  }catch(e){
-    if(el) el.innerHTML='<span style="color:var(--bad)">Drive error: '+esc(e.message)+'</span>';
-    throw e;
+  async function api(a, method, body){
+    method = method || 'GET';
+    var o={ method:method, headers:authHeaders(), cache:'no-store' };
+    if(method==='POST') o.body=JSON.stringify(body||{});
+    var r=await fetch(apiUrl(a), o);
+    var d=await r.json().catch(function(){ return {}; });
+    if(!r.ok || d.ok===false) throw new Error(d.error || ('HTTP '+r.status));
+    return d;
   }
-}
 
-function renderBank(summary, txs){
-  const total=summary&&summary.total!=null?summary.total:0;
-  document.getElementById('bankTotal').textContent='Rs.'+Number(total).toLocaleString();
-  document.getElementById('bankMeta').textContent=(summary&&summary.count||0)+' txs · last '+(summary&&summary.days||30)+' days';
-  const series=(summary&&summary.series)||[];
-  const max=Math.max(...series.map(s=>s.total),1);
-  document.getElementById('bankChart').innerHTML=series.map(s=>{
-    const h=Math.max(4, Math.round(76*s.total/max));
-    return '<div title="'+esc(s.date)+': '+s.total+'" style="flex:1;height:'+h+'px;background:linear-gradient(180deg,#7c5cff,#2dd4bf);border-radius:3px 3px 0 0;opacity:'+(s.total?1:0.25)+'"></div>';
-  }).join('');
-  const cats=summary&&summary.byCategory||{};
-  document.getElementById('bankCats').innerHTML=Object.keys(cats).length
-    ?Object.keys(cats).map(k=>'<span class="pill">'+esc(k)+': Rs.'+Number(cats[k]).toLocaleString()+'</span>').join('')
-    :'<span class="muted">No categories yet</span>';
-  const list=txs||[];
-  document.getElementById('bankList').innerHTML=list.length
-    ?list.map(t=>'<div style="padding:8px 0;border-bottom:1px solid var(--border)"><b>Rs.'+esc(t.amount)+'</b> · '+esc(t.merchant||t.note||'—')+
-      ' <span class="muted mono">'+esc(t.category)+' · '+esc(String(t.tx_date).slice(0,10))+'</span> '+
-      '<button class="danger" data-bank-del="'+esc(t.id)+'" type="button" style="padding:4px 8px;font-size:.72rem">Del</button></div>').join('')
-    :'No transactions yet.';
-}
-function renderApk(a){
-  const el=document.getElementById('apkStatus');
-  if(!a){el.textContent='—';return}
-  if(!a.configured){
-    el.innerHTML=esc(a.message||'Not configured')+'<br><span class="mono">PWA: '+esc(a.pwa_url||'')+'</span>';
-  } else if(a.has_run){
-    el.innerHTML='Status: <b>'+esc(a.status)+'</b> · Conclusion: <b>'+esc(a.conclusion||'—')+'</b><br>'+
-      esc(a.display_title||'')+'<br><span class="mono">'+esc(String(a.updated_at||'').slice(0,19))+'</span><br>'+
-      esc(a.artifact_hint||'');
-  } else {
-    el.textContent=a.message||a.error||JSON.stringify(a);
+  function showWorld(name){
+    document.querySelectorAll('.world').forEach(function(w){ w.classList.toggle('active', w.getAttribute('data-world')===name); });
+    document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('on', t.getAttribute('data-world')===name); });
+    $('worldTitle').textContent = titles[name]||name;
+    try{ localStorage.setItem('rq_world', name); }catch(e){}
   }
-  const link=document.getElementById('apkActionsLink');
-  if(a.actions_url){link.href=a.actions_url;link.style.display='inline'}
-  else if(a.html_url){link.href=a.html_url}
-}
 
-async function loadBank(){
-  const s=await api('bank_summary');
-  const l=await api('bank_list');
-  renderBank(s,l.transactions||[]);
-}
-async function loadApk(){
-  try{const a=await api('apk_status');renderApk(a)}catch(e){document.getElementById('apkStatus').textContent=e.message}
-}
+  $('tabs').onclick=function(e){
+    var t=e.target.closest('.tab'); if(!t) return;
+    showWorld(t.getAttribute('data-world'));
+  };
 
-function renderHealth(health){
-  const checks=(health&&health.checks)||[];
-  document.getElementById('healthRow').innerHTML=checks.length
-    ?checks.map(c=>'<span class="pill"><span class="dot '+(c.ok?'ok':'bad')+'"></span>'+esc(c.name)+'</span>').join('')
-    :'—';
-}
-
-async function loadChat(){
-  const h=await api('chat_pro_history&limit=50'.split('&')[0]==='chat_pro_history'? 'chat_pro_history' : 'chat_pro_history');
-  // fix: use proper action
-}
-async function loadChatReal(){
-  const h=await api('chat_pro_history');
-  const msgs=h.messages||[];
-  chatBefore=msgs.length?msgs[0].created_at:null;
-  renderChat(msgs,false);
-}
-
-async function loadOverview(){
-  document.getElementById('liveBadge').textContent='…';
-  const data=await api('overview');
-  renderHealth(data.health);
-  renderShadow((data.shadow&&data.shadow.tasks)||[]);
-  renderCron(data.cron);
-  document.getElementById('meta').textContent=(data.system&&data.system.name)||'Queen OS';
-  document.getElementById('liveBadge').textContent='LIVE';
-  return data;
-}
-
-async function loadBrain(q){
-  if(q){
-    const r=await api('brain_pro_search','POST',{q});
-    renderBrain(r.items||[]);
-  } else {
-    const r=await api('brain_pro');
-    renderBrain(r.items||[]);
+  function appendBubble(role, content){
+    var log=$('chatLog');
+    var div=document.createElement('div');
+    div.className='bubble '+(role==='user'?'user':'bot');
+    div.textContent=content;
+    log.appendChild(div);
+    log.scrollTop=log.scrollHeight;
   }
-}
 
-async function loadFortress(){
-  try{
-    const j=await api('jobs');
-    renderJobs(j.jobs||[]);
-  }catch(e){document.getElementById('jobsList').textContent=e.message}
-  try{
-    const ev=await api('events');
-    renderEvents(ev.events||[]);
-  }catch(e){document.getElementById('eventsList').textContent=e.message}
-}
+  async function loadChat(){
+    try{
+      var h=await api('chat_pro_history');
+      var log=$('chatLog'); log.innerHTML='';
+      (h.messages||[]).forEach(function(m){ appendBubble(m.role==='user'?'user':'bot', m.content||''); });
+    }catch(e){ $('chatLog').textContent='Chat: '+e.message; }
+  }
 
-async function boot(){
-  await loadOverview();
-  await loadChatReal();
-  await loadBrain();
-  await loadFortress();
-  try{await loadBank()}catch(_){}
-  try{await loadApk()}catch(_){}
-  try{await loadDrive()}catch(_){}
-  try{await loadMailStatus()}catch(_){}
-}
+  async function loadBrain(){
+    try{
+      var r=await api('brain_pro');
+      var items=r.items||[];
+      $('brainList').innerHTML = items.length ? items.map(function(x){
+        return '<div style="padding:8px 0;border-bottom:1px solid var(--border)"><b>'+esc(x.key_display)+'</b> = <span class="mono">'+esc(x.value)+'</span></div>';
+      }).join('') : 'Empty';
+    }catch(e){ $('brainList').textContent=e.message; }
+  }
 
-document.getElementById('unlock').onclick=async()=>{
-  const err=document.getElementById('err'); err.textContent='';
-  const s=document.getElementById('secret').value.trim();
-  if(!s){err.textContent='Enter DASH_SECRET';return}
-  const btn=document.getElementById('unlock');
-  btn.disabled=true;btn.innerHTML='<span class="spin"></span>…';
-  try{
-    setSecret(s);
-    if(document.getElementById('remember').checked){
-      const r=await fetch('/api/dash?action=session_login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:s})}).then(x=>x.json());
-      if(r.ok&&r.token) setToken(r.token,true);
+  function renderBank(summary, txs){
+    var total = summary && summary.total!=null ? summary.total : 0;
+    $('bankTotal').textContent = 'Rs.'+Number(total).toLocaleString();
+    $('bankMeta').textContent = (summary && summary.count || 0)+' txs · 30d';
+    var series = (summary && summary.series) || [];
+    var max = 1;
+    series.forEach(function(s){ if(s.total>max) max=s.total; });
+    $('bankChart').innerHTML = series.map(function(s){
+      var h=Math.max(4, Math.round(66*s.total/max));
+      return '<div style="flex:1;height:'+h+'px;background:linear-gradient(180deg,#7c5cff,#2dd4bf);border-radius:3px 3px 0 0;opacity:'+(s.total?1:0.25)+'"></div>';
+    }).join('');
+    var list = txs||[];
+    $('bankList').innerHTML = list.length ? list.map(function(t){
+      return '<div style="padding:8px 0;border-bottom:1px solid var(--border)"><b>Rs.'+esc(t.amount)+'</b> · '+esc(t.merchant||t.note||'—')+
+        ' <span class="muted mono">'+esc(t.category)+'</span> '+
+        '<button type="button" class="danger" data-bank-del="'+esc(t.id)+'" style="padding:4px 8px;font-size:.72rem">Del</button></div>';
+    }).join('') : 'No transactions';
+  }
+
+  async function loadBank(){
+    var s=await api('bank_summary');
+    var l=await api('bank_list');
+    renderBank(s, l.transactions||[]);
+  }
+
+  async function loadDrive(){
+    $('driveList').textContent='Loading…';
+    try{
+      var r=await api('drive_list');
+      var files=r.files||[];
+      if(!files.length){
+        $('driveList').innerHTML='<span class="muted">No files in <b>vault</b>. Upload via Telegram: <span class="mono">vault upload</span></span>';
+        return;
+      }
+      $('driveList').innerHTML = '<div class="muted" style="margin-bottom:8px">'+files.length+' file(s) · bucket '+esc(r.bucket||'vault')+'</div>'+
+        files.map(function(f){
+          var path=f.path||f.name;
+          var kb=f.size!=null?(Math.round(Number(f.size)/1024)+' KB'):'';
+          return '<div style="padding:8px 0;border-bottom:1px solid var(--border)"><b>'+esc(path)+'</b> <span class="muted mono">'+esc(kb)+'</span><br>'+
+            '<button type="button" data-drive-open="'+esc(path)+'" style="padding:4px 8px;font-size:.72rem;margin-top:4px">Open</button> '+
+            '<button type="button" class="danger" data-drive-del="'+esc(path)+'" style="padding:4px 8px;font-size:.72rem">Del</button></div>';
+        }).join('');
+    }catch(e){
+      $('driveList').innerHTML='<span style="color:var(--bad)">'+esc(e.message)+'</span>';
     }
-    await boot();
-    document.getElementById('gate').style.display='none';
-    document.getElementById('app').classList.add('show');
-    const w=localStorage.getItem('rq_world')||'chat';
-    showWorld(w);
-  }catch(e){clearAuth();err.textContent=e.message||String(e)}
-  finally{btn.disabled=false;btn.textContent='Enter Platform'}
-};
-
-document.getElementById('btnLock').onclick=async()=>{try{await api('session_logout','POST',{})}catch(_){}
-  clearAuth();location.reload()};
-document.getElementById('btnRefresh').onclick=()=>boot().then(()=>toast('Refreshed')).catch(e=>toast(e.message));
-
-document.getElementById('chatForm').onsubmit=async e=>{
-  e.preventDefault();
-  const input=document.getElementById('chatInput');
-  const text=input.value.trim(); if(!text) return;
-  input.value='';
-  appendBubble('user',text);
-  try{
-    const r=await api('chat_pro','POST',{message:text});
-    appendBubble('bot',r.text||'',r.tools,r.trust,r.latency_ms);
-  }catch(err){appendBubble('bot','Error: '+err.message)}
-};
-document.getElementById('btnLoadMore').onclick=async()=>{
-  try{
-    let url=apiUrl('chat_pro_history')+'&limit=50';
-    if(chatBefore) url+='&before='+encodeURIComponent(chatBefore);
-    const r=await fetch(url,{headers:authHeaders()}).then(x=>x.json());
-    if(!r.ok) throw new Error(r.error||'fail');
-    const msgs=r.messages||[];
-    if(msgs.length){chatBefore=msgs[0].created_at;renderChat(msgs,true)}
-    else toast('No older messages');
-  }catch(e){toast(e.message)}
-};
-document.getElementById('btnClearChat').onclick=async()=>{
-  if(!confirm('Clear platform chat history?')) return;
-  try{await api('chat_pro_clear','POST',{});await loadChatReal();toast('Cleared')}catch(e){toast(e.message)}
-};
-
-document.getElementById('brainSearch').oninput=e=>{
-  const q=e.target.value.trim();
-  clearTimeout(window.__brT);
-  window.__brT=setTimeout(()=>loadBrain(q).catch(err=>toast(err.message)),300);
-};
-document.getElementById('brainAdd').onsubmit=async e=>{
-  e.preventDefault();
-  const key=document.getElementById('brainKey').value.trim();
-  const value=document.getElementById('brainVal').value.trim();
-  if(!key||!value) return;
-  try{await api('brain_remember','POST',{key,value});document.getElementById('brainVal').value='';await loadBrain();toast('Saved')}catch(err){toast(err.message)}
-};
-document.getElementById('brainList').onclick=async e=>{
-  const rev=e.target.closest('[data-reveal]');
-  const forg=e.target.closest('[data-forget]');
-  if(rev){
-    try{
-      const r=await api('brain_reveal','POST',{key:rev.getAttribute('data-reveal')});
-      if(r.item) alert(r.item.key_display+':\n'+r.item.value);
-    }catch(err){toast(err.message)}
   }
-  if(forg){
-    try{await api('brain_forget','POST',{key:forg.getAttribute('data-forget')});await loadBrain();toast('Forgot')}catch(err){toast(err.message)}
-  }
-};
 
-document.getElementById('shadowForm').onsubmit=async e=>{
-  e.preventDefault();
-  const t=document.getElementById('shadowInput').value.trim(); if(!t) return;
-  try{await api('shadow_add','POST',{text:t});document.getElementById('shadowInput').value='';await loadOverview();toast('Shadow saved')}catch(err){toast(err.message)}
-};
-document.getElementById('btnShadowMorning').onclick=async e=>{
-  e.target.disabled=true;
-  try{await api('shadow_morning','POST',{});toast('Morning report sent');await loadOverview()}catch(err){toast(err.message)}
-  finally{e.target.disabled=false}
-};
-document.getElementById('shadowList').onclick=async e=>{
-  const b=e.target.closest('[data-sh]'); if(!b) return;
-  try{await api('shadow_done','POST',{id:b.getAttribute('data-id')});await loadOverview()}catch(err){toast(err.message)}
-};
-
-document.getElementById('btnTestJob').onclick=async()=>{
-  try{const r=await api('job_enqueue','POST',{type:'test_ping',input:{ts:Date.now()}});toast('Job '+String(r.job.id).slice(0,8));await loadFortress()}catch(e){toast(e.message)}
-};
-document.getElementById('btnEvents').onclick=()=>loadFortress().then(()=>toast('Activity refreshed'));
-
-document.getElementById('btnGodHeal').onclick=async e=>{e.target.disabled=true;try{await api('god_heal','POST',{});toast('Heal ok')}catch(err){toast(err.message)}finally{e.target.disabled=false}};
-document.getElementById('btnNight').onclick=async e=>{e.target.disabled=true;try{await api('night_run','POST',{});toast('Night ok')}catch(err){toast(err.message)}finally{e.target.disabled=false}};
-document.getElementById('btnWorker').onclick=async e=>{e.target.disabled=true;try{await api('think_worker','POST',{});toast('Worker ok')}catch(err){toast(err.message)}finally{e.target.disabled=false}};
-document.getElementById('btnCronHeal').onclick=async()=>{try{await api('cron_heal','POST',{});toast('Cron heal');await loadOverview()}catch(e){toast(e.message)}};
-document.getElementById('btnCronRefresh').onclick=()=>loadOverview().then(()=>toast('Cron refreshed'));
-document.getElementById('cronBody').onclick=async e=>{
-  const b=e.target.closest('[data-cron]'); if(!b) return;
-  const op=b.getAttribute('data-cron'); const id=b.getAttribute('data-id');
-  try{
-    await fetch(apiUrl(op==='enable'?'cron_enable':'cron_disable')+'&id='+encodeURIComponent(id),{method:'POST',headers:authHeaders(),body:JSON.stringify({id})}).then(async r=>{const d=await r.json();if(!r.ok||d.ok===false)throw new Error(d.error||'fail')});
-    await loadOverview();
-  }catch(err){toast(err.message)}
-};
-
-
-document.getElementById('bankForm').onsubmit=async e=>{
-  e.preventDefault();
-  const amount=document.getElementById('bankAmount').value.trim();
-  const merchant=document.getElementById('bankMerchant').value.trim();
-  const note=document.getElementById('bankNote').value.trim();
-  const category=document.getElementById('bankCategory').value.trim();
-  try{
-    if(amount){
-      await api('bank_add','POST',{amount,merchant,note,category:category||undefined});
-    } else if(note){
-      await api('bank_bill','POST',{text:note});
-    } else { toast('Enter amount'); return; }
-    document.getElementById('bankAmount').value='';
-    document.getElementById('bankNote').value='';
-    toast('Saved to Bank');
-    await loadBank();
-  }catch(err){toast(err.message)}
-};
-document.getElementById('bankList').onclick=async e=>{
-  const b=e.target.closest('[data-bank-del]'); if(!b) return;
-  e.preventDefault(); e.stopPropagation();
-  const id=b.getAttribute('data-bank-del');
-  if(!id){toast('Missing id');return}
-  if(!confirm('Delete this transaction?')) return;
-  b.disabled=true;
-  try{
-    await api('bank_delete','POST',{id:id});
-    toast('Deleted');
-    await loadBank();
-  }catch(err){toast('Delete failed: '+err.message)}
-  finally{b.disabled=false}
-};
-document.getElementById('btnApkRefresh').onclick=()=>loadApk().then(()=>toast('APK status refreshed'));
-
-
-document.getElementById('btnMailSend')?.addEventListener('click', async ()=>{
-  const btn=document.getElementById('btnMailSend');
-  btn.disabled=true; btn.textContent='Sending…';
-  try{
-    const subject=document.getElementById('mailSubject')?.value?.trim()||'Queen OS Report';
-    const text=document.getElementById('mailBody')?.value?.trim()||'';
-    const r=await api('mail_send','POST',{subject,text});
-    if(r.ok) toast('Email sent → '+(r.to||''));
-    else toast(r.error||'send failed');
-  }catch(e){toast(e.message)}
-  finally{btn.disabled=false;btn.textContent='📧 Send Email'}
-});
-    if(r.ok) toast('Email sent → '+(r.to||''));
-    else toast(r.error||'send failed');
-  }catch(e){toast(e.message)}
-  finally{btn.disabled=false;btn.textContent='📧 Send Email'}
-});
-document.getElementById('btnVoiceSpeak')?.addEventListener('click', async ()=>{
-  const btn=document.getElementById('btnVoiceSpeak');
-  const text=document.getElementById('voiceText')?.value?.trim()||'';
-  if(!text){toast('Enter text');return}
-  btn.disabled=true;btn.textContent='Generating…';
-  try{
-    const r=await api('voice_speak','POST',{text});
-    const el=document.getElementById('voiceResult');
-    if(r.ok&&r.url){
-      el.innerHTML='Provider: '+esc(r.provider||'tts')+' · <a href="'+esc(r.url)+'" target="_blank" rel="noopener" style="color:#c4b5fd">Play / Download</a>';
-      toast('Voice ready');
-    }else if(r.ok){ el.textContent=r.note||r.preview||'Voice generated'; toast('Voice generated'); }
-    else toast(r.error||'TTS failed');
-  }catch(e){toast(e.message)}
-  finally{btn.disabled=false;btn.textContent='🔊 Generate Voice'}
-});
-    const el=document.getElementById('voiceResult');
-    if(r.ok&&r.url){
-      el.innerHTML='Provider: '+esc(r.provider||'tts')+' · <a href="'+esc(r.url)+'" target="_blank" rel="noopener" style="color:#c4b5fd">Play / Download</a>';
-      toast('Voice ready');
-    } else if(r.ok){
-      el.textContent=r.note||r.preview||'Voice generated';
-      toast('Voice generated');
-    } else toast(r.error||'TTS failed');
-  }catch(e){toast(e.message)}
-  finally{btn.disabled=false;btn.textContent='🔊 Generate Voice'}
-});
-
-
-// --- Drive / Mail / Voice / Bank (delegated) ---
-document.getElementById('btnDriveRefresh')?.addEventListener('click', async ()=>{
-  try{ await loadDrive(); toast('Drive refreshed'); }catch(e){ toast(e.message); }
-});
-document.getElementById('driveList')?.addEventListener('click', async (e)=>{
-  const open=e.target.closest('[data-drive-open]');
-  const del=e.target.closest('[data-drive-del]');
-  if(open){
+  async function loadMailStatus(){
     try{
-      const r=await api('drive_sign','POST',{path:open.getAttribute('data-drive-open')});
-      if(r.url) window.open(r.url,'_blank'); else toast('No signed URL');
-    }catch(err){toast(err.message)}
+      var r=await api('mail_status');
+      $('mailStatus').innerHTML = r.configured
+        ? ('Resend: <b style="color:var(--good)">ready</b> · to '+esc(r.to||'(set FOUNDER_EMAIL)'))
+        : 'Resend: not configured — add RESEND_API_KEY';
+    }catch(e){ $('mailStatus').textContent=e.message; }
   }
-  if(del){
-    if(!confirm('Delete from Drive?')) return;
+
+  async function loadShadow(){
     try{
-      await api('drive_delete','POST',{path:del.getAttribute('data-drive-del')});
-      toast('Deleted');
-      await loadDrive();
-    }catch(err){toast(err.message)}
+      var o=await api('overview');
+      var tasks=(o.shadow&&o.shadow.tasks)||[];
+      $('shadowList').innerHTML = tasks.length ? tasks.map(function(t){
+        return '<div style="padding:6px 0;border-bottom:1px solid var(--border)">'+esc(t.raw_text||t.text||JSON.stringify(t))+'</div>';
+      }).join('') : 'No tasks';
+      var checks=(o.health&&o.health.checks)||[];
+      $('healthRow').innerHTML = checks.length ? checks.map(function(c){ return esc(c.name)+':'+(c.ok?'ok':'fail'); }).join(' · ') : '—';
+      $('meta').textContent=(o.system&&o.system.name)||'Queen OS';
+    }catch(e){ $('shadowList').textContent=e.message; }
   }
-});
 
-if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  async function boot(){
+    await loadChat();
+    try{ await loadBrain(); }catch(e){}
+    try{ await loadBank(); }catch(e){}
+    try{ await loadDrive(); }catch(e){}
+    try{ await loadMailStatus(); }catch(e){}
+    try{ await loadShadow(); }catch(e){}
+  }
 
-(async()=>{
-  if(getToken()||getSecret()){
+  $('unlock').onclick = async function(){
+    var err=$('err'); err.textContent='';
+    var s=$('secret').value.trim();
+    if(!s){ err.textContent='Enter DASH_SECRET'; return; }
+    var btn=$('unlock');
+    btn.disabled=true; btn.innerHTML='<span class="spin"></span>…';
     try{
+      setSecret(s);
+      if($('remember').checked){
+        try{
+          var r=await fetch('/api/dash?action=session_login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:s})}).then(function(x){return x.json();});
+          if(r.ok && r.token) setToken(r.token, true);
+        }catch(e){}
+      }
+      // Quick auth probe
+      await api('overview');
       await boot();
-      document.getElementById('gate').style.display='none';
-      document.getElementById('app').classList.add('show');
+      $('gate').style.display='none';
+      $('app').classList.add('show');
       showWorld(localStorage.getItem('rq_world')||'chat');
-    }catch(_){clearAuth()}
+    }catch(e){
+      clearAuth();
+      err.textContent = e.message || String(e);
+    }finally{
+      btn.disabled=false; btn.textContent='Enter Platform';
+    }
+  };
+
+  $('btnLock').onclick = function(){ clearAuth(); location.reload(); };
+  $('btnRefresh').onclick = function(){ boot().then(function(){ toast('Refreshed'); }).catch(function(e){ toast(e.message); }); };
+
+  $('chatForm').onsubmit = async function(e){
+    e.preventDefault();
+    var text=$('chatInput').value.trim(); if(!text) return;
+    $('chatInput').value='';
+    appendBubble('user', text);
+    try{
+      var r=await api('chat_pro','POST',{message:text});
+      appendBubble('bot', r.text||'');
+    }catch(err){ appendBubble('bot', 'Error: '+err.message); }
+  };
+
+  $('brainAdd').onsubmit = async function(e){
+    e.preventDefault();
+    var key=$('brainKey').value.trim();
+    var value=$('brainVal').value.trim();
+    if(!key||!value) return;
+    try{ await api('brain_remember','POST',{key:key,value:value}); $('brainVal').value=''; await loadBrain(); toast('Saved'); }
+    catch(err){ toast(err.message); }
+  };
+
+  $('bankForm').onsubmit = async function(e){
+    e.preventDefault();
+    var amount=$('bankAmount').value.trim();
+    var merchant=$('bankMerchant').value.trim();
+    var note=$('bankNote').value.trim();
+    try{
+      await api('bank_add','POST',{amount:amount,merchant:merchant,note:note});
+      $('bankAmount').value=''; $('bankNote').value='';
+      await loadBank(); toast('Saved');
+    }catch(err){ toast(err.message); }
+  };
+
+  $('bankList').onclick = async function(e){
+    var b=e.target.closest('[data-bank-del]'); if(!b) return;
+    if(!confirm('Delete transaction?')) return;
+    try{ await api('bank_delete','POST',{id:b.getAttribute('data-bank-del')}); toast('Deleted'); await loadBank(); }
+    catch(err){ toast(err.message); }
+  };
+
+  $('btnDriveRefresh').onclick = function(){ loadDrive().then(function(){ toast('Drive refreshed'); }); };
+  $('driveList').onclick = async function(e){
+    var open=e.target.closest('[data-drive-open]');
+    var del=e.target.closest('[data-drive-del]');
+    if(open){
+      try{ var r=await api('drive_sign','POST',{path:open.getAttribute('data-drive-open')}); if(r.url) window.open(r.url,'_blank'); else toast('No URL'); }
+      catch(err){ toast(err.message); }
+    }
+    if(del){
+      if(!confirm('Delete file?')) return;
+      try{ await api('drive_delete','POST',{path:del.getAttribute('data-drive-del')}); toast('Deleted'); await loadDrive(); }
+      catch(err){ toast(err.message); }
+    }
+  };
+
+  $('btnMailSend').onclick = async function(){
+    var btn=$('btnMailSend'); btn.disabled=true; btn.textContent='Sending…';
+    try{
+      var r=await api('mail_send','POST',{subject:$('mailSubject').value.trim(), text:$('mailBody').value.trim()});
+      toast(r.ok ? ('Sent → '+(r.to||'')) : (r.error||'fail'));
+    }catch(e){ toast(e.message); }
+    finally{ btn.disabled=false; btn.textContent='📧 Send Email'; }
+  };
+
+  $('btnVoiceSpeak').onclick = async function(){
+    var text=$('voiceText').value.trim(); if(!text){ toast('Enter text'); return; }
+    var btn=$('btnVoiceSpeak'); btn.disabled=true; btn.textContent='Generating…';
+    try{
+      var r=await api('voice_speak','POST',{text:text});
+      if(r.ok && r.url){ $('voiceResult').innerHTML='<a href="'+esc(r.url)+'" target="_blank" rel="noopener" style="color:#c4b5fd">Play / Download</a>'; toast('Voice ready'); }
+      else if(r.ok){ $('voiceResult').textContent=r.note||'OK'; toast('Voice generated'); }
+      else toast(r.error||'fail');
+    }catch(e){ toast(e.message); }
+    finally{ btn.disabled=false; btn.textContent='🔊 Generate Voice'; }
+  };
+
+  $('shadowForm').onsubmit = async function(e){
+    e.preventDefault();
+    var t=$('shadowInput').value.trim(); if(!t) return;
+    try{ await api('shadow_add','POST',{text:t}); $('shadowInput').value=''; await loadShadow(); toast('Saved'); }
+    catch(err){ toast(err.message); }
+  };
+  $('btnShadowMorning').onclick = async function(){
+    try{ await api('shadow_morning','POST',{}); toast('Morning report sent'); }catch(e){ toast(e.message); }
+  };
+
+  $('btnGodHeal').onclick = async function(){ try{ await api('god_heal','POST',{}); toast('Heal ok'); }catch(e){ toast(e.message); } };
+  $('btnNight').onclick = async function(){ try{ await api('night_run','POST',{}); toast('Night ok'); }catch(e){ toast(e.message); } };
+  $('btnWorker').onclick = async function(){ try{ await api('think_worker','POST',{}); toast('Worker ok'); }catch(e){ toast(e.message); } };
+
+  // Kill stale SW caches on load
+  if('serviceWorker' in navigator){
+    navigator.serviceWorker.getRegistrations().then(function(regs){
+      regs.forEach(function(r){ r.update(); });
+    });
+    navigator.serviceWorker.register('/sw.js?v=4').catch(function(){});
   }
+
+  // Auto-login if token/secret present
+  (async function(){
+    if(getToken()||getSecret()){
+      try{
+        await api('overview');
+        await boot();
+        $('gate').style.display='none';
+        $('app').classList.add('show');
+        showWorld(localStorage.getItem('rq_world')||'chat');
+      }catch(e){ clearAuth(); }
+    }
+  })();
 })();
-setInterval(()=>{if(document.getElementById('app').classList.contains('show')) loadOverview().catch(()=>{})},60000);
 </script>
 </body>
 </html>
