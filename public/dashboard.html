@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-  <title>Queen OS 50x · v7</title>
+  <title>Queen OS 50x · v8</title>
   <meta name="theme-color" content="#070a12" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/manifest.webmanifest" />
@@ -56,7 +56,7 @@
   <div id="gate">
     <div class="brand" style="margin-bottom:12px">
       <div class="logo">👑</div>
-      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">v7 · Morning Pack · Drive parity · Mail</div></div>
+      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">v8 · Alerts · Hull B · APK · Drive search</div></div>
     </div>
     <input id="secret" type="password" placeholder="DASH_SECRET" autocomplete="current-password" />
     <label><input type="checkbox" id="remember" checked /> Remember me (30 days)</label>
@@ -71,6 +71,7 @@
         <div><h1 id="worldTitle">Chat</h1><div class="sub" id="meta">Queen OS</div></div>
       </div>
       <div class="row">
+        <button type="button" id="btnAlerts" style="padding:8px 10px;position:relative">🔔<span id="alertDot" style="display:none;position:absolute;top:4px;right:4px;width:8px;height:8px;background:#f87171;border-radius:50%"></span></button>
         <button type="button" id="btnRefresh" style="padding:8px 10px">↻</button>
         <button type="button" id="btnLock" class="danger" style="padding:8px 10px">Lock</button>
       </div>
@@ -163,6 +164,22 @@
       </section>
 
       <section class="world" data-world="more">
+        <div class="card">
+          <h2>🔔 Alert Center</h2>
+          <div id="alertsList" class="muted">—</div>
+          <button type="button" id="btnAlertsSeen" style="margin-top:8px">Mark seen</button>
+        </div>
+        <div class="card">
+          <h2>🧠 Hull B · Think Jobs</h2>
+          <div id="hullJobsList" class="mono muted">—</div>
+          <button type="button" id="btnHullRefresh" style="margin-top:8px">↻ Refresh jobs</button>
+        </div>
+        <div class="card">
+          <h2>📱 APK Update</h2>
+          <div id="apkStatus" class="muted">—</div>
+          <button type="button" id="btnApkCheck" style="margin-top:8px">Check update</button>
+        </div>
+
         <div class="card">
           <h2>Command Center</h2>
           <div class="row">
@@ -334,6 +351,46 @@
     }catch(e){ $('shadowList').textContent=e.message; }
   }
 
+  
+  async function loadAlerts(){
+    try{
+      var r=await api('alerts');
+      var list=r.alerts||[];
+      var dot=$('alertDot');
+      if(dot) dot.style.display=(r.unseen>0||list.some(function(a){return a.level==='critical'||a.severity==='critical';}))?'block':'none';
+      var el=$('alertsList');
+      if(!el) return;
+      if(!list.length){ el.textContent='No active alerts.'; return; }
+      el.innerHTML=list.slice(0,10).map(function(a){
+        return '<div style="padding:6px 0;border-bottom:1px solid var(--border)"><b>'+esc(a.level||a.severity||'info')+'</b> '+esc(a.title||a.message||'')+'</div>';
+      }).join('');
+    }catch(e){ if($('alertsList')) $('alertsList').textContent=e.message; }
+  }
+  async function loadHullJobs(){
+    try{
+      var r=await api('jobs');
+      var jobs=r.jobs||[];
+      var el=$('hullJobsList');
+      if(!el) return;
+      if(!jobs.length){ el.textContent='No jobs.'; return; }
+      el.innerHTML=jobs.slice(0,8).map(function(j){
+        return '#'+esc(j.id)+' · '+esc(j.status)+' · '+esc(String(j.prompt||j.question||'').slice(0,50));
+      }).join('<br>');
+    }catch(e){ if($('hullJobsList')) $('hullJobsList').textContent=e.message; }
+  }
+  async function loadApk(){
+    try{
+      var r=await api('apk_status');
+      var el=$('apkStatus');
+      if(!el) return;
+      if(r.configured===false){ el.textContent=r.message||'APK status not fully configured'; return; }
+      var ver=r.head_sha||r.run_number||r.status||'—';
+      el.innerHTML='Status: <b>'+esc(r.status||r.conclusion||'—')+'</b><br>Run: '+esc(String(ver))+
+        (r.html_url?('<br><a href="'+esc(r.html_url)+'" target="_blank" rel="noopener" style="color:#c4b5fd">Open Actions</a>'):'')+
+        (r.pwa_url?('<br><span class="muted">PWA: '+esc(r.pwa_url)+'</span>'):'');
+    }catch(e){ if($('apkStatus')) $('apkStatus').textContent=e.message; }
+  }
+
   async function boot(){
     await loadChat();
     try{ await loadBrain(); }catch(e){}
@@ -341,6 +398,9 @@
     try{ await loadDrive(); }catch(e){}
     try{ await loadMailStatus(); }catch(e){}
     try{ await loadShadow(); }catch(e){}
+    try{ await loadAlerts(); }catch(e){}
+    try{ await loadHullJobs(); }catch(e){}
+    try{ await loadApk(); }catch(e){}
   }
 
   $('unlock').onclick = async function(){
@@ -464,6 +524,12 @@
   $('btnShadowMorning').onclick = async function(){
     try{ await api('shadow_morning','POST',{}); toast('Morning report sent'); }catch(e){ toast(e.message); }
   };
+
+  
+  if($('btnAlerts')) $('btnAlerts').onclick=function(){ showWorld('more'); loadAlerts(); };
+  if($('btnAlertsSeen')) $('btnAlertsSeen').onclick=async function(){ try{ await api('alerts_seen','POST',{}); toast('Marked seen'); await loadAlerts(); }catch(e){ toast(e.message);} };
+  if($('btnHullRefresh')) $('btnHullRefresh').onclick=function(){ loadHullJobs().then(function(){ toast('Jobs refreshed'); }); };
+  if($('btnApkCheck')) $('btnApkCheck').onclick=function(){ loadApk().then(function(){ toast('APK checked'); }); };
 
   $('btnGodHeal').onclick = async function(){ try{ await api('god_heal','POST',{}); toast('Heal ok'); }catch(e){ toast(e.message); } };
   $('btnNight').onclick = async function(){ try{ await api('night_run','POST',{}); toast('Night ok'); }catch(e){ toast(e.message); } };
