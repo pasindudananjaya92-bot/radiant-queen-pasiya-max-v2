@@ -679,6 +679,25 @@ async function actionDriveDelete(path) {
   return d.removeFile(path);
 }
 
+
+async function actionMailSend(body = {}) {
+  const m = await import('../lib/mailManager.js');
+  return m.sendEmail(body);
+}
+async function actionMailStatus() {
+  const m = await import('../lib/mailManager.js');
+  return {
+    ok: true,
+    configured: m.mailConfigured(),
+    from: process.env.RESEND_FROM || process.env.MAIL_FROM || null,
+    to: process.env.FOUNDER_EMAIL || process.env.MAIL_TO || null,
+  };
+}
+async function actionVoiceSpeak(body = {}) {
+  const v = await import('../lib/voiceDash.js');
+  return v.speakForDashboard(body.text || body.message || '');
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -792,6 +811,9 @@ export default async function handler(req, res) {
       if (action === 'drive' || action === 'drive_list') {
         return json(res, 200, await actionDriveList());
       }
+      if (action === 'mail_status') {
+        return json(res, 200, await actionMailStatus());
+      }
       return json(res, 200, await actionOverview());
     }
 
@@ -891,6 +913,14 @@ export default async function handler(req, res) {
       if (action === 'drive_delete') {
         const body = parseBody(req);
         return json(res, 200, await actionDriveDelete(body.path || body.name));
+      }
+      if (action === 'mail_send') {
+        const body = parseBody(req);
+        return json(res, 200, await actionMailSend(body));
+      }
+      if (action === 'voice_speak') {
+        const body = parseBody(req);
+        return json(res, 200, await actionVoiceSpeak(body));
       }
       if (action === 'alerts_seen') {
         return json(res, 200, await actionAlertsSeen());
