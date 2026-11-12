@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-  <title>Queen OS 50x · v4</title>
+  <title>Queen OS 50x · v7</title>
   <meta name="theme-color" content="#070a12" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/manifest.webmanifest" />
@@ -56,7 +56,7 @@
   <div id="gate">
     <div class="brand" style="margin-bottom:12px">
       <div class="logo">👑</div>
-      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">v4 · Drive · Mail · Voice · Telegram parity</div></div>
+      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">v7 · Morning Pack · Drive parity · Mail</div></div>
     </div>
     <input id="secret" type="password" placeholder="DASH_SECRET" autocomplete="current-password" />
     <label><input type="checkbox" id="remember" checked /> Remember me (30 days)</label>
@@ -80,6 +80,7 @@
       <section class="world active" data-world="chat">
         <div class="card">
           <div id="chatLog"></div>
+          <div class="row" style="margin-bottom:8px"><button type="button" id="btnChatClear" style="padding:6px 10px;font-size:.75rem">🧹 Clear Chat</button></div>
           <form id="chatForm" class="composer">
             <textarea id="chatInput" rows="2" placeholder="Message… or think …"></textarea>
             <button class="primary" type="submit">Send</button>
@@ -372,6 +373,12 @@
 
   $('btnLock').onclick = function(){ clearAuth(); location.reload(); };
   $('btnRefresh').onclick = function(){ boot().then(function(){ toast('Refreshed'); }).catch(function(e){ toast(e.message); }); };
+
+  $('btnChatClear').onclick = async function(){
+    if(!confirm('Clear dashboard chat history?')) return;
+    try{ await api('chat_pro_clear','POST',{}); $('chatLog').innerHTML=''; toast('Chat cleared'); }
+    catch(err){ toast(err.message); }
+  };
 
   $('chatForm').onsubmit = async function(e){
     e.preventDefault();
