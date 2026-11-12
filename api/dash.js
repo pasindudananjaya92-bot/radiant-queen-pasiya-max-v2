@@ -494,6 +494,11 @@ async function actionAlertsSeen() {
   const mod = await import('../lib/dashboardAlerts.js');
   return mod.markAlertsSeen();
 }
+async function actionAlertsClear() {
+  const mod = await import('../lib/dashboardAlerts.js');
+  if (typeof mod.clearAlerts === 'function') return mod.clearAlerts();
+  return { ok: false, error: 'clearAlerts missing' };
+}
 
 async function actionSessionLogin() {
   const mod = await import('../lib/dashboardSession.js');
@@ -926,6 +931,9 @@ export default async function handler(req, res) {
       }
       if (action === 'alerts_seen') {
         return json(res, 200, await actionAlertsSeen());
+      }
+      if (action === 'alerts_clear') {
+        return json(res, 200, await actionAlertsClear());
       }
       if (action === 'think_worker' || action === 'worker') {
         return json(res, 200, await actionThinkWorker());
