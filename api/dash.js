@@ -665,6 +665,20 @@ async function actionApkStatus() {
 }
 
 
+
+async function actionDriveList() {
+  const d = await import('../lib/driveManager.js');
+  return d.listDrive(50);
+}
+async function actionDriveSign(path) {
+  const d = await import('../lib/driveManager.js');
+  return d.signFile(path);
+}
+async function actionDriveDelete(path) {
+  const d = await import('../lib/driveManager.js');
+  return d.removeFile(path);
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -775,6 +789,9 @@ export default async function handler(req, res) {
       if (action === 'apk' || action === 'apk_status') {
         return json(res, 200, await actionApkStatus());
       }
+      if (action === 'drive' || action === 'drive_list') {
+        return json(res, 200, await actionDriveList());
+      }
       return json(res, 200, await actionOverview());
     }
 
@@ -866,6 +883,14 @@ export default async function handler(req, res) {
       if (action === 'bank_bill' || action === 'bank_bill_ingest') {
         const body = parseBody(req);
         return json(res, 200, await actionBankBill(body));
+      }
+      if (action === 'drive_sign') {
+        const body = parseBody(req);
+        return json(res, 200, await actionDriveSign(body.path || body.name));
+      }
+      if (action === 'drive_delete') {
+        const body = parseBody(req);
+        return json(res, 200, await actionDriveDelete(body.path || body.name));
       }
       if (action === 'alerts_seen') {
         return json(res, 200, await actionAlertsSeen());
