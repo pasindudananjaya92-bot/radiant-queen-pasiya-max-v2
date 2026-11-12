@@ -599,7 +599,8 @@ export default async function handler(req, res) {
     if (job === 'morningbrief' || job === 'morning_brief' || job === 'nightbrief' || job === 'morningpack' || job === 'morning_pack') {
       // Phase 7 — Merged Morning Pack (Shadow + Health + Bank + Weather)
       const { runMergedMorning } = await import('../lib/morningPack.js');
-      const r = await runMergedMorning({ sendTelegram: true, voice: true });
+      // Phase 9: always try email to FOUNDER_EMAIL (Resend) in addition to Telegram + voice
+      const r = await runMergedMorning({ sendTelegram: true, voice: true, email: true });
       return res.status(200).json({
         ok: true,
         job: 'morningpack',
@@ -607,6 +608,8 @@ export default async function handler(req, res) {
         voice: !!(r.voice && r.voice.ok),
         voice_error: r.voice && r.voice.error ? r.voice.error : null,
         send_ok: !!(r.send && r.send.ok),
+        email_ok: !!(r.email && r.email.ok),
+        email_error: r.email && r.email.error ? r.email.error : null,
       });
     }
 
