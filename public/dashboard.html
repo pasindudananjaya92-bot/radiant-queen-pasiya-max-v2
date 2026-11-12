@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-  <title>Queen OS 50x</title>
+  <title>Queen OS 50x · Fix3</title>
   <meta name="theme-color" content="#070a12" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/manifest.webmanifest" />
@@ -77,7 +77,7 @@
   <div id="gate">
     <div class="brand" style="margin-bottom:12px">
       <div class="logo">👑</div>
-      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">Private Platform · P6C Bank · P6F APK</div></div>
+      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">Private Platform · Drive · Mail · Voice · Fix3</div></div>
     </div>
     <input id="secret" type="password" placeholder="DASH_SECRET" />
     <label><input type="checkbox" id="remember" checked /> Remember me (30 days)</label>
@@ -186,20 +186,20 @@
       </section>
 
       <!-- MAIL placeholder -->
-      <section class="world" data-world="mail">
+            <section class="world" data-world="mail">
         <div class="card">
           <h2>Queen Mail</h2>
-          <p class="muted" style="margin-top:0">Resend API · set RESEND_API_KEY + FOUNDER_EMAIL</p>
+          <p class="muted" style="margin-top:0">Resend API · RESEND_API_KEY + FOUNDER_EMAIL</p>
           <div id="mailStatus" class="muted" style="margin-bottom:10px">—</div>
           <input class="field" id="mailSubject" placeholder="Subject" value="Queen OS Report" />
-          <textarea id="mailBody" class="field" rows="4" placeholder="Email body..." style="width:100%;min-height:100px;padding:11px;border-radius:12px;border:1px solid var(--border);background:#0a0e18;color:var(--text)"></textarea>
-          <button class="primary" id="btnMailSend" style="width:100%;margin-top:8px">📧 Send Email</button>
+          <textarea id="mailBody" rows="4" placeholder="Email body..." style="width:100%;min-height:110px;padding:11px;border-radius:12px;border:1px solid var(--border);background:#0a0e18;color:var(--text);margin-bottom:8px"></textarea>
+          <button class="primary" id="btnMailSend" style="width:100%">📧 Send Email</button>
         </div>
         <div class="card">
           <h2>Queen Voice</h2>
-          <p class="muted" style="margin-top:0">TTS via existing ttsManager (Google/Edge fallback)</p>
-          <textarea id="voiceText" class="field" rows="3" placeholder="Text to speak..." style="width:100%;min-height:80px;padding:11px;border-radius:12px;border:1px solid var(--border);background:#0a0e18;color:var(--text)"></textarea>
-          <button class="primary" id="btnVoiceSpeak" style="width:100%;margin-top:8px">🔊 Generate Voice</button>
+          <p class="muted" style="margin-top:0">Text-to-speech · Play link after generate</p>
+          <textarea id="voiceText" rows="3" placeholder="Text to speak..." style="width:100%;min-height:90px;padding:11px;border-radius:12px;border:1px solid var(--border);background:#0a0e18;color:var(--text);margin-bottom:8px"></textarea>
+          <button class="primary" id="btnVoiceSpeak" style="width:100%">🔊 Generate Voice</button>
           <div id="voiceResult" class="muted" style="margin-top:10px"></div>
         </div>
       </section>
@@ -403,24 +403,31 @@ async function loadMailStatus(){
 function renderDrive(files){
   const el=document.getElementById('driveList');
   if(!el) return;
-  if(!files||!files.length){el.innerHTML='<span class="muted">No files in vault bucket yet. Upload via Telegram: caption <span class="mono">vault upload</span></span>';return}
+  if(!files||!files.length){
+    el.innerHTML='<span class="muted">No files found in bucket <b>vault</b>. Upload via Telegram caption <span class="mono">vault upload</span>.</span>';
+    return;
+  }
   el.innerHTML='<div class="muted" style="margin-bottom:8px">'+files.length+' file(s)</div>'+files.map(f=>{
-    const path=f.path||f.name;
-    const size=f.size!=null?(' · '+Math.round(Number(f.size)/1024)+' KB'):'';
+    const path=f.path||f.name||'';
+    const kb=f.size!=null?(Math.round(Number(f.size)/1024)+' KB'):'';
     return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">'+
-    '<b>'+esc(path)+'</b><span class="muted mono">'+esc(size)+'</span><br>'+
-    '<button data-drive-open="'+esc(path)+'" style="padding:4px 8px;font-size:.72rem;margin-top:4px">Open</button> '+
-    '<button class="danger" data-drive-del="'+esc(path)+'" style="padding:4px 8px;font-size:.72rem">Del</button></div>';
+      '<b>'+esc(path)+'</b> <span class="muted mono">'+esc(kb)+'</span><br>'+
+      '<button type="button" data-drive-open="'+esc(path)+'" style="padding:4px 8px;font-size:.72rem;margin-top:4px">Open</button> '+
+      '<button type="button" class="danger" data-drive-del="'+esc(path)+'" style="padding:4px 8px;font-size:.72rem">Del</button></div>';
   }).join('');
 }
 async function loadDrive(){
+  const el=document.getElementById('driveList');
+  if(el) el.textContent='Loading…';
   try{
     const r=await api('drive_list');
-    const files=r.files||[];
-    renderDrive(files);
-    if(r.error) toast(r.error);
-    else if(!files.length) toast('Drive empty (bucket: '+(r.bucket||'vault')+')');
-  }catch(e){toast('Drive: '+e.message);renderDrive([]);}
+    if(r.ok===false) throw new Error(r.error||'drive failed');
+    renderDrive(r.files||[]);
+    return r;
+  }catch(e){
+    if(el) el.innerHTML='<span style="color:var(--bad)">Drive error: '+esc(e.message)+'</span>';
+    throw e;
+  }
 }
 
 function renderBank(summary, txs){
@@ -441,7 +448,7 @@ function renderBank(summary, txs){
   document.getElementById('bankList').innerHTML=list.length
     ?list.map(t=>'<div style="padding:8px 0;border-bottom:1px solid var(--border)"><b>Rs.'+esc(t.amount)+'</b> · '+esc(t.merchant||t.note||'—')+
       ' <span class="muted mono">'+esc(t.category)+' · '+esc(String(t.tx_date).slice(0,10))+'</span> '+
-      '<button class="danger" data-bank-del="'+esc(t.id)+'" style="padding:4px 8px;font-size:.72rem">Del</button></div>').join('')
+      '<button class="danger" data-bank-del="'+esc(t.id)+'" type="button" style="padding:4px 8px;font-size:.72rem">Del</button></div>').join('')
     :'No transactions yet.';
 }
 function renderApk(a){
@@ -664,31 +671,54 @@ document.getElementById('bankForm').onsubmit=async e=>{
 };
 document.getElementById('bankList').onclick=async e=>{
   const b=e.target.closest('[data-bank-del]'); if(!b) return;
-  if(!confirm('Delete transaction?')) return;
-  try{await api('bank_delete','POST',{id:b.getAttribute('data-bank-del')});await loadBank()}catch(err){toast(err.message)}
+  e.preventDefault(); e.stopPropagation();
+  const id=b.getAttribute('data-bank-del');
+  if(!id){toast('Missing id');return}
+  if(!confirm('Delete this transaction?')) return;
+  b.disabled=true;
+  try{
+    await api('bank_delete','POST',{id:id});
+    toast('Deleted');
+    await loadBank();
+  }catch(err){toast('Delete failed: '+err.message)}
+  finally{b.disabled=false}
 };
 document.getElementById('btnApkRefresh').onclick=()=>loadApk().then(()=>toast('APK status refreshed'));
 
 
-document.getElementById('btnMailSend')&&(document.getElementById('btnMailSend').onclick=async()=>{
+document.getElementById('btnMailSend')?.addEventListener('click', async ()=>{
   const btn=document.getElementById('btnMailSend');
-  btn.disabled=true;btn.textContent='Sending…';
+  btn.disabled=true; btn.textContent='Sending…';
   try{
-    const subject=document.getElementById('mailSubject').value.trim();
-    const text=document.getElementById('mailBody').value.trim();
+    const subject=document.getElementById('mailSubject')?.value?.trim()||'Queen OS Report';
+    const text=document.getElementById('mailBody')?.value?.trim()||'';
     const r=await api('mail_send','POST',{subject,text});
     if(r.ok) toast('Email sent → '+(r.to||''));
     else toast(r.error||'send failed');
   }catch(e){toast(e.message)}
   finally{btn.disabled=false;btn.textContent='📧 Send Email'}
 });
-document.getElementById('btnVoiceSpeak')&&(document.getElementById('btnVoiceSpeak').onclick=async()=>{
+    if(r.ok) toast('Email sent → '+(r.to||''));
+    else toast(r.error||'send failed');
+  }catch(e){toast(e.message)}
+  finally{btn.disabled=false;btn.textContent='📧 Send Email'}
+});
+document.getElementById('btnVoiceSpeak')?.addEventListener('click', async ()=>{
   const btn=document.getElementById('btnVoiceSpeak');
-  const text=document.getElementById('voiceText').value.trim();
+  const text=document.getElementById('voiceText')?.value?.trim()||'';
   if(!text){toast('Enter text');return}
   btn.disabled=true;btn.textContent='Generating…';
   try{
     const r=await api('voice_speak','POST',{text});
+    const el=document.getElementById('voiceResult');
+    if(r.ok&&r.url){
+      el.innerHTML='Provider: '+esc(r.provider||'tts')+' · <a href="'+esc(r.url)+'" target="_blank" rel="noopener" style="color:#c4b5fd">Play / Download</a>';
+      toast('Voice ready');
+    }else if(r.ok){ el.textContent=r.note||r.preview||'Voice generated'; toast('Voice generated'); }
+    else toast(r.error||'TTS failed');
+  }catch(e){toast(e.message)}
+  finally{btn.disabled=false;btn.textContent='🔊 Generate Voice'}
+});
     const el=document.getElementById('voiceResult');
     if(r.ok&&r.url){
       el.innerHTML='Provider: '+esc(r.provider||'tts')+' · <a href="'+esc(r.url)+'" target="_blank" rel="noopener" style="color:#c4b5fd">Play / Download</a>';
@@ -699,6 +729,30 @@ document.getElementById('btnVoiceSpeak')&&(document.getElementById('btnVoiceSpea
     } else toast(r.error||'TTS failed');
   }catch(e){toast(e.message)}
   finally{btn.disabled=false;btn.textContent='🔊 Generate Voice'}
+});
+
+
+// --- Drive / Mail / Voice / Bank (delegated) ---
+document.getElementById('btnDriveRefresh')?.addEventListener('click', async ()=>{
+  try{ await loadDrive(); toast('Drive refreshed'); }catch(e){ toast(e.message); }
+});
+document.getElementById('driveList')?.addEventListener('click', async (e)=>{
+  const open=e.target.closest('[data-drive-open]');
+  const del=e.target.closest('[data-drive-del]');
+  if(open){
+    try{
+      const r=await api('drive_sign','POST',{path:open.getAttribute('data-drive-open')});
+      if(r.url) window.open(r.url,'_blank'); else toast('No signed URL');
+    }catch(err){toast(err.message)}
+  }
+  if(del){
+    if(!confirm('Delete from Drive?')) return;
+    try{
+      await api('drive_delete','POST',{path:del.getAttribute('data-drive-del')});
+      toast('Deleted');
+      await loadDrive();
+    }catch(err){toast(err.message)}
+  }
 });
 
 if('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(()=>{});
