@@ -900,7 +900,9 @@ export default async function handler(req, res) {
       }
       if (action === 'bank_delete' || action === 'bank_tx_delete') {
         const body = parseBody(req);
-        return json(res, 200, await actionBankDelete(body.id || req.query?.id));
+        const id = body.id || body.tx_id || req.query?.id || '';
+        if (!id) return json(res, 400, { ok: false, error: 'id required' });
+        return json(res, 200, await actionBankDelete(String(id)));
       }
       if (action === 'bank_bill' || action === 'bank_bill_ingest') {
         const body = parseBody(req);
