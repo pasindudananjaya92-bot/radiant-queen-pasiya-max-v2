@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-  <title>Queen OS 50x · v9</title>
+  <title>Queen OS 50x · v10</title>
   <meta name="theme-color" content="#070a12" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/manifest.webmanifest" />
@@ -56,7 +56,7 @@
   <div id="gate">
     <div class="brand" style="margin-bottom:12px">
       <div class="logo">👑</div>
-      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">v9 · Multi-currency · Drive folders · Auto email</div></div>
+      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">v10 · FX · Drive folders TG · Alerts</div></div>
     </div>
     <input id="secret" type="password" placeholder="DASH_SECRET" autocomplete="current-password" />
     <label><input type="checkbox" id="remember" checked /> Remember me (30 days)</label>
@@ -71,7 +71,7 @@
         <div><h1 id="worldTitle">Chat</h1><div class="sub" id="meta">Queen OS</div></div>
       </div>
       <div class="row">
-        <button type="button" id="btnAlerts" style="padding:8px 10px;position:relative">🔔<span id="alertDot" style="display:none;position:absolute;top:4px;right:4px;width:8px;height:8px;background:#f87171;border-radius:50%"></span></button>
+        <button type="button" id="btnAlerts" style="padding:8px 10px;position:relative">🔔<span id="alertDot" style="display:none;position:absolute;top:2px;right:2px;min-width:16px;height:16px;padding:0 4px;background:#f87171;border-radius:8px;font-size:10px;line-height:16px;font-weight:700">0</span></button>
         <button type="button" id="btnRefresh" style="padding:8px 10px">↻</button>
         <button type="button" id="btnLock" class="danger" style="padding:8px 10px">Lock</button>
       </div>
@@ -167,7 +167,7 @@
         <div class="card">
           <h2>🔔 Alert Center</h2>
           <div id="alertsList" class="muted">—</div>
-          <button type="button" id="btnAlertsSeen" style="margin-top:8px">Mark seen</button>
+          <div class="row" style="margin-top:8px"><button type="button" id="btnAlertsSeen">Mark all read</button><button type="button" id="btnAlertsRefresh">↻ Refresh</button><button type="button" class="danger" id="btnAlertsClear">Clear stored</button></div>
         </div>
         <div class="card">
           <h2>🧠 Hull B · Think Jobs</h2>
@@ -290,7 +290,8 @@
   function renderBank(summary, txs){
     var total = summary && summary.total!=null ? summary.total : 0;
     $('bankTotal').textContent = (summary && summary.formatted) ? summary.formatted : moneyFmt(total, summary && summary.currency);
-    $('bankMeta').textContent = (summary && summary.count || 0)+' txs · 30d · multi-currency';
+    if(summary && summary.total_base_formatted){ $('bankMeta').textContent = (summary.count||0)+' txs · ≈ '+summary.total_base_formatted+' ('+(summary.base_currency||'LKR')+(summary.fx_live?' · live FX':' · approx')+')'; } else {
+    $('bankMeta').textContent = (summary && summary.count || 0)+' txs · 30d · multi-currency'; }
     var series = (summary && summary.series) || [];
     var max = 1;
     series.forEach(function(s){ if(s.total>max) max=s.total; });
@@ -386,13 +387,23 @@
     try{
       var r=await api('alerts');
       var list=r.alerts||[];
+      var unseen=Number(r.unseen||0);
       var dot=$('alertDot');
-      if(dot) dot.style.display=(r.unseen>0||list.some(function(a){return a.level==='critical'||a.severity==='critical';}))?'block':'none';
+      if(dot){
+        if(unseen>0){ dot.style.display='block'; dot.textContent=String(unseen>9?'9+':unseen); }
+        else { dot.style.display='none'; dot.textContent='0'; }
+      }
       var el=$('alertsList');
       if(!el) return;
-      if(!list.length){ el.textContent='No active alerts.'; return; }
-      el.innerHTML=list.slice(0,10).map(function(a){
-        return '<div style="padding:6px 0;border-bottom:1px solid var(--border)"><b>'+esc(a.level||a.severity||'info')+'</b> '+esc(a.title||a.message||'')+'</div>';
+      if(!list.length){ el.textContent='No active alerts. System quiet.'; return; }
+      el.innerHTML=list.slice(0,15).map(function(a){
+        var sev=a.level||a.severity||'info';
+        var color=sev==='critical'?'#f87171':(sev==='warn'||sev==='warning')?'#fbbf24':'#94a3b8';
+        var live=a.live?' · live':'';
+        return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">'
+          +'<span style="color:'+color+';font-weight:700">'+esc(sev)+'</span>'
+          +' <b>'+esc(a.title||a.message||'')+'</b>'
+          +'<div class="muted" style="font-size:.75rem">'+esc(a.source||'')+live+(a.body||a.message?(' · '+esc(String(a.body||a.message||'').slice(0,100))):'')+'</div></div>';
       }).join('');
     }catch(e){ if($('alertsList')) $('alertsList').textContent=e.message; }
   }
@@ -559,7 +570,9 @@
 
   
   if($('btnAlerts')) $('btnAlerts').onclick=function(){ showWorld('more'); loadAlerts(); };
-  if($('btnAlertsSeen')) $('btnAlertsSeen').onclick=async function(){ try{ await api('alerts_seen','POST',{}); toast('Marked seen'); await loadAlerts(); }catch(e){ toast(e.message);} };
+  if($('btnAlertsSeen')) $('btnAlertsSeen').onclick=async function(){ try{ await api('alerts_seen','POST',{}); toast('Marked read'); await loadAlerts(); }catch(e){ toast(e.message);} };
+  if($('btnAlertsRefresh')) $('btnAlertsRefresh').onclick=function(){ loadAlerts().then(function(){ toast('Alerts refreshed'); }); };
+  if($('btnAlertsClear')) $('btnAlertsClear').onclick=async function(){ if(!confirm('Clear stored alerts?')) return; try{ await api('alerts_clear','POST',{}); toast('Cleared'); await loadAlerts(); }catch(e){ toast(e.message);} };
   if($('btnHullRefresh')) $('btnHullRefresh').onclick=function(){ loadHullJobs().then(function(){ toast('Jobs refreshed'); }); };
   if($('btnApkCheck')) $('btnApkCheck').onclick=function(){ loadApk().then(function(){ toast('APK checked'); }); };
 
