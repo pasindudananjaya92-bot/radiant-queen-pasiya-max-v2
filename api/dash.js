@@ -494,6 +494,33 @@ async function actionAlertsSeen() {
   const mod = await import('../lib/dashboardAlerts.js');
   return mod.markAlertsSeen();
 }
+
+async function actionWarRoom() {
+  const mod = await import('../lib/warRoom.js');
+  return mod.getWarRoomOverview();
+}
+
+async function actionHealNow() {
+  const mod = await import('../lib/healerEngine.js');
+  return mod.runImmuneCycle({ dryRun: false });
+}
+
+async function actionHealDry() {
+  const mod = await import('../lib/healerEngine.js');
+  return mod.runImmuneCycle({ dryRun: true });
+}
+
+async function actionSentinelScan() {
+  const mod = await import('../lib/sentinelEngine.js');
+  return mod.runSentinelScan();
+}
+
+async function actionMissionList() {
+  const mod = await import('../lib/missionControl.js');
+  const list = await mod.listMissions({ limit: 12 });
+  return { ok: true, missions: list };
+}
+
 async function actionAlertsClear() {
   const mod = await import('../lib/dashboardAlerts.js');
   if (typeof mod.clearAlerts === 'function') return mod.clearAlerts();
@@ -759,6 +786,8 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       if (action === 'me') return json(res, 200, { ok: true, auth });
       if (action === 'health') return json(res, 200, await actionHealth());
+      if (action === 'warroom' || action === 'war_room' || action === 'nation') return json(res, 200, await actionWarRoom());
+      if (action === 'missions') return json(res, 200, await actionMissionList());
       if (action === 'jobs' || action === 'queue') return json(res, 200, await actionJobs(20));
       if (action === 'night') return json(res, 200, await actionNight(8));
       if (action === 'mem' || action === 'memory') return json(res, 200, await actionMem(15));
@@ -935,6 +964,15 @@ export default async function handler(req, res) {
       if (action === 'alerts_clear') {
         return json(res, 200, await actionAlertsClear());
       }
+      if (action === 'heal_now') {
+        return json(res, 200, await actionHealNow());
+      }
+      if (action === 'heal_dry') {
+        return json(res, 200, await actionHealDry());
+      }
+      if (action === 'sentinel_scan') {
+        return json(res, 200, await actionSentinelScan());
+      }
       if (action === 'think_worker' || action === 'worker') {
         return json(res, 200, await actionThinkWorker());
       }
@@ -982,7 +1020,7 @@ export default async function handler(req, res) {
       return json(res, 400, {
         ok: false,
         error: 'unknown POST action',
-        actions: ['chat','think','god_heal','session_login','think_worker','voice_on','voice_off','night_run','cron_enable','cron_disable','cron_delete','cron_heal','alerts_seen','auth'],
+        actions: ['chat','think','god_heal','session_login','think_worker','voice_on','voice_off','night_run','cron_enable','cron_disable','cron_delete','cron_heal','alerts_seen','alerts_clear','heal_now','heal_dry','sentinel_scan','auth'],
       });
     }
 
