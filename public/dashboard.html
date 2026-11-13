@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-  <title>Queen OS 50x · v11F</title>
+  <title>Queen OS 50x · v12D</title>
   <meta name="theme-color" content="#070a12" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/manifest.webmanifest" />
@@ -56,7 +56,7 @@
   <div id="gate">
     <div class="brand" style="margin-bottom:12px">
       <div class="logo">👑</div>
-      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">v11F · War · Scout · Roster · Auto-Heal</div></div>
+      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">v12D · Agent Lab · Pipeline</div></div>
     </div>
     <input id="secret" type="password" placeholder="DASH_SECRET" autocomplete="current-password" />
     <label><input type="checkbox" id="remember" checked /> Remember me (30 days)</label>
@@ -165,6 +165,14 @@
 
       
       <section class="world" data-world="war">
+
+        <div class="card">
+          <h2>🧪 Agent Lab</h2>
+          <div id="labStats" class="muted">—</div>
+          <div id="labList" class="muted" style="margin-top:8px">—</div>
+          <button type="button" id="btnLabRefresh" style="margin-top:8px">↻ Refresh Lab</button>
+        </div>
+
         <div class="card">
           <h2>🛡 War Room</h2>
           <div id="warThreat" style="font-size:1.1rem;font-weight:700;margin:6px 0">Threat: —</div>
@@ -479,6 +487,29 @@
     if(t==='yellow') return '#fbbf24';
     return '#34d399';
   }
+  
+  async function loadLab(){
+    try{
+      var r=await api('pipeline_stats');
+      if($('labStats')){
+        $('labStats').innerHTML='Events: <b>'+esc(r.total||0)+'</b> · OK '+esc(r.ok_count||0)+' · Fail '+esc(r.fail_count||0);
+      }
+      var fam=r.byFamily||{};
+      var top=Object.keys(fam).sort(function(a,b){return fam[b]-fam[a];}).slice(0,6)
+        .map(function(k){return k+': '+fam[k];}).join(' · ');
+      var recent=r.recent||[];
+      var list=recent.slice(0,8).map(function(x){
+        var icon=x.ok===false?'❌':'✅';
+        return '<div style="padding:6px 0;border-bottom:1px solid var(--border)">'+icon+' <b>'+esc(x.family||'')+'</b> · '+esc(x.corps||'')+' · '+esc(x.ms||0)+'ms<div class="muted mono">'+esc(String(x.raw_text||'').slice(0,50))+'</div></div>';
+      }).join('');
+      if($('labList')){
+        $('labList').innerHTML=(top?('<div class="muted" style="margin-bottom:8px">'+esc(top)+'</div>'):'')+(list||'No events yet');
+      }
+    }catch(e){
+      if($('labStats')) $('labStats').textContent=e.message||String(e);
+    }
+  }
+
   async function loadWarRoom(){
     try{
       var r=await api('warroom');
@@ -683,6 +714,7 @@
 
   
   
+  if($('btnLabRefresh')) $('btnLabRefresh').onclick=function(){ loadLab().then(function(){ toast('Lab refreshed'); }); };
   if($('btnWarRefresh')) $('btnWarRefresh').onclick=function(){ loadWarRoom().then(function(){ toast('War Room refreshed'); }); };
   if($('btnWarHeal')) $('btnWarHeal').onclick=async function(){
     var b=$('btnWarHeal'); if(b){ b.disabled=true; b.textContent='Healing…'; }
