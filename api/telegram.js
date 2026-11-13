@@ -19074,7 +19074,7 @@ bot.command('commands', async (ctx) => {
 
     if (text.startsWith('/')) return;
 
-    // Wave 11A: Mission Control MUST never reach Gemini/AI
+    // Wave 11: Mission + Healer MUST never reach Gemini/AI
     try {
       const t0 = String(text || '').trim().replace(/^\//, '');
       if (/^(swarm|nation|corps|mission|missions)\b/i.test(t0)) {
@@ -19093,8 +19093,24 @@ bot.command('commands', async (ctx) => {
           return;
         }
       }
+      if (/^(heal|immune|playbook|playbooks)\b/i.test(t0)) {
+        try {
+          const healerRoutes = await import('../lib/healerRoutes.js');
+          const out = await healerRoutes.tryHandle(t0, ctx);
+          await ctx.reply(String(out != null ? out : '❌ Healer empty').slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(String(out != null ? out : 'Healer empty').replace(/[*_`]/g, '').slice(0, 4000));
+          });
+          return;
+        } catch (he) {
+          await ctx.reply('❌ Healer error: ' + (he?.message || he));
+          return;
+        }
+      }
     } catch (e) {
-      console.error('missionRoutes telegram gate', e?.message || e);
+      console.error('mission/healer telegram gate', e?.message || e);
     }
 
     // Agent-1: NL → EXECUTE tools (founder private). Else Tool Awareness tip.
