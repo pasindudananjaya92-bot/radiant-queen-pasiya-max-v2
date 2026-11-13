@@ -515,6 +515,11 @@ async function actionSentinelScan() {
   return mod.runSentinelScan();
 }
 
+async function actionScoutOs() {
+  const mod = await import('../lib/scoutEngine.js');
+  return mod.runScoutIntel('os');
+}
+
 async function actionMissionList() {
   const mod = await import('../lib/missionControl.js');
   const list = await mod.listMissions({ limit: 12 });
@@ -972,6 +977,9 @@ export default async function handler(req, res) {
       }
       if (action === 'sentinel_scan') {
         return json(res, 200, await actionSentinelScan());
+      }
+      if (action === 'scout_os') {
+        return json(res, 200, await actionScoutOs());
       }
       if (action === 'think_worker' || action === 'worker') {
         return json(res, 200, await actionThinkWorker());
