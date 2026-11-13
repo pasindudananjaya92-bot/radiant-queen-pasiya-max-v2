@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-  <title>Queen OS 50x · v11E</title>
+  <title>Queen OS 50x · v11F</title>
   <meta name="theme-color" content="#070a12" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/manifest.webmanifest" />
@@ -56,7 +56,7 @@
   <div id="gate">
     <div class="brand" style="margin-bottom:12px">
       <div class="logo">👑</div>
-      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">v11E · War Room · Nation · Immune · Sentinel</div></div>
+      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">v11F · War · Scout · Roster · Auto-Heal</div></div>
     </div>
     <input id="secret" type="password" placeholder="DASH_SECRET" autocomplete="current-password" />
     <label><input type="checkbox" id="remember" checked /> Remember me (30 days)</label>
@@ -190,6 +190,11 @@
         <div class="card">
           <h2>🛰️ Sentinel</h2>
           <div id="warSentinel" class="muted">—</div>
+        </div>
+        <div class="card">
+          <h2>🔭 Scout</h2>
+          <div id="warScout" class="muted">—</div>
+          <button type="button" id="btnWarScout" style="margin-top:8px">Scout OS</button>
         </div>
         <div class="card">
           <h2>💚 Health</h2>
@@ -513,7 +518,17 @@
       var s=r.sentinel;
       if($('warSentinel')){
         if(!s) $('warSentinel').textContent='No scan log. Tap Sentinel or Telegram: sentinel scan';
-        else $('warSentinel').innerHTML='<b>'+esc(s.severity||'info')+'</b> · '+esc(s.title||s.scan_type||'')+'<div class="muted">'+esc(String(s.detail||'').slice(0,120))+'</div>';
+        else {
+          var scoreLine=(s.score!=null)?('Score '+s.score+'/100 · '):'';
+          $('warSentinel').innerHTML='<b>'+scoreLine+esc(s.severity||s.title||'info')+'</b> · '+esc(s.title||s.scan_type||'')+
+            '<div class="muted">'+esc(String(s.detail||'').slice(0,140))+'</div>';
+        }
+      }
+      // Scout
+      if($('warScout')){
+        var sc=r.scout;
+        if(!sc) $('warScout').textContent='No scout brief yet. Tap Scout OS or Telegram: scout os';
+        else $('warScout').innerHTML='<b>'+esc(sc.topic||'os')+'</b> · '+esc(sc.ms||'')+'ms<div class="muted">'+esc(String(sc.preview||'').slice(0,160))+'</div>';
       }
       // Health
       var h=r.health;
@@ -675,10 +690,30 @@
     catch(e){ toast(e.message||e); }
     finally{ if(b){ b.disabled=false; b.textContent='🛡 Heal now'; } }
   };
+  if($('btnWarScout')) $('btnWarScout').onclick=async function(){
+    var b=$('btnWarScout'); if(b){ b.disabled=true; b.textContent='Scouting…'; }
+    try{ var r=await api('scout_os','POST',{}); toast('Scout done');
+      if($('warScout')&&r.brief){ $('warScout').innerHTML='<b>'+esc(r.brief.topic||'os')+'</b><div class="muted">'+esc(String(r.report||'').slice(0,200))+'</div>'; }
+      else if($('warScout')&&r.report){ $('warScout').textContent=String(r.report).slice(0,240); }
+    }catch(e){ toast(e.message||e); }
+    finally{ if(b){ b.disabled=false; b.textContent='Scout OS'; } }
+  };
   if($('btnWarSentinel')) $('btnWarSentinel').onclick=async function(){
     var b=$('btnWarSentinel'); if(b){ b.disabled=true; b.textContent='Scanning…'; }
-    try{ var r=await api('sentinel_scan','POST',{}); toast('Sentinel '+((r.score!=null)?(r.score+'/100'):'done')); await loadWarRoom(); }
-    catch(e){ toast(e.message||e); }
+    try{
+      var r=await api('sentinel_scan','POST',{});
+      var sc=(r.score!=null)?r.score:null;
+      toast('Sentinel '+(sc!=null?(sc+'/100'):'done'));
+      // Paint panel immediately from API response (do not wait for DB log)
+      if($('warSentinel')){
+        var sev=r.critical?('critical'):(r.warn?('warn'):('info'));
+        var findings=(r.findings||[]).slice(0,4).map(function(f){ return '· '+esc(f.title||f.detail||''); }).join('<br>');
+        $('warSentinel').innerHTML='<b>Score '+(sc!=null?sc:'—')+'/100</b> · '+esc(sev)+
+          '<div class="muted">critical='+esc(r.critical)+' · warn='+esc(r.warn)+' · '+(r.ms||'?')+'ms</div>'+
+          (findings?('<div style="margin-top:6px">'+findings+'</div>'):'<div class="muted">No critical findings</div>');
+      }
+      try{ await loadWarRoom(); }catch(e2){}
+    }catch(e){ toast(e.message||e); }
     finally{ if(b){ b.disabled=false; b.textContent='🛰️ Sentinel'; } }
   };
 
