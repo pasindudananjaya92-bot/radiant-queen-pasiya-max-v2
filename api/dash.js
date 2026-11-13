@@ -495,6 +495,18 @@ async function actionAlertsSeen() {
   return mod.markAlertsSeen();
 }
 
+
+async function actionPipelineStats() {
+  const mod = await import('../lib/pipelineEngine.js');
+  return mod.pipelineStats(40);
+}
+
+async function actionPipelineLast() {
+  const mod = await import('../lib/pipelineEngine.js');
+  const recent = await mod.recentPipeline(12);
+  return { ok: true, recent };
+}
+
 async function actionWarRoom() {
   const mod = await import('../lib/warRoom.js');
   return mod.getWarRoomOverview();
@@ -792,6 +804,8 @@ export default async function handler(req, res) {
       if (action === 'me') return json(res, 200, { ok: true, auth });
       if (action === 'health') return json(res, 200, await actionHealth());
       if (action === 'warroom' || action === 'war_room' || action === 'nation') return json(res, 200, await actionWarRoom());
+      if (action === 'pipeline' || action === 'pipeline_stats' || action === 'lab') return json(res, 200, await actionPipelineStats());
+      if (action === 'pipeline_last') return json(res, 200, await actionPipelineLast());
       if (action === 'missions') return json(res, 200, await actionMissionList());
       if (action === 'jobs' || action === 'queue') return json(res, 200, await actionJobs(20));
       if (action === 'night') return json(res, 200, await actionNight(8));
