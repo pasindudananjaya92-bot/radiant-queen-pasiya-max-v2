@@ -19194,6 +19194,15 @@ bot.command('commands', async (ctx) => {
         const { tryAgentExecute } = await import('../lib/agentExecute.js');
         const executed = await tryAgentExecute({ text, ctx });
         if (executed) {
+          try {
+            const pe = await import('../lib/pipelineEngine.js');
+            await pe.finalizePipeline({
+              text,
+              reply: String(executed),
+              ms: 0,
+              stage: 'telegram_execute',
+            });
+          } catch (_) {}
           await ctx.reply(String(executed).slice(0, 4000));
           return;
         }
