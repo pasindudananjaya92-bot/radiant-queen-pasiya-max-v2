@@ -19141,6 +19141,22 @@ bot.command('commands', async (ctx) => {
           return;
         }
       }
+      if (/^(codeswarm|codeheal|fixswarm)\b/i.test(t0)) {
+        try {
+          const codeSwarmRoutes = await import('../lib/codeSwarmRoutes.js');
+          const out = await codeSwarmRoutes.tryHandle(t0, ctx);
+          await ctx.reply(String(out != null ? out : '❌ Code Swarm empty').slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(String(out != null ? out : 'Code Swarm empty').replace(/[*_`]/g, '').slice(0, 4000));
+          });
+          return;
+        } catch (cs) {
+          await ctx.reply('❌ Code Swarm error: ' + (cs?.message || cs));
+          return;
+        }
+      }
     } catch (e) {
       console.error('mission/healer/sentinel telegram gate', e?.message || e);
     }
