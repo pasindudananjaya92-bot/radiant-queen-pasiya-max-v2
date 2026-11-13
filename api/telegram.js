@@ -19125,6 +19125,22 @@ bot.command('commands', async (ctx) => {
           return;
         }
       }
+      if (/^(scout|intel)\b/i.test(t0)) {
+        try {
+          const scoutRoutes = await import('../lib/scoutRoutes.js');
+          const out = await scoutRoutes.tryHandle(t0, ctx);
+          await ctx.reply(String(out != null ? out : '❌ Scout empty').slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(String(out != null ? out : 'Scout empty').replace(/[*_`]/g, '').slice(0, 4000));
+          });
+          return;
+        } catch (sc) {
+          await ctx.reply('❌ Scout error: ' + (sc?.message || sc));
+          return;
+        }
+      }
     } catch (e) {
       console.error('mission/healer/sentinel telegram gate', e?.message || e);
     }
