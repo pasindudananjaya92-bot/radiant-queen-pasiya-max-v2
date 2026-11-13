@@ -19168,6 +19168,22 @@ bot.command('commands', async (ctx) => {
           return;
         }
       }
+      if (/^(pipeline|lab)\b/i.test(t0)) {
+        try {
+          const pipelineRoutes = await import('../lib/pipelineRoutes.js');
+          const out = await pipelineRoutes.tryHandle(t0, ctx);
+          await ctx.reply(String(out != null ? out : '❌ Pipeline empty').slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(String(out != null ? out : 'Pipeline empty').replace(/[*_`]/g, '').slice(0, 4000));
+          });
+          return;
+        } catch (pe) {
+          await ctx.reply('❌ Pipeline error: ' + (pe?.message || pe));
+          return;
+        }
+      }
     } catch (e) {
       console.error('mission/healer/sentinel telegram gate', e?.message || e);
     }
