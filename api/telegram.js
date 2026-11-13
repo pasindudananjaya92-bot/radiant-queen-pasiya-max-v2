@@ -2211,11 +2211,22 @@ async function githubPutFile(path, contentBuffer, message) {
       const { healSourceBeforePush } = await import('../lib/ghHeal.js');
       const healed = await healSourceBeforePush(pth, contentBuffer.toString('utf8'));
       if (!healed.ok) {
-        return { ok: false, error: 'Syntax blocked push: ' + (healed.error || 'invalid'), heal: healed };
+        const tri = healed.triage
+          ? ' | swarm:' + (healed.triage.kind || '') + ' L' + (healed.triage.line ?? healed.line ?? '')
+          : '';
+        return {
+          ok: false,
+          error: 'Syntax blocked push: ' + (healed.error || 'invalid') + tri,
+          heal: healed,
+        };
       }
       if (healed.code) contentBuffer = Buffer.from(healed.code, 'utf8');
       if (healed.fixed) {
-        message = (message || '') + ' [ghHeal auto-syntax-fix]';
+        const tag =
+          healed.stage === 'codeswarm-healed'
+            ? ' [CodeSwarm 12B auto-heal]'
+            : ' [ghHeal auto-syntax-fix]';
+        message = (message || '') + tag;
       }
     }
   } catch (e) {
@@ -4236,7 +4247,7 @@ const arg = text.replace(/^\/\S+\s*/, '').trim();
       try {
         const heal = await import('../lib/ghHeal.js');
         if (typeof heal.healSourceBeforePush === 'function') {
-          const h = await heal.healSourceBeforePush(text, destPath);
+          const h = await heal.healSourceBeforePush(destPath, text);
           if (h && h.blocked) {
             await ctx.reply('🛡 ghHeal blocked: ' + (h.error || 'invalid'));
             return;
