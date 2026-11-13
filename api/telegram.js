@@ -19109,8 +19109,24 @@ bot.command('commands', async (ctx) => {
           return;
         }
       }
+      if (/^(sentinel|audit|auditor|cyber)\b/i.test(t0)) {
+        try {
+          const sentinelRoutes = await import('../lib/sentinelRoutes.js');
+          const out = await sentinelRoutes.tryHandle(t0, ctx);
+          await ctx.reply(String(out != null ? out : '❌ Sentinel empty').slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(String(out != null ? out : 'Sentinel empty').replace(/[*_`]/g, '').slice(0, 4000));
+          });
+          return;
+        } catch (se) {
+          await ctx.reply('❌ Sentinel error: ' + (se?.message || se));
+          return;
+        }
+      }
     } catch (e) {
-      console.error('mission/healer telegram gate', e?.message || e);
+      console.error('mission/healer/sentinel telegram gate', e?.message || e);
     }
 
     // Agent-1: NL → EXECUTE tools (founder private). Else Tool Awareness tip.
