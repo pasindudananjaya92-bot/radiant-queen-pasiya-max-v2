@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-  <title>Queen OS 50x · v10</title>
+  <title>Queen OS 50x · v11E</title>
   <meta name="theme-color" content="#070a12" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/manifest.webmanifest" />
@@ -39,7 +39,7 @@
     .muted{color:var(--muted)}
     .mono{font-family:ui-monospace,monospace;font-size:.75rem}
     .tabs{position:fixed;left:0;right:0;bottom:0;height:calc(var(--tab-h) + var(--safe));padding-bottom:var(--safe);background:rgba(8,11,20,.95);border-top:1px solid var(--border);display:flex;justify-content:space-around;align-items:flex-start;padding-top:6px;z-index:40}
-    .tab{flex:1;background:none;border:none;color:var(--muted);font-size:.6rem;font-weight:600;padding:4px 2px;display:flex;flex-direction:column;align-items:center;gap:2px}
+    .tab{flex:1;background:none;border:none;color:var(--muted);font-size:.55rem;font-weight:600;padding:4px 1px;display:flex;flex-direction:column;align-items:center;gap:2px}
     .tab.on{color:#c4b5fd}
     #chatLog{height:calc(100vh - 230px);min-height:240px;overflow:auto;border:1px solid var(--border);border-radius:14px;padding:10px;background:rgba(0,0,0,.28);margin-bottom:10px}
     .bubble{margin:0 0 10px;padding:9px 11px;border-radius:14px;max-width:92%;font-size:.9rem;line-height:1.4;white-space:pre-wrap;word-break:break-word}
@@ -56,7 +56,7 @@
   <div id="gate">
     <div class="brand" style="margin-bottom:12px">
       <div class="logo">👑</div>
-      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">v10 · FX · Drive folders TG · Alerts</div></div>
+      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">v11E · War Room · Nation · Immune · Sentinel</div></div>
     </div>
     <input id="secret" type="password" placeholder="DASH_SECRET" autocomplete="current-password" />
     <label><input type="checkbox" id="remember" checked /> Remember me (30 days)</label>
@@ -163,6 +163,40 @@
         </div>
       </section>
 
+      
+      <section class="world" data-world="war">
+        <div class="card">
+          <h2>🛡 War Room</h2>
+          <div id="warThreat" style="font-size:1.1rem;font-weight:700;margin:6px 0">Threat: —</div>
+          <div id="warMeta" class="muted">—</div>
+          <div class="row" style="margin-top:10px">
+            <button type="button" class="primary" id="btnWarRefresh">↻ Refresh</button>
+            <button type="button" id="btnWarHeal">🛡 Heal now</button>
+            <button type="button" id="btnWarSentinel">🛰️ Sentinel</button>
+          </div>
+        </div>
+        <div class="card">
+          <h2>👑 Nation</h2>
+          <div id="warNation" class="muted">—</div>
+        </div>
+        <div class="card">
+          <h2>📋 Missions</h2>
+          <div id="warMissions" class="muted">—</div>
+        </div>
+        <div class="card">
+          <h2>🛡 Immune log</h2>
+          <div id="warHeals" class="muted">—</div>
+        </div>
+        <div class="card">
+          <h2>🛰️ Sentinel</h2>
+          <div id="warSentinel" class="muted">—</div>
+        </div>
+        <div class="card">
+          <h2>💚 Health</h2>
+          <div id="warHealth" class="muted">—</div>
+        </div>
+      </section>
+
       <section class="world" data-world="more">
         <div class="card">
           <h2>🔔 Alert Center</h2>
@@ -202,6 +236,7 @@
       <button type="button" class="tab" data-world="shadow"><span>🌑</span>Shadow</button>
       <button type="button" class="tab" data-world="drive"><span>📁</span>Drive</button>
       <button type="button" class="tab" data-world="mail"><span>✉️</span>Mail</button>
+      <button type="button" class="tab" data-world="war"><span>🛡</span>War</button>
       <button type="button" class="tab" data-world="more"><span>⚡</span>More</button>
     </nav>
   </div>
@@ -432,6 +467,69 @@
     }catch(e){ if($('apkStatus')) $('apkStatus').textContent=e.message; }
   }
 
+  
+  function threatColor(t){
+    t=String(t||'green');
+    if(t==='red') return '#f87171';
+    if(t==='yellow') return '#fbbf24';
+    return '#34d399';
+  }
+  async function loadWarRoom(){
+    try{
+      var r=await api('warroom');
+      var th=r.threat||'green';
+      if($('warThreat')){
+        $('warThreat').textContent='Threat: '+String(th).toUpperCase();
+        $('warThreat').style.color=threatColor(th);
+      }
+      if($('warMeta')) $('warMeta').textContent=(r.ms!=null?r.ms+'ms · ':'')+'Wave 11E War Room';
+      // Nation
+      var n=r.nation||{};
+      var corps=n.corps||{};
+      var corpsHtml=Object.keys(corps).sort().map(function(k){
+        return '<span class="mono" style="margin-right:8px">'+esc(k)+': '+corps[k].active+'/'+corps[k].total+'</span>';
+      }).join(' ');
+      if($('warNation')){
+        $('warNation').innerHTML='Roster: <b>'+esc(n.roster_count||0)+'</b> · Open missions: <b>'+esc(n.open_missions||0)+'</b><br>'+(corpsHtml||'—');
+      }
+      // Missions
+      var missions=r.missions||[];
+      if($('warMissions')){
+        if(!missions.length) $('warMissions').textContent='No missions yet. Use Telegram: mission create …';
+        else $('warMissions').innerHTML=missions.slice(0,8).map(function(m){
+          return '<div style="padding:6px 0;border-bottom:1px solid var(--border)"><span class="mono">'+esc(String(m.id).slice(0,8))+'</span> · <b>'+esc(m.status)+'</b> · '+esc(m.title||'')+'</div>';
+        }).join('');
+      }
+      // Heals
+      var heals=r.heals||[];
+      if($('warHeals')){
+        if(!heals.length) $('warHeals').textContent='No heal log yet. Run Heal now or Telegram: heal now';
+        else $('warHeals').innerHTML=heals.slice(0,6).map(function(h){
+          var icon=h.status==='success'?'✅':(h.status==='skipped'?'⏭':'❌');
+          return '<div style="padding:6px 0;border-bottom:1px solid var(--border)">'+icon+' <b>'+esc(h.playbook)+'</b> · '+esc(h.status)+'<div class="muted" style="font-size:.75rem">'+esc(String(h.detail||'').slice(0,100))+'</div></div>';
+        }).join('');
+      }
+      // Sentinel last
+      var s=r.sentinel;
+      if($('warSentinel')){
+        if(!s) $('warSentinel').textContent='No scan log. Tap Sentinel or Telegram: sentinel scan';
+        else $('warSentinel').innerHTML='<b>'+esc(s.severity||'info')+'</b> · '+esc(s.title||s.scan_type||'')+'<div class="muted">'+esc(String(s.detail||'').slice(0,120))+'</div>';
+      }
+      // Health
+      var h=r.health;
+      var checks=(h&&(h.checks||h.results))||[];
+      if($('warHealth')){
+        if(!checks.length) $('warHealth').textContent=h?(h.summary||'Health module OK'):'—';
+        else $('warHealth').innerHTML=checks.slice(0,10).map(function(c){
+          var ok=c.ok!==false;
+          return (ok?'✅':'❌')+' '+esc(c.name||c.id||'svc')+(c.ms!=null?(' · '+c.ms+'ms'):'');
+        }).join('<br>');
+      }
+    }catch(e){
+      if($('warMeta')) $('warMeta').textContent=e.message||String(e);
+    }
+  }
+
   async function boot(){
     await loadChat();
     try{ await loadBrain(); }catch(e){}
@@ -569,6 +667,21 @@
   };
 
   
+  
+  if($('btnWarRefresh')) $('btnWarRefresh').onclick=function(){ loadWarRoom().then(function(){ toast('War Room refreshed'); }); };
+  if($('btnWarHeal')) $('btnWarHeal').onclick=async function(){
+    var b=$('btnWarHeal'); if(b){ b.disabled=true; b.textContent='Healing…'; }
+    try{ var r=await api('heal_now','POST',{}); toast(r.ok!==false?'Immune cycle done':'Heal issue'); await loadWarRoom(); }
+    catch(e){ toast(e.message||e); }
+    finally{ if(b){ b.disabled=false; b.textContent='🛡 Heal now'; } }
+  };
+  if($('btnWarSentinel')) $('btnWarSentinel').onclick=async function(){
+    var b=$('btnWarSentinel'); if(b){ b.disabled=true; b.textContent='Scanning…'; }
+    try{ var r=await api('sentinel_scan','POST',{}); toast('Sentinel '+((r.score!=null)?(r.score+'/100'):'done')); await loadWarRoom(); }
+    catch(e){ toast(e.message||e); }
+    finally{ if(b){ b.disabled=false; b.textContent='🛰️ Sentinel'; } }
+  };
+
   if($('btnAlerts')) $('btnAlerts').onclick=function(){ showWorld('more'); loadAlerts(); };
   if($('btnAlertsSeen')) $('btnAlertsSeen').onclick=async function(){ try{ await api('alerts_seen','POST',{}); toast('Marked read'); await loadAlerts(); }catch(e){ toast(e.message);} };
   if($('btnAlertsRefresh')) $('btnAlertsRefresh').onclick=function(){ loadAlerts().then(function(){ toast('Alerts refreshed'); }); };
