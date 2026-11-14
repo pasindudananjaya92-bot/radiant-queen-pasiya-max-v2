@@ -496,15 +496,22 @@ async function actionAlertsSeen() {
 }
 
 
-async function actionPipelineStats() {
+async function actionPipelineStats(query = {}) {
   const mod = await import('../lib/pipelineEngine.js');
-  return mod.pipelineStats(40);
+  const failsOnly = String(query.filter || query.fails || '') === 'fails' || query.failsOnly === '1';
+  return mod.pipelineStats(40, failsOnly);
 }
 
-async function actionPipelineLast() {
+async function actionPipelineLast(query = {}) {
   const mod = await import('../lib/pipelineEngine.js');
-  const recent = await mod.recentPipeline(12);
-  return { ok: true, recent };
+  const failsOnly = String(query.filter || '') === 'fails';
+  const recent = await mod.recentPipeline({ limit: 12, failsOnly });
+  return { ok: true, recent, filter: failsOnly ? 'fails' : 'all' };
+}
+
+async function actionPipelineFails() {
+  const mod = await import('../lib/pipelineEngine.js');
+  return mod.failAlerts(15);
 }
 
 async function actionWarRoom() {
@@ -804,8 +811,9 @@ export default async function handler(req, res) {
       if (action === 'me') return json(res, 200, { ok: true, auth });
       if (action === 'health') return json(res, 200, await actionHealth());
       if (action === 'warroom' || action === 'war_room' || action === 'nation') return json(res, 200, await actionWarRoom());
-      if (action === 'pipeline' || action === 'pipeline_stats' || action === 'lab') return json(res, 200, await actionPipelineStats());
-      if (action === 'pipeline_last') return json(res, 200, await actionPipelineLast());
+      if (action === 'pipeline' || action === 'pipeline_stats' || action === 'lab') return json(res, 200, await actionPipelineStats(req.query || {}));
+      if (action === 'pipeline_last') return json(res, 200, await actionPipelineLast(req.query || {}));
+      if (action === 'pipeline_fails') return json(res, 200, await actionPipelineFails());
       if (action === 'missions') return json(res, 200, await actionMissionList());
       if (action === 'jobs' || action === 'queue') return json(res, 200, await actionJobs(20));
       if (action === 'night') return json(res, 200, await actionNight(8));
