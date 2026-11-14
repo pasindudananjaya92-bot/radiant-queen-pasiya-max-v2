@@ -19184,6 +19184,22 @@ bot.command('commands', async (ctx) => {
           return;
         }
       }
+      if (/^(qa|legion)\b/i.test(t0)) {
+        try {
+          const qaRoutes = await import('../lib/qaRoutes.js');
+          const out = await qaRoutes.tryHandle(t0, ctx);
+          await ctx.reply(String(out != null ? out : '❌ QA empty').slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(String(out != null ? out : 'QA empty').replace(/[*_`]/g, '').slice(0, 4000));
+          });
+          return;
+        } catch (qe) {
+          await ctx.reply('❌ QA error: ' + (qe?.message || qe));
+          return;
+        }
+      }
     } catch (e) {
       console.error('mission/healer/sentinel telegram gate', e?.message || e);
     }
