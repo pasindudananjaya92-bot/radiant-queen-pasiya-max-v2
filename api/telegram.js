@@ -19184,7 +19184,23 @@ bot.command('commands', async (ctx) => {
           return;
         }
       }
-      if (/^(pipeline|lab)\b/i.test(t0)) {
+      if (/^(lab|laboratory|researchnet)\b/i.test(t0)) {
+        try {
+          const labRoutes = await import('../lib/labRoutes.js');
+          const out = await labRoutes.tryHandle(t0, ctx);
+          await ctx.reply(String(out != null ? out : '❌ Lab empty').slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(String(out != null ? out : 'Lab empty').replace(/[*_`]/g, '').slice(0, 4000));
+          });
+          return;
+        } catch (le) {
+          await ctx.reply('❌ Lab error: ' + (le?.message || le));
+          return;
+        }
+      }
+      if (/^(pipeline)\b/i.test(t0)) {
         try {
           const pipelineRoutes = await import('../lib/pipelineRoutes.js');
           const out = await pipelineRoutes.tryHandle(t0, ctx);
@@ -19213,22 +19229,6 @@ bot.command('commands', async (ctx) => {
           return;
         } catch (qe) {
           await ctx.reply('❌ QA error: ' + (qe?.message || qe));
-          return;
-        }
-      }
-      if (/^(lab|laboratory|researchnet)\b/i.test(t0)) {
-        try {
-          const labRoutes = await import('../lib/labRoutes.js');
-          const out = await labRoutes.tryHandle(t0, ctx);
-          await ctx.reply(String(out != null ? out : '❌ Lab empty').slice(0, 4000), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          }).catch(async () => {
-            await ctx.reply(String(out != null ? out : 'Lab empty').replace(/[*_`]/g, '').slice(0, 4000));
-          });
-          return;
-        } catch (le) {
-          await ctx.reply('❌ Lab error: ' + (le?.message || le));
           return;
         }
       }
