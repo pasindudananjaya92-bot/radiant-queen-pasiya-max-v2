@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-  <title>Queen OS 50x · v12E</title>
+  <title>Queen OS 50x · v13D</title>
   <meta name="theme-color" content="#070a12" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/manifest.webmanifest" />
@@ -56,7 +56,7 @@
   <div id="gate">
     <div class="brand" style="margin-bottom:12px">
       <div class="logo">👑</div>
-      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">v12E · Lab filters · Fail alerts</div></div>
+      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">v13D · QA Legion panel</div></div>
     </div>
     <input id="secret" type="password" placeholder="DASH_SECRET" autocomplete="current-password" />
     <label><input type="checkbox" id="remember" checked /> Remember me (30 days)</label>
@@ -176,6 +176,22 @@
           <div id="labList" class="muted" style="margin-top:8px">—</div>
           <button type="button" id="btnLabRefresh" style="margin-top:8px">↻ Refresh Lab</button>
         </div>
+
+        <div class="card">
+          <h2>⚔ QA Legion</h2>
+          <div id="qaStats" class="muted">—</div>
+          <div class="chips" style="margin:8px 0">
+            <button type="button" class="chip on" data-qa-filter="open">Open</button>
+            <button type="button" class="chip" data-qa-filter="all">All</button>
+          </div>
+          <div id="qaList" class="muted">—</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+            <button type="button" id="btnQaRefresh">↻ Refresh</button>
+            <button type="button" id="btnQaScan">⚔ QA Scan</button>
+          </div>
+          <div id="qaPlaybook" class="muted" style="margin-top:10px"></div>
+        </div>
+
 
         <div class="card">
           <h2>🛡 War Room</h2>
@@ -492,6 +508,60 @@
     return '#34d399';
   }
   
+  
+  var qaFilter='open';
+  async function loadQa(){
+    try{
+      var r=await api('qa_tickets&status='+encodeURIComponent(qaFilter));
+      var leg=r.legion||{};
+      var tickets=r.tickets||[];
+      if($('qaStats')){
+        $('qaStats').innerHTML='Legion <b>'+esc(leg.total||50)+'</b> · Wings '+esc(leg.wings||10)+' · Showing <b>'+tickets.length+'</b> ('+esc(qaFilter)+')';
+      }
+      if($('qaList')){
+        if(!tickets.length){
+          $('qaList').innerHTML='<div class="muted">No tickets — legion standing by</div>';
+        } else {
+          $('qaList').innerHTML=tickets.map(function(t){
+            var id=String(t.id||'').slice(0,8);
+            var st=t.status==='open'?'🟡':'✅';
+            return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">'+
+              st+' <b>'+esc(t.wing||'')+'</b> ['+esc(t.severity||'')+'] · <span class="mono">'+esc(id)+'</span>'+
+              '<div>'+esc(String(t.title||'').slice(0,80))+'</div>'+
+              '<button type="button" class="chip" data-qa-pb="'+esc(id)+'" style="margin-top:4px">Playbook</button>'+
+              '</div>';
+          }).join('');
+          $('qaList').querySelectorAll('[data-qa-pb]').forEach(function(b){
+            b.onclick=function(){ loadQaPlaybook(b.getAttribute('data-qa-pb')); };
+          });
+        }
+      }
+    }catch(e){
+      if($('qaStats')) $('qaStats').textContent=e.message||String(e);
+    }
+  }
+  async function loadQaPlaybook(id){
+    try{
+      var r=await api('qa_playbook&id='+encodeURIComponent(id||''));
+      if(!r.ok){ if($('qaPlaybook')) $('qaPlaybook').textContent=r.error||'fail'; return; }
+      var p=r.playbook||{};
+      var steps=(p.steps||[]).map(function(s,i){ return (i+1)+'. '+esc(s); }).join('<br>');
+      if($('qaPlaybook')){
+        $('qaPlaybook').innerHTML='<b>Playbook '+esc(p.name||'')+'</b> ('+esc(p.wing||'')+')<br>'+steps;
+      }
+    }catch(e){
+      if($('qaPlaybook')) $('qaPlaybook').textContent=e.message||String(e);
+    }
+  }
+  async function runQaScanUi(){
+    try{
+      toast('QA scan…');
+      var r=await api('qa_scan');
+      toast(r.clean?'QA clean':('Findings '+(r.findings||0)));
+      await loadQa();
+    }catch(e){ toast(e.message||String(e)); }
+  }
+
   var labFilter='all';
   async function loadLab(){
     try{
@@ -723,6 +793,9 @@
   
   
   document.querySelectorAll('[data-lab-filter]').forEach(function(b){ b.onclick=function(){ labFilter=b.getAttribute('data-lab-filter')||'all'; document.querySelectorAll('[data-lab-filter]').forEach(function(x){ x.classList.toggle('on', x===b); }); loadLab(); }; });
+  document.querySelectorAll('[data-qa-filter]').forEach(function(b){ b.onclick=function(){ qaFilter=b.getAttribute('data-qa-filter')||'open'; document.querySelectorAll('[data-qa-filter]').forEach(function(x){ x.classList.toggle('on', x===b); }); loadQa(); }; });
+  if($('btnQaRefresh')) $('btnQaRefresh').onclick=function(){ loadQa().then(function(){ toast('QA refreshed'); }); };
+  if($('btnQaScan')) $('btnQaScan').onclick=function(){ runQaScanUi(); };
   if($('btnLabRefresh')) $('btnLabRefresh').onclick=function(){ loadLab().then(function(){ toast('Lab refreshed'); }); };
   if($('btnWarRefresh')) $('btnWarRefresh').onclick=function(){ loadWarRoom().then(function(){ toast('War Room refreshed'); }); };
   if($('btnWarHeal')) $('btnWarHeal').onclick=async function(){
