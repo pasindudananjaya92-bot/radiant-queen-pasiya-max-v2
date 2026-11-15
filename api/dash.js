@@ -496,6 +496,41 @@ async function actionAlertsSeen() {
 }
 
 
+
+async function actionQaTickets(query = {}) {
+  const mod = await import('../lib/qaEngine.js');
+  const status = String(query.status || 'open');
+  const tickets = await mod.listTickets({ status: status === 'all' ? 'all' : status, limit: 15 });
+  const leg = mod.legionSummary();
+  return {
+    ok: true,
+    legion: { total: leg.total, wings: leg.wings },
+    tickets,
+    status,
+  };
+}
+
+async function actionQaScan() {
+  const mod = await import('../lib/qaEngine.js');
+  return mod.runQaScan();
+}
+
+async function actionQaPlaybook(query = {}) {
+  const mod = await import('../lib/qaEngine.js');
+  const id = String(query.id || '').trim();
+  if (!id) return { ok: false, error: 'id required' };
+  const rows = await mod.listTickets({ status: 'all', limit: 50 });
+  const t = rows.find((x) => String(x.id).startsWith(id)) || (await mod.getTicket(id));
+  if (!t) return { ok: false, error: 'not found' };
+  const plan = mod.suggestPlaybook({
+    wing: t.wing,
+    title: t.title,
+    detail: t.detail,
+    severity: t.severity,
+  });
+  return { ok: true, ticket: t, playbook: plan };
+}
+
 async function actionPipelineStats(query = {}) {
   const mod = await import('../lib/pipelineEngine.js');
   const failsOnly = String(query.filter || query.fails || '') === 'fails' || query.failsOnly === '1';
@@ -814,6 +849,9 @@ export default async function handler(req, res) {
       if (action === 'pipeline' || action === 'pipeline_stats' || action === 'lab') return json(res, 200, await actionPipelineStats(req.query || {}));
       if (action === 'pipeline_last') return json(res, 200, await actionPipelineLast(req.query || {}));
       if (action === 'pipeline_fails') return json(res, 200, await actionPipelineFails());
+      if (action === 'qa' || action === 'qa_tickets') return json(res, 200, await actionQaTickets(req.query || {}));
+      if (action === 'qa_scan') return json(res, 200, await actionQaScan());
+      if (action === 'qa_playbook') return json(res, 200, await actionQaPlaybook(req.query || {}));
       if (action === 'missions') return json(res, 200, await actionMissionList());
       if (action === 'jobs' || action === 'queue') return json(res, 200, await actionJobs(20));
       if (action === 'night') return json(res, 200, await actionNight(8));
