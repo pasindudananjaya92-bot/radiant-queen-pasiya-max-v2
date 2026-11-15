@@ -4188,6 +4188,14 @@ const arg = text.replace(/^\/\S+\s*/, '').trim();
       }
       const gate = quickSyntaxGate(text, destPath);
       if (!gate.ok) {
+        try {
+          const qa = await import('../lib/qaEngine.js');
+          await qa.openTicket({
+            title: 'gh gate block: ' + destPath,
+            detail: String(gate.error || ''),
+            fingerprint: 'gh-gate:' + String(destPath || '') + ':' + String(gate.error || '').slice(0, 40),
+          });
+        } catch (_) {}
         await ctx.reply('🛡 Blocked: ' + gate.error);
         return;
       }
@@ -4240,6 +4248,14 @@ const arg = text.replace(/^\/\S+\s*/, '').trim();
       const { githubPutFile, quickSyntaxGate } = await import('../lib/ghUploadLite.js');
       const gate = quickSyntaxGate(text, destPath);
       if (!gate.ok) {
+        try {
+          const qa = await import('../lib/qaEngine.js');
+          await qa.openTicket({
+            title: 'gh upload block: ' + destPath,
+            detail: String(gate.error || ''),
+            fingerprint: 'gh-up:' + String(destPath || '') + ':' + String(gate.error || '').slice(0, 40),
+          });
+        } catch (_) {}
         await ctx.reply('🛡 Upload blocked: ' + gate.error + '\nFix syntax, then retry.');
         return;
       }
