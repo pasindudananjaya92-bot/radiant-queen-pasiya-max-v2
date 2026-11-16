@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-  <title>Queen OS 50x · v13D</title>
+  <title>Queen OS 50x · v14E</title>
   <meta name="theme-color" content="#070a12" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/manifest.webmanifest" />
@@ -56,7 +56,7 @@
   <div id="gate">
     <div class="brand" style="margin-bottom:12px">
       <div class="logo">👑</div>
-      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">v13D · QA Legion panel</div></div>
+      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">v14E · Lab Station</div></div>
     </div>
     <input id="secret" type="password" placeholder="DASH_SECRET" autocomplete="current-password" />
     <label><input type="checkbox" id="remember" checked /> Remember me (30 days)</label>
@@ -191,6 +191,19 @@
           </div>
           <div id="qaPlaybook" class="muted" style="margin-top:10px"></div>
         </div>
+
+        <div class="card" id="labStationCard">
+          <h2>🧪 Lab Station</h2>
+          <div id="labStationStats" class="muted">—</div>
+          <div id="labStationProps" class="muted" style="margin-top:8px">—</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+            <button type="button" id="btnLabStatRefresh">↻ Status</button>
+            <button type="button" id="btnLabStatReport">Daily report</button>
+            <button type="button" id="btnLabStatResearch">Research run</button>
+          </div>
+          <div id="labStationOut" class="muted" style="margin-top:10px;white-space:pre-wrap;font-size:.85rem"></div>
+        </div>
+
 
 
         <div class="card">
@@ -510,6 +523,68 @@
   
   
   var qaFilter='open';
+  
+  async function loadLabStation(){
+    try{
+      var r=await api('lab_status');
+      var corps=r.byCorps||{};
+      var cstr=Object.keys(corps).map(function(k){return k+':'+corps[k];}).join(' · ');
+      if($('labStationStats')){
+        $('labStationStats').innerHTML='Phase <b>'+esc(r.phase||'')+'</b> · Research '+esc(r.research||0)+
+          ' · Nation <b>'+esc(r.nation||0)+'</b> · Gates '+esc(r.gates||0)+
+          '<div class="muted" style="margin-top:4px">'+esc(cstr)+'</div>';
+      }
+      var props=r.proposals||[];
+      if($('labStationProps')){
+        if(!props.length) $('labStationProps').textContent='No open proposals';
+        else {
+          $('labStationProps').innerHTML=props.map(function(p){
+            var id=String(p.id||'').slice(0,8);
+            return '<div style="padding:6px 0;border-bottom:1px solid var(--border)">'+
+              '<b>'+esc(String(p.title||'').slice(0,60))+'</b> · <span class="mono">'+esc(id)+'</span>'+
+              '<div class="muted">'+esc(String(p.summary||'').slice(0,100))+'</div>'+
+              '<button type="button" class="chip" data-lab-impl="'+esc(id)+'" style="margin-top:4px">Checklist</button></div>';
+          }).join('');
+          $('labStationProps').querySelectorAll('[data-lab-impl]').forEach(function(b){
+            b.onclick=function(){ labImplement(b.getAttribute('data-lab-impl')); };
+          });
+        }
+      }
+    }catch(e){
+      if($('labStationStats')) $('labStationStats').textContent=e.message||String(e);
+    }
+  }
+  async function labImplement(id){
+    try{
+      var r=await api('lab_implement&id='+encodeURIComponent(id||''));
+      if(!r.ok){ toast(r.error||'fail'); return; }
+      var c=r.checklist||{};
+      var steps=(c.steps||[]).map(function(s){ return (s.done?'✅':'☐')+' '+s.n+'. '+s.text; }).join('\n');
+      if($('labStationOut')) $('labStationOut').textContent='Implement '+id+'\n'+steps+'\n\nRollback: '+(c.rollback||'');
+    }catch(e){ toast(e.message||String(e)); }
+  }
+  async function labRunReport(){
+    try{
+      toast('Lab report…');
+      var r=await api('lab_report');
+      if($('labStationOut')) $('labStationOut').textContent=String(r.body||JSON.stringify(r)).slice(0,2500);
+      toast('Report ready');
+    }catch(e){ toast(e.message||String(e)); }
+  }
+  async function labRunResearch(){
+    try{
+      toast('Research run…');
+      var r=await api('lab_research');
+      var lines=['Web: '+(r.webOk?'OK':'offline')+(r.provider?' · '+r.provider:'')+' · '+(r.ms||0)+'ms',''];
+      (r.findings||[]).forEach(function(f){
+        lines.push(f.topic); lines.push(String(f.snippet||'').slice(0,200)); lines.push('');
+      });
+      if($('labStationOut')) $('labStationOut').textContent=lines.join('\n').slice(0,2500);
+      toast(r.webOk?'Research live':'Research fallback');
+      await loadLabStation();
+    }catch(e){ toast(e.message||String(e)); }
+  }
+
   async function loadQa(){
     try{
       var r=await api('qa_tickets&status='+encodeURIComponent(qaFilter));
@@ -794,6 +869,9 @@
   
   document.querySelectorAll('[data-lab-filter]').forEach(function(b){ b.onclick=function(){ labFilter=b.getAttribute('data-lab-filter')||'all'; document.querySelectorAll('[data-lab-filter]').forEach(function(x){ x.classList.toggle('on', x===b); }); loadLab(); }; });
   document.querySelectorAll('[data-qa-filter]').forEach(function(b){ b.onclick=function(){ qaFilter=b.getAttribute('data-qa-filter')||'open'; document.querySelectorAll('[data-qa-filter]').forEach(function(x){ x.classList.toggle('on', x===b); }); loadQa(); }; });
+  if($('btnLabStatRefresh')) $('btnLabStatRefresh').onclick=function(){ loadLabStation().then(function(){ toast('Lab station'); }); };
+  if($('btnLabStatReport')) $('btnLabStatReport').onclick=function(){ labRunReport(); };
+  if($('btnLabStatResearch')) $('btnLabStatResearch').onclick=function(){ labRunResearch(); };
   if($('btnQaRefresh')) $('btnQaRefresh').onclick=function(){ loadQa().then(function(){ toast('QA refreshed'); }); };
   if($('btnQaScan')) $('btnQaScan').onclick=function(){ runQaScanUi(); };
   if($('btnLabRefresh')) $('btnLabRefresh').onclick=function(){ loadLab().then(function(){ toast('Lab refreshed'); }); };
