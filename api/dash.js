@@ -498,6 +498,20 @@ async function actionAlertsSeen() {
 
 
 
+async function actionTwinDraft(query = {}) {
+  const mod = await import('../lib/twinEngine.js');
+  const msg = String(query.msg || query.text || '').trim();
+  if (!msg) return { ok: false, error: 'msg required' };
+  return mod.createDraft({ inbound: msg, channel: 'web', from_label: 'dashboard' });
+}
+async function actionTwinDrafts() {
+  const mod = await import('../lib/twinEngine.js');
+  return { ok: true, drafts: await mod.listDrafts({ status: 'pending', limit: 20 }) };
+}
+async function actionEmpireStatus() {
+  const mod = await import('../lib/empireEngine.js');
+  return mod.empireStatus();
+}
 async function actionLabStatus() {
   const mod = await import('../lib/labEngine.js');
   const s = mod.labStatus();
@@ -898,6 +912,9 @@ export default async function handler(req, res) {
       if (action === 'qa' || action === 'qa_tickets') return json(res, 200, await actionQaTickets(req.query || {}));
       if (action === 'qa_scan') return json(res, 200, await actionQaScan());
       if (action === 'qa_playbook') return json(res, 200, await actionQaPlaybook(req.query || {}));
+      if (action === 'twin_draft') return json(res, 200, await actionTwinDraft(req.query || {}));
+      if (action === 'twin_drafts') return json(res, 200, await actionTwinDrafts());
+      if (action === 'empire_status') return json(res, 200, await actionEmpireStatus());
       if (action === 'lab_status' || action === 'lab') return json(res, 200, await actionLabStatus());
       if (action === 'lab_report') return json(res, 200, await actionLabReport());
       if (action === 'lab_research') return json(res, 200, await actionLabResearch());
