@@ -19106,6 +19106,24 @@ bot.command('commands', async (ctx) => {
       const t0 = String(text || '').trim().replace(/^\//, '');
       
       
+      
+      if (/^(deploy|guardian)\b/i.test(t0)) {
+        try {
+          const deployRoutes = await import('../lib/deployRoutes.js');
+          const out = await deployRoutes.tryHandle(t0, ctx);
+          await ctx.reply(String(out != null ? out : '❌ Deploy Guardian empty').slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(String(out != null ? out : 'Deploy Guardian empty').replace(/[*_`]/g, '').slice(0, 4000));
+          });
+          return;
+        } catch (de) {
+          await ctx.reply('❌ Deploy Guardian error: ' + (de?.message || de));
+          return;
+        }
+      }
+
       if (/^(god|twin|empire|deal|inbox|gswarm|unit)\b/i.test(t0) || /^(swarm\s+spawn|swarm\s+units)\b/i.test(t0)) {
         try {
           const godRoutes = await import('../lib/godRoutes.js');
