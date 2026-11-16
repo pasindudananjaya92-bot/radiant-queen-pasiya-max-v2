@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
-  <title>Queen OS 50x · v15</title>
+  <title>Queen OS 50x · v16</title>
   <meta name="theme-color" content="#070a12" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/manifest.webmanifest" />
@@ -56,7 +56,7 @@
   <div id="gate">
     <div class="brand" style="margin-bottom:12px">
       <div class="logo">👑</div>
-      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">v15 · QA clear · Lab auto-refresh</div></div>
+      <div><h1 style="margin:0;font-size:1.1rem">Queen OS 50x</h1><div class="sub">v16 · Digest · Expanded probe</div></div>
     </div>
     <input id="secret" type="password" placeholder="DASH_SECRET" autocomplete="current-password" />
     <label><input type="checkbox" id="remember" checked /> Remember me (30 days)</label>
@@ -200,6 +200,8 @@
             <button type="button" id="btnLabStatRefresh">↻ Status</button>
             <button type="button" id="btnLabStatReport">Daily report</button>
             <button type="button" id="btnLabStatResearch">Research run</button>
+            <button type="button" id="btnLabDigest">Founder digest</button>
+            <button type="button" id="btnQaClearDash">Clear probe tickets</button>
           </div>
           <div id="labStationOut" class="muted" style="margin-top:10px;white-space:pre-wrap;font-size:.85rem"></div>
         </div>
@@ -556,10 +558,16 @@
             return '<div style="padding:6px 0;border-bottom:1px solid var(--border)">'+
               '<b>'+esc(String(p.title||'').slice(0,60))+'</b> · <span class="mono">'+esc(id)+'</span>'+
               '<div class="muted">'+esc(String(p.summary||'').slice(0,100))+'</div>'+
-              '<button type="button" class="chip" data-lab-impl="'+esc(id)+'" style="margin-top:4px">Checklist</button></div>';
+              '<button type="button" class="chip" data-lab-impl="'+esc(id)+'" style="margin-top:4px">Checklist</button> '+
+              '<button type="button" class="chip" data-lab-adopt="'+esc(id)+'" style="margin-top:4px">Adopt</button></div>';
           }).join('');
           $('labStationProps').querySelectorAll('[data-lab-impl]').forEach(function(b){
             b.onclick=function(){ labImplement(b.getAttribute('data-lab-impl')); };
+          });
+          $('labStationProps').querySelectorAll('[data-lab-adopt]').forEach(function(b){
+            b.onclick=async function(){
+              try{ var id=b.getAttribute('data-lab-adopt'); await api('lab_adopt&id='+encodeURIComponent(id)); toast('Adopted '+id); loadLabStation(); }catch(e){ toast(e.message||String(e)); }
+            };
           });
         }
       }
@@ -885,6 +893,16 @@
   if($('btnLabStatRefresh')) $('btnLabStatRefresh').onclick=function(){ loadLabStation().then(function(){ toast('Lab station'); }); };
   if($('btnLabStatReport')) $('btnLabStatReport').onclick=function(){ labRunReport(); };
   if($('btnLabStatResearch')) $('btnLabStatResearch').onclick=function(){ labRunResearch(); };
+  if($('btnLabDigest')) $('btnLabDigest').onclick=async function(){
+    try{ toast('Digest…'); var r=await api('lab_digest');
+      if($('labStationOut')) $('labStationOut').textContent=String(r.body||JSON.stringify(r)).slice(0,2500);
+      toast('Digest ready'); }catch(e){ toast(e.message||String(e)); }
+  };
+  if($('btnQaClearDash')) $('btnQaClearDash').onclick=async function(){
+    try{ toast('Clearing…'); var r=await api('qa_clear');
+      toast('Closed '+(r.probe_closed||r.closed||0)); try{ loadQa(); }catch(e){} try{ loadLabStation(); }catch(e){};
+    }catch(e){ toast(e.message||String(e)); }
+  };
   if($('btnQaRefresh')) $('btnQaRefresh').onclick=function(){ loadQa().then(function(){ toast('QA refreshed'); }); };
   if($('btnQaScan')) $('btnQaScan').onclick=function(){ runQaScanUi(); };
   if($('btnLabRefresh')) $('btnLabRefresh').onclick=function(){ loadLab().then(function(){ toast('Lab refreshed'); }); };
