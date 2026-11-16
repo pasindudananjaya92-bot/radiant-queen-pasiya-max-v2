@@ -19104,6 +19104,25 @@ bot.command('commands', async (ctx) => {
     // Wave 11: Mission + Healer MUST never reach Gemini/AI
     try {
       const t0 = String(text || '').trim().replace(/^\//, '');
+      
+      
+      if (/^(god|twin|empire|deal)\b/i.test(t0) || /^(swarm\s+spawn|swarm\s+units|gswarm)\b/i.test(t0)) {
+        try {
+          const godRoutes = await import('../lib/godRoutes.js');
+          const out = await godRoutes.tryHandle(t0, ctx);
+          await ctx.reply(String(out != null ? out : '❌ GOD empty').slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(String(out != null ? out : 'GOD empty').replace(/[*_`]/g, '').slice(0, 4000));
+          });
+          return;
+        } catch (ge) {
+          await ctx.reply('❌ GOD error: ' + (ge?.message || ge));
+          return;
+        }
+      }
+
       if (/^(swarm|nation|corps|mission|missions)\b/i.test(t0)) {
         try {
           const missionRoutes = await import('../lib/missionRoutes.js');
@@ -19187,23 +19206,6 @@ bot.command('commands', async (ctx) => {
       
       
       
-      if (/^(god|twin|empire)\b/i.test(t0) || /^(swarm\s+spawn|swarm\s+units)\b/i.test(t0)) {
-        try {
-          const godRoutes = await import('../lib/godRoutes.js');
-          const out = await godRoutes.tryHandle(t0, ctx);
-          await ctx.reply(String(out != null ? out : '❌ GOD empty').slice(0, 4000), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          }).catch(async () => {
-            await ctx.reply(String(out != null ? out : 'GOD empty').replace(/[*_`]/g, '').slice(0, 4000));
-          });
-          return;
-        } catch (ge) {
-          await ctx.reply('❌ GOD error: ' + (ge?.message || ge));
-          return;
-        }
-      }
-
       if (/^(omni|omnimind)\b/i.test(t0)) {
         try {
           const omniRoutes = await import('../lib/omniRoutes.js');
