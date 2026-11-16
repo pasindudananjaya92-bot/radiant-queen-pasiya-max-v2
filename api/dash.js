@@ -497,6 +497,34 @@ async function actionAlertsSeen() {
 
 
 
+
+async function actionLabStatus() {
+  const mod = await import('../lib/labEngine.js');
+  const s = mod.labStatus();
+  const props = await mod.listProposals({ status: 'proposed', limit: 8 });
+  return { ok: true, ...s, proposals: props };
+}
+
+async function actionLabReport() {
+  const mod = await import('../lib/labEngine.js');
+  return mod.generateDailyReport();
+}
+
+async function actionLabResearch() {
+  const mod = await import('../lib/labEngine.js');
+  return mod.runResearchPulse();
+}
+
+async function actionLabImplement(query = {}) {
+  const mod = await import('../lib/labEngine.js');
+  const id = String(query.id || '').trim();
+  if (!id) return { ok: false, error: 'id required' };
+  const rows = await mod.listProposals({ status: 'all', limit: 50 });
+  const p = rows.find((x) => String(x.id).startsWith(id.toLowerCase()));
+  if (!p) return { ok: false, error: 'not found' };
+  return { ok: true, checklist: mod.implementChecklist(p), proposal: p };
+}
+
 async function actionQaTickets(query = {}) {
   const mod = await import('../lib/qaEngine.js');
   const status = String(query.status || 'open');
@@ -852,6 +880,10 @@ export default async function handler(req, res) {
       if (action === 'qa' || action === 'qa_tickets') return json(res, 200, await actionQaTickets(req.query || {}));
       if (action === 'qa_scan') return json(res, 200, await actionQaScan());
       if (action === 'qa_playbook') return json(res, 200, await actionQaPlaybook(req.query || {}));
+      if (action === 'lab_status' || action === 'lab') return json(res, 200, await actionLabStatus());
+      if (action === 'lab_report') return json(res, 200, await actionLabReport());
+      if (action === 'lab_research') return json(res, 200, await actionLabResearch());
+      if (action === 'lab_implement') return json(res, 200, await actionLabImplement(req.query || {}));
       if (action === 'missions') return json(res, 200, await actionMissionList());
       if (action === 'jobs' || action === 'queue') return json(res, 200, await actionJobs(20));
       if (action === 'night') return json(res, 200, await actionNight(8));
