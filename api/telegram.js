@@ -19185,6 +19185,24 @@ bot.command('commands', async (ctx) => {
         }
       }
       
+      
+      if (/^(omni|omnimind)\b/i.test(t0)) {
+        try {
+          const omniRoutes = await import('../lib/omniRoutes.js');
+          const out = await omniRoutes.tryHandle(t0, ctx);
+          await ctx.reply(String(out != null ? out : '❌ OMNI empty').slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(String(out != null ? out : 'OMNI empty').replace(/[*_`]/g, '').slice(0, 4000));
+          });
+          return;
+        } catch (oe) {
+          await ctx.reply('❌ OMNI error: ' + (oe?.message || oe));
+          return;
+        }
+      }
+
       if (/^(coverage|stations)\b/i.test(t0)) {
         try {
           const coverageRoutes = await import('../lib/coverageRoutes.js');
