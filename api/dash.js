@@ -498,6 +498,18 @@ async function actionAlertsSeen() {
 
 
 
+async function actionDealCreate(query = {}) {
+  const emp = await import('../lib/empireEngine.js');
+  const twin = await import('../lib/twinEngine.js');
+  const client = String(query.client || '').trim();
+  const amount = String(query.amount || '').trim();
+  const desc = String(query.desc || query.description || '').trim();
+  const msg = String(query.msg || query.message || '').trim();
+  if (!client || !amount) return { ok: false, error: 'client and amount required' };
+  const inv = await emp.createInvoiceDraft({ client_name: client, amount, description: desc });
+  const dr = await twin.createDraft({ inbound: msg || desc, from_label: client, channel: 'deal' });
+  return { ok: true, invoice: inv.invoice || inv, draft: dr };
+}
 async function actionTwinDraft(query = {}) {
   const mod = await import('../lib/twinEngine.js');
   const msg = String(query.msg || query.text || '').trim();
@@ -912,6 +924,7 @@ export default async function handler(req, res) {
       if (action === 'qa' || action === 'qa_tickets') return json(res, 200, await actionQaTickets(req.query || {}));
       if (action === 'qa_scan') return json(res, 200, await actionQaScan());
       if (action === 'qa_playbook') return json(res, 200, await actionQaPlaybook(req.query || {}));
+      if (action === 'deal_create') return json(res, 200, await actionDealCreate(req.query || {}));
       if (action === 'twin_draft') return json(res, 200, await actionTwinDraft(req.query || {}));
       if (action === 'twin_drafts') return json(res, 200, await actionTwinDrafts());
       if (action === 'empire_status') return json(res, 200, await actionEmpireStatus());
