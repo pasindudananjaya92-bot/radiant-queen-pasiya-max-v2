@@ -524,6 +524,130 @@ async function actionEmpireStatus() {
   const mod = await import('../lib/empireEngine.js');
   return mod.empireStatus();
 }
+
+async function actionPublicHealth() {
+  const checks = {
+    token: Boolean(process.env.BOT_TOKEN),
+    gemini: Boolean(process.env.GEMINI_API_KEY),
+    groq: Boolean(process.env.GROQ_API_KEY),
+    supabase: Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
+  };
+  let db = null;
+  try {
+    if (checks.supabase) {
+      const { createClient } = await import('@supabase/supabase-js');
+      const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+      const { error } = await sb.from('rq_gold').select('user_id').limit(1);
+      db = !error;
+    }
+  } catch (_) {
+    db = false;
+  }
+  const ok = checks.token && (checks.groq || checks.gemini);
+  return { ok, service: 'radiant-queen', time: new Date().toISOString(), checks: { ...checks, db } };
+}
+
+async function actionPublicStats(req) {
+  const SECRET = process.env.STATS_SECRET || process.env.CRON_SECRET || '';
+  if (SECRET) {
+    const q = String(req.query?.secret || '').trim();
+    const auth = String(req.headers?.authorization || '');
+    if (q !== SECRET && auth !== 'Bearer ' + SECRET) {
+      return { ok: false, error: 'unauthorized' };
+    }
+  }
+  try {
+    const { createClient } = await import('@supabase/supabase-js');
+    const url = process.env.SUPABASE_URL || '';
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || '';
+    if (!url || !key) return { ok: false, error: 'no supabase' };
+    const sb = createClient(url, key);
+    async function cnt(table) {
+      try {
+        const { count, error } = await sb.from(table).select('*', { count: 'exact', head: true });
+        return error ? null : count ?? 0;
+      } catch (_) {
+        return null;
+      }
+    }
+    return {
+      ok: true,
+      time: new Date().toISOString(),
+      tables: {
+        qa: await cnt('rq_qa_tickets'),
+        think_jobs: await cnt('think_jobs'),
+        twin_drafts: await cnt('rq_twin_drafts'),
+        invoices: await cnt('rq_empire_invoices'),
+      },
+    };
+  } catch (e) {
+    return { ok: false, error: e.message || String(e) };
+  }
+}
+
+async function actionLiveBoard(req) {
+  try {
+    const { getLiveBoard, refreshLiveBoard } = await import('../lib/liveBoard.js');
+    const q = req.query || {};
+    const wantRefresh = String(q.refresh || '') === '1';
+    const secret = String(q.secret || '').trim();
+    const CRON_SECRET = process.env.CRON_SECRET || '';
+    const authOk = !CRON_SECRET || secret === CRON_SECRET;
+    if (wantRefresh && authOk && typeof refreshLiveBoard === 'function') {
+      return await refreshLiveBoard();
+    }
+    if (typeof getLiveBoard === 'function') return await getLiveBoard();
+    return { ok: false, error: 'liveBoard module missing methods' };
+  } catch (e) {
+    return { ok: false, error: e.message || String(e) };
+  }
+}
+
+async function actionCanvas(req, res) {
+  // Fetch HTML from GitHub public/canvas
+  const id = String(req.query?.id || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
+  if (!id) {
+    res.statusCode = 400;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ ok: false, error: 'id required' }));
+    return true;
+  }
+  try {
+    const owner = process.env.GITHUB_OWNER || 'pasindudananjaya92-bot';
+    const repo = process.env.GITHUB_REPO || 'radiant-queen-pasiya-max-v2';
+    const branch = process.env.GITHUB_BRANCH || 'main';
+    const url =
+      'https://raw.githubusercontent.com/' +
+      owner +
+      '/' +
+      repo +
+      '/' +
+      branch +
+      '/public/canvas/' +
+      id +
+      '/index.html';
+    const r = await fetch(url);
+    if (!r.ok) {
+      res.statusCode = 404;
+      res.setHeader('Content-Type', 'text/plain');
+      res.end('canvas not found');
+      return true;
+    }
+    const html = await r.text();
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, max-age=60');
+    res.end(html);
+    return true;
+  } catch (e) {
+    res.statusCode = 500;
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ ok: false, error: e.message || String(e) }));
+    return true;
+  }
+}
+
+
 async function actionLabStatus() {
   const mod = await import('../lib/labEngine.js');
   const s = mod.labStatus();
@@ -915,6 +1039,23 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
+      
+      // Consolidated from api/health|stats|live-board|canvas (FN12)
+      if (action === 'public_health' || action === 'ping_health') {
+        const body = await actionPublicHealth();
+        return json(res, body.ok ? 200 : 503, body);
+      }
+      if (action === 'public_stats' || action === 'stats') {
+        return json(res, 200, await actionPublicStats(req));
+      }
+      if (action === 'live_board' || action === 'liveboard') {
+        return json(res, 200, await actionLiveBoard(req));
+      }
+      if (action === 'canvas') {
+        const handled = await actionCanvas(req, res);
+        if (handled) return;
+      }
+
       if (action === 'me') return json(res, 200, { ok: true, auth });
       if (action === 'health') return json(res, 200, await actionHealth());
       if (action === 'warroom' || action === 'war_room' || action === 'nation') return json(res, 200, await actionWarRoom());
