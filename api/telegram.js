@@ -19184,6 +19184,24 @@ bot.command('commands', async (ctx) => {
           return;
         }
       }
+      
+      if (/^(coverage|stations)\b/i.test(t0)) {
+        try {
+          const coverageRoutes = await import('../lib/coverageRoutes.js');
+          const out = await coverageRoutes.tryHandle(t0, ctx);
+          await ctx.reply(String(out != null ? out : '❌ Coverage empty').slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(String(out != null ? out : 'Coverage empty').replace(/[*_`]/g, '').slice(0, 4000));
+          });
+          return;
+        } catch (ce) {
+          await ctx.reply('❌ Coverage error: ' + (ce?.message || ce));
+          return;
+        }
+      }
+
       if (/^(lab|laboratory|researchnet)\b/i.test(t0)) {
         try {
           const labRoutes = await import('../lib/labRoutes.js');
