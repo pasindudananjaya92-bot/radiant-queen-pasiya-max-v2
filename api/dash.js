@@ -515,6 +515,24 @@ async function actionLabResearch() {
   return mod.runResearchPulse();
 }
 
+async function actionLabDigest() {
+  const mod = await import('../lib/labEngine.js');
+  return mod.generateFounderDigest();
+}
+async function actionQaClear(query = {}) {
+  const mod = await import('../lib/qaEngine.js');
+  const all = String(query.all || '') === '1';
+  if (all) return mod.closeTicketsBulk({ onlyProbeFails: false, limit: 50 });
+  const r = await mod.closeTicketsBulk({ onlyProbeFails: true, limit: 50 });
+  const soft = await mod.autoCloseSafeTickets();
+  return { ok: true, probe_closed: r.closed, safe_closed: soft.closed, matched: r.matched };
+}
+async function actionLabAdopt(query = {}) {
+  const mod = await import('../lib/labEngine.js');
+  const id = String(query.id || '').trim();
+  if (!id) return { ok: false, error: 'id required' };
+  return mod.setProposalStatus(id, 'approved');
+}
 async function actionLabImplement(query = {}) {
   const mod = await import('../lib/labEngine.js');
   const id = String(query.id || '').trim();
@@ -884,6 +902,9 @@ export default async function handler(req, res) {
       if (action === 'lab_report') return json(res, 200, await actionLabReport());
       if (action === 'lab_research') return json(res, 200, await actionLabResearch());
       if (action === 'lab_implement') return json(res, 200, await actionLabImplement(req.query || {}));
+      if (action === 'lab_digest') return json(res, 200, await actionLabDigest());
+      if (action === 'lab_adopt') return json(res, 200, await actionLabAdopt(req.query || {}));
+      if (action === 'qa_clear') return json(res, 200, await actionQaClear(req.query || {}));
       if (action === 'missions') return json(res, 200, await actionMissionList());
       if (action === 'jobs' || action === 'queue') return json(res, 200, await actionJobs(20));
       if (action === 'night') return json(res, 200, await actionNight(8));
