@@ -56,10 +56,5 @@
       "source": "/canvas/:id/index.html",
       "destination": "/api/canvas?id=:id"
     }
-  ],
-  "excludeFiles": [
-    "apk-wrapper/**",
-    "workers/**",
-    "hull-b/**"
   ]
 }
