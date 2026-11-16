@@ -1,60 +1,8 @@
 {
   "rewrites": [
     {
-      "source": "/api/canvas",
-      "destination": "/api/dash?action=canvas"
-    },
-    {
-      "source": "/api/live-board/",
-      "destination": "/api/dash?action=live_board"
-    },
-    {
-      "source": "/api/live-board",
-      "destination": "/api/dash?action=live_board"
-    },
-    {
-      "source": "/api/stats",
-      "destination": "/api/dash?action=public_stats"
-    },
-    {
       "source": "/api/health",
       "destination": "/api/dash?action=public_health"
-    },
-    {
-      "source": "/api/cron-ghost",
-      "destination": "/api/cron?job=ghost"
-    },
-    {
-      "source": "/api/cron-track",
-      "destination": "/api/cron?job=track"
-    },
-    {
-      "source": "/api/cron-watch",
-      "destination": "/api/cron?job=watch"
-    },
-    {
-      "source": "/api/cron-reminders",
-      "destination": "/api/cron?job=reminders"
-    },
-    {
-      "source": "/api/cron-reminder",
-      "destination": "/api/cron?job=reminders"
-    },
-    {
-      "source": "/api/cron-digest",
-      "destination": "/api/cron?job=digest"
-    },
-    {
-      "source": "/canvas/:id",
-      "destination": "/api/canvas?id=:id"
-    },
-    {
-      "source": "/canvas/:id/",
-      "destination": "/api/canvas?id=:id"
-    },
-    {
-      "source": "/canvas/:id/index.html",
-      "destination": "/api/canvas?id=:id"
     }
   ]
-}
+} 
