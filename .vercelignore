@@ -1,0 +1,7 @@
+# Do not upload build/native noise
+hull-b/**
+workers/**
+apk-wrapper/**
+**/*.apk
+**/.git/**
+**/node_modules/**
