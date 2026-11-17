@@ -19142,7 +19142,7 @@ bot.command('commands', async (ctx) => {
         }
       }
 
-      if (/^(god|twin|empire|deal|inbox|gswarm|unit)\b/i.test(t0) || /^(swarm\s+spawn|swarm\s+units)\b/i.test(t0)) {
+      if (/^(god|twin|empire|deal|inbox|gswarm|unit|web|preset)\b/i.test(t0) || /^(swarm\s+spawn|swarm\s+units)\b/i.test(t0)) {
         try {
           const godRoutes = await import('../lib/godRoutes.js');
           const out = await godRoutes.tryHandle(t0, ctx);
