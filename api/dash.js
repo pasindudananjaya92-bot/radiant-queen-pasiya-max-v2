@@ -648,6 +648,19 @@ async function actionCanvas(req, res) {
 }
 
 
+
+async function actionSitePublic(query = {}) {
+  const wm = await import('../lib/webMaster.js');
+  const section = String(query.section || '').trim();
+  if (section) {
+    const one = await wm.getSection(section);
+    if (!one.ok) return one;
+    if (one.row.published === false) return { ok: false, error: 'unpublished' };
+    return { ok: true, section: one.row.section, title: one.row.title, content: one.row.content, content_type: one.row.content_type };
+  }
+  return wm.publicSitePayload();
+}
+
 async function actionLabStatus() {
   const mod = await import('../lib/labEngine.js');
   const s = mod.labStatus();
@@ -1057,6 +1070,7 @@ export default async function handler(req, res) {
       }
 
       if (action === 'me') return json(res, 200, { ok: true, auth });
+      if (action === 'site_public' || action === 'site') return json(res, 200, await actionSitePublic(req.query || {}));
       if (action === 'health') return json(res, 200, await actionHealth());
       if (action === 'warroom' || action === 'war_room' || action === 'nation') return json(res, 200, await actionWarRoom());
       if (action === 'pipeline' || action === 'pipeline_stats' || action === 'lab') return json(res, 200, await actionPipelineStats(req.query || {}));
