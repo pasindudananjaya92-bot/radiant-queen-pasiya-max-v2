@@ -19142,6 +19142,23 @@ bot.command('commands', async (ctx) => {
         }
       }
 
+      if (/^(mega)\b/i.test(t0)) {
+        try {
+          const megaRoutes = await import('../lib/megaRoutes.js');
+          const out = await megaRoutes.tryHandle(t0, ctx);
+          await ctx.reply(String(out != null ? out : '❌ Mega empty').slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(String(out != null ? out : 'Mega empty').replace(/[*_`]/g, '').slice(0, 4000));
+          });
+          return;
+        } catch (me) {
+          await ctx.reply('❌ Mega error: ' + (me?.message || me));
+          return;
+        }
+      }
+
       if (/^(morning)\b/i.test(t0)) {
         try {
           const platformRoutes = await import('../lib/platformRoutes.js');
