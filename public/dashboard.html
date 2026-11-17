@@ -50,6 +50,9 @@
     #toast{position:fixed;left:50%;bottom:calc(var(--tab-h) + 16px + var(--safe));transform:translateX(-50%);background:#151c30;border:1px solid var(--border);padding:10px 14px;border-radius:12px;display:none;z-index:50;max-width:92vw;font-size:.86rem}
     .spin{display:inline-block;width:11px;height:11px;border:2px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;margin-right:6px}
     @keyframes sp{to{transform:rotate(360deg)}}
+    button:focus-visible,a:focus-visible,.tab:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{
+      outline:2px solid #a78bfa;outline-offset:2px
+    }
     @media (prefers-reduced-motion: reduce){
       *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
       .spin{animation:none!important;border-top-color:rgba(255,255,255,.55)}
