@@ -19107,6 +19107,24 @@ bot.command('commands', async (ctx) => {
       
       
       
+      
+      if (/^(site|webmaster|webmaster)\b/i.test(t0)) {
+        try {
+          const webMasterRoutes = await import('../lib/webMasterRoutes.js');
+          const out = await webMasterRoutes.tryHandle(t0, ctx);
+          await ctx.reply(String(out != null ? out : '❌ Site empty').slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(String(out != null ? out : 'Site empty').replace(/[*_`]/g, '').slice(0, 4000));
+          });
+          return;
+        } catch (se) {
+          await ctx.reply('❌ Site error: ' + (se?.message || se));
+          return;
+        }
+      }
+
       if (/^(deploy|guardian)\b/i.test(t0)) {
         try {
           const deployRoutes = await import('../lib/deployRoutes.js');
