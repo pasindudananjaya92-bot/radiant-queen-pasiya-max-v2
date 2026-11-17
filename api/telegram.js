@@ -19053,6 +19053,28 @@ bot.command('commands', async (ctx) => {
     const text = (ctx.message.text || '').trim();
     if (!text) return;
 
+    // ULTRA-EARLY: mega* never reaches AI (Wave 24 fix)
+    {
+      const __tMega = text.replace(/^\//, '');
+      if (/^(mega)\b/i.test(__tMega)) {
+        try {
+          const megaRoutes = await import('../lib/megaRoutes.js');
+          const out = await megaRoutes.tryHandle(__tMega, ctx);
+          const body = String(out != null && out !== '' ? out : '❌ Mega empty');
+          await ctx.reply(body.slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(body.replace(/[*_`\[\]]/g, '').slice(0, 4000));
+          });
+        } catch (e) {
+          await ctx.reply('❌ Mega error: ' + (e && e.message ? e.message : e));
+        }
+        return;
+      }
+    }
+
+
     // Never send founder GitHub upload captions to AI as "how to use git CLI"
     if (isAdmin(ctx) && /^(gh|ghpath|upload)\s+\S+/i.test(text)) {
       const m = text.match(/^(?:gh|ghpath|upload)\s+:?\s*(\S+)/i);
