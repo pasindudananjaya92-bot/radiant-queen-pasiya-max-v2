@@ -19053,6 +19053,27 @@ bot.command('commands', async (ctx) => {
     const text = (ctx.message.text || '').trim();
     if (!text) return;
 
+    // ULTRA-EARLY: queen* never reaches AI (Wave 26)
+    {
+      const __tQueen = text.replace(/^\//, '');
+      if (/^(queen)\b/i.test(__tQueen)) {
+        try {
+          const queenRoutes = await import('../lib/queenRoutes.js');
+          const out = await queenRoutes.tryHandle(__tQueen, ctx);
+          const body = String(out != null && out !== '' ? out : '❌ Queen empty');
+          await ctx.reply(body.slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(body.replace(/[*_`\[\]]/g, '').slice(0, 4000));
+          });
+        } catch (e) {
+          await ctx.reply('❌ Queen error: ' + (e && e.message ? e.message : e));
+        }
+        return;
+      }
+    }
+
     // ULTRA-EARLY: mega* never reaches AI (Wave 24 fix)
     {
       const __tMega = text.replace(/^\//, '');
