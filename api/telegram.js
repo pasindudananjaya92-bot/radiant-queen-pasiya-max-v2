@@ -19053,6 +19053,28 @@ bot.command('commands', async (ctx) => {
     const text = (ctx.message.text || '').trim();
     if (!text) return;
 
+    
+    // ULTRA-EARLY: decide* never reaches AI (Wave 27A)
+    {
+      const __tDec = text.replace(/^\//, '');
+      if (/^(decide|decision|decisions)\b/i.test(__tDec)) {
+        try {
+          const decisionsRoutes = await import('../lib/decisionsRoutes.js');
+          const out = await decisionsRoutes.tryHandle(__tDec, ctx);
+          const body = String(out != null && out !== '' ? out : '❌ Decide empty');
+          await ctx.reply(body.slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(body.replace(/[*_`\[\]]/g, '').slice(0, 4000));
+          });
+        } catch (e) {
+          await ctx.reply('❌ Decide error: ' + (e && e.message ? e.message : e));
+        }
+        return;
+      }
+    }
+
     // ULTRA-EARLY: queen* never reaches AI (Wave 26)
     {
       const __tQueen = text.replace(/^\//, '');
