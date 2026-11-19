@@ -19049,6 +19049,40 @@ bot.command('commands', async (ctx) => {
     }
   });
 
+  
+  // VISION SCAN 29A — photo + caption scan|explain|කියවන්න → structured OCR report
+  bot.on('photo', async (ctx, next) => {
+    try {
+      const caption = String(ctx.message?.caption || '').trim();
+      const capNorm = caption.replace(/^\//, '');
+      const wantScan =
+        /^(scan|explain|vision|read|ocr|කියවන්න)\b/i.test(capNorm) ||
+        /^(scan|explain|කියවන්න)$/i.test(capNorm);
+      // Default: if caption empty and FOUNDER, still allow reply-to with /scan later — only auto on keywords
+      if (!wantScan) return next();
+      const photos = ctx.message.photo || [];
+      const best = photos[photos.length - 1];
+      if (!best?.file_id) return next();
+      await ctx.reply('👁 Scanning…').catch(() => {});
+      const vision = await import('../lib/visionManager.js');
+      const r = await vision.scanFromTelegramFile({
+        botToken: process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN,
+        fileId: best.file_id,
+        caption: caption || 'Full structured scan',
+      });
+      const body = vision.formatScanResult(r);
+      await ctx.reply(body.slice(0, 4000), { disable_web_page_preview: true }).catch(async () => {
+        await ctx.reply(body.replace(/[*_`]/g, '').slice(0, 4000));
+      });
+      return;
+    } catch (e) {
+      try {
+        await ctx.reply('👁 Vision error: ' + String(e.message || e).slice(0, 200));
+      } catch (_) {}
+      return next();
+    }
+  });
+
   bot.on('text', async (ctx) => {
     const text = (ctx.message.text || '').trim();
     if (!text) return;
