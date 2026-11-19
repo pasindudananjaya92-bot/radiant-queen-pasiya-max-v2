@@ -19050,23 +19050,20 @@ bot.command('commands', async (ctx) => {
   });
 
   
-  // VISION SCAN 29A — photo + caption scan|explain|කියවන්න → structured OCR report
+  // VISION SCAN 29B — Hobby-safe mid-size photo + timeout-friendly errors
   bot.on('photo', async (ctx, next) => {
     try {
       const caption = String(ctx.message?.caption || '').trim();
       const capNorm = caption.replace(/^\//, '');
-      const wantScan =
-        /^(scan|explain|vision|read|ocr|කියවන්න)\b/i.test(capNorm) ||
-        /^(scan|explain|කියවන්න)$/i.test(capNorm);
-      // Default: if caption empty and FOUNDER, still allow reply-to with /scan later — only auto on keywords
+      const wantScan = /^(scan|explain|vision|read|ocr|කියවන්න)\b/i.test(capNorm);
       if (!wantScan) return next();
-      const photos = ctx.message.photo || [];
-      const best = photos[photos.length - 1];
-      if (!best?.file_id) return next();
-      await ctx.reply('👁 Scanning…').catch(() => {});
       const vision = await import('../lib/visionManager.js');
+      const best = vision.pickTelegramPhoto(ctx.message.photo || []);
+      if (!best?.file_id) return next();
+      await ctx.reply('👁 Scanning (Hobby-safe)...').catch(() => null);
+      const token = process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
       const r = await vision.scanFromTelegramFile({
-        botToken: process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN,
+        botToken: token,
         fileId: best.file_id,
         caption: caption || 'Full structured scan',
       });
@@ -19077,7 +19074,11 @@ bot.command('commands', async (ctx) => {
       return;
     } catch (e) {
       try {
-        await ctx.reply('👁 Vision error: ' + String(e.message || e).slice(0, 200));
+        await ctx.reply(
+          '👁 Vision error: ' +
+            String(e && e.message ? e.message : e).slice(0, 180) +
+            '\n_If timeout — crop image and retry._'
+        );
       } catch (_) {}
       return next();
     }
