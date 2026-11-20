@@ -19103,6 +19103,32 @@ bot.command('commands', async (ctx) => {
     const text = (ctx.message.text || '').trim();
     if (!text) return;
 
+    // Wave 32A — Queen Receptionist: non-Founder private DMs → inbox (no AI chat)
+    try {
+      const chatType = ctx.chat?.type || '';
+      if (chatType === 'private') {
+        const adminIds = String(process.env.ADMIN_ID || process.env.FOUNDER_ID || '')
+          .split(/[\s,]+/)
+          .filter(Boolean);
+        const uid = String(ctx.from?.id || '');
+        const isFounder = !adminIds.length || adminIds.includes(uid);
+        if (!isFounder) {
+          const t0 = text.replace(/^\//, '').trim();
+          if (!/^(start|help|menu|ping)$/i.test(t0)) {
+            const rec = await import('../lib/receptionistEngine.js');
+            const out = await rec.handlePublicDm(ctx, text);
+            if (out.visitorReply) {
+              await ctx.reply(out.visitorReply).catch(() => {});
+            }
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      console.error('receptionist public dm', e?.message || e);
+    }
+
+
     
     // ULTRA-EARLY: decide* never reaches AI (Wave 27A)
     {
