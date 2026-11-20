@@ -17186,20 +17186,30 @@ bot.command('commands', async (ctx) => {
   });
 
   // ——— Photo handler → Agent router (vault upload, etc.) ———
-  bot.on('photo', async (ctx) => {
+  bot.on('photo', async (ctx, next) => {
     try {
-      if (!isAdmin(ctx)) return;
-      if (ctx.chat?.type !== 'private') return;
+      if (!isAdmin(ctx)) return next();
+      if (ctx.chat?.type !== 'private') return next();
       const captionRaw = String(ctx.message?.caption || '').trim();
-      if (!captionRaw) return;
+      if (!captionRaw) return next();
+      // Vision scan captions must reach vision photo handler (not text-only agent path)
+      const capNorm = captionRaw.replace(/^\//, '');
+      if (/^(scan|explain|vision|read|ocr|කියවන්න)\b/i.test(capNorm)) {
+        return next();
+      }
       // Let agent router handle vault upload / other caption commands
       const { tryAgentExecute } = await import('../lib/agentExecute.js');
       const executed = await tryAgentExecute({ text: captionRaw, ctx });
       if (executed) {
-        await ctx.reply(String(executed).slice(0, 4000), { parse_mode: 'Markdown' });
+        await ctx.reply(String(executed).slice(0, 4000), { parse_mode: 'Markdown' }).catch(async () => {
+          await ctx.reply(String(executed).replace(/[*_`]/g, '').slice(0, 4000));
+        });
+        return;
       }
+      return next();
     } catch (e) {
       console.error('photo agentExecute', e?.message || e);
+      return next();
     }
   });
 
@@ -18975,8 +18985,13 @@ bot.command('commands', async (ctx) => {
     }
   });
 
-  bot.on('photo', async (ctx) => {
+  bot.on('photo', async (ctx, next) => {
     try {
+      const captionRaw = String(ctx.message?.caption || '').trim().replace(/^\//, '');
+      // Founder Vision Scan (scan/explain/...) — do not spend gold; pass to vision handler
+      if (/^(scan|explain|vision|read|ocr|කියවන්න)\b/i.test(captionRaw)) {
+        return next();
+      }
       const payP = await spendGold(ctx, 'vision');
       if (!payP.ok) {
         await ctx.reply(payP.message || 'Not enough gold. /balance');
