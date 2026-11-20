@@ -19130,6 +19130,43 @@ bot.command('commands', async (ctx) => {
 
 
     
+    // ULTRA-EARLY: inbox/channel/lead — Receptionist + CRM (Wave 32A fix)
+    {
+      const __tIn = text.replace(/^\//, '');
+      if (/^(inbox|receptionist|channel|reception)\b/i.test(__tIn)) {
+        try {
+          const receptionistRoutes = await import('../lib/receptionistRoutes.js');
+          const out = await receptionistRoutes.tryHandle(__tIn, ctx);
+          const body = String(out != null && out !== '' ? out : '🛎️ inbox help');
+          await ctx.reply(body.slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(body.replace(/[*_`\[\]]/g, '').slice(0, 4000));
+          });
+        } catch (e) {
+          await ctx.reply('❌ Inbox error: ' + (e && e.message ? e.message : e));
+        }
+        return;
+      }
+      if (/^(lead|leads)\b/i.test(__tIn)) {
+        try {
+          const leadsRoutes = await import('../lib/leadsRoutes.js');
+          const out = await leadsRoutes.tryHandle(__tIn, ctx);
+          const body = String(out != null && out !== '' ? out : '🧲 lead help');
+          await ctx.reply(body.slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(body.replace(/[*_`\[\]]/g, '').slice(0, 4000));
+          });
+        } catch (e) {
+          await ctx.reply('❌ Lead error: ' + (e && e.message ? e.message : e));
+        }
+        return;
+      }
+    }
+
     // ULTRA-EARLY: decide* never reaches AI (Wave 27A)
     {
       const __tDec = text.replace(/^\//, '');
@@ -19317,7 +19354,7 @@ bot.command('commands', async (ctx) => {
         }
       }
 
-      if (/^(god|twin|empire|deal|inbox|gswarm|unit|web|preset)\b/i.test(t0) || /^(swarm\s+spawn|swarm\s+units)\b/i.test(t0)) {
+      if (/^(god|twin|empire|deal|gswarm|unit|web|preset)\b/i.test(t0) || /^(swarm\s+spawn|swarm\s+units)\b/i.test(t0)) {
         try {
           const godRoutes = await import('../lib/godRoutes.js');
           const out = await godRoutes.tryHandle(t0, ctx);
