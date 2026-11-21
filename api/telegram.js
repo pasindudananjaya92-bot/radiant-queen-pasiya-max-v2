@@ -19167,6 +19167,27 @@ bot.command('commands', async (ctx) => {
       }
     }
 
+    // ULTRA-EARLY: blog — Blogger Web Master 33A
+    {
+      const __tBlog = text.replace(/^\//, '');
+      if (/^(blog)\b/i.test(__tBlog)) {
+        try {
+          const blogRoutes = await import('../lib/blogRoutes.js');
+          const out = await blogRoutes.tryHandle(__tBlog, ctx);
+          const body = String(out != null && out !== '' ? out : '📝 blog help');
+          await ctx.reply(body.slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(body.replace(/[*_`\[\]]/g, '').slice(0, 4000));
+          });
+        } catch (e) {
+          await ctx.reply('❌ Blog error: ' + (e && e.message ? e.message : e));
+        }
+        return;
+      }
+    }
+
     // ULTRA-EARLY: decide* never reaches AI (Wave 27A)
     {
       const __tDec = text.replace(/^\//, '');
