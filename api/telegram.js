@@ -19188,6 +19188,27 @@ bot.command('commands', async (ctx) => {
       }
     }
 
+    // ULTRA-EARLY: substack — Substack Web Master 34A
+    {
+      const __tSub = text.replace(/^\//, '');
+      if (/^(substack)\b/i.test(__tSub)) {
+        try {
+          const substackRoutes = await import('../lib/substackRoutes.js');
+          const out = await substackRoutes.tryHandle(__tSub, ctx);
+          const body = String(out != null && out !== '' ? out : '📰 substack help');
+          await ctx.reply(body.slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(body.replace(/[*_`\[\]]/g, '').slice(0, 4000));
+          });
+        } catch (e) {
+          await ctx.reply('❌ Substack error: ' + (e && e.message ? e.message : e));
+        }
+        return;
+      }
+    }
+
     // ULTRA-EARLY: decide* never reaches AI (Wave 27A)
     {
       const __tDec = text.replace(/^\//, '');
