@@ -19188,6 +19188,27 @@ bot.command('commands', async (ctx) => {
       }
     }
 
+    // ULTRA-EARLY: yt/youtube — YouTube Desk 35A
+    {
+      const __tYt = text.replace(/^\//, '');
+      if (/^(yt|youtube)\b/i.test(__tYt)) {
+        try {
+          const youtubeRoutes = await import('../lib/youtubeRoutes.js');
+          const out = await youtubeRoutes.tryHandle(__tYt, ctx);
+          const body = String(out != null && out !== '' ? out : '🎬 yt help');
+          await ctx.reply(body.slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(body.replace(/[*_`\[\]]/g, '').slice(0, 4000));
+          });
+        } catch (e) {
+          await ctx.reply('❌ YouTube error: ' + (e && e.message ? e.message : e));
+        }
+        return;
+      }
+    }
+
     // ULTRA-EARLY: substack — Substack Web Master 34A
     {
       const __tSub = text.replace(/^\//, '');
