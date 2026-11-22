@@ -19188,6 +19188,27 @@ bot.command('commands', async (ctx) => {
       }
     }
 
+    // ULTRA-EARLY: gops — GitHub Ops Desk 36A
+    {
+      const __tGops = text.replace(/^\//, '');
+      if (/^(gops)\b/i.test(__tGops)) {
+        try {
+          const gopsRoutes = await import('../lib/gopsRoutes.js');
+          const out = await gopsRoutes.tryHandle(__tGops, ctx);
+          const body = String(out != null && out !== '' ? out : '🛠 gops help');
+          await ctx.reply(body.slice(0, 4000), {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          }).catch(async () => {
+            await ctx.reply(body.replace(/[*_`\[\]]/g, '').slice(0, 4000));
+          });
+        } catch (e) {
+          await ctx.reply('❌ GOps error: ' + (e && e.message ? e.message : e));
+        }
+        return;
+      }
+    }
+
     // ULTRA-EARLY: yt/youtube — YouTube Desk 35A
     {
       const __tYt = text.replace(/^\//, '');
