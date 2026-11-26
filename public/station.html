@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0b0f14" />
+<title>Queen Station · 39A</title>
+<style>
+:root { --bg:#0b0f14; --card:#141a22; --text:#e8eef6; --muted:#9aa8b8; --accent:#5b9dff; --ok:#3dd68c; }
+* { box-sizing:border-box; }
+body { margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:var(--text); }
+header { padding:1rem 1.25rem; border-bottom:1px solid #1e2836; display:flex; justify-content:space-between; align-items:center; }
+h1 { font-size:1.1rem; margin:0; }
+.wrap { max-width:900px; margin:0 auto; padding:1rem; }
+.grid { display:grid; gap:.75rem; }
+@media(min-width:700px){ .grid{ grid-template-columns:1fr 1fr; } }
+.card { background:var(--card); border-radius:14px; padding:1rem; }
+.muted { color:var(--muted); font-size:.85rem; }
+.btn { background:var(--accent); color:#061018; border:0; border-radius:10px; padding:.55rem .9rem; font-weight:700; cursor:pointer; }
+pre { white-space:pre-wrap; font-size:.8rem; background:#0e141c; padding:.75rem; border-radius:10px; overflow:auto; }
+input { width:100%; padding:.55rem; border-radius:8px; border:1px solid #2a3544; background:#0e141c; color:var(--text); margin:.35rem 0; }
+@media (prefers-reduced-motion:reduce){ *{transition:none!important;animation:none!important;} }
+</style>
+</head>
+<body>
+<header>
+  <h1>🏛 Queen Station · 39A</h1>
+  <span class="muted">Control room</span>
+</header>
+<div class="wrap">
+  <div class="card">
+    <p class="muted">Uses same <code>DASH_SECRET</code> as dashboard. Read-only board. Telegram: <code>station status</code></p>
+    <label class="muted">DASH_SECRET</label>
+    <input id="sec" type="password" placeholder="DASH_SECRET" />
+    <button class="btn" id="go">Load Station</button>
+  </div>
+  <div class="grid" style="margin-top:1rem;">
+    <div class="card"><h3>Pulse</h3><pre id="pulse">—</pre></div>
+    <div class="card"><h3>Hint</h3><pre id="hint">station status · funnel status · coo · health</pre></div>
+  </div>
+  <div class="card" style="margin-top:1rem;">
+    <h3>Raw</h3>
+    <pre id="raw">Auth then load. If API missing station action, use Telegram.</pre>
+  </div>
+</div>
+<script>
+const pulse = document.getElementById('pulse');
+const raw = document.getElementById('raw');
+const sec = document.getElementById('sec');
+sec.value = localStorage.getItem('DASH_SECRET') || '';
+document.getElementById('go').onclick = async () => {
+  const s = sec.value.trim();
+  localStorage.setItem('DASH_SECRET', s);
+  pulse.textContent = 'Loading…';
+  try {
+    // Prefer dash health-style endpoints; station text is Telegram-first in 39A
+    const h = await fetch('/api/dash?action=health&secret=' + encodeURIComponent(s));
+    const hj = await h.json().catch(() => ({}));
+    pulse.textContent = JSON.stringify(hj, null, 2).slice(0, 1500);
+    raw.textContent = 'Station full board: run in Telegram → station status\nDash health response above (truthful API check).';
+  } catch (e) {
+    pulse.textContent = String(e);
+  }
+};
+</script>
+</body>
+</html>
