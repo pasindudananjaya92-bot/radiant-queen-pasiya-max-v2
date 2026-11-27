@@ -2211,22 +2211,11 @@ async function githubPutFile(path, contentBuffer, message) {
       const { healSourceBeforePush } = await import('../lib/ghHeal.js');
       const healed = await healSourceBeforePush(pth, contentBuffer.toString('utf8'));
       if (!healed.ok) {
-        const tri = healed.triage
-          ? ' | swarm:' + (healed.triage.kind || '') + ' L' + (healed.triage.line ?? healed.line ?? '')
-          : '';
-        return {
-          ok: false,
-          error: 'Syntax blocked push: ' + (healed.error || 'invalid') + tri,
-          heal: healed,
-        };
+        return { ok: false, error: 'Syntax blocked push: ' + (healed.error || 'invalid'), heal: healed };
       }
       if (healed.code) contentBuffer = Buffer.from(healed.code, 'utf8');
       if (healed.fixed) {
-        const tag =
-          healed.stage === 'codeswarm-healed'
-            ? ' [CodeSwarm 12B auto-heal]'
-            : ' [ghHeal auto-syntax-fix]';
-        message = (message || '') + tag;
+        message = (message || '') + ' [ghHeal auto-syntax-fix]';
       }
     }
   } catch (e) {
@@ -2991,9 +2980,28 @@ ${LINKS}`;
     routerErr = err;
   }
 
-  // 3a) Emergency OpenRouter (if key present)
+  // 3a) Emergency OpenRouter + Wave 40B tool calling (if key present)
   const orKey = process.env.OPENROUTER_API_KEY || '';
   if (orKey) {
+    try {
+      const { chatWithOpenRouterTools } = await import('../lib/aiWithTools.js');
+      const out = await chatWithOpenRouterTools({
+        systemInstruction,
+        userPrompt,
+        enableTools: true,
+      });
+      if (out && out.text && !looksLikeError(out.text)) {
+        resolvedModel = 'openrouter' + (out.usedTools ? '+tools' : '');
+        try {
+          const { setCached } = await import('../lib/aiCache.js');
+          await setCached(userPrompt, out.text, personaId);
+        } catch (_) {}
+        await rememberTurn(userPrompt, out.text);
+        return out.text.slice(0, 3500);
+      }
+    } catch (orToolsErr) {
+      // fall through to plain OpenRouter loop below
+    }
     const orModels = [
       process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free',
       'google/gemma-2-9b-it:free',
@@ -4188,14 +4196,6 @@ const arg = text.replace(/^\/\S+\s*/, '').trim();
       }
       const gate = quickSyntaxGate(text, destPath);
       if (!gate.ok) {
-        try {
-          const qa = await import('../lib/qaEngine.js');
-          await qa.openTicket({
-            title: 'gh gate block: ' + destPath,
-            detail: String(gate.error || ''),
-            fingerprint: 'gh-gate:' + String(destPath || '') + ':' + String(gate.error || '').slice(0, 40),
-          });
-        } catch (_) {}
         await ctx.reply('🛡 Blocked: ' + gate.error);
         return;
       }
@@ -4248,14 +4248,6 @@ const arg = text.replace(/^\/\S+\s*/, '').trim();
       const { githubPutFile, quickSyntaxGate } = await import('../lib/ghUploadLite.js');
       const gate = quickSyntaxGate(text, destPath);
       if (!gate.ok) {
-        try {
-          const qa = await import('../lib/qaEngine.js');
-          await qa.openTicket({
-            title: 'gh upload block: ' + destPath,
-            detail: String(gate.error || ''),
-            fingerprint: 'gh-up:' + String(destPath || '') + ':' + String(gate.error || '').slice(0, 40),
-          });
-        } catch (_) {}
         await ctx.reply('🛡 Upload blocked: ' + gate.error + '\nFix syntax, then retry.');
         return;
       }
@@ -4263,7 +4255,7 @@ const arg = text.replace(/^\/\S+\s*/, '').trim();
       try {
         const heal = await import('../lib/ghHeal.js');
         if (typeof heal.healSourceBeforePush === 'function') {
-          const h = await heal.healSourceBeforePush(destPath, text);
+          const h = await heal.healSourceBeforePush(text, destPath);
           if (h && h.blocked) {
             await ctx.reply('🛡 ghHeal blocked: ' + (h.error || 'invalid'));
             return;
@@ -17186,30 +17178,20 @@ bot.command('commands', async (ctx) => {
   });
 
   // ——— Photo handler → Agent router (vault upload, etc.) ———
-  bot.on('photo', async (ctx, next) => {
+  bot.on('photo', async (ctx) => {
     try {
-      if (!isAdmin(ctx)) return next();
-      if (ctx.chat?.type !== 'private') return next();
+      if (!isAdmin(ctx)) return;
+      if (ctx.chat?.type !== 'private') return;
       const captionRaw = String(ctx.message?.caption || '').trim();
-      if (!captionRaw) return next();
-      // Vision scan captions must reach vision photo handler (not text-only agent path)
-      const capNorm = captionRaw.replace(/^\//, '');
-      if (/^(scan|explain|vision|read|ocr|කියවන්න)\b/i.test(capNorm)) {
-        return next();
-      }
+      if (!captionRaw) return;
       // Let agent router handle vault upload / other caption commands
       const { tryAgentExecute } = await import('../lib/agentExecute.js');
       const executed = await tryAgentExecute({ text: captionRaw, ctx });
       if (executed) {
-        await ctx.reply(String(executed).slice(0, 4000), { parse_mode: 'Markdown' }).catch(async () => {
-          await ctx.reply(String(executed).replace(/[*_`]/g, '').slice(0, 4000));
-        });
-        return;
+        await ctx.reply(String(executed).slice(0, 4000), { parse_mode: 'Markdown' });
       }
-      return next();
     } catch (e) {
       console.error('photo agentExecute', e?.message || e);
-      return next();
     }
   });
 
@@ -18985,13 +18967,8 @@ bot.command('commands', async (ctx) => {
     }
   });
 
-  bot.on('photo', async (ctx, next) => {
+  bot.on('photo', async (ctx) => {
     try {
-      const captionRaw = String(ctx.message?.caption || '').trim().replace(/^\//, '');
-      // Founder Vision Scan (scan/explain/...) — do not spend gold; pass to vision handler
-      if (/^(scan|explain|vision|read|ocr|කියවන්න)\b/i.test(captionRaw)) {
-        return next();
-      }
       const payP = await spendGold(ctx, 'vision');
       if (!payP.ok) {
         await ctx.reply(payP.message || 'Not enough gold. /balance');
@@ -19064,256 +19041,9 @@ bot.command('commands', async (ctx) => {
     }
   });
 
-  
-  // VISION SCAN 29B — Hobby-safe mid-size photo + timeout-friendly errors
-  bot.on('photo', async (ctx, next) => {
-    try {
-      const caption = String(ctx.message?.caption || '').trim();
-      const capNorm = caption.replace(/^\//, '');
-      const wantScan = /^(scan|explain|vision|read|ocr|කියවන්න)\b/i.test(capNorm);
-      if (!wantScan) return next();
-      const vision = await import('../lib/visionManager.js');
-      const best = vision.pickTelegramPhoto(ctx.message.photo || []);
-      if (!best?.file_id) return next();
-      await ctx.reply('👁 Scanning (Hobby-safe)...').catch(() => null);
-      const token = process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
-      const r = await vision.scanFromTelegramFile({
-        botToken: token,
-        fileId: best.file_id,
-        caption: caption || 'Full structured scan',
-      });
-      const body = vision.formatScanResult(r);
-      await ctx.reply(body.slice(0, 4000), { disable_web_page_preview: true }).catch(async () => {
-        await ctx.reply(body.replace(/[*_`]/g, '').slice(0, 4000));
-      });
-      return;
-    } catch (e) {
-      try {
-        await ctx.reply(
-          '👁 Vision error: ' +
-            String(e && e.message ? e.message : e).slice(0, 180) +
-            '\n_If timeout — crop image and retry._'
-        );
-      } catch (_) {}
-      return next();
-    }
-  });
-
   bot.on('text', async (ctx) => {
     const text = (ctx.message.text || '').trim();
     if (!text) return;
-
-    // Wave 32A — Queen Receptionist: non-Founder private DMs → inbox (no AI chat)
-    try {
-      const chatType = ctx.chat?.type || '';
-      if (chatType === 'private') {
-        const adminIds = String(process.env.ADMIN_ID || process.env.FOUNDER_ID || '')
-          .split(/[\s,]+/)
-          .filter(Boolean);
-        const uid = String(ctx.from?.id || '');
-        const isFounder = !adminIds.length || adminIds.includes(uid);
-        if (!isFounder) {
-          const t0 = text.replace(/^\//, '').trim();
-          if (!/^(start|help|menu|ping)$/i.test(t0)) {
-            const rec = await import('../lib/receptionistEngine.js');
-            const out = await rec.handlePublicDm(ctx, text);
-            if (out.visitorReply) {
-              await ctx.reply(out.visitorReply).catch(() => {});
-            }
-            return;
-          }
-        }
-      }
-    } catch (e) {
-      console.error('receptionist public dm', e?.message || e);
-    }
-
-
-    
-    // ULTRA-EARLY: inbox/channel/lead — Receptionist + CRM (Wave 32A fix)
-    {
-      const __tIn = text.replace(/^\//, '');
-      if (/^(inbox|receptionist|channel|reception)\b/i.test(__tIn)) {
-        try {
-          const receptionistRoutes = await import('../lib/receptionistRoutes.js');
-          const out = await receptionistRoutes.tryHandle(__tIn, ctx);
-          const body = String(out != null && out !== '' ? out : '🛎️ inbox help');
-          await ctx.reply(body.slice(0, 4000), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          }).catch(async () => {
-            await ctx.reply(body.replace(/[*_`\[\]]/g, '').slice(0, 4000));
-          });
-        } catch (e) {
-          await ctx.reply('❌ Inbox error: ' + (e && e.message ? e.message : e));
-        }
-        return;
-      }
-      if (/^(lead|leads)\b/i.test(__tIn)) {
-        try {
-          const leadsRoutes = await import('../lib/leadsRoutes.js');
-          const out = await leadsRoutes.tryHandle(__tIn, ctx);
-          const body = String(out != null && out !== '' ? out : '🧲 lead help');
-          await ctx.reply(body.slice(0, 4000), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          }).catch(async () => {
-            await ctx.reply(body.replace(/[*_`\[\]]/g, '').slice(0, 4000));
-          });
-        } catch (e) {
-          await ctx.reply('❌ Lead error: ' + (e && e.message ? e.message : e));
-        }
-        return;
-      }
-    }
-
-    // ULTRA-EARLY: blog — Blogger Web Master 33A
-    {
-      const __tBlog = text.replace(/^\//, '');
-      if (/^(blog)\b/i.test(__tBlog)) {
-        try {
-          const blogRoutes = await import('../lib/blogRoutes.js');
-          const out = await blogRoutes.tryHandle(__tBlog, ctx);
-          const body = String(out != null && out !== '' ? out : '📝 blog help');
-          await ctx.reply(body.slice(0, 4000), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          }).catch(async () => {
-            await ctx.reply(body.replace(/[*_`\[\]]/g, '').slice(0, 4000));
-          });
-        } catch (e) {
-          await ctx.reply('❌ Blog error: ' + (e && e.message ? e.message : e));
-        }
-        return;
-      }
-    }
-
-    // ULTRA-EARLY: gops — GitHub Ops Desk 36A
-    {
-      const __tGops = text.replace(/^\//, '');
-      if (/^(gops)\b/i.test(__tGops)) {
-        try {
-          const gopsRoutes = await import('../lib/gopsRoutes.js');
-          const out = await gopsRoutes.tryHandle(__tGops, ctx);
-          const body = String(out != null && out !== '' ? out : '🛠 gops help');
-          await ctx.reply(body.slice(0, 4000), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          }).catch(async () => {
-            await ctx.reply(body.replace(/[*_`\[\]]/g, '').slice(0, 4000));
-          });
-        } catch (e) {
-          await ctx.reply('❌ GOps error: ' + (e && e.message ? e.message : e));
-        }
-        return;
-      }
-    }
-
-    // ULTRA-EARLY: yt/youtube — YouTube Desk 35A
-    {
-      const __tYt = text.replace(/^\//, '');
-      if (/^(yt|youtube)\b/i.test(__tYt)) {
-        try {
-          const youtubeRoutes = await import('../lib/youtubeRoutes.js');
-          const out = await youtubeRoutes.tryHandle(__tYt, ctx);
-          const body = String(out != null && out !== '' ? out : '🎬 yt help');
-          await ctx.reply(body.slice(0, 4000), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          }).catch(async () => {
-            await ctx.reply(body.replace(/[*_`\[\]]/g, '').slice(0, 4000));
-          });
-        } catch (e) {
-          await ctx.reply('❌ YouTube error: ' + (e && e.message ? e.message : e));
-        }
-        return;
-      }
-    }
-
-    // ULTRA-EARLY: substack — Substack Web Master 34A
-    {
-      const __tSub = text.replace(/^\//, '');
-      if (/^(substack)\b/i.test(__tSub)) {
-        try {
-          const substackRoutes = await import('../lib/substackRoutes.js');
-          const out = await substackRoutes.tryHandle(__tSub, ctx);
-          const body = String(out != null && out !== '' ? out : '📰 substack help');
-          await ctx.reply(body.slice(0, 4000), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          }).catch(async () => {
-            await ctx.reply(body.replace(/[*_`\[\]]/g, '').slice(0, 4000));
-          });
-        } catch (e) {
-          await ctx.reply('❌ Substack error: ' + (e && e.message ? e.message : e));
-        }
-        return;
-      }
-    }
-
-    // ULTRA-EARLY: decide* never reaches AI (Wave 27A)
-    {
-      const __tDec = text.replace(/^\//, '');
-      if (/^(decide|decision|decisions)\b/i.test(__tDec)) {
-        try {
-          const decisionsRoutes = await import('../lib/decisionsRoutes.js');
-          const out = await decisionsRoutes.tryHandle(__tDec, ctx);
-          const body = String(out != null && out !== '' ? out : '❌ Decide empty');
-          await ctx.reply(body.slice(0, 4000), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          }).catch(async () => {
-            await ctx.reply(body.replace(/[*_`\[\]]/g, '').slice(0, 4000));
-          });
-        } catch (e) {
-          await ctx.reply('❌ Decide error: ' + (e && e.message ? e.message : e));
-        }
-        return;
-      }
-    }
-
-    // ULTRA-EARLY: queen* never reaches AI (Wave 26)
-    {
-      const __tQueen = text.replace(/^\//, '');
-      if (/^(queen)\b/i.test(__tQueen)) {
-        try {
-          const queenRoutes = await import('../lib/queenRoutes.js');
-          const out = await queenRoutes.tryHandle(__tQueen, ctx);
-          const body = String(out != null && out !== '' ? out : '❌ Queen empty');
-          await ctx.reply(body.slice(0, 4000), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          }).catch(async () => {
-            await ctx.reply(body.replace(/[*_`\[\]]/g, '').slice(0, 4000));
-          });
-        } catch (e) {
-          await ctx.reply('❌ Queen error: ' + (e && e.message ? e.message : e));
-        }
-        return;
-      }
-    }
-
-    // ULTRA-EARLY: mega* never reaches AI (Wave 24 fix)
-    {
-      const __tMega = text.replace(/^\//, '');
-      if (/^(mega)\b/i.test(__tMega)) {
-        try {
-          const megaRoutes = await import('../lib/megaRoutes.js');
-          const out = await megaRoutes.tryHandle(__tMega, ctx);
-          const body = String(out != null && out !== '' ? out : '❌ Mega empty');
-          await ctx.reply(body.slice(0, 4000), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          }).catch(async () => {
-            await ctx.reply(body.replace(/[*_`\[\]]/g, '').slice(0, 4000));
-          });
-        } catch (e) {
-          await ctx.reply('❌ Mega error: ' + (e && e.message ? e.message : e));
-        }
-        return;
-      }
-    }
-
 
     // Never send founder GitHub upload captions to AI as "how to use git CLI"
     if (isAdmin(ctx) && /^(gh|ghpath|upload)\s+\S+/i.test(text)) {
@@ -19366,95 +19096,6 @@ bot.command('commands', async (ctx) => {
     // Wave 11: Mission + Healer MUST never reach Gemini/AI
     try {
       const t0 = String(text || '').trim().replace(/^\//, '');
-      
-      
-      
-      
-      if (/^(site|webmaster|webmaster)\b/i.test(t0)) {
-        try {
-          const webMasterRoutes = await import('../lib/webMasterRoutes.js');
-          const out = await webMasterRoutes.tryHandle(t0, ctx);
-          await ctx.reply(String(out != null ? out : '❌ Site empty').slice(0, 4000), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          }).catch(async () => {
-            await ctx.reply(String(out != null ? out : 'Site empty').replace(/[*_`]/g, '').slice(0, 4000));
-          });
-          return;
-        } catch (se) {
-          await ctx.reply('❌ Site error: ' + (se?.message || se));
-          return;
-        }
-      }
-
-      if (/^(deploy|guardian)\b/i.test(t0)) {
-        try {
-          const deployRoutes = await import('../lib/deployRoutes.js');
-          const out = await deployRoutes.tryHandle(t0, ctx);
-          await ctx.reply(String(out != null ? out : '❌ Deploy Guardian empty').slice(0, 4000), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          }).catch(async () => {
-            await ctx.reply(String(out != null ? out : 'Deploy Guardian empty').replace(/[*_`]/g, '').slice(0, 4000));
-          });
-          return;
-        } catch (de) {
-          await ctx.reply('❌ Deploy Guardian error: ' + (de?.message || de));
-          return;
-        }
-      }
-
-      if (/^(mega)\b/i.test(t0)) {
-        try {
-          const megaRoutes = await import('../lib/megaRoutes.js');
-          const out = await megaRoutes.tryHandle(t0, ctx);
-          await ctx.reply(String(out != null ? out : '❌ Mega empty').slice(0, 4000), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          }).catch(async () => {
-            await ctx.reply(String(out != null ? out : 'Mega empty').replace(/[*_`]/g, '').slice(0, 4000));
-          });
-          return;
-        } catch (me) {
-          await ctx.reply('❌ Mega error: ' + (me?.message || me));
-          return;
-        }
-      }
-
-      if (/^(morning)\b/i.test(t0)) {
-        try {
-          const platformRoutes = await import('../lib/platformRoutes.js');
-          const out = await platformRoutes.tryHandle(t0, ctx);
-          await ctx.reply(String(out != null ? out : '❌ Morning Pack empty').slice(0, 4000), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          }).catch(async () => {
-            await ctx.reply(String(out != null ? out : 'Morning Pack empty').replace(/[*_`]/g, '').slice(0, 4000));
-          });
-          return;
-        } catch (me) {
-          await ctx.reply('❌ Morning Pack error: ' + (me?.message || me));
-          return;
-        }
-      }
-
-      if (/^(god|twin|empire|deal|gswarm|unit|web|preset)\b/i.test(t0) || /^(swarm\s+spawn|swarm\s+units)\b/i.test(t0)) {
-        try {
-          const godRoutes = await import('../lib/godRoutes.js');
-          const out = await godRoutes.tryHandle(t0, ctx);
-          await ctx.reply(String(out != null ? out : '❌ GOD empty').slice(0, 4000), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          }).catch(async () => {
-            await ctx.reply(String(out != null ? out : 'GOD empty').replace(/[*_`]/g, '').slice(0, 4000));
-          });
-          return;
-        } catch (ge) {
-          await ctx.reply('❌ GOD error: ' + (ge?.message || ge));
-          return;
-        }
-      }
-
       if (/^(swarm|nation|corps|mission|missions)\b/i.test(t0)) {
         try {
           const missionRoutes = await import('../lib/missionRoutes.js');
@@ -19519,107 +19160,6 @@ bot.command('commands', async (ctx) => {
           return;
         }
       }
-      if (/^(codeswarm|codeheal|fixswarm)\b/i.test(t0)) {
-        try {
-          const codeSwarmRoutes = await import('../lib/codeSwarmRoutes.js');
-          const out = await codeSwarmRoutes.tryHandle(t0, ctx);
-          await ctx.reply(String(out != null ? out : '❌ Code Swarm empty').slice(0, 4000), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          }).catch(async () => {
-            await ctx.reply(String(out != null ? out : 'Code Swarm empty').replace(/[*_`]/g, '').slice(0, 4000));
-          });
-          return;
-        } catch (cs) {
-          await ctx.reply('❌ Code Swarm error: ' + (cs?.message || cs));
-          return;
-        }
-      }
-      
-      
-      
-      if (/^(omni|omnimind)\b/i.test(t0)) {
-        try {
-          const omniRoutes = await import('../lib/omniRoutes.js');
-          const out = await omniRoutes.tryHandle(t0, ctx);
-          await ctx.reply(String(out != null ? out : '❌ OMNI empty').slice(0, 4000), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          }).catch(async () => {
-            await ctx.reply(String(out != null ? out : 'OMNI empty').replace(/[*_`]/g, '').slice(0, 4000));
-          });
-          return;
-        } catch (oe) {
-          await ctx.reply('❌ OMNI error: ' + (oe?.message || oe));
-          return;
-        }
-      }
-
-      if (/^(coverage|stations)\b/i.test(t0)) {
-        try {
-          const coverageRoutes = await import('../lib/coverageRoutes.js');
-          const out = await coverageRoutes.tryHandle(t0, ctx);
-          await ctx.reply(String(out != null ? out : '❌ Coverage empty').slice(0, 4000), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          }).catch(async () => {
-            await ctx.reply(String(out != null ? out : 'Coverage empty').replace(/[*_`]/g, '').slice(0, 4000));
-          });
-          return;
-        } catch (ce) {
-          await ctx.reply('❌ Coverage error: ' + (ce?.message || ce));
-          return;
-        }
-      }
-
-      if (/^(lab|laboratory|researchnet)\b/i.test(t0)) {
-        try {
-          const labRoutes = await import('../lib/labRoutes.js');
-          const out = await labRoutes.tryHandle(t0, ctx);
-          await ctx.reply(String(out != null ? out : '❌ Lab empty').slice(0, 4000), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          }).catch(async () => {
-            await ctx.reply(String(out != null ? out : 'Lab empty').replace(/[*_`]/g, '').slice(0, 4000));
-          });
-          return;
-        } catch (le) {
-          await ctx.reply('❌ Lab error: ' + (le?.message || le));
-          return;
-        }
-      }
-      if (/^(pipeline)\b/i.test(t0)) {
-        try {
-          const pipelineRoutes = await import('../lib/pipelineRoutes.js');
-          const out = await pipelineRoutes.tryHandle(t0, ctx);
-          await ctx.reply(String(out != null ? out : '❌ Pipeline empty').slice(0, 4000), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          }).catch(async () => {
-            await ctx.reply(String(out != null ? out : 'Pipeline empty').replace(/[*_`]/g, '').slice(0, 4000));
-          });
-          return;
-        } catch (pe) {
-          await ctx.reply('❌ Pipeline error: ' + (pe?.message || pe));
-          return;
-        }
-      }
-      if (/^(qa|legion)\b/i.test(t0)) {
-        try {
-          const qaRoutes = await import('../lib/qaRoutes.js');
-          const out = await qaRoutes.tryHandle(t0, ctx);
-          await ctx.reply(String(out != null ? out : '❌ QA empty').slice(0, 4000), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          }).catch(async () => {
-            await ctx.reply(String(out != null ? out : 'QA empty').replace(/[*_`]/g, '').slice(0, 4000));
-          });
-          return;
-        } catch (qe) {
-          await ctx.reply('❌ QA error: ' + (qe?.message || qe));
-          return;
-        }
-      }
     } catch (e) {
       console.error('mission/healer/sentinel telegram gate', e?.message || e);
     }
@@ -19630,15 +19170,6 @@ bot.command('commands', async (ctx) => {
         const { tryAgentExecute } = await import('../lib/agentExecute.js');
         const executed = await tryAgentExecute({ text, ctx });
         if (executed) {
-          try {
-            const pe = await import('../lib/pipelineEngine.js');
-            await pe.finalizePipeline({
-              text,
-              reply: String(executed),
-              ms: 0,
-              stage: 'telegram_execute',
-            });
-          } catch (_) {}
           await ctx.reply(String(executed).slice(0, 4000));
           return;
         }
