@@ -4544,6 +4544,18 @@ bot.start(async (ctx) => {
         `Send a photo anytime for vision.`, mainMenuKeyboard(ctx));
   });
 
+
+  // Wave 43A — HQ image (Gemini, founder only)
+  bot.command(['image', 'img', 'photohq'], async (ctx) => {
+    try {
+      const { handleImageCommand } = await import('../lib/imageGen.js');
+      await handleImageCommand(ctx, ctx.message?.text || '');
+    } catch (e) {
+      console.error('image cmd', e?.message || e);
+      try { await ctx.reply('Image error: ' + (e?.message || e)); } catch (_) {}
+    }
+  });
+
   bot.command(['persona', 'mood', 'tone'], async (ctx) => {
     try {
       const { normalizePersona, listPersonasText } = await import('../lib/personas.js');
@@ -19167,6 +19179,16 @@ bot.command('commands', async (ctx) => {
     // Agent-1: NL → EXECUTE tools (founder private). Else Tool Awareness tip.
     try {
       if (ctx.chat?.type === 'private') {
+        // Wave 43A image NL / slash already handled by command; NL fallback
+        if (/^(?:image|generate\s+image)\s+/i.test(String(text || '').trim())) {
+          try {
+            const { handleImageCommand } = await import('../lib/imageGen.js');
+            await handleImageCommand(ctx, text);
+            return;
+          } catch (imgE) {
+            console.error('image nl', imgE?.message || imgE);
+          }
+        }
         const { tryAgentExecute } = await import('../lib/agentExecute.js');
         const executed = await tryAgentExecute({ text, ctx });
         if (executed) {
